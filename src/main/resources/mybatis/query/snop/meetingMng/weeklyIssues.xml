@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="weeklyIssues">
+
+	<select id="isSCMTeamSelect" parameterType="map" resultType="map">
+	/*** weeklyIssues.isSCMTeamSelect ***/
+	/*  삭제시 사용자가 SCM팀 권한을 가지고 있는지 여부를 확인하기 위함  */
+
+	with USER_ROLE AS(
+		select *
+		from TB_MAP_USER_ROLE
+	where USER_ID = @{USER_ID})
+
+	SELECT COUNT(*)AS isSCM
+	FROM USER_ROLE
+	WHERE ROLE_CD = 'GOCQT0001'
+	
+	/* GOCQT0001: SCM팀 ROLE CODE */
+	
+	</select>
+
+		<select id="isAdminSelect" parameterType="map" resultType="map">
+	/*** weeklyIssues.isAdminSelect ***/
+	/*  삭제시 사용자가 ADMIN 권한을 가지고 있는지 여부를 확인하기 위함  */
+
+	with USER_ROLE AS(
+		select *
+		from TB_MAP_USER_ROLE
+	where USER_ID = @{USER_ID})
+
+	SELECT COUNT(*)AS isADMIN
+	FROM USER_ROLE
+	WHERE ROLE_CD = 'ADMINDP0001'
+	
+	/* ADMINDP0001: ADMIN ROLE CODE */
+	
+	</select>
+
+	
+	<select id="weeklyIssuesListSelect" parameterType="map" resultType="map">
+		
+
+	/*** weeklyIssues.weeklyIssuesListSelect ***/
+	 SELECT 
+	 KM.COMPANY_CD AS COMPANY_CD
+	 , KM.BU_CD AS BU_CD
+	 , KM.ISSUES_ID AS ISSUES_ID
+	
+	 , (
+	 	SELECT YEARWEEK + 'W'
+		  FROM TB_MST_CALENDAR
+		 WHERE YYYYMMDD = CONVERT(VARCHAR(8), KM.ISSUES_DATE, 112)
+	 	) AS ISSUES_WEEK
+	 
+     , KM.TITLE AS TITLE
+     , KM.[CONTENT] AS CONTENT
+     , CONVERT(VARCHAR(30), CAST(KM.ISSUES_DATE AS DATE), 23) ISSUES_DATE
+     , KM.FILE_NO AS FILE_NO
+     , CF.FILE_NM_ORG AS FILE_NM_ORG
+     , KM.CREATE_ID AS CREATE_ID
+	 , KM.CREATE_DTTM AS CREATE_DTTM
+	 , dbo.UFN_GET_USER_NAME(KM.UPDATE_ID) AS UPDATE_ID
+	 , KM.UPDATE_ID AS UPDATE_ID_TEMP
+	 , KM.UPDATE_DTTM AS UPDATE_DTTM
+	
+     FROM TB_WEEKLY_ISSUES KM WITH(NOLOCK)
+ 	 INNER JOIN TB_MST_USER MU WITH(NOLOCK)
+     ON MU.USER_ID = KM.CREATE_ID
+ 	 OUTER APPLY (
+              SELECT TOP 1 CF.FILE_NM_ORG
+                FROM TB_COMM_FILE CF WITH(NOLOCK)
+               WHERE CF.FILE_NO = KM.FILE_NO
+               	AND DEL_FLAG != 'Y'
+				ORDER BY CF.FILE_SEQ
+             ) CF
+ 	 WHERE KM.COMPANY_CD = @{GV_COMPANY_CD}
+     AND KM.BU_CD = @{GV_BU_CD}
+     AND KM.DEL_FLAG != 'Y'
+
+	AND CONVERT(VARCHAR,KM.CREATE_DTTM,112) BETWEEN @{fromCal} AND @{toCal} 
+	ORDER BY KM.CREATE_DTTM DESC
+
+
+
+	</select>
+	
+	
+	
+	
+	<insert id="weeklyIssuesListInsert" parameterType="map">
+		/****** [ weeklyIssues.weeklyIssuesListInsert ] ******/
+		/* TB_WEEKLY_ISSUES PRIMARY KEY:COMPANY_CD, BU_CD, ISSUES_ID   */
+    BEGIN 
+    
+		DECLARE @P_ISSUES_ID  nvarchar(9)
+		
+		SET @P_ISSUES_ID = (SELECT dbo.UFN_GET_WEEKLY_ISSUES_ID())
+		
+	    INSERT INTO TB_WEEKLY_ISSUES (
+	            COMPANY_CD
+	          , BU_CD
+	          , ISSUES_ID
+	          , TITLE
+	          , CONTENT
+	          , ISSUES_DATE
+	          , FILE_NO
+	          , CREATE_ID
+	          , CREATE_DTTM
+	          , UPDATE_ID
+	          , UPDATE_DTTM 
+	          , DEL_FLAG
+	    ) VALUES (
+	            ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+	          , ISNULL(@{BU_CD},@{GV_BU_CD})
+	          , @P_ISSUES_ID
+	          , @{TITLE}
+	          , @{CONTENT}
+	          , REPLACE (@{ISSUES_DATE}, '-', '')
+	          , @{FILE_NO}
+	          , @{UPDATE_ID_TEMP}
+	          , DBO.UFN_GETDATE()
+	          , @{UPDATE_ID_TEMP}
+	          , DBO.UFN_GETDATE()
+	          , ISNULL(@{DEL_FLAG}, 'N')
+	    );
+    END;
+    
+	</insert>
+	
+	
+	<update id="weeklyIssuesListUpdate" parameterType="map">
+    /****** [ weeklyIssues.weeklyIssuesListUpdate ] ******/
+    /* TB_WEEKLY_ISSUES PRIMARY KEY:COMPANY_CD, BU_CD, MINUTES_ID   */
+    UPDATE TB_WEEKLY_ISSUES
+       SET TITLE		     = @{TITLE}
+         , CONTENT     		 = @{CONTENT}
+         , ISSUES_DATE      = REPLACE (@{ISSUES_DATE}, '-', '')
+         , FILE_NO     		 = @{FILE_NO}
+         , UPDATE_ID 	     = @{UPDATE_ID_TEMP}
+         , UPDATE_DTTM  = DBO.UFN_GETDATE()
+    
+     WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}
+       AND ISSUES_ID   = @{ISSUES_ID}
+    </update>
+	
+	
+	<update id="weeklyIssuesListDelete" parameterType="map">
+    /****** [ weeklyIssues.weeklyIssuesListDelete ] ******/
+    
+    UPDATE TB_WEEKLY_ISSUES
+     SET DEL_FLAG = 'Y'
+     	, UPDATE_ID 	     = @{UPDATE_ID_TEMP}
+         , UPDATE_DTTM  = DBO.UFN_GETDATE()
+     
+     
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}	
+       AND ISSUES_ID     = @{ISSUES_ID}
+   
+    </update>
+	
+	
+	<update id="weeklyIssuesListFileNoUpdate" parameterType="map">
+	/****** [ weeklyIssues.weeklyIssuesListFileNoUpdate ] ******/
+	/* TB_WEEKLY_ISSUES PRIMARY KEY:COMPANY_CD, BU_CD, MINUTES_ID   */
+	
+	UPDATE TB_WEEKLY_ISSUES
+	SET FILE_NO = @{FILE_NO}
+	WHERE COMPANY_CD = @{COMPANY_CD}
+	 AND BU_CD = ISNULL(@{BU_CD},@{GV_BU_CD})
+	  AND ISSUES_ID   = @{ISSUES_ID}
+	</update>
+	
+	
+</mapper>

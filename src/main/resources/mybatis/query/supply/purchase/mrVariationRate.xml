@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.purchase">
+	
+	
+	<select id="mrVariationRateListSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.mrVariationRateListSelect ] ******/
+		SELECT NULL AS TMP 
+			#foreach( $dimMap in $_parameter.dimList )
+			#if($velocityCount == 1)
+			 , 'Total' AS ${dimMap.DIM_CD}_NM
+			#else
+			 , NULL AS ${dimMap.DIM_CD}_NM
+			#end
+			#end 
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-01_F], 1)) AS 'MRP_QTY_W-01_F'
+		     , SUM(ROUND(ISNULL(KAMSC.[MRP_QTY_W-01_F], 0) - ISNULL(KAMSC.[MRP_QTY_W-01], 0), 1)) AS GAP
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-01], 1)) AS 'MRP_QTY_W-01'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-02], 1)) AS 'MRP_QTY_W-02'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-03], 1)) AS 'MRP_QTY_W-03'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-04], 1)) AS 'MRP_QTY_W-04'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-05], 1)) AS 'MRP_QTY_W-05'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-06], 1)) AS 'MRP_QTY_W-06'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-07], 1)) AS 'MRP_QTY_W-07'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-08], 1)) AS 'MRP_QTY_W-08'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-09], 1)) AS 'MRP_QTY_W-09'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-10], 1)) AS 'MRP_QTY_W-10'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-11], 1)) AS 'MRP_QTY_W-11'
+		     , SUM(ROUND(KAMSC.[MRP_QTY_W-12], 1)) AS 'MRP_QTY_W-12'
+		     , NULL AS MIN_MRP_QTY
+		     , NULL AS MAX_MRP_QTY
+		     , NULL AS AVG_MRP_QTY
+		     , NULL AS STDEV_MRP_QTY
+		     , AVG(ABS(ROUND((ISNULL(KAMSC.[MRP_QTY_W-01_F], 0) - ISNULL(KAMSC.[MRP_QTY_W-01], 0)) / NULLIF(KAMSC.[MRP_QTY_W-01], 0) * 100, 0))) AS 'F/P_CHG'
+		     , AVG(ABS(ROUND((ISNULL(KAMSC.[MRP_QTY_W-01], 0) - ISNULL(KAMSC.[MRP_QTY_W-02], 0)) / NULLIF(KAMSC.[MRP_QTY_W-02], 0) * 100, 0))) AS 'W-02_CHG'
+		     , AVG(ABS(ROUND((ISNULL(KAMSC.[MRP_QTY_W-01], 0) - ISNULL(KAMSC.[MRP_QTY_W-03], 0)) / NULLIF(KAMSC.[MRP_QTY_W-03], 0) * 100, 0))) AS 'W-03_CHG'
+		     , AVG(ABS(ROUND((ISNULL(KAMSC.[MRP_QTY_W-01], 0) - ISNULL(KAMSC.[MRP_QTY_W-04], 0)) / NULLIF(KAMSC.[MRP_QTY_W-04], 0) * 100, 0))) AS 'W-04_CHG'
+		     , AVG(ABS(ROUND((ISNULL(KAMSC.[MRP_QTY_W-01], 0) - ISNULL(KAMSC.[MRP_QTY_W-05], 0)) / NULLIF(KAMSC.[MRP_QTY_W-05], 0) * 100, 0))) AS 'W-05_CHG'
+		     , AVG(ABS(ROUND((ISNULL(KAMSC.[MRP_QTY_W-01], 0) - ISNULL(KAMSC.[MRP_QTY_W-08], 0)) / NULLIF(KAMSC.[MRP_QTY_W-08], 0) * 100, 0))) AS 'W-08_CHG'
+		     , AVG(ABS(ROUND((ISNULL(KAMSC.[MRP_QTY_W-01], 0) - ISNULL(KAMSC.[MRP_QTY_W-12], 0)) / NULLIF(KAMSC.[MRP_QTY_W-12], 0) * 100, 0))) AS 'W-12_CHG'
+		FROM TB_MST_ITEM MI WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		  ON MIG.COMPANY_CD = MI.COMPANY_CD
+		 AND MIG.BU_CD = MI.BU_CD
+		 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		LEFT OUTER JOIN TB_KPI_APS_MRP_SUM_CHG KAMSC WITH(NOLOCK)
+		  ON KAMSC.COMPANY_CD = MI.COMPANY_CD
+		 AND KAMSC.BU_CD = MI.BU_CD
+		 AND KAMSC.YEARWEEK = @{fromWeek}
+		 AND KAMSC.ITEM_CD = MI.ITEM_CD
+		WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND MI.BU_CD = @{GV_BU_CD}
+		#if($_parameter.item_cd and $_parameter.item_cd != "")
+       	  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+  		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       	  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+  		#end
+		#if($_parameter.itemType and $_parameter.itemType != "")
+	      AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+	  	#end  
+		#if($_parameter.procurType and $_parameter.procurType != "")
+          AND MIP.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+  		#end		 
+		#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+      	  AND MIG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+  		#end 
+		#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+       	  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  		#end
+		UNION ALL
+		SELECT NULL AS TMP 
+			#foreach( $dimMap in $_parameter.dimList )
+			 , $dimMap.DIM_CD 
+			#end
+			 , [MRP_QTY_W-01_F] AS 'MRP_QTY_W-01_F'
+			 , GAP
+			 , [MRP_QTY_W-01] AS 'MRP_QTY_W-01'
+			 , [MRP_QTY_W-02] AS 'MRP_QTY_W-02'
+			 , [MRP_QTY_W-03] AS 'MRP_QTY_W-03'
+			 , [MRP_QTY_W-04] AS 'MRP_QTY_W-04'
+			 , [MRP_QTY_W-05] AS 'MRP_QTY_W-05'
+			 , [MRP_QTY_W-06] AS 'MRP_QTY_W-06'
+			 , [MRP_QTY_W-07] AS 'MRP_QTY_W-07'
+			 , [MRP_QTY_W-08] AS 'MRP_QTY_W-08'
+			 , [MRP_QTY_W-09] AS 'MRP_QTY_W-09'
+			 , [MRP_QTY_W-10] AS 'MRP_QTY_W-10'
+			 , [MRP_QTY_W-11] AS 'MRP_QTY_W-11'
+			 , [MRP_QTY_W-12] AS 'MRP_QTY_W-12'
+			 , MIN_MRP_QTY
+			 , MAX_MRP_QTY
+			 , AVG_MRP_QTY
+			 , STDEV_MRP_QTY
+			 , [F/P_CHG] AS 'F/P_CHG'
+			 , [W-02_CHG] AS 'W-02_CHG'
+			 , [W-03_CHG] AS 'W-03_CHG'
+			 , [W-04_CHG] AS 'W-04_CHG'
+			 , [W-05_CHG] AS 'W-05_CHG'
+			 , [W-08_CHG] AS 'W-08_CHG'
+			 , [W-12_CHG] AS 'W-12_CHG'
+		FROM
+		(
+			SELECT MI.ITEM_CD
+			     , MI.ITEM_NM
+			     , MI.ITEM_GROUP_CD
+			     , MIG.ITEM_GROUP_NM
+			     , MI.SPEC
+			     , MIP.PUR_LT
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-01_F]), 1) AS 'MRP_QTY_W-01_F'
+			     , ROUND(MAX(ISNULL(KAMSC.[MRP_QTY_W-01_F], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0)), 1) AS GAP
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-01]), 1) AS 'MRP_QTY_W-01'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-02]), 1) AS 'MRP_QTY_W-02'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-03]), 1) AS 'MRP_QTY_W-03'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-04]), 1) AS 'MRP_QTY_W-04'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-05]), 1) AS 'MRP_QTY_W-05'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-06]), 1) AS 'MRP_QTY_W-06'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-07]), 1) AS 'MRP_QTY_W-07'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-08]), 1) AS 'MRP_QTY_W-08'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-09]), 1) AS 'MRP_QTY_W-09'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-10]), 1) AS 'MRP_QTY_W-10'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-11]), 1) AS 'MRP_QTY_W-11'
+			     , ROUND(MAX(KAMSC.[MRP_QTY_W-12]), 1) AS 'MRP_QTY_W-12'
+			     , ROUND(MIN(M.MRP_QTY), 1) AS MIN_MRP_QTY
+			     , ROUND(MAX(M.MRP_QTY), 1) AS MAX_MRP_QTY
+			     , ROUND(AVG(M.MRP_QTY), 1) AS AVG_MRP_QTY
+			     , ROUND(STDEV(M.MRP_QTY), 1) AS STDEV_MRP_QTY
+			     , ROUND((MAX(ISNULL(KAMSC.[MRP_QTY_W-01_F], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0))) / NULLIF(MAX(KAMSC.[MRP_QTY_W-01]), 0) * 100, 0) AS 'F/P_CHG'
+			     , ROUND((MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-02], 0))) / NULLIF(MAX(KAMSC.[MRP_QTY_W-02]), 0) * 100, 0) AS 'W-02_CHG'
+			     , ROUND((MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-03], 0))) / NULLIF(MAX(KAMSC.[MRP_QTY_W-03]), 0) * 100, 0) AS 'W-03_CHG'
+			     , ROUND((MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-04], 0))) / NULLIF(MAX(KAMSC.[MRP_QTY_W-04]), 0) * 100, 0) AS 'W-04_CHG'
+			     , ROUND((MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-05], 0))) / NULLIF(MAX(KAMSC.[MRP_QTY_W-05]), 0) * 100, 0) AS 'W-05_CHG'
+			     , ROUND((MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-08], 0))) / NULLIF(MAX(KAMSC.[MRP_QTY_W-08]), 0) * 100, 0) AS 'W-08_CHG'
+			     , ROUND((MAX(ISNULL(KAMSC.[MRP_QTY_W-01], 0)) - MAX(ISNULL(KAMSC.[MRP_QTY_W-12], 0))) / NULLIF(MAX(KAMSC.[MRP_QTY_W-12]), 0) * 100, 0) AS 'W-12_CHG'
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			   ON MIP.COMPANY_CD = MI.COMPANY_CD
+			 AND MIP.BU_CD = MI.BU_CD
+			 AND MIP.PLANT_CD = 'WF01'
+			 AND MIP.ITEM_CD = MI.ITEM_CD
+			LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+			  ON MIG.COMPANY_CD = MI.COMPANY_CD
+			 AND MIG.BU_CD = MI.BU_CD
+			 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+			LEFT OUTER JOIN TB_KPI_APS_MRP_SUM_CHG KAMSC WITH(NOLOCK)
+			  ON KAMSC.COMPANY_CD = MI.COMPANY_CD
+			 AND KAMSC.BU_CD = MI.BU_CD
+			 AND KAMSC.YEARWEEK = @{fromWeek}
+			 AND KAMSC.ITEM_CD = MI.ITEM_CD
+			CROSS APPLY (VALUES (KAMSC.[MRP_QTY_W-01]), (KAMSC.[MRP_QTY_W-02]), (KAMSC.[MRP_QTY_W-03]), (KAMSC.[MRP_QTY_W-04]), (KAMSC.[MRP_QTY_W-05]), (KAMSC.[MRP_QTY_W-06]), (KAMSC.[MRP_QTY_W-07]), (KAMSC.[MRP_QTY_W-08]), (KAMSC.[MRP_QTY_W-09]), (KAMSC.[MRP_QTY_W-10]), (KAMSC.[MRP_QTY_W-11]), (KAMSC.[MRP_QTY_W-12])) AS M (MRP_QTY)
+			WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MI.BU_CD = @{GV_BU_CD}
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+	       	  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+	  		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+	       	  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+	  		#end
+			#if($_parameter.itemType and $_parameter.itemType != "")
+		      AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+		  	#end  
+			#if($_parameter.procurType and $_parameter.procurType != "")
+	          AND MIP.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+	  		#end		 
+			#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+	      	  AND MIG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+	  		#end 
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+	       	  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+	  		#end
+			GROUP BY MI.ITEM_CD, MI.ITEM_NM, MI.ITEM_GROUP_CD, MIG.ITEM_GROUP_NM, MI.SPEC, MIP.PUR_LT
+		) A
+	</select>
+	
+	
+	
+</mapper>

@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="bsc">
+	<select id="bscYearSumBucketSelect" parameterType="map" resultType="map">
+		SELECT 'Q' + YEAR AS ROOT_CD 
+		     , CASE MONTH WHEN 1 THEN 'ONE_MONTH'
+		                  WHEN 2 THEN 'TWO_MONTH'
+		                  WHEN 3 THEN 'THREE_MONTH'
+		                  WHEN 4 THEN 'FOUR_MONTH'
+		                  WHEN 5 THEN 'FIVE_MONTH'
+		                  WHEN 6 THEN 'SIX_MONTH'
+		                  WHEN 7 THEN 'SEVEN_MONTH'
+		                  WHEN 8 THEN 'EIGHT_MONTH'
+		                  WHEN 9 THEN 'NINE_MONTH'
+		                  WHEN 10 THEN 'TEN_MONTH'
+		                  WHEN 11 THEN 'ELEVEN_MONTH'
+		                  WHEN 12 THEN 'TWELVE_MONTH'
+		             END CD
+		     , CASE MONTH WHEN 1 THEN 'ONE_MONTH'
+		                  WHEN 2 THEN 'TWO_MONTH'
+		                  WHEN 3 THEN 'THREE_MONTH'
+		                  WHEN 4 THEN 'FOUR_MONTH'
+		                  WHEN 5 THEN 'FIVE_MONTH'
+		                  WHEN 6 THEN 'SIX_MONTH'
+		                  WHEN 7 THEN 'SEVEN_MONTH'
+		                  WHEN 8 THEN 'EIGHT_MONTH'
+		                  WHEN 9 THEN 'NINE_MONTH'
+		                  WHEN 10 THEN 'TEN_MONTH'
+		                  WHEN 11 THEN 'ELEVEN_MONTH'
+		                  WHEN 12 THEN 'TWELVE_MONTH'
+		             END NM
+		     , 'M' + YEARMONTH AS BUCKET_ID
+		     , YEARMONTH AS BUCKET_VAL
+		     , 'group' AS TYPE
+		     , 'MONTH' AS BUCKET_TYPE
+		FROM TB_MST_CALENDAR
+		WHERE YEAR = @{fromDate}
+		GROUP BY YEAR, YEARMONTH, MONTH
+	</select>
+    <select id="bscYearSumSelect" parameterType="map" resultType="map">
+        /****** [ bsc.bscYearSumSelect ] ******/
+        #set($_parameter.bscList = ['BSC_KPI1', 'BSC_KPI2', 'BSC_KPI3', 'BSC_KPI4', 'BSC_KPI5', 'BSC_KPI6', 'BSC_KPI7', 'BSC_KPI8', 'BSC_KPI9', 'BSC_KPI10', 'BSC_KPI11', 'BSC_KPI12', 'BSC_KPI13', 'BSC_KPI14', 'BSC_KPI15', 'BSC_KPI16', 'BSC_KPI17', 'BSC_KPI18'])
+		BEGIN
+    
+    		DECLARE @P_YEAR  NVARCHAR(4) = @{year};
+    		
+    		WITH W_CODE AS 
+    		(
+      			#set($_parameter.groupCd = "BU_CD,DIV_CD,TEAM_CD,PART_CD")
+		      	#set($_parameter.buAllYn = "Y")
+		      	<include refid="include.mstCode"/>
+		    ), 
+    		W_CNT AS 
+    		(
+        		SELECT *
+          		FROM 
+          		( 
+          			SELECT KPI_ID
+	                     , COMPANY_CD
+	                     , BU_CD
+	                     , DIV_CD
+	                     , TEAM_CD
+	                     , COUNT(*) AS CNT
+					#if($_parameter.rdoAqType == "ACC")   
+	                FROM TB_KPI_BSC_ACC BSC WITH(NOLOCK)
+	                #else
+	                FROM TB_KPI_BSC BSC WITH(NOLOCK)
+	                #end
+					WHERE KPI_ID IN (
+										#foreach( $item in $_parameter.bscList )
+    										'$item' #if( $foreach.hasNext ), #end
+										#end  
+									)
+                      AND TEAM_CD != 'ALL'
+                      AND YEARMONTH IN (
+                      					SELECT YEARMONTH
+										FROM TB_MST_CALENDAR
+										WHERE YEAR = @P_YEAR
+										GROUP BY YEARMONTH
+                      				  )
+               		GROUP BY KPI_ID, COMPANY_CD, BU_CD, DIV_CD, TEAM_CD
+              	) A
+         		WHERE A.CNT <![CDATA[>]]> 2
+   			),
+   			W_MEASURE AS 
+		    (
+		    	SELECT CATEGORY_CD, CATEGORY_NM, CATEGORY_IDX 
+		        FROM 
+		        (
+		        	SELECT NULL AS CATEGORY_CD
+		        	     , NULL AS CATEGORY_NM
+		        	     , NULL AS CATEGORY_IDX
+					#foreach( $meaMap in $_parameter.meaList )
+		            UNION ALL 
+		            SELECT '$meaMap.CD'
+		                 , '$meaMap.NM'
+		                 , $velocityCount 
+					#end
+				) A
+		        WHERE CATEGORY_CD IS NOT NULL
+		    ),
+		   	W_MAIN AS
+		   	(
+			    SELECT M.COMPANY_CD
+			         , M.BU_CD
+			         , M.BU_NM
+			         , M.GRP_LVL_ID
+			         , M.DIV_CD
+			         , M.DIV_NM
+			         , M.TEAM_CD
+			         , M.TEAM_NM
+			         , M.PART_CD
+			         , M.PART_NM
+			         , M.BU_SORT
+			         , M.DIV_SORT
+			         , M.TEM_SORT
+			         , M.CATEGORY_CD
+		             , M.CATEGORY_NM
+		             , M.CATEGORY_IDX
+			        #foreach( $bucketMap in $_parameter.bucketList )
+			         , M.${bucketMap.CD}
+			        #end
+			    FROM
+			    (
+		   			SELECT X.COMPANY_CD
+			             , X.BU_CD
+			             , X.BU_NM
+			             , X.LVL AS GRP_LVL_ID
+			             , CASE X.LVL WHEN 7 THEN NULL ELSE X.DIV_CD END                                           AS DIV_CD
+			             , CASE X.LVL WHEN 7 THEN 'Sub Total' ELSE X.DIV_NM END                                    AS DIV_NM
+			             , CASE X.LVL WHEN 7 THEN NULL WHEN 5 THEN NULL ELSE X.TEAM_CD END                         AS TEAM_CD
+			             , CASE X.LVL WHEN 7 THEN NULL WHEN 5 THEN 'Sub Total' ELSE X.TEAM_NM END                  AS TEAM_NM
+			             , CASE X.LVL WHEN 7 THEN NULL WHEN 5 THEN NULL WHEN 3 THEN NULL ELSE X.PART_CD END        AS PART_CD 
+			             , CASE X.LVL WHEN 7 THEN NULL WHEN 5 THEN NULL WHEN 3 THEN 'Sub Total' ELSE X.PART_NM END AS PART_NM
+			             , X.BU_SORT
+			             , X.DIV_SORT
+			             , X.TEM_SORT
+			             , M.CATEGORY_CD
+			             , M.CATEGORY_NM
+			             , M.CATEGORY_IDX
+			             
+			             #foreach( $bucketMap in $_parameter.bucketList )
+			             #set($paramMonth = "$bucketMap.BUCKET_VAL")
+	             		 , SUM(
+	                 			CASE
+	    							#foreach( $meaMap in $_parameter.meaList )
+		    							#if($bucketMap.CD.indexOf("_WEIGHT_RATE") > -1)
+		    							
+		                      				WHEN YEARMONTH = '$paramMonth' AND M.CATEGORY_CD = '${meaMap.CD}' THEN ${meaMap.CD}_WEIGHT_RATE
+		                      			#elseif($bucketMap.CD.indexOf("_BSC_SCORE") > -1)
+		                      			
+		                      				WHEN YEARMONTH = '$paramMonth' AND M.CATEGORY_CD = '${meaMap.CD}' THEN ${meaMap.CD}_BSC_SCORE
+		                      			#elseif($bucketMap.CD.indexOf("_WEIGHT_SCORE") > -1)
+		                      				
+		                      				WHEN YEARMONTH = '$paramMonth' AND M.CATEGORY_CD = '${meaMap.CD}' THEN ${meaMap.CD}_WEIGHT_RATE * ${meaMap.CD}_BSC_SCORE
+		                      			#end
+	    							#end
+	                      			ELSE 0
+	                  			END
+	             			 ) AS $bucketMap.CD
+						#end
+		   			FROM
+		   			(
+			   			SELECT BSC.COMPANY_CD
+			                 , BSC.BU_CD
+			                 , BU.CODE_NM AS BU_NM
+			                 , BSC.DIV_CD
+			                 , DIV.CODE_NM AS DIV_NM
+			                 , BSC.TEAM_CD
+			                 , TEM.CODE_NM AS TEAM_NM
+			                 , BSC.PART_CD
+			                 , PART.CODE_NM AS PART_NM
+			                 , BU.SORT AS BU_SORT
+			                 , DIV.SORT AS DIV_SORT
+			                 , TEM.SORT AS TEM_SORT
+			                 , BSC.YEARMONTH
+			                 , BSC.WEIGHT_RATE
+			                 , CASE WHEN BSC.DIV_CD = 'ALL' THEN 7
+			                        WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD = 'ALL' THEN 5
+			                        WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD = 'ALL' THEN 3
+			                        WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD != 'ALL' THEN 0
+			                    END LVL
+			                 , BSC.KPI_ID
+			                 , KPI.KPI_ID KPI
+			                 #foreach( $bscMap in $_parameter.bscList )
+			    			 	#set( $bscCol = $bscMap )
+			    			 	, (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.WEIGHT_RATE ELSE NULL END) AS ${bscCol}_WEIGHT_RATE
+			                    , (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.BSC_SCORE ELSE NULL END) AS ${bscCol}_BSC_SCORE
+			    			 #end
+			   			#if($_parameter.rdoAqType == "ACC")   
+                   		FROM TB_KPI_BSC_ACC BSC WITH(NOLOCK)
+                   		#else
+                   		FROM TB_KPI_BSC BSC WITH(NOLOCK)
+                   		#end
+			            LEFT OUTER JOIN TB_MST_ORG_KPI KPI WITH (NOLOCK)
+			              ON BSC.COMPANY_CD = KPI.COMPANY_CD
+			             AND BSC.BU_CD      = KPI.BU_CD
+			             AND BSC.PART_CD    = KPI.PART_CD
+			             AND BSC.KPI_ID     = KPI.KPI_ID
+			             AND KPI.USE_FLAG   = 'Y'
+			             AND KPI.DEL_FLAG   = 'N'
+			            LEFT OUTER JOIN W_CODE BU
+			              ON BU.CODE_CD  = BSC.BU_CD
+			             AND BU.GROUP_CD = 'BU_CD'
+			            LEFT OUTER JOIN W_CODE DIV
+			              ON DIV.BU_CD      = BSC.BU_CD
+                  		   AND DIV.CODE_CD    = BSC.DIV_CD
+                  		   AND DIV.GROUP_CD   = 'DIV_CD'
+			            LEFT OUTER JOIN W_CODE TEM
+			              ON TEM.BU_CD    = BSC.BU_CD
+			             AND TEM.CODE_CD  = BSC.TEAM_CD
+			             AND TEM.GROUP_CD = 'TEAM_CD'
+						LEFT OUTER JOIN W_CODE PART
+		                  ON PART.BU_CD    = BSC.BU_CD
+		                 AND PART.CODE_CD  = BSC.PART_CD
+		                 AND PART.GROUP_CD   = 'PART_CD'
+			            LEFT OUTER JOIN W_CNT CNT
+			              ON BSC.COMPANY_CD = CNT.COMPANY_CD
+			             AND BSC.BU_CD      = CNT.BU_CD
+			             AND BSC.DIV_CD     = CNT.DIV_CD
+			             AND BSC.TEAM_CD    = CNT.TEAM_CD
+			             AND BSC.KPI_ID     = CNT.KPI_ID
+						WHERE 1 = 1
+						  AND BSC.PART_CD != 'ALL'
+						  #if($_parameter.teamCd == "")
+						    AND BSC.BU_CD + BSC.DIV_CD IN ('$_parameter.buCd.replace(",","','")' + '$_parameter.divCd.replace(",","','")')
+						  #else
+						    AND BSC.TEAM_CD IN ('$_parameter.teamCd.replace(",","','")')
+						    AND BSC.BU_CD + BSC.DIV_CD IN ('$_parameter.buCd.replace(",","','")' + '$_parameter.divCd.replace(",","','")')
+						  #end
+						  
+			        	  AND BSC.KPI_ID IN (
+												#foreach( $item in $_parameter.bscList )
+			    									'$item' 
+			    									#if( $foreach.hasNext ), #end
+												#end 
+			                     			)
+						  AND BSC.YEARMONTH IN (
+						  							SELECT YEARMONTH
+													FROM TB_MST_CALENDAR
+													WHERE YEAR = @P_YEAR
+													GROUP BY YEARMONTH
+											   )
+					) X
+					CROSS JOIN W_MEASURE M
+		       		GROUP BY X.COMPANY_CD, X.BU_CD, X.BU_NM, X.LVL, X.DIV_CD, X.DIV_NM, X.TEAM_CD, X.TEAM_NM, X.PART_CD, X.PART_NM, X.BU_SORT, X.DIV_SORT, X.TEM_SORT, M.CATEGORY_CD, M.CATEGORY_NM, M.CATEGORY_IDX
+	       		) M
+       		),
+       		W_MAIN_LVL_1 AS 
+       		(
+       			SELECT COMPANY_CD
+		             , BU_CD
+		             , BU_NM
+		             , 1 AS GRP_LVL_ID
+		             , DIV_CD
+		             , DIV_NM
+		             , TEAM_CD
+		             , TEAM_NM
+		             , PART_CD
+		             , PART_NM
+		             , BU_SORT
+		             , DIV_SORT
+		             , TEM_SORT
+		             , ' ' AS CATEGORY_CD
+		             , 'Sub Total' AS CATEGORY_NM
+		             , ' ' AS CATEGORY_IDX
+		             , SUM(ONE_MONTH_WEIGHT_SCORE) AS ONE_MONTH_WEIGHT_SCORE
+		             , SUM(TWO_MONTH_WEIGHT_SCORE) AS TWO_MONTH_WEIGHT_SCORE
+		             , SUM(THREE_MONTH_WEIGHT_SCORE) AS THREE_MONTH_WEIGHT_SCORE 
+		             , SUM(FOUR_MONTH_WEIGHT_SCORE) AS FOUR_MONTH_WEIGHT_SCORE 
+		             , SUM(FIVE_MONTH_WEIGHT_SCORE) AS FIVE_MONTH_WEIGHT_SCORE 
+		             , SUM(SIX_MONTH_WEIGHT_SCORE) AS SIX_MONTH_WEIGHT_SCORE 
+		             , SUM(SEVEN_MONTH_WEIGHT_SCORE) AS SEVEN_MONTH_WEIGHT_SCORE  
+		             , SUM(EIGHT_MONTH_WEIGHT_SCORE) AS EIGHT_MONTH_WEIGHT_SCORE  
+		             , SUM(NINE_MONTH_WEIGHT_SCORE) AS NINE_MONTH_WEIGHT_SCORE 
+		             , SUM(TEN_MONTH_WEIGHT_SCORE) AS TEN_MONTH_WEIGHT_SCORE 
+		             , SUM(ELEVEN_MONTH_WEIGHT_SCORE) AS ELEVEN_MONTH_WEIGHT_SCORE 
+		             , SUM(TWELVE_MONTH_WEIGHT_SCORE) AS TWELVE_MONTH_WEIGHT_SCORE 
+		             , SUM(ONE_MONTH_WEIGHT_RATE) AS ONE_MONTH_WEIGHT_RATE
+		             , SUM(TWO_MONTH_WEIGHT_RATE) AS TWO_MONTH_WEIGHT_RATE
+		             , SUM(THREE_MONTH_WEIGHT_RATE) AS THREE_MONTH_WEIGHT_RATE
+		             , SUM(FOUR_MONTH_WEIGHT_RATE) AS FOUR_MONTH_WEIGHT_RATE
+		             , SUM(FIVE_MONTH_WEIGHT_RATE) AS FIVE_MONTH_WEIGHT_RATE
+		             , SUM(SIX_MONTH_WEIGHT_RATE) AS SIX_MONTH_WEIGHT_RATE
+		             , SUM(SEVEN_MONTH_WEIGHT_RATE) AS SEVEN_MONTH_WEIGHT_RATE
+		             , SUM(EIGHT_MONTH_WEIGHT_RATE) AS EIGHT_MONTH_WEIGHT_RATE
+		             , SUM(NINE_MONTH_WEIGHT_RATE) AS NINE_MONTH_WEIGHT_RATE
+		             , SUM(TEN_MONTH_WEIGHT_RATE) AS TEN_MONTH_WEIGHT_RATE
+		             , SUM(ELEVEN_MONTH_WEIGHT_RATE) AS ELEVEN_MONTH_WEIGHT_RATE
+		             , SUM(TWELVE_MONTH_WEIGHT_RATE) AS TWELVE_MONTH_WEIGHT_RATE
+		             , ISNULL(SUM(ONE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(ONE_MONTH_WEIGHT_RATE), 0) AS ONE_MONTH
+	               	 , ISNULL(SUM(TWO_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TWO_MONTH_WEIGHT_RATE), 0) AS TWO_MONTH
+	               	 , ISNULL(SUM(THREE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(THREE_MONTH_WEIGHT_RATE), 0) AS THREE_MONTH
+	                 , ISNULL(SUM(FOUR_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(FOUR_MONTH_WEIGHT_RATE), 0) AS FOUR_MONTH
+	                 , ISNULL(SUM(FIVE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(FIVE_MONTH_WEIGHT_RATE), 0) AS FIVE_MONTH
+	                 , ISNULL(SUM(SIX_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(SIX_MONTH_WEIGHT_RATE), 0) AS SIX_MONTH
+	                 , ISNULL(SUM(SEVEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(SEVEN_MONTH_WEIGHT_RATE), 0) AS SEVEN_MONTH
+	                 , ISNULL(SUM(EIGHT_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(EIGHT_MONTH_WEIGHT_RATE), 0) AS EIGHT_MONTH
+	                 , ISNULL(SUM(NINE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(NINE_MONTH_WEIGHT_RATE), 0) AS NINE_MONTH
+	                 , ISNULL(SUM(TEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TEN_MONTH_WEIGHT_RATE), 0) AS TEN_MONTH
+	                 , ISNULL(SUM(ELEVEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(ELEVEN_MONTH_WEIGHT_RATE), 0) AS ELEVEN_MONTH
+	                 , ISNULL(SUM(TWELVE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TWELVE_MONTH_WEIGHT_RATE), 0) AS TWELVE_MONTH
+		          FROM W_MAIN
+		          GROUP BY COMPANY_CD, BU_CD, BU_NM, GRP_LVL_ID, DIV_CD, DIV_NM, TEAM_CD, TEAM_NM, PART_CD, PART_NM, BU_SORT, DIV_SORT, TEM_SORT
+       		),
+       		W_MAIN_LVL_3 AS 
+       		(
+	       		SELECT COMPANY_CD
+		             , BU_CD
+		             , BU_NM
+		             , 3 AS GRP_LVL_ID
+		             , DIV_CD
+		             , DIV_NM
+		             , TEAM_CD
+		             , TEAM_NM
+		             , NULL AS PART_CD
+	             	 , 'Sub Total' AS PART_NM
+		             , BU_SORT
+		             , DIV_SORT
+		             , TEM_SORT
+		             , ' ' AS CATEGORY_CD
+		             , ' ' AS CATEGORY_NM
+		             , ' ' AS CATEGORY_IDX
+		             , SUM(ONE_MONTH_WEIGHT_SCORE) AS ONE_MONTH_WEIGHT_SCORE
+		             , SUM(TWO_MONTH_WEIGHT_SCORE) AS TWO_MONTH_WEIGHT_SCORE
+		             , SUM(THREE_MONTH_WEIGHT_SCORE) AS THREE_MONTH_WEIGHT_SCORE 
+		             , SUM(FOUR_MONTH_WEIGHT_SCORE) AS FOUR_MONTH_WEIGHT_SCORE 
+		             , SUM(FIVE_MONTH_WEIGHT_SCORE) AS FIVE_MONTH_WEIGHT_SCORE 
+		             , SUM(SIX_MONTH_WEIGHT_SCORE) AS SIX_MONTH_WEIGHT_SCORE 
+		             , SUM(SEVEN_MONTH_WEIGHT_SCORE) AS SEVEN_MONTH_WEIGHT_SCORE  
+		             , SUM(EIGHT_MONTH_WEIGHT_SCORE) AS EIGHT_MONTH_WEIGHT_SCORE  
+		             , SUM(NINE_MONTH_WEIGHT_SCORE) AS NINE_MONTH_WEIGHT_SCORE 
+		             , SUM(TEN_MONTH_WEIGHT_SCORE) AS TEN_MONTH_WEIGHT_SCORE 
+		             , SUM(ELEVEN_MONTH_WEIGHT_SCORE) AS ELEVEN_MONTH_WEIGHT_SCORE 
+		             , SUM(TWELVE_MONTH_WEIGHT_SCORE) AS TWELVE_MONTH_WEIGHT_SCORE 
+		             , SUM(ONE_MONTH_WEIGHT_RATE) AS ONE_MONTH_WEIGHT_RATE
+		             , SUM(TWO_MONTH_WEIGHT_RATE) AS TWO_MONTH_WEIGHT_RATE
+		             , SUM(THREE_MONTH_WEIGHT_RATE) AS THREE_MONTH_WEIGHT_RATE
+		             , SUM(FOUR_MONTH_WEIGHT_RATE) AS FOUR_MONTH_WEIGHT_RATE
+		             , SUM(FIVE_MONTH_WEIGHT_RATE) AS FIVE_MONTH_WEIGHT_RATE
+		             , SUM(SIX_MONTH_WEIGHT_RATE) AS SIX_MONTH_WEIGHT_RATE
+		             , SUM(SEVEN_MONTH_WEIGHT_RATE) AS SEVEN_MONTH_WEIGHT_RATE
+		             , SUM(EIGHT_MONTH_WEIGHT_RATE) AS EIGHT_MONTH_WEIGHT_RATE
+		             , SUM(NINE_MONTH_WEIGHT_RATE) AS NINE_MONTH_WEIGHT_RATE
+		             , SUM(TEN_MONTH_WEIGHT_RATE) AS TEN_MONTH_WEIGHT_RATE
+		             , SUM(ELEVEN_MONTH_WEIGHT_RATE) AS ELEVEN_MONTH_WEIGHT_RATE
+		             , SUM(TWELVE_MONTH_WEIGHT_RATE) AS TWELVE_MONTH_WEIGHT_RATE
+		             , ISNULL(SUM(ONE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(ONE_MONTH_WEIGHT_RATE), 0) AS ONE_MONTH
+	               	 , ISNULL(SUM(TWO_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TWO_MONTH_WEIGHT_RATE), 0) AS TWO_MONTH
+	               	 , ISNULL(SUM(THREE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(THREE_MONTH_WEIGHT_RATE), 0) AS THREE_MONTH
+	                 , ISNULL(SUM(FOUR_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(FOUR_MONTH_WEIGHT_RATE), 0) AS FOUR_MONTH
+	                 , ISNULL(SUM(FIVE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(FIVE_MONTH_WEIGHT_RATE), 0) AS FIVE_MONTH
+	                 , ISNULL(SUM(SIX_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(SIX_MONTH_WEIGHT_RATE), 0) AS SIX_MONTH
+	                 , ISNULL(SUM(SEVEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(SEVEN_MONTH_WEIGHT_RATE), 0) AS SEVEN_MONTH
+	                 , ISNULL(SUM(EIGHT_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(EIGHT_MONTH_WEIGHT_RATE), 0) AS EIGHT_MONTH
+	                 , ISNULL(SUM(NINE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(NINE_MONTH_WEIGHT_RATE), 0) AS NINE_MONTH
+	                 , ISNULL(SUM(TEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TEN_MONTH_WEIGHT_RATE), 0) AS TEN_MONTH
+	                 , ISNULL(SUM(ELEVEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(ELEVEN_MONTH_WEIGHT_RATE), 0) AS ELEVEN_MONTH
+	                 , ISNULL(SUM(TWELVE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TWELVE_MONTH_WEIGHT_RATE), 0) AS TWELVE_MONTH
+				FROM W_MAIN_LVL_1
+	          	GROUP BY COMPANY_CD, BU_CD, BU_NM, GRP_LVL_ID, DIV_CD, DIV_NM, TEAM_CD, TEAM_NM, BU_SORT, DIV_SORT, TEM_SORT
+       		), 
+       		W_MAIN_LVL_5 AS
+       		(
+	       		SELECT COMPANY_CD
+		             , BU_CD
+		             , BU_NM
+		             , 5 AS GRP_LVL_ID
+		             , DIV_CD
+		             , DIV_NM
+		             , NULL AS TEAM_CD
+		             , 'Sub Total' AS TEAM_NM
+		             , NULL AS PART_CD
+		             , NULL AS PART_NM
+		             , BU_SORT
+		             , DIV_SORT
+		             , NULL AS TEM_SORT
+		             , '  ' AS CATEGORY_CD
+		             , '  ' AS CATEGORY_NM
+		             , '  ' AS CATEGORY_IDX
+		             , SUM(ONE_MONTH_WEIGHT_SCORE) AS ONE_MONTH_WEIGHT_SCORE
+		             , SUM(TWO_MONTH_WEIGHT_SCORE) AS TWO_MONTH_WEIGHT_SCORE
+		             , SUM(THREE_MONTH_WEIGHT_SCORE) AS THREE_MONTH_WEIGHT_SCORE 
+		             , SUM(FOUR_MONTH_WEIGHT_SCORE) AS FOUR_MONTH_WEIGHT_SCORE 
+		             , SUM(FIVE_MONTH_WEIGHT_SCORE) AS FIVE_MONTH_WEIGHT_SCORE 
+		             , SUM(SIX_MONTH_WEIGHT_SCORE) AS SIX_MONTH_WEIGHT_SCORE 
+		             , SUM(SEVEN_MONTH_WEIGHT_SCORE) AS SEVEN_MONTH_WEIGHT_SCORE  
+		             , SUM(EIGHT_MONTH_WEIGHT_SCORE) AS EIGHT_MONTH_WEIGHT_SCORE  
+		             , SUM(NINE_MONTH_WEIGHT_SCORE) AS NINE_MONTH_WEIGHT_SCORE 
+		             , SUM(TEN_MONTH_WEIGHT_SCORE) AS TEN_MONTH_WEIGHT_SCORE 
+		             , SUM(ELEVEN_MONTH_WEIGHT_SCORE) AS ELEVEN_MONTH_WEIGHT_SCORE 
+		             , SUM(TWELVE_MONTH_WEIGHT_SCORE) AS TWELVE_MONTH_WEIGHT_SCORE 
+		             , SUM(ONE_MONTH_WEIGHT_RATE) AS ONE_MONTH_WEIGHT_RATE
+		             , SUM(TWO_MONTH_WEIGHT_RATE) AS TWO_MONTH_WEIGHT_RATE
+		             , SUM(THREE_MONTH_WEIGHT_RATE) AS THREE_MONTH_WEIGHT_RATE
+		             , SUM(FOUR_MONTH_WEIGHT_RATE) AS FOUR_MONTH_WEIGHT_RATE
+		             , SUM(FIVE_MONTH_WEIGHT_RATE) AS FIVE_MONTH_WEIGHT_RATE
+		             , SUM(SIX_MONTH_WEIGHT_RATE) AS SIX_MONTH_WEIGHT_RATE
+		             , SUM(SEVEN_MONTH_WEIGHT_RATE) AS SEVEN_MONTH_WEIGHT_RATE
+		             , SUM(EIGHT_MONTH_WEIGHT_RATE) AS EIGHT_MONTH_WEIGHT_RATE
+		             , SUM(NINE_MONTH_WEIGHT_RATE) AS NINE_MONTH_WEIGHT_RATE
+		             , SUM(TEN_MONTH_WEIGHT_RATE) AS TEN_MONTH_WEIGHT_RATE
+		             , SUM(ELEVEN_MONTH_WEIGHT_RATE) AS ELEVEN_MONTH_WEIGHT_RATE
+		             , SUM(TWELVE_MONTH_WEIGHT_RATE) AS TWELVE_MONTH_WEIGHT_RATE
+		             , ISNULL(SUM(ONE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(ONE_MONTH_WEIGHT_RATE), 0) AS ONE_MONTH
+	               	 , ISNULL(SUM(TWO_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TWO_MONTH_WEIGHT_RATE), 0) AS TWO_MONTH
+	               	 , ISNULL(SUM(THREE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(THREE_MONTH_WEIGHT_RATE), 0) AS THREE_MONTH
+	                 , ISNULL(SUM(FOUR_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(FOUR_MONTH_WEIGHT_RATE), 0) AS FOUR_MONTH
+	                 , ISNULL(SUM(FIVE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(FIVE_MONTH_WEIGHT_RATE), 0) AS FIVE_MONTH
+	                 , ISNULL(SUM(SIX_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(SIX_MONTH_WEIGHT_RATE), 0) AS SIX_MONTH
+	                 , ISNULL(SUM(SEVEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(SEVEN_MONTH_WEIGHT_RATE), 0) AS SEVEN_MONTH
+	                 , ISNULL(SUM(EIGHT_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(EIGHT_MONTH_WEIGHT_RATE), 0) AS EIGHT_MONTH
+	                 , ISNULL(SUM(NINE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(NINE_MONTH_WEIGHT_RATE), 0) AS NINE_MONTH
+	                 , ISNULL(SUM(TEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TEN_MONTH_WEIGHT_RATE), 0) AS TEN_MONTH
+	                 , ISNULL(SUM(ELEVEN_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(ELEVEN_MONTH_WEIGHT_RATE), 0) AS ELEVEN_MONTH
+	                 , ISNULL(SUM(TWELVE_MONTH_WEIGHT_SCORE), 0) / NULLIF(SUM(TWELVE_MONTH_WEIGHT_RATE), 0) AS TWELVE_MONTH
+				FROM W_MAIN_LVL_3
+				GROUP BY COMPANY_CD, BU_CD, BU_NM, GRP_LVL_ID, DIV_CD, DIV_NM, PART_CD, PART_NM, BU_SORT, DIV_SORT
+			)
+			SELECT COMPANY_CD
+	             , BU_CD	
+	             , BU_NM
+	             , GRP_LVL_ID
+	             , DIV_CD, DIV_NM
+	             , TEAM_CD
+	             , TEAM_NM
+	             , PART_CD
+	             , PART_NM
+	             , BU_SORT
+	             , DIV_SORT
+	             , TEM_SORT
+	             , CATEGORY_CD
+	             , CATEGORY_NM
+	             , CATEGORY_IDX
+	             , ISNULL(SUM(ONE_MONTH_BSC_SCORE), 0) AS ONE_MONTH
+	           	 , ISNULL(SUM(TWO_MONTH_BSC_SCORE), 0) AS TWO_MONTH
+	           	 , ISNULL(SUM(THREE_MONTH_BSC_SCORE), 0) AS THREE_MONTH
+	             , ISNULL(SUM(FOUR_MONTH_BSC_SCORE), 0) AS FOUR_MONTH
+	             , ISNULL(SUM(FIVE_MONTH_BSC_SCORE), 0) AS FIVE_MONTH
+	             , ISNULL(SUM(SIX_MONTH_BSC_SCORE), 0) AS SIX_MONTH
+	             , ISNULL(SUM(SEVEN_MONTH_BSC_SCORE), 0) AS SEVEN_MONTH
+	             , ISNULL(SUM(EIGHT_MONTH_BSC_SCORE), 0) AS EIGHT_MONTH
+	             , ISNULL(SUM(NINE_MONTH_BSC_SCORE), 0) AS NINE_MONTH
+	             , ISNULL(SUM(TEN_MONTH_BSC_SCORE), 0) AS TEN_MONTH
+	             , ISNULL(SUM(ELEVEN_MONTH_BSC_SCORE), 0) AS ELEVEN_MONTH
+	             , ISNULL(SUM(TWELVE_MONTH_BSC_SCORE), 0) AS TWELVE_MONTH
+	             
+	             , ISNULL(SUM(ONE_MONTH_BSC_SCORE), 0) + ISNULL(SUM(TWO_MONTH_BSC_SCORE), 0) + ISNULL(SUM(THREE_MONTH_BSC_SCORE), 0)
+	             + ISNULL(SUM(FOUR_MONTH_BSC_SCORE), 0) + ISNULL(SUM(FIVE_MONTH_BSC_SCORE), 0) + ISNULL(SUM(SIX_MONTH_BSC_SCORE), 0)
+	             + ISNULL(SUM(SEVEN_MONTH_BSC_SCORE), 0) + ISNULL(SUM(EIGHT_MONTH_BSC_SCORE), 0) + ISNULL(SUM(NINE_MONTH_BSC_SCORE), 0)
+	             + ISNULL(SUM(TEN_MONTH_BSC_SCORE), 0) + ISNULL(SUM(ELEVEN_MONTH_BSC_SCORE), 0) + ISNULL(SUM(TWELVE_MONTH_BSC_SCORE), 0)
+	             AS OMIT_FLAG
+		    FROM W_MAIN
+		    GROUP BY COMPANY_CD, BU_CD, BU_NM, GRP_LVL_ID, DIV_CD, DIV_NM, TEAM_CD, TEAM_NM, PART_CD, PART_NM, BU_SORT, DIV_SORT, TEM_SORT, CATEGORY_CD, CATEGORY_NM, CATEGORY_IDX
+		    UNION ALL 
+		    SELECT COMPANY_CD
+	             , BU_CD	
+	             , BU_NM
+	             , GRP_LVL_ID
+	             , DIV_CD, DIV_NM
+	             , TEAM_CD
+	             , TEAM_NM
+	             , PART_CD
+	             , PART_NM
+	             , BU_SORT
+	             , DIV_SORT
+	             , TEM_SORT
+	             , CATEGORY_CD
+	             , CATEGORY_NM
+	             , CATEGORY_IDX
+	             , ONE_MONTH
+	           	 , TWO_MONTH
+	           	 , THREE_MONTH
+	             , FOUR_MONTH
+	             , FIVE_MONTH
+	             , SIX_MONTH
+	             , SEVEN_MONTH
+	             , EIGHT_MONTH
+	             , NINE_MONTH
+	             , TEN_MONTH
+	             , ELEVEN_MONTH
+	             , TWELVE_MONTH
+	             , ISNULL(ONE_MONTH, 0) + ISNULL(TWO_MONTH, 0) + ISNULL(THREE_MONTH, 0) + ISNULL(FOUR_MONTH, 0) + ISNULL(FIVE_MONTH, 0) + ISNULL(SIX_MONTH, 0) + ISNULL(SEVEN_MONTH, 0) 
+       		       + ISNULL(EIGHT_MONTH, 0) + ISNULL(NINE_MONTH, 0) + ISNULL(TEN_MONTH, 0) + ISNULL(ELEVEN_MONTH, 0) + ISNULL(TWELVE_MONTH, 0) AS OMIT_FLAG
+		    FROM W_MAIN_LVL_1
+		    UNION ALL 
+		    SELECT COMPANY_CD
+	             , BU_CD	
+	             , BU_NM
+	             , GRP_LVL_ID
+	             , DIV_CD, DIV_NM
+	             , TEAM_CD
+	             , TEAM_NM
+	             , PART_CD
+	             , PART_NM
+	             , BU_SORT
+	             , DIV_SORT
+	             , TEM_SORT
+	             , CATEGORY_CD
+	             , CATEGORY_NM
+	             , CATEGORY_IDX
+	             , ONE_MONTH
+	           	 , TWO_MONTH
+	           	 , THREE_MONTH
+	             , FOUR_MONTH
+	             , FIVE_MONTH
+	             , SIX_MONTH
+	             , SEVEN_MONTH
+	             , EIGHT_MONTH
+	             , NINE_MONTH
+	             , TEN_MONTH
+	             , ELEVEN_MONTH
+	             , TWELVE_MONTH
+	             , ISNULL(ONE_MONTH, 0) + ISNULL(TWO_MONTH, 0) + ISNULL(THREE_MONTH, 0) + ISNULL(FOUR_MONTH, 0) + ISNULL(FIVE_MONTH, 0) + ISNULL(SIX_MONTH, 0) + ISNULL(SEVEN_MONTH, 0) 
+       		       + ISNULL(EIGHT_MONTH, 0) + ISNULL(NINE_MONTH, 0) + ISNULL(TEN_MONTH, 0) + ISNULL(ELEVEN_MONTH, 0) + ISNULL(TWELVE_MONTH, 0) AS OMIT_FLAG
+		    FROM W_MAIN_LVL_3
+		    UNION ALL 
+		    SELECT COMPANY_CD
+	             , BU_CD	
+	             , BU_NM
+	             , GRP_LVL_ID
+	             , DIV_CD, DIV_NM
+	             , TEAM_CD
+	             , TEAM_NM
+	             , PART_CD
+	             , PART_NM
+	             , BU_SORT
+	             , DIV_SORT
+	             , TEM_SORT
+	             , CATEGORY_CD
+	             , CATEGORY_NM
+	             , CATEGORY_IDX
+	             , ONE_MONTH
+	           	 , TWO_MONTH
+	           	 , THREE_MONTH
+	             , FOUR_MONTH
+	             , FIVE_MONTH
+	             , SIX_MONTH
+	             , SEVEN_MONTH
+	             , EIGHT_MONTH
+	             , NINE_MONTH
+	             , TEN_MONTH
+	             , ELEVEN_MONTH
+	             , TWELVE_MONTH
+	             , ISNULL(ONE_MONTH, 0) + ISNULL(TWO_MONTH, 0) + ISNULL(THREE_MONTH, 0) + ISNULL(FOUR_MONTH, 0) + ISNULL(FIVE_MONTH, 0) + ISNULL(SIX_MONTH, 0) + ISNULL(SEVEN_MONTH, 0) 
+       		       + ISNULL(EIGHT_MONTH, 0) + ISNULL(NINE_MONTH, 0) + ISNULL(TEN_MONTH, 0) + ISNULL(ELEVEN_MONTH, 0) + ISNULL(TWELVE_MONTH, 0) AS OMIT_FLAG
+		    FROM W_MAIN_LVL_5
+		    ORDER BY BU_SORT, DIV_SORT, TEM_SORT, PART_CD, GRP_LVL_ID DESC, CATEGORY_IDX
+			
+		END;
+        
+        	
+    </select>
+    
+    
+</mapper>

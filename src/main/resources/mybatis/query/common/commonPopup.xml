@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+
+	<select id="comItemPopupSelect" parameterType="map" resultType="map">
+	    /****** [ common.comItemPopupSelect ] ******/
+		<include refid="include.macros"/>
+		#getProductTree()
+	
+		WITH W_CODE AS 
+		(
+	      #set($_parameter.groupCd = "ITEM_TYPE")
+	      <include refid="include.mstCode"/>
+	    )  
+		SELECT A.ITEM_CD
+		     , A.ITEM_NM
+		     , A.SPEC
+		     , A.ITEM_TYPE
+		     , C.CODE_NM AS ITEM_TYPE_NM
+		     , A.DRAW_NO
+		     , A.ITEM_GROUP_CD
+		     , B.ITEM_GROUP_NM
+		     , E.CUST_GROUP_CD
+		     , E.CUST_GROUP_NM
+		FROM TB_MST_ITEM A WITH(NOLOCK)
+		LEFT JOIN TB_MST_ITEM_GROUP B
+		  ON B.COMPANY_CD    = A.COMPANY_CD
+		 AND B.BU_CD         = A.BU_CD
+		 AND B.ITEM_GROUP_CD = A.ITEM_GROUP_CD
+		 AND B.DEL_FLAG      = 'N'
+		LEFT JOIN W_CODE C
+		  ON C.CODE_CD = A.ITEM_TYPE
+		LEFT JOIN TB_MST_REP_CUST D WITH(NOLOCK)
+		  ON D.COMPANY_CD  = A.COMPANY_CD
+		 AND D.BU_CD       = A.BU_CD
+		 AND D.REP_CUST_CD = A.REP_CUST_CD
+		 AND D.VALID_FLAG  = 'Y'
+		LEFT JOIN TB_MST_CUST_GROUP E
+		  ON E.COMPANY_CD    = D.COMPANY_CD
+		 AND E.BU_CD         = D.BU_CD
+		 AND E.CUST_GROUP_CD = D.CUST_GROUP_CD
+		 AND E.USE_FLAG      = 'Y'
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.USE_FLAG   = 'Y'
+		#if($_parameter.ITEM_NM and $_parameter.ITEM_NM != "")
+		  AND (A.ITEM_CD LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%'
+		    OR A.ITEM_NM LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%')
+		#end
+		#if($_parameter.ITEM_TYPE and $_parameter.ITEM_TYPE != "")
+		  AND A.ITEM_TYPE IN ('$_parameter.ITEM_TYPE.replace(",","','")')
+		#end
+		#if($_parameter.ITEM_GROUP_CD and $_parameter.ITEM_GROUP_CD != "")
+		  AND (A.ITEM_GROUP_CD LIKE '%' + REPLACE(@{ITEM_GROUP_CD},'_','[_]') + '%'
+		    OR B.ITEM_GROUP_NM LIKE '%' + REPLACE(@{ITEM_GROUP_CD},'_','[_]') + '%')
+		#end
+		#if($_parameter.SPEC and $_parameter.SPEC != "")
+		  AND A.SPEC LIKE '%' + @{SPEC} + '%'
+		#end
+		#if($_parameter.DRAW_NO and $_parameter.DRAW_NO != "")
+		  AND A.DRAW_NO LIKE '%' + @{DRAW_NO} + '%'
+		#end
+		#if($_parameter.CUST_GROUP_CD and $_parameter.CUST_GROUP_CD != "")
+		  AND (E.CUST_GROUP_CD LIKE '%' + REPLACE(@{CUST_GROUP_CD},'_','[_]') + '%'
+		    OR E.CUST_GROUP_NM LIKE '%' + REPLACE(@{CUST_GROUP_CD},'_','[_]') + '%')
+		#end
+		#if($_parameter.POP_TYPE == "COM_ITEM_PLAN")
+		  AND C.ATTB_2_CD  = 'Y'
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		  AND A.ITEM_CD NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+	    #set($treeAlias = "A")
+	    <include refid="include.productTree"/>
+		ORDER BY
+		#if($_parameter.INIT_DATA and $_parameter.INIT_DATA != "")
+			CASE WHEN A.ITEM_CD IN ('$_parameter.INIT_DATA.replace(",","','")') THEN 0 ELSE 1 END,
+		#end
+		  A.ITEM_CD, A.ITEM_NM
+	</select>
+	
+	<select id="wipHoldingReqPopupSelect" parameterType="map" resultType="map">
+	    /****** [ common.wipHoldingReqPopupSelect ] ******/
+		SELECT DPOH.PROD_ORDER_NO
+	         , DPOH.ORDER_STATUS 
+		     , DPOH.ITEM_CD
+		     , MI.ITEM_NM
+		     , MI.SPEC
+		     , MIP.ROUTING_ID
+		     , MIG.UPPER_ITEM_GROUP_NM
+		     , MIG.ITEM_GROUP_NM
+		     , MI.ITEM_GRADE
+		     , MC.REP_CUST_GROUP_NM
+		     , MC.CUST_GROUP_NM
+		     , DPOH.PROD_ORDER_QTY
+		     , ISNULL(DPOH.PROD_ORDER_QTY, 0) - ISNULL(DRP.RESULT_QTY, 0) AS REMAIN_QTY
+		     , TMC.CODE_NM AS ORDER_STATUS_NM
+		FROM TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+		INNER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+		   ON DPOD.COMPANY_CD = DPOH.COMPANY_CD
+		  AND DPOD.BU_CD = DPOH.BU_CD
+		  AND DPOD.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+		  AND DPOD.ROUTE_ORDER IN ('L', 'S')
+		LEFT OUTER JOIN TB_DYN_ROUTING_PERFORMANCE DRP WITH(NOLOCK)
+		  ON DRP.COMPANY_CD = DPOD.COMPANY_CD
+		 AND DRP.BU_CD = DPOD.BU_CD
+		 AND DRP.PROD_ORDER_NO = DPOD.PROD_ORDER_NO
+		 AND DRP.OPERATION_NO = DPOD.OPERATION_NO
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		  ON MI.COMPANY_CD = DPOH.COMPANY_CD
+		  AND MI.BU_CD = DPOH.BU_CD
+		  AND MI.ITEM_CD = DPOH.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MI.COMPANY_CD
+		 AND MC.BU_CD = MI.BU_CD
+		 AND MC.CUST_CD = MI.REP_CUST_CD
+		LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		  ON MIG.COMPANY_CD = MI.COMPANY_CD
+		 AND MIG.BU_CD = MI.BU_CD
+		 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		LEFT OUTER JOIN TB_MST_CODE TMC WITH(NOLOCK)
+		  ON DPOH.ORDER_STATUS = TMC.CODE_CD
+	     AND TMC.BU_CD = 'QT'
+	     AND TMC.GROUP_CD = 'ORDER_STATUS'
+		LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		  ON MC3.BU_CD = 'ALL'
+		 AND MC3.GROUP_CD = 'PROCUR_TYPE'
+		 AND MC3.CODE_CD = MIP.PROCUR_TYPE
+		 AND MC3.USE_FLAG = 'Y'
+		WHERE EXISTS (
+		               	SELECT 1
+		                FROM TB_MST_CODE WITH(NOLOCK)
+		                WHERE BU_CD = 'ALL'
+		                  AND GROUP_CD = 'PROCUR_TYPE'
+		                  AND CODE_CD = MIP.PROCUR_TYPE
+		                  AND ATTB_1_CD = 'Y'
+		                  AND USE_FLAG = 'Y'
+		              )
+		  AND DPOH.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND DPOH.BU_CD      = @{GV_BU_CD}
+		  AND TMC.CODE_CD != 'CL'
+		  AND ISNULL(DPOH.PROD_ORDER_QTY, 0) - ISNULL(DRP.RESULT_QTY, 0) > 0
+		  AND NOT EXISTS (
+	                   	SELECT 1
+	                    FROM TB_DYN_WIP_HOLDING DWH WITH(NOLOCK)
+	                    WHERE DWH.COMPANY_CD = DPOH.COMPANY_CD
+	                      AND DWH.BU_CD = DPOH.BU_CD
+	                      AND DWH.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+	                      AND DWH.DEL_FLAG = 'N'
+	                  )
+		#if($_parameter.ITEM_NM and $_parameter.ITEM_NM != "")
+	      AND ( DPOH.ITEM_CD LIKE '%$_parameter.ITEM_NM%' OR MI.ITEM_NM LIKE '%$_parameter.ITEM_NM%' or 
+		         DPOH.ITEM_CD IN ('$_parameter.ITEM_NM.replace(",","','")') ) 
+	  	#end 
+		#if($_parameter.PROD_ORDER_NO and $_parameter.PROD_ORDER_NO != "")
+	      AND ( DPOH.PROD_ORDER_NO LIKE '%$_parameter.PROD_ORDER_NO%' OR
+		         DPOH.PROD_ORDER_NO IN ('$_parameter.PROD_ORDER_NO.replace(",","','")') ) 
+		#end 
+	  	#if($_parameter.PROCUR_TYPE and $_parameter.PROCUR_TYPE != "")
+	      AND MC3.CODE_CD IN ('$_parameter.PROCUR_TYPE.replace(",","','")')
+		#end
+	  	#if($_parameter.ROUTING and $_parameter.ROUTING != "")
+	      AND MIP.ROUTING_ID IN ('$_parameter.ROUTING.replace(",","','")')
+		#end
+	</select>
+
+	<select id="comItemRepPopupSelect" parameterType="map" resultType="map">
+	    /****** [ common.comItemRepPopupSelect ] ******/
+	    <include refid="include.macros"/>
+		#getProductTree()
+	
+		SELECT A.ITEM_CD
+		     , A.ITEM_NM
+		     , A.ITEM_TYPE
+		FROM TB_MST_ITEM A WITH (NOLOCK)
+		WHERE A.COMPANY_CD    = @{GV_COMPANY_CD}
+		  AND A.BU_CD         = @{GV_BU_CD}
+		#if($_parameter.ITEM_NM and $_parameter.ITEM_NM != "")
+		  AND (A.ITEM_CD LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%'
+		    OR A.ITEM_NM LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%')
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		  AND A.ITEM_CD NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+		#set($treeAlias = "A")
+	    <include refid="include.productTree"/>
+		GROUP BY A.ITEM_CD, A.ITEM_NM, A.ITEM_TYPE
+		ORDER BY
+		#if($_parameter.INIT_DATA and $_parameter.INIT_DATA != "")
+			CASE WHEN A.ITEM_CD IN ('$_parameter.INIT_DATA.replace(",","','")') THEN 0 ELSE 1 END,
+		#end
+		  A.ITEM_CD, A.ITEM_NM
+	</select>
+
+	<select id="customerPopupSelect" parameterType="map" resultType="map">
+		/****** [ common.customerPopupSelect] ******/
+		SELECT CUST_CD
+		     , CUST_NM
+		FROM TB_MST_CUSTOMER WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		#if($_parameter.CUST_NM and $_parameter.CUST_NM != "")
+		  AND (
+		          CUST_CD LIKE '%' + REPLACE(@{CUST_NM},'_','[_]') + '%'
+		       OR CUST_NM LIKE '%' + REPLACE(@{CUST_NM},'_','[_]') + '%'
+		      )
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		  AND CUST_CD NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+		ORDER BY
+		#if($_parameter.INIT_DATA and $_parameter.INIT_DATA != "")
+			CASE WHEN CUST_CD IN ('$_parameter.INIT_DATA.replace(",","','")') THEN 0 ELSE 1 END,
+		#end
+		  CUST_CD, CUST_NM
+	</select>
+
+	<select id="empPopupSelect" parameterType="map" resultType="map">
+		/****** [ common.empPopupSelect] ******/
+		SELECT A.USER_ID
+		     , A.USER_NM
+		     , A.DEPT_CD
+		     , B.DEPT_NM
+		FROM TB_MST_USER A WITH(NOLOCK)
+		LEFT JOIN TB_MST_DEPT B WITH(NOLOCK)
+		  ON B.DEPT_CD    = A.DEPT_CD
+		 AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		 AND B.BU_CD = 'CO'
+		WHERE 1 = 1
+		AND A.USE_FLAG = 'Y'
+		#if($_parameter.sizeEmpArry and $_parameter.sizeEmpArry <![CDATA[>=]]>2)
+			   #foreach($dimMap in $_parameter.EmpArr)
+			   	#if($velocityCount==1)
+			   		AND (A.USER_NM LIKE '%' + '$dimMap.empNm' + '%'
+			   	#else
+			   		OR A.USER_NM LIKE '%' + '$dimMap.empNm' + '%'
+			   	#end
+			   #end
+			   )
+		
+		#else 
+			#if($_parameter.USER_NM and $_parameter.USER_NM != "")
+			AND (A.USER_ID LIKE '%' + REPLACE(@{USER_NM},'_','[_]') + '%'
+		    OR A.USER_NM LIKE '%' + REPLACE(@{USER_NM},'_','[_]') + '%')
+		    #end
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		  AND A.USER_ID NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+		ORDER BY
+		#if($_parameter.INIT_DATA and $_parameter.INIT_DATA != "")
+			CASE WHEN A.USER_ID IN ('$_parameter.INIT_DATA.replace(",","','")') THEN 0 ELSE 1 END,
+		#end
+		  A.USER_ID, A.USER_NM
+	</select>
+
+	<select id="partPopupSelect" parameterType="map" resultType="map">
+		/****** [ common.partPopupSelect] ******/
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.DIV_CD
+		     , A.TEAM_CD
+		     , A.PART_CD
+		     , A.PART_NM
+		     , A.COMPANY_CD+A.BU_CD+A.DIV_CD+A.TEAM_CD+A.PART_CD AS ROW_KEY
+		FROM 
+		(
+			SELECT COMPANY_CD
+		         , BU_CD
+		         , DIV_CD
+		         , TEAM_CD
+		         , PART_CD
+		         , CASE WHEN 'ko' = @{GV_LANG} THEN PART_NM_KR
+	                	WHEN 'cn' = @{GV_LANG} THEN PART_NM_CN
+	                	ELSE PART_NM
+		         	END PART_NM
+		         , COMPANY_CD+BU_CD+DIV_CD+TEAM_CD+PART_CD AS ROW_KEY
+			FROM UV_MST_ORG A WITH(NOLOCK)
+	        UNION ALL 
+	        SELECT @{GV_COMPANY_CD}
+	             , 'QT'
+	             , 'SCM'
+	             , 'SCM'
+	             , 'SCM'
+	             , 'SCM'
+	             , 'SCM'
+		) A
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		#if($_parameter.PART_NM and $_parameter.PART_NM != "")
+		  AND (A.PART_CD LIKE '%' + REPLACE(@{PART_NM},'_','[_]') + '%'
+		    OR A.PART_NM LIKE '%' + REPLACE(@{PART_NM},'_','[_]') + '%')
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		  AND A.COMPANY_CD+A.BU_CD+A.DIV_CD+A.TEAM_CD+A.PART_CD NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+		ORDER BY
+		#if($_parameter.INIT_DATA and $_parameter.INIT_DATA != "")
+			CASE WHEN A.COMPANY_CD+A.BU_CD+A.DIV_CD+A.TEAM_CD+A.PART_CD IN ('$_parameter.INIT_DATA.replace(",","','")') THEN 0 ELSE 1 END,
+		#end
+		  A.COMPANY_CD, A.BU_CD, A.DIV_CD, A.TEAM_CD, A.PART_CD, A.PART_NM
+	</select>
+	
+	<select id="prodOrderNoPopupSelect" parameterType="map" resultType="map">
+		/****** [ common.prodOrderNoPopupSelect ] ******/
+		SELECT DISTINCT PROD_ORDER_NO
+		FROM TB_DYN_PROD_ORDER
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	      AND BU_CD = @{GV_BU_CD}
+	    #if($_parameter.PROD_ORDER_NO and $_parameter.PROD_ORDER_NO != "")
+		  AND (PROD_ORDER_NO LIKE '%' + REPLACE(@{PROD_ORDER_NO},'_','[_]') + '%'
+			OR PROD_ORDER_NO LIKE '%' + REPLACE(@{PROD_ORDER_NO},'_','[_]') + '%')
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		  AND PROD_ORDER_NO NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+	</select>
+	
+	<select id="materialsCodePopupSelect" parameterType="map" resultType="map">
+		/****** [ common.materialsCodePopupSelect ] ******/
+		SELECT DISTINCT A1.CHILD_ITEM_CD AS ITEM_CD
+		     , A2.ITEM_NM
+		     , A2.SPEC
+		     , A2.ITEM_TYPE
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN A3.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A3.CODE_NM_CN
+	                ELSE A3.CODE_NM
+	           END ITEM_TYPE_NM
+		     , A2.DRAW_NO
+		FROM TB_DYN_PROD_ORDER A1 WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM A2 WITH(NOLOCK)
+		   ON A1.COMPANY_CD = A2.COMPANY_CD
+		  AND A1.BU_CD = A2.BU_CD
+		  AND A1.CHILD_ITEM_CD = A2.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CODE A3 WITH(NOLOCK)
+          ON A3.GROUP_CD = 'ITEM_TYPE'
+         AND A3.CODE_CD  = A2.ITEM_TYPE
+         AND A3.USE_FLAG = 'Y'  
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A1.BU_CD = @{GV_BU_CD}
+		#if($_parameter.ITEM_NM and $_parameter.ITEM_NM != "")
+	  	  AND (A1.CHILD_ITEM_CD LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%'
+	    	OR A2.ITEM_NM LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%')
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+	  	  AND A1.ITEM_CD NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+		#if($_parameter.ITEM_TYPE and $_parameter.ITEM_TYPE != "")
+		  AND A2.ITEM_TYPE IN ('$_parameter.ITEM_TYPE.replace(",","','")')
+		#end
+		#if($_parameter.SPEC and $_parameter.SPEC != "")
+		  AND A2.SPEC LIKE '%' + @{SPEC} + '%'
+		#end
+		#if($_parameter.DRAW_NO and $_parameter.DRAW_NO != "")
+		  AND A2.DRAW_NO LIKE '%' + @{DRAW_NO} + '%'
+		#end
+	</select>
+
+</mapper>

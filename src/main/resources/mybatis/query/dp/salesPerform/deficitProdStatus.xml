@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+
+	<select id="deficitProdPresentListSelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.deficitProdPresentListSelect ] ******/
+		<include refid="snop.common.w_cust" />
+		, W_SALES_RESULT AS 
+		(
+			SELECT A1.COMPANY_CD
+			     , A1.BU_CD
+			     , A1.ITEM_CD
+			     , A3.CUST_GROUP_CD
+			     , SUM(A1.QTY) AS QTY 
+			     , SUM(A1.AMT_KRW) AS AMT_KRW
+			     , A2.YEARMONTH
+			FROM TB_DYN_BILL_ORDER A1 WITH(NOLOCK)
+			INNER JOIN TB_MST_CALENDAR A2 WITH(NOLOCK)
+			   ON A1.BILL_DATE = A2.YYYYMMDD
+			INNER JOIN TB_MST_CUSTOMER A3 WITH(NOLOCK)
+			   ON A1.COMPANY_CD = A3.COMPANY_CD
+			  AND A1.BU_CD = A3.BU_CD
+			  AND A1.CUST_CD = A3.CUST_CD
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.DEL_FLAG = 'N'
+			  AND A2.YEARMONTH BETWEEN @{fromMon} AND @{toMon}
+			GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A3.CUST_GROUP_CD, A2.YEARMONTH
+		)
+		, W_SALES_COST AS 
+		(
+			SELECT COMPANY_CD
+			     , BU_CD
+			     , ITEM_CD
+			     , CUST_GROUP_CD
+			     , YEARMONTH
+			     , MAT_KRW
+			     , LABOR_KRW
+			     , EXP_KRW
+			     , OUT_SRC_KRW
+			     , PUR_PRICE_KRW
+			     , SGNA_KRW
+			FROM TB_DYN_MONTHLY_COSTG WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND YEARMONTH BETWEEN @{fromMon} AND @{toMon}
+			  AND DEL_FLAG = 'N'
+		),
+		W_MAIN AS 
+		(
+		    SELECT T.COMPANY_CD
+		         , T.BU_CD
+		         , ISNULL(T.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+				 , ISNULL(T.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+				 , ISNULL(T.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+				 , ISNULL(T.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+				 , ISNULL(T.ITEM_CD, ' ') AS ITEM_CD
+				 , ISNULL(T.ITEM_CD, ' ') AS ITEM_CD_NM
+				 , ISNULL(T.ITEM_NM, ' ') AS ITEM_NM
+				 , ISNULL(T.ITEM_NM, ' ') AS ITEM_NM_NM
+		         , T.YEARMONTH AS JOIN_YEARMONTH
+		         , ISNULL(LEFT(CONVERT(VARCHAR, CONVERT(DATE, T.YEARMONTH + '01'), 102), 7), ' ') AS YEARMONTH
+		         , ISNULL(LEFT(CONVERT(VARCHAR, CONVERT(DATE, T.YEARMONTH + '01'), 102), 7), ' ') AS YEARMONTH_NM
+		         , SUM(T.QTY) AS QTY
+		         , SUM(T.AMT_KRW) AS AMT_KRW
+		         , SUM(T.MAT_KRW) * SUM(T.QTY) AS MAT_KRW
+		         , SUM(T.LABOR_KRW) * SUM(T.QTY) AS LABOR_KRW
+		         , SUM(T.EXP_KRW) * SUM(T.QTY) AS EXP_KRW
+		         , SUM(T.OUT_SRC_KRW) * SUM(T.QTY) AS OUT_SRC_KRW
+		         , SUM(T.PUR_PRICE_KRW) * SUM(T.QTY) AS PUR_PRICE_KRW
+		         , SUM(T.SGNA_KRW) * SUM(T.QTY) AS SGNA_KRW
+		         , (SUM(T.MAT_KRW) * SUM(T.QTY)) + (SUM(T.LABOR_KRW) * SUM(T.QTY)) 
+		         + (SUM(T.EXP_KRW) * SUM(T.QTY)) + (SUM(T.OUT_SRC_KRW) * SUM(T.QTY)) 
+		         + (SUM(T.PUR_PRICE_KRW) * SUM(T.QTY)) AS AMT_COST
+		         , SUM(T.AMT_KRW) - ((SUM(T.MAT_KRW) * SUM(T.QTY)) + (SUM(T.LABOR_KRW) * SUM(T.QTY)) 
+		                           + (SUM(T.EXP_KRW) * SUM(T.QTY)) + (SUM(T.OUT_SRC_KRW) * SUM(T.QTY)) 
+		                           + (SUM(T.PUR_PRICE_KRW) * SUM(T.QTY))) AS AMT_SALES_TOTAL_PROFIT
+		         , (SUM(T.AMT_KRW) - ((SUM(T.MAT_KRW) * SUM(T.QTY)) + (SUM(T.LABOR_KRW) * SUM(T.QTY)) 
+		                           + (SUM(T.EXP_KRW) * SUM(T.QTY)) + (SUM(T.OUT_SRC_KRW) * SUM(T.QTY)) 
+		                           + (SUM(T.PUR_PRICE_KRW) * SUM(T.QTY)))) 
+		                           - (SUM(T.SGNA_KRW) * SUM(T.QTY)) AS SALES_PROFIT
+			FROM 
+			(
+		    	SELECT T1.COMPANY_CD
+	                 , T1.BU_CD
+	                 , T1.CUST_GROUP_CD
+	                 , T1.CUST_GROUP_NM
+	                 , T1.ITEM_CD
+	                 , T1.ITEM_NM
+	                 , T2.YEARMONTH
+	                 , T2.QTY
+	                 , T2.AMT_KRW
+	                 , T3.MAT_KRW
+	                 , T3.LABOR_KRW
+	                 , T3.EXP_KRW
+	                 , T3.OUT_SRC_KRW
+	                 , T3.PUR_PRICE_KRW
+	                 , T3.SGNA_KRW
+				FROM W_CUST T1
+	            LEFT OUTER JOIN W_SALES_RESULT T2
+	              ON T1.COMPANY_CD    = T2.COMPANY_CD
+	             AND T1.BU_CD         = T2.BU_CD
+	             AND T1.CUST_GROUP_CD = T2.CUST_GROUP_CD
+	             AND T1.ITEM_CD       = T2.ITEM_CD
+	            LEFT OUTER JOIN W_SALES_COST T3
+	              ON T1.COMPANY_CD    = T3.COMPANY_CD
+	             AND T1.BU_CD         = T3.BU_CD
+	             AND T1.CUST_GROUP_CD = T3.CUST_GROUP_CD
+	             AND T1.ITEM_CD       = T3.ITEM_CD
+	             AND T2.YEARMONTH     = T3.YEARMONTH
+	            WHERE T2.YEARMONTH IS NOT NULL
+	             AND T2.YEARMONTH BETWEEN @{fromMon} AND @{toMon}
+			) T
+		    GROUP BY T.COMPANY_CD, T.BU_CD, T.CUST_GROUP_CD, T.CUST_GROUP_NM, T.ITEM_CD, T.ITEM_NM, T.YEARMONTH
+		),
+		W_GIGAN AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.CUST_GROUP_CD
+		         , A.ITEM_CD
+		         , B.YEARMONTH
+			FROM 
+			(
+				SELECT T1.*
+		        FROM 
+		        (
+					SELECT M.COMPANY_CD
+                         , M.BU_CD
+                         , M.CUST_GROUP_CD
+                         , M.ITEM_CD
+                         , MIN(M.YEARMONTH) AS FROM_DT
+                         , MAX(M.YEARMONTH) AS TO_DT
+                         , COUNT(*) AS CNT
+					FROM 
+					(
+						SELECT T.COMPANY_CD
+                             , T.BU_CD
+                             , T.CUST_GROUP_CD
+                             , T.ITEM_CD
+                             , T.YEARMONTH
+                             , IDX + MON_C - (MON_C + (D_MON - CASE WHEN YEAR <![CDATA[<>]]> D_YEAR THEN (YEAR - D_YEAR) * 12 ELSE 0 END)) AS NO
+						FROM 
+						(
+							SELECT COMPANY_CD
+                                 , BU_CD
+                                 , CUST_GROUP_CD
+                                 , ITEM_CD
+                                 , JOIN_YEARMONTH AS YEARMONTH
+                                 , SALES_PROFIT
+                                 , ROW_NUMBER() OVER(PARTITION BY COMPANY_CD, BU_CD, CUST_GROUP_CD, ITEM_CD ORDER BY JOIN_YEARMONTH) AS IDX
+                                 , DATEPART(YEAR, GETDATE()) AS YEAR
+                                 , CONVERT(INT, SUBSTRING(JOIN_YEARMONTH,1,4)) AS D_YEAR
+                                 , CONVERT(INT, SUBSTRING(JOIN_YEARMONTH,5,2)) AS D_MON
+                                 , CONVERT(CHAR(6), GETDATE(), 112) AS MON_C
+							FROM W_MAIN
+                            WHERE SALES_PROFIT <![CDATA[<]]> 0
+                            #if($_parameter.amountFrom != "" and $_parameter.amountTo != "")
+                              AND SALES_PROFIT BETWEEN @{amountFrom} AND @{amountTo}
+							#end
+						) T
+					) M
+		            GROUP BY M.COMPANY_CD, M.BU_CD, M.CUST_GROUP_CD, M.ITEM_CD, M.NO
+				) T1
+				WHERE T1.CNT <![CDATA[>=]]> 6 
+			) A
+			, 
+			(
+				SELECT DISTINCT YEARMONTH
+		        FROM TB_MST_CALENDAR
+		        WHERE YEARMONTH BETWEEN @{fromMon} AND @{toMon}
+			) B
+		    WHERE B.YEARMONTH BETWEEN A.FROM_DT AND TO_DT
+		),
+		W_GIGAN_NON AS 
+		(
+			SELECT T.*
+		    FROM 
+		    (
+		    	SELECT COMPANY_CD
+	                 , BU_CD
+	                 , CUST_GROUP_CD
+	                 , ITEM_CD
+	                 , JOIN_YEARMONTH AS YEARMONTH
+	                 , COUNT(*) OVER(PARTITION BY COMPANY_CD, BU_CD, CUST_GROUP_CD, ITEM_CD) AS CNT
+				FROM W_MAIN
+	            WHERE SALES_PROFIT <![CDATA[<]]> 0
+	            #if($_parameter.amountFrom != "" and $_parameter.amountTo != "")
+                  AND SALES_PROFIT BETWEEN @{amountFrom} AND @{amountTo}
+				#end
+			) T
+		    WHERE T.CNT <![CDATA[>=]]> 6
+		)
+		SELECT U1.TMP_COL
+		     #foreach($dimMap in $_parameter.dimList)
+		     , U1.${dimMap.DIM_CD}_NM, $dimMap.DIM_CD 
+		     #end
+		     , COMPANY_CD
+		     , BU_CD
+		     , GRP_LVL_ID
+		     , QTY
+		     , AMT_KRW
+		     , MAT_KRW
+		     , LABOR_KRW
+		     , EXP_KRW
+		     , OUT_SRC_KRW
+		     , PUR_PRICE_KRW
+		     , SGNA_KRW
+		     , AMT_COST
+		     , AMT_SALES_TOTAL_PROFIT
+		     , SALES_PROFIT
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE FINANCE_COMMENT END FINANCE_COMMENT
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE ANALYZE_BAND END ANALYZE_BAND
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE SALES_COMMNET END SALES_COMMNET
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE ANALYZE_REASON END ANALYZE_REASON
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE ENG_COMMENT END ENG_COMMENT
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PROD_COMMENT END PROD_COMMENT
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PURCHASE_COMMENT END PURCHASE_COMMENT
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE OPEN_YN END OPEN_YN
+			 , ROUND((U1.MAT_KRW / NULLIF(U1.AMT_COST, 0) * 100), 2) AS MAT_KRW_RATE
+			 , ROUND((U1.LABOR_KRW / NULLIF(U1.AMT_COST, 0) * 100), 2) AS LABOR_KRW_RATE
+			 , ROUND((U1.EXP_KRW / NULLIF(U1.AMT_COST, 0) * 100), 2) AS EXP_KRW_RATE
+			 , ROUND((U1.OUT_SRC_KRW / NULLIF(U1.AMT_COST, 0) * 100), 2) AS OUT_SRC_KRW_RATE
+		FROM 
+		(
+			SELECT NULL AS TMP_COL
+	             , MAX(COMPANY_CD) AS COMPANY_CD
+	             , MAX(BU_CD) AS BU_CD
+	             , MAX(JOIN_YEARMONTH) AS JOIN_YEARMONTH
+	             <include refid="include.getCdDimTotal"/>
+	             <include refid="include.getGrpLvlId"/>
+	             , SUM(QTY) AS QTY
+	             , SUM(AMT_KRW) AS AMT_KRW
+	             , SUM(MAT_KRW) AS MAT_KRW
+	             , SUM(LABOR_KRW) AS LABOR_KRW
+	             , SUM(EXP_KRW) AS EXP_KRW
+	             , SUM(OUT_SRC_KRW) AS OUT_SRC_KRW
+	             , SUM(PUR_PRICE_KRW) AS PUR_PRICE_KRW
+	             , SUM(SGNA_KRW) AS SGNA_KRW
+	             , SUM(AMT_COST) AS AMT_COST
+	             , SUM(AMT_SALES_TOTAL_PROFIT) AS AMT_SALES_TOTAL_PROFIT
+	             , SUM(SALES_PROFIT) AS SALES_PROFIT
+	             , MAX(FINANCE_COMMENT) AS FINANCE_COMMENT
+		         , MAX(ANALYZE_BAND) AS ANALYZE_BAND
+		         , MAX(SALES_COMMNET) AS SALES_COMMNET
+		         , MAX(ANALYZE_REASON) AS ANALYZE_REASON
+		         , MAX(ENG_COMMENT) AS ENG_COMMENT
+		         , MAX(PROD_COMMENT) AS PROD_COMMENT
+		         , MAX(PURCHASE_COMMENT) AS PURCHASE_COMMENT
+	             , MAX(OPEN_YN) AS OPEN_YN
+			FROM 
+			(
+				#if($_parameter.continueDeficit != "" and $_parameter.count == "")
+		        SELECT T.*
+                     , U2.FINANCE_COMMENT
+                     , U2.ANALYZE_BAND
+                     , U2.SALES_COMMNET
+                     , U2.ANALYZE_REASON
+                     , U2.ENG_COMMENT
+                     , U2.PROD_COMMENT
+                     , U2.PURCHASE_COMMENT
+                     , U2.OPEN_YN
+				FROM 
+				(
+					SELECT A.*
+				    FROM W_MAIN A
+				    INNER JOIN W_GIGAN B
+				       ON A.COMPANY_CD = B.COMPANY_CD
+				      AND A.BU_CD = B.BU_CD
+				      AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+				      AND A.ITEM_CD = B.ITEM_CD
+				      AND A.JOIN_YEARMONTH = B.YEARMONTH		                  
+				) T
+		        LEFT OUTER JOIN TB_KPI_LOSS_ANALYZE U2 WITH(NOLOCK)
+				  ON T.COMPANY_CD = U2.COMPANY_CD
+ 			   	 AND T.BU_CD = U2.BU_CD
+ 			     AND T.CUST_GROUP_CD = U2.CUST_GROUP_CD
+ 			     AND T.ITEM_CD = U2.ITEM_CD
+ 			     AND T.JOIN_YEARMONTH = U2.YEARMONTH
+ 			 	WHERE U2.OPEN_YN = 'Y'
+		        #end
+		                
+				#if($_parameter.continueDeficit == "" and $_parameter.count == "")
+		        SELECT T.*
+                     , U2.FINANCE_COMMENT
+                     , U2.ANALYZE_BAND
+                     , U2.SALES_COMMNET
+                     , U2.ANALYZE_REASON
+                     , U2.ENG_COMMENT
+                     , U2.PROD_COMMENT
+                     , U2.PURCHASE_COMMENT
+                     , U2.OPEN_YN
+				FROM W_MAIN T
+                LEFT OUTER JOIN TB_KPI_LOSS_ANALYZE U2 WITH(NOLOCK)
+	  			  ON T.COMPANY_CD = U2.COMPANY_CD
+	 			  AND T.BU_CD = U2.BU_CD
+	 			  AND T.CUST_GROUP_CD = U2.CUST_GROUP_CD
+	 			  AND T.ITEM_CD = U2.ITEM_CD
+	 			  AND T.JOIN_YEARMONTH = U2.YEARMONTH
+	 			WHERE U2.OPEN_YN = 'Y'
+				#end
+		                
+				#if($_parameter.continueDeficit == "" and $_parameter.count != "")
+		        SELECT T.*
+                     , U2.FINANCE_COMMENT
+                     , U2.ANALYZE_BAND
+                     , U2.SALES_COMMNET
+                     , U2.ANALYZE_REASON
+                     , U2.ENG_COMMENT
+                     , U2.PROD_COMMENT
+                     , U2.PURCHASE_COMMENT
+                     , U2.OPEN_YN
+				FROM 
+				(
+					SELECT A.*
+				    FROM W_MAIN A
+				    INNER JOIN W_GIGAN_NON B
+				       ON A.COMPANY_CD = B.COMPANY_CD
+				      AND A.BU_CD = B.BU_CD
+				      AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+				      AND A.ITEM_CD = B.ITEM_CD
+				      AND A.JOIN_YEARMONTH = B.YEARMONTH		                       
+				) T
+		        LEFT OUTER JOIN TB_KPI_LOSS_ANALYZE U2 WITH(NOLOCK)
+			  	  ON T.COMPANY_CD = U2.COMPANY_CD
+			 	 AND T.BU_CD = U2.BU_CD
+			 	 AND T.CUST_GROUP_CD = U2.CUST_GROUP_CD
+			 	 AND T.ITEM_CD = U2.ITEM_CD
+			 	 AND T.JOIN_YEARMONTH = U2.YEARMONTH
+			 	WHERE U2.OPEN_YN = 'Y'
+		        #end
+		                
+				#if($_parameter.amountFrom != "" and $_parameter.amountTo != "")
+		         AND SALES_PROFIT BETWEEN @{amountFrom} AND @{amountTo}
+		        #end
+			) T
+		    GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+		) U1
+		ORDER BY TMP_COL
+    	#foreach($dimMap in $_parameter.dimList)
+			, U1.$dimMap.DIM_CD
+		#end    
+
+	</select>
+	
+	<update id="deficitProdPresentListMerge" parameterType="map">
+		/****** [ dp.salesPerform.deficitProdPresentListMerge ] ******/
+	 	MERGE INTO TB_KPI_LOSS_ANALYZE A
+		USING
+		(
+			SELECT @{COMPANY_CD} AS COMPANY_CD
+			     , @{BU_CD} AS BU_CD
+			     , @{ITEM_CD} AS ITEM_CD
+			     , @{CUST_GROUP_CD} AS CUST_GROUP_CD
+			     , REPLACE(@{YEARMONTH}, '.', '') AS YEARMONTH
+			     , @{FINANCE_COMMENT} AS FINANCE_COMMENT
+			     , @{ANALYZE_BAND} AS ANALYZE_BAND
+			     , @{SALES_COMMNET} AS SALES_COMMNET
+			     , @{ANALYZE_REASON} AS ANALYZE_REASON
+			     , @{ENG_COMMENT} AS ENG_COMMENT
+			     , @{PROD_COMMENT} AS PROD_COMMENT
+			     , @{PURCHASE_COMMENT} AS PURCHASE_COMMENT
+		) B
+		ON
+		(
+			A.COMPANY_CD = B.COMPANY_CD
+		  AND A.BU_CD = B.BU_CD
+		  AND A.ITEM_CD = B.ITEM_CD
+		  AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+		  AND A.YEARMONTH = B.YEARMONTH
+		)
+		WHEN MATCHED THEN
+		UPDATE SET
+			FINANCE_COMMENT = B.FINANCE_COMMENT
+		  , ANALYZE_BAND = B.ANALYZE_BAND
+		  , SALES_COMMNET = B.SALES_COMMNET
+		  , ANALYZE_REASON = B.ANALYZE_REASON
+		  , ENG_COMMENT = B.ENG_COMMENT 
+		  , PROD_COMMENT = B.PROD_COMMENT
+		  , PURCHASE_COMMENT = B.PURCHASE_COMMENT
+		  , UPDATE_ID = @{GV_USER_ID}
+		  , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+			COMPANY_CD
+		  , BU_CD
+		  , ITEM_CD
+		  , CUST_GROUP_CD
+		  , YEARMONTH
+		  , FINANCE_COMMENT
+		  , ANALYZE_BAND
+		  , SALES_COMMNET
+		  , ANALYZE_REASON
+		  , ENG_COMMENT
+		  , PROD_COMMENT
+		  , PURCHASE_COMMENT
+		  , CREATE_ID
+		  , CREATE_DTTM
+		)VALUES(
+			B.COMPANY_CD
+		  , B.BU_CD
+		  , B.ITEM_CD
+		  , B.CUST_GROUP_CD
+		  , B.YEARMONTH
+		  , B.FINANCE_COMMENT
+		  , B.ANALYZE_BAND
+		  , B.SALES_COMMNET
+		  , B.ANALYZE_REASON
+		  , B.ENG_COMMENT
+		  , B.PROD_COMMENT
+		  , B.PURCHASE_COMMENT
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		);
+	</update>
+	
+	<delete id="deficitProdPresentListDelete" parameterType="map">
+		/****** [ dp.salesPerform.deficitProdPresentListDelete ] ******/
+	</delete>
+	
+	<select id="authoritySelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPerform.authoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('DP30701', 'DP30702', 'DP30703', 'DP30704')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+</mapper>

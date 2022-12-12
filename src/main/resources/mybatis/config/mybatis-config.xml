@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <settings>
+    	<setting name="cacheEnabled" value="false" />
+    	<setting name="useGeneratedKeys" value="false" />
+        <setting name="mapUnderscoreToCamelCase" value="true"/>
+        <setting name="jdbcTypeForNull" value="VARCHAR" /><!-- null 허용 -->
+        <setting name="defaultExecutorType" value="BATCH" /><!-- batch 처리 설정 -->
+        <setting name="logImpl" value="SLF4J" /><!-- logging 구현체 -->
+        <setting name="defaultScriptingLanguage" value="velocity"/>
+    </settings>
+
+    <typeAliases>
+        <typeAlias alias="hashMap" type="java.util.HashMap" />
+        <typeAlias alias="map" type="java.util.Map" />
+        <typeAlias alias="velocity" type="org.mybatis.scripting.velocity.VelocityLanguageDriver"/>
+    </typeAliases>
+    
+    <typeHandlers>
+	  <typeHandler javaType="java.lang.Object" jdbcType="CLOB" handler="org.apache.ibatis.type.StringTypeHandler" />
+	</typeHandlers>
+    
+    <!-- //sql 로그용도로 사용 -->
+    <plugins>
+		<plugin interceptor="wi.com.wisnop.common.interceptor.MybatisLogInterceptor" />
+	</plugins>
+	
+</configuration>
+

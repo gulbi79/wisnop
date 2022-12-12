@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+
+	<select id="yearListSelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.yearListSelect ] ******/
+	    SELECT YEAR AS CODE_CD
+	         , YEAR AS CODE_NM
+		FROM
+		(
+			SELECT DISTINCT YEAR
+		  	FROM TB_MST_CALENDAR WITH(NOLOCK)
+		) A
+		WHERE YEAR <![CDATA[<=]]> CONVERT(VARCHAR(4), DBO.UFN_GETDATE(), 112)
+		ORDER BY YEAR DESC
+    </select>
+	  
+	<select id="lamSalesTrendWeeklySelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.lamSalesTrendWeeklySelect ] ******/
+	    SELECT NULL AS TMP_COL
+	    	#foreach( $dimMap in $_parameter.dimList )
+	    	 , B.$dimMap.DIM_CD
+			 , B.${dimMap.DIM_CD}_NM AS ${dimMap.DIM_CD}_NM
+			#end
+	    	#set($strInBucket = "")
+			#foreach( $bucketMap in $_parameter.bucketList )
+			#set($paramWeek = "$bucketMap.BUCKET_VAL")
+	  		#if($bucketMap.TOT_TYPE != "MT")
+	         , $bucketMap.CD AS $bucketMap.CD
+	    	#set($strInBucket = $strInBucket + "," +$bucketMap.CD)
+	  		#else
+	         , ISNULL($strInBucket.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+	    	#set($strInBucket = "")
+	  		#end
+			#end
+			 , Q1_QTY
+			 , Q2_QTY
+			 , Q3_QTY
+			 , Q4_QTY
+			 , Q1_QTY / 3 AS Q1_AVG
+			 , Q2_QTY / 3 AS Q2_AVG
+			 , Q3_QTY / 3 AS Q3_AVG
+			 , Q4_QTY / 3 AS Q4_AVG
+			 , FIRST_QTY
+			 , SECOND_QTY
+			 , FIRST_QTY / 6 AS FIRST_AVG
+			 , SECOND_QTY / 6 AS SECOND_AVG
+			 , YEAR_QTY
+			 , YEAR_AMT
+		FROM
+	    (
+		    SELECT NULL AS TMP_COL
+				<include refid="include.getCdDimTotal"/>
+				<include refid="include.getGrpLvlId"/>
+				#foreach( $bucketMap in $_parameter.bucketList )
+				#set($paramWeek = "$bucketMap.BUCKET_VAL")
+		  		#if($bucketMap.TOT_TYPE != "MT")
+		         , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN QTY END) AS $bucketMap.CD
+		  		#end
+				#end
+				 , SUM(CASE WHEN QUARTER = 1 THEN QTY END) AS Q1_QTY
+				 , SUM(CASE WHEN QUARTER = 2 THEN QTY END) AS Q2_QTY
+				 , SUM(CASE WHEN QUARTER = 3 THEN QTY END) AS Q3_QTY
+				 , SUM(CASE WHEN QUARTER = 4 THEN QTY END) AS Q4_QTY
+				 , SUM(CASE WHEN HALF = 1 THEN QTY END) AS FIRST_QTY
+				 , SUM(CASE WHEN HALF = 2 THEN QTY END) AS SECOND_QTY
+				 , SUM(QTY) AS YEAR_QTY
+				 , SUM(YEAR_AMT) AS YEAR_AMT
+		    FROM
+		    (
+			    SELECT ISNULL(DBO.CUST_CD, ' ') AS CUST_CD
+			         , ISNULL(DBO.CUST_CD, ' ') AS CUST_CD_NM
+				     , ISNULL(MBP.BP_NM, ' ') AS CUST_NM
+				     , ISNULL(MBP.BP_NM, ' ') AS CUST_NM_NM
+				     , ISNULL(CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN MCO.CODE_NM_KR
+				            	   WHEN UPPER(@{GV_LANG}) = 'CN' THEN MCO.CODE_NM_CN
+				             	   ELSE MCO.CODE_NM
+							   END, ' ') AS LAM_ORD_TYPE
+				     , ISNULL(CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN MCO.CODE_NM_KR
+				            	   WHEN UPPER(@{GV_LANG}) = 'CN' THEN MCO.CODE_NM_CN
+				             	   ELSE MCO.CODE_NM
+							   END, ' ') AS LAM_ORD_TYPE_NM
+				     , ISNULL(DBO.ITEM_CD, ' ') AS ITEM_CD
+				     , ISNULL(DBO.ITEM_CD, ' ') AS ITEM_CD_NM
+				     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+				     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+				     , ISNULL(MI.SPEC, ' ') AS SPEC
+				     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+				     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO
+				     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO_NM
+				     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+				     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+				     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+				     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+				     , ISNULL(CAST (MICG.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+				     , ISNULL(CAST (MICG.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+				     , TMC.YEARPWEEK
+				     , TMC.QUARTER
+				     , TMC.HALF
+				     , DBO.QTY
+				     , DBO.AMT_KRW AS YEAR_AMT
+				FROM TB_DYN_BILL_ORDER DBO WITH(NOLOCK)
+				INNER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+				   ON MC.COMPANY_CD = DBO.COMPANY_CD
+				  AND MC.BU_CD = DBO.BU_CD
+				  AND MC.CUST_CD = DBO.CUST_CD
+				  AND MC.REP_CUST_GROUP_CD = 'RCG003'
+				INNER JOIN TB_MST_BIZ_PARTNER MBP WITH(NOLOCK)
+    			   ON MBP.COMPANY_CD = DBO.COMPANY_CD
+   				  AND MBP.BU_CD = DBO.BU_CD
+   				  AND MBP.BP_CD = DBO.CUST_CD
+				INNER JOIN TB_MST_CALENDAR MCAL WITH(NOLOCK)
+				   ON MCAL.YYYYMMDD = DBO.BILL_DATE
+				INNER JOIN TB_DYN_SALES_ORDER DSO WITH(NOLOCK)
+				   ON DSO.COMPANY_CD = DBO.COMPANY_CD
+				  AND DSO.BU_CD = DBO.BU_CD
+				  AND DSO.SO_NO = DBO.SO_NO
+				  AND DSO.SO_SEQ = DBO.SO_SEQ
+				  AND DSO.DEL_FLAG = 'N'
+				INNER JOIN TB_MST_CODE MCO WITH(NOLOCK)
+				   ON MCO.BU_CD = DBO.BU_CD
+				  AND MCO.GROUP_CD = 'LAM_ORD_TYPE'
+				  AND MCO.CODE_CD = CASE WHEN DBO.BILL_TO_PARTY = '10485' AND DSO.SL_CD = 'P36' THEN 'CON'
+				                         WHEN DBO.BILL_TO_PARTY = '10485' AND DSO.SL_CD != 'P36' THEN 'NON'
+				                         WHEN DBO.BILL_TO_PARTY = '30038' AND DSO.SL_CD = 'P31' THEN 'CON'
+				                         WHEN DBO.BILL_TO_PARTY = '30038' AND DSO.SL_CD != 'P31' THEN 'NON'
+				                     END
+				INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+				   ON MI.COMPANY_CD = DBO.COMPANY_CD
+				  AND MI.BU_CD = DBO.BU_CD
+				  AND MI.ITEM_CD = DBO.ITEM_CD
+				LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+				  ON MIG.COMPANY_CD = MI.COMPANY_CD
+				 AND MIG.BU_CD = MI.BU_CD
+				 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+				LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+				  ON MICG.COMPANY_CD = DBO.COMPANY_CD
+				 AND MICG.BU_CD = DBO.BU_CD
+				 AND MICG.ITEM_CD =DBO.ITEM_CD
+				 AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+				LEFT OUTER JOIN TB_MST_CALENDAR TMC WITH(NOLOCK)
+				  ON DBO.BILL_DATE = TMC.YYYYMMDD
+				WHERE DBO.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND DBO.BU_CD = @{GV_BU_CD}
+				  AND DBO.DEL_FLAG = 'N'
+				  AND TMC.YEAR = @{year}
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+       			  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+  				#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       			  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+  				#end
+  				#if($_parameter.spec and $_parameter.spec != "")
+       			  AND (MI.SPEC LIKE '%'+@{spec}+'%')
+  				#end
+  				#if($_parameter.lamOrdType and $_parameter.lamOrdType != "")
+                  AND MCO.CODE_CD = @{lamOrdType}
+  				#end
+			) A
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)  
+		) B
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		  , B.$dimMap.DIM_CD
+		#end 
+	</select>
+</mapper>

@@ -1,0 +1,1622 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.planCommon">
+	<select id="weekListSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.weekListSelect ] ******/
+		SELECT YEARPWEEK
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YYYYMMDD BETWEEN @{fCal} AND @{tCal}
+		GROUP BY YEARPWEEK
+	</select>	
+
+	<select id="salesPlanVersionSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.salesPlanVersionSelect ] ******/
+		#if ($_parameter.menuParam == "CFM")
+			WITH MP_PLAN AS 
+			(
+			    SELECT MAX(START_WEEK) AS START_WEEK
+			    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+			    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+			      AND BU_CD        = @{GV_BU_CD}
+			      AND PLAN_TYPE_CD = 'MP'
+			      AND CUT_OFF_FLAG = 'Y'
+			)
+			, CUR_PLAN AS 
+			(
+				SELECT PLAN_ID, START_WEEK, END_WEEK
+			    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+			    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+			      AND BU_CD        = @{GV_BU_CD}
+			      AND PLAN_TYPE_CD = 'DP_W'
+			      AND START_WEEK   = (
+								         SELECT TOP 1 YEARWEEK 
+								         FROM TB_MST_CALENDAR
+								         WHERE YEARWEEK <![CDATA[<]]> (SELECT START_WEEK FROM MP_PLAN)
+								         ORDER BY YEARWEEK DESC
+								      )
+			)
+			, NEXT_WEEK AS 
+			(
+			    SELECT TOP 1 C.YYYYMMDD
+			    FROM CUR_PLAN P
+			    JOIN TB_MST_CALENDAR C WITH(NOLOCK)
+			      ON P.START_WEEK <![CDATA[<]]> C.YEARWEEK 
+			     AND C.DAY_NM = 'FRI'
+			    ORDER BY C.YYYYMMDD ASC
+			),
+		#else
+			WITH CUR_PLAN AS 
+			(
+				SELECT TOP 1 PLAN_ID
+				     , START_WEEK
+				     , END_WEEK
+			    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+			    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+			      AND BU_CD        = @{GV_BU_CD}
+			      AND PLAN_TYPE_CD = 'DP_W'
+			      AND CUT_OFF_FLAG = 'N'
+			    ORDER BY PLAN_ID DESC
+			),
+		#end
+			MAX_MONTH AS 
+			(
+				SELECT TOP 1 CASE WHEN C.MONTH+4 > 12 THEN C.YEAR+1 ELSE C.YEAR END AS YEAR
+			         , CASE WHEN C.MONTH+4 > 12 THEN C.MONTH-8 ELSE C.MONTH+4 END AS MONTH
+			    FROM CUR_PLAN P
+			    JOIN TB_MST_CALENDAR C WITH(NOLOCK)
+			      ON P.START_WEEK = C.YEARWEEK
+			    ORDER BY C.MONTH DESC 
+			)
+			SELECT (SELECT CONVERT(VARCHAR(10), CONVERT(DATE, MIN(C.YYYYMMDD)), 120) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.START_WEEK = C.YEARWEEK)) AS MIN_DATE
+			     , CONVERT(VARCHAR(10), DATEADD(DAY, 20, (SELECT CONVERT(VARCHAR(10), CONVERT(DATE, MIN(C.YYYYMMDD)), 120) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.START_WEEK = C.YEARWEEK))), 120) AS TO_DATE
+			     , CONVERT(VARCHAR(10), DATEADD(DAY, 21, (SELECT CONVERT(VARCHAR(10), CONVERT(DATE, MIN(C.YYYYMMDD)), 120) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.START_WEEK = C.YEARWEEK))), 120) AS W3_DATE
+			     , CONVERT(VARCHAR(10), DATEADD(DAY, 139, (SELECT CONVERT(VARCHAR(10), CONVERT(DATE, MIN(C.YYYYMMDD)), 120) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.START_WEEK = C.YEARWEEK))), 120) AS CLOSE_DATE
+			     , (SELECT MIN(C.YEARPWEEK) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.START_WEEK = C.YEARWEEK)) AS MIN_PWEEK
+			     , (SELECT PLAN_ID FROM CUR_PLAN P) AS PLAN_ID
+				#if ($_parameter.menuParam == "CFM")
+			     , (SELECT YYYYMMDD FROM NEXT_WEEK N ) AS NEXT_DATE
+			     , (SELECT TOP 1 CONVERT(VARCHAR(10), DATEADD(DD, 140, C.YYYYMMDD), 120) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.START_WEEK = C.YEARWEEK) ORDER BY C.YYYYMMDD DESC) AS MAX_DATE
+			     , (SELECT YEARPWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT TOP 1 CONVERT(VARCHAR, DATEADD(DD, 140, C.YYYYMMDD), 112) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.START_WEEK = C.YEARWEEK) ORDER BY C.YYYYMMDD DESC)) AS MAX_PWEEK
+			    #else
+			     , (SELECT CONVERT(VARCHAR(10), CONVERT(DATE, MAX(C.YYYYMMDD)), 120) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.END_WEEK = C.YEARWEEK)) AS MAX_DATE
+			     , (SELECT MAX(C.YEARPWEEK) FROM CUR_PLAN  P JOIN TB_MST_CALENDAR C WITH(NOLOCK) ON (P.END_WEEK = C.YEARWEEK)) AS MAX_PWEEK
+				#end
+	</select>
+	
+	<select id="salesPlanRoleSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.salesPlanRoleSelect ] ******/
+		BEGIN
+		    <include refid="dp.common.salesPlanRole"/>
+		
+		    SELECT @AP2_YN AS AP2_YN
+		         , @AP1_YN AS AP1_YN
+		         , @GOC_YN AS GOC_YN
+		    ;
+		END
+	</select>
+	
+	<select id="ap13mWeekSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.ap13mWeekSelect ] ******/
+		SELECT MAX(MIN_RATE) AS MIN_RATE
+		     , MAX(MAX_RATE) AS MAX_RATE
+		FROM
+		(
+		  	SELECT CASE WHEN CODE_CD = 'MIN' THEN MIN(ATTB_1_CD) END MIN_RATE
+		         , CASE WHEN CODE_CD = 'MAX' THEN MAX(ATTB_1_CD) END MAX_RATE            
+		  	FROM TB_MST_CODE
+		  	WHERE BU_CD = @{GV_BU_CD}
+		      AND GROUP_CD = 'SP_ALERT_RATE'
+		      AND USE_FLAG = 'Y'
+		  	GROUP BY CODE_CD
+		) A1
+	</select>
+	
+	<select id="salesPlanIdPastSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.salesPlanIdPastSelect] ******/
+		#if($_parameter.menuParam == "CFM")
+			WITH MP_PLAN AS 
+			(
+			    SELECT MAX(START_WEEK) AS START_WEEK
+			    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+			    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+			      AND BU_CD        = @{GV_BU_CD}
+			      AND PLAN_TYPE_CD = 'MP'
+			      AND CUT_OFF_FLAG = 'Y'
+			)
+			, CUR_PLAN AS 
+			(
+				SELECT PLAN_ID
+				     , START_WEEK
+				     , END_WEEK
+				     , CUT_OFF_FLAG
+			    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+			    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+			      AND BU_CD        = @{GV_BU_CD}
+			      AND PLAN_TYPE_CD = 'DP_W'
+			      AND START_WEEK  <![CDATA[<=]]>  (
+								         SELECT TOP 1 YEARWEEK 
+								         FROM TB_MST_CALENDAR
+								         WHERE YEARWEEK <![CDATA[<]]>  (SELECT START_WEEK FROM MP_PLAN)
+								         ORDER BY YEARWEEK DESC
+								      )
+			)
+		#else
+			WITH CUR_PLAN AS 
+			(
+				SELECT PLAN_ID
+				     , START_WEEK
+				     , END_WEEK
+				     , RELEASE_FLAG
+			    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+			    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+			      AND BU_CD        = @{GV_BU_CD}
+			      AND PLAN_TYPE_CD = 'DP_W'
+			)
+		#end
+		#if ($_parameter.menuParam == "CFM")
+		  SELECT PLAN_ID AS CODE_CD
+                 , PLAN_ID AS CODE_NM
+                 , START_WEEK
+                 , END_WEEK
+                 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, -7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) + '_W' AS BEFORE_PLAN_ID
+                 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) AS DIM_WEEK
+                 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 14, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) AS DIM_WEEK_1
+                 , (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'MON') AS DIM_WEEK_MONDAY
+                 , (SELECT YEARPWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT MIN(CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112)) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK)) AS PART_A_DIM_WEEK
+                 , (SELECT YEARPWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT MAX(CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112)) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK)) AS PART_B_DIM_WEEK
+                 , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS START_DAY
+                 , (SELECT CONVERT(VARCHAR(10), DATEADD(DAY, 20, YYYYMMDD), 112) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS END_DAY
+                 , (SELECT CONVERT(VARCHAR(10), DATEADD(DAY, 21, YYYYMMDD), 112) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS W3_DAY
+                 , (SELECT CONVERT(VARCHAR(10), DATEADD(DAY, 41, YYYYMMDD), 112) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS CLOSE_DAY
+                 , (SELECT MIN(YYYYMMDD) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK) AS START_REMAINS
+                 , (SELECT MAX(YYYYMMDD) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK) AS END_REMAINS
+                 , CUT_OFF_FLAG
+                 FROM CUR_PLAN A1 
+                 ORDER BY PLAN_ID DESC
+		#else
+		, TEMP AS (
+		    SELECT PLAN_ID AS CODE_CD
+                 , PLAN_ID AS CODE_NM
+                 , START_WEEK
+                 , END_WEEK
+                 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, -7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) + '_W' AS BEFORE_PLAN_ID
+                 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) AS DIM_WEEK
+                 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 14, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) AS DIM_WEEK_1
+                 , (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'MON') AS DIM_WEEK_MONDAY
+                 , (SELECT YEARPWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT MIN(CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112)) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK)) AS PART_A_DIM_WEEK
+                 , (SELECT YEARPWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT MAX(CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112)) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK)) AS PART_B_DIM_WEEK
+                 , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS START_DAY
+                 , (SELECT CONVERT(VARCHAR(10), DATEADD(DAY, 20, YYYYMMDD), 112) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS END_DAY
+                 , (SELECT CONVERT(VARCHAR(10), DATEADD(DAY, 21, YYYYMMDD), 112) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS W3_DAY
+                 , (SELECT CONVERT(VARCHAR(10), DATEADD(DAY, 41, YYYYMMDD), 112) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN') AS CLOSE_DAY
+                 , (SELECT MIN(YYYYMMDD) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK) AS START_REMAINS
+                 , (SELECT MAX(YYYYMMDD) FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK) AS END_REMAINS
+                 , RELEASE_FLAG
+                 , (
+                 
+	                    SELECT MIN(YEARMONTH) 
+	                    FROM TB_MST_CALENDAR 
+	                    WHERE YEARWEEK = A1.START_WEEK
+	                        
+                   )  AS 'YEARMONTH'
+                 , RANK() OVER(ORDER BY PLAN_ID DESC) AS RN
+                 FROM CUR_PLAN A1 
+                 
+        )
+        
+        SELECT *
+        , CASE WHEN TEMP.RN = 1 THEN 
+        (
+            SELECT TOP 1 START_MONTH
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+              AND BU_CD        = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'DP_M'
+              AND CUT_OFF_FLAG = 'Y'
+              ORDER BY PLAN_ID DESC
+        )+'M'
+        ELSE
+        (
+                        
+            TEMP.YEARMONTH
+                 
+        )+'M'
+        END AS 'YEARMONTH_M'
+        FROM TEMP
+        
+        
+		#end
+		
+	</select>
+	
+	<select id="currentWeekSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.currentWeekSelect] ******/
+		SELECT CONVERT(VARCHAR(4), DATEPART(YY, DBO.UFN_GETDATE())) + REPLICATE(0, 2 - LEN(DATEPART(WEEK, DBO.UFN_GETDATE()))) +  CONVERT(VARCHAR(2), DATEPART(WEEK, DBO.UFN_GETDATE())) AS CURRENT_WEEK
+		     , CONVERT(VARCHAR(4), DATEPART(YY, DBO.UFN_GETDATE())) + REPLICATE(0, 2 - LEN(DATEPART(MONTH, DBO.UFN_GETDATE()))) +  CONVERT(VARCHAR(2), DATEPART(MONTH, DBO.UFN_GETDATE())) AS CURRENT_MONTH
+		     , LEFT(CONVERT(VARCHAR(8), DATEADD(M, 1, CONVERT(VARCHAR(4), DATEPART(YY, DBO.UFN_GETDATE())) + REPLICATE(0, 2 - LEN(DATEPART(MONTH, DBO.UFN_GETDATE()))) +  CONVERT(VARCHAR(2), DATEPART(MONTH, DBO.UFN_GETDATE())) + '01'), 112), 6) AS CURRENT_MONTH_NEXT
+	</select>
+	
+	<select id="qtyDateSearchSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.qtyDateSearchSelect ] ******/
+		SELECT YYYYMMDD
+		FROM TB_MST_CALENDAR
+		WHERE 1 = 1
+		#if ($_parameter.pastFlag == "Y")
+		  AND YEARWEEK = @{yearWeek}
+		  #if ($_parameter.menuParam == "CFM")
+		    AND DAY_NM = 'FRI' 
+		  #else
+		    AND DAY_NM = 'TUE'
+		  #end
+		#else
+		  AND YYYYMMDD = CONVERT(VARCHAR(8), DBO.UFN_GETDATE(), 112)
+		#end
+	</select>
+	
+	<update id="salesPlanProcedureUpdate" parameterType="map">
+		BEGIN
+			exec dbo.USP_TB_DYN_SALES_PLAN_UPDATE @{GV_COMPANY_CD}, @{GV_BU_CD}, 'CFM_SP', @{ITEM_CD_NM}, @{CUST_GROUP_CD_NM};
+		END;
+	</update>
+	
+	<update id="salesPlanReasonUpdate" parameterType="map">
+    /****** [ dp.planCommon.salesPlanReasonUpdate ] ******/
+    BEGIN
+        /* Select : Product Level2 code and Confirm Y/N ---------------------------- */
+        DECLARE @CONFIRM_YN      nvarchar(1);
+        DECLARE @PROD_LVL2_CD    nvarchar(20);
+        DECLARE @SALES_PRICE_KRW numeric(21, 6);
+        
+#if($_parameter.menuParam == "CFM")
+        WITH W_CODE AS 
+        (
+            #set($_parameter.groupCd="DAY_INDEX")
+            <include refid="include.mstCode"/>
+        )
+        SELECT @CONFIRM_YN = CASE WHEN CD.ATTB_1_CD = 'N' THEN 'Y'
+                			      ELSE (
+						                  SELECT TOP 1 CASE WHEN PLAN_ID = @{planIdPast} THEN 'N' ELSE 'Y' END
+						                  FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+						                  WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+						                    AND BU_CD        = @{GV_BU_CD}
+						                    AND PLAN_TYPE_CD = 'DP_W'
+						                    AND RELEASE_FLAG = 'Y'
+						                  ORDER BY PLAN_ID DESC
+                						)
+                			  END
+		FROM W_CODE CD
+        JOIN TB_MST_CALENDAR CA WITH(NOLOCK)
+          ON CD.CODE_CD  = CA.DAY_NM
+		 AND CA.YYYYMMDD = CONVERT(VARCHAR(8), DBO.UFN_GETDATE(), 112)
+       	;
+        
+		SELECT @PROD_LVL2_CD    = IT.PROD_LVL2_CD
+             , @SALES_PRICE_KRW = ISNULL(CG.SALES_PRICE_KRW, 0)
+        FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+        JOIN TB_MST_ITEM IT WITH(NOLOCK)
+          ON CG.COMPANY_CD = IT.COMPANY_CD
+         AND CG.BU_CD      = IT.BU_CD
+         AND CG.ITEM_CD    = IT.ITEM_CD
+         AND IT.VALID_FLAG = 'Y'
+         AND IT.USE_FLAG   = 'Y'
+		WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+          AND CG.BU_CD         = @{GV_BU_CD}
+          AND CG.ITEM_CD       = @{ITEM_CD}
+          AND CG.CUST_GROUP_CD = @{CUST_GROUP_CD}
+          #if($_parameter.pastFlag != "Y")
+	      AND CG.SALES_PLAN_YN = 'Y'
+	      #end
+          AND CG.VALID_FLAG    = 'Y'
+		;
+#else
+		SELECT @CONFIRM_YN = 
+        		#if($_parameter.menuParam == "AP2")
+        		ISNULL(CG.CONFIRM_YN_AP2, 'N')
+        		#end
+             , @PROD_LVL2_CD    = IT.PROD_LVL2_CD
+             , @SALES_PRICE_KRW = ISNULL(CG.SALES_PRICE_KRW, 0)
+		FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+        JOIN TB_MST_ITEM IT WITH(NOLOCK)
+          ON CG.COMPANY_CD = IT.COMPANY_CD
+		 AND CG.BU_CD      = IT.BU_CD
+         AND CG.ITEM_CD    = IT.ITEM_CD
+         AND IT.VALID_FLAG = 'Y'
+         AND IT.USE_FLAG   = 'Y'
+		WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+          AND CG.BU_CD         = @{GV_BU_CD}
+          AND CG.ITEM_CD       = @{ITEM_CD}
+          AND CG.CUST_GROUP_CD = @{CUST_GROUP_CD}
+		#if($_parameter.pastFlag != "Y")
+          AND CG.SALES_PLAN_YN = 'Y'
+		#end
+          AND CG.VALID_FLAG    = 'Y'
+		;
+#end
+
+        /* Check : Confirm Y/N ----------------------------------------------------- */
+        IF (@CONFIRM_YN != 'Y')
+            BEGIN
+                
+                /* Select : Frozen Week -------------------------------------------- */
+                DECLARE @FROZEN_WEEK nvarchar(1000);
+                
+                WITH W_PWEEK AS 
+                (
+                    SELECT YEARWEEK
+                         , YEARPWEEK
+                         , DENSE_RANK() OVER(ORDER BY YEARWEEK ASC) AS RNUM
+                    FROM TB_MST_CALENDAR WITH(NOLOCK)
+                    WHERE YYYYMMDD BETWEEN @{planStartDay} AND @{toCal}
+                    GROUP BY YEARWEEK, YEARPWEEK
+                ),
+                W_CODE AS 
+                (
+                    #set($_parameter.groupCd="DMD_FROZEN_PERIOD")
+                    <include refid="include.mstCode"/>
+                ),
+                W_FROZEN AS 
+                (
+					SELECT W.YEARPWEEK
+                    FROM W_PWEEK W
+                    WHERE W.RNUM <![CDATA[<=]]> 
+                    (
+                    	SELECT CASE WHEN ISNUMERIC(MAX(CD.ATTB_1_CD)) = 1 THEN MAX(CD.ATTB_1_CD) ELSE 1 END AS FROZEN_WEEK
+                        FROM W_CODE CD WITH(NOLOCK)
+                        WHERE CD.CODE_CD = @PROD_LVL2_CD
+					)
+                )
+                SELECT @FROZEN_WEEK = STUFF((SELECT ',' + YEARPWEEK FROM W_FROZEN ORDER BY YEARPWEEK ASC FOR XML PATH ('')), 1, 1, '');
+                
+                /* Week Cursor ----------------------------------------------------- */
+                DECLARE BUCKET_LIST CURSOR FOR
+                
+#foreach ($bucketMap in $_parameter.BUCKET_LIST)
+#if ($foreach.count != 1)
+				UNION ALL
+#end
+				SELECT '$bucketMap.YEARPWEEK' AS YEARPWEEK, '$bucketMap.YEARWEEK' AS YEARWEEK, '$bucketMap.ADJ_REASON' AS ADJ_REASON  
+#end
+                /* Open : Week Cursor ---------------------------------------------- */
+                OPEN BUCKET_LIST
+                
+                DECLARE @YEARPWEEK  nvarchar(7);
+                DECLARE @YEARWEEK   nvarchar(6);
+                DECLARE @ADJ_REASON nvarchar(4000);
+                
+                FETCH NEXT FROM BUCKET_LIST INTO @YEARPWEEK, @YEARWEEK, @ADJ_REASON
+                
+                WHILE (@@FETCH_STATUS = 0)
+                    BEGIN
+                        
+                        /* Check : Frozen Week ------------------------------------- */
+                        IF (CHARINDEX(@YEARPWEEK, @FROZEN_WEEK) = 0)
+                          BEGIN
+
+                            /* Start Save : Sales Plan ----------------------------- */
+                            IF (@ADJ_REASON = '')
+                            
+                              BEGIN
+                                
+                                UPDATE TB_DYN_SALES_PLAN
+                                   SET ADJ_REASON    = ''
+                                     , UPDATE_ID   = CASE WHEN ADJ_REASON = @ADJ_REASON THEN UPDATE_ID ELSE @{GV_USER_ID} END
+                                     , UPDATE_DTTM = CASE WHEN ADJ_REASON = @ADJ_REASON THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+                                 WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+                                   AND BU_CD         = @{GV_BU_CD}
+                                   AND ITEM_CD       = @{ITEM_CD}
+                                   AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+                                   AND MEAS_CD       = @{MEAS_CD}
+                                   AND YEARPWEEK     = @YEARPWEEK;
+                              END
+                            ELSE
+                              BEGIN
+								MERGE TB_DYN_SALES_PLAN AS A
+                                USING (SELECT 'X' AS DUAL) AS B 
+                                   ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+                                     AND BU_CD         = @{GV_BU_CD}
+                                     AND ITEM_CD       = @{ITEM_CD}
+                                     AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+                                     AND MEAS_CD       = @{MEAS_CD}
+                                     AND YEARPWEEK     = @YEARPWEEK
+                                   )
+                                WHEN MATCHED THEN
+                                   UPDATE
+                                      SET ADJ_REASON  = @ADJ_REASON
+                                        , UPDATE_ID   = CASE WHEN ADJ_REASON = @ADJ_REASON THEN UPDATE_ID ELSE @{GV_USER_ID} END
+                                        , UPDATE_DTTM = CASE WHEN ADJ_REASON = @ADJ_REASON THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+                                WHEN NOT MATCHED THEN
+                                   INSERT 
+                                   (
+                                       COMPANY_CD
+                                     , BU_CD
+                                     , ITEM_CD
+                                     , CUST_GROUP_CD
+                                     , MEAS_CD
+                                     , YEARPWEEK
+                                     , YEARWEEK
+                                     , ADJ_REASON
+                                     , CREATE_ID
+                                     , CREATE_DTTM
+                                     , UPDATE_ID
+                                     , UPDATE_DTTM
+                                   ) VALUES (
+                                       @{GV_COMPANY_CD}
+                                     , @{GV_BU_CD}
+                                     , @{ITEM_CD}
+                                     , @{CUST_GROUP_CD}
+                                     , @{MEAS_CD}
+                                     , @YEARPWEEK
+                                     , @YEARWEEK
+                                     , @ADJ_REASON
+                                     , @{GV_USER_ID}
+                                     , DBO.UFN_GETDATE()
+                                     , @{GV_USER_ID}
+                                     , DBO.UFN_GETDATE()
+                                   );
+                              END
+                              
+                            /* End Save   : Sales Plan ----------------------------- */
+                            
+                          END
+                        
+                        FETCH NEXT FROM BUCKET_LIST INTO @YEARPWEEK, @YEARWEEK, @ADJ_REASON
+                    
+                    END
+                    
+                CLOSE BUCKET_LIST
+                DEALLOCATE BUCKET_LIST
+                /* Close : Week Cursor --------------------------------------------- */
+            END
+    END;
+    </update>
+	
+	
+	<update id="salesPlanUpdate" parameterType="map">
+    /****** [ dp.planCommon.salesPlanUpdate ] ******/
+	BEGIN
+        /* Select : Product Level2 code and Confirm Y/N ---------------------------- */
+        DECLARE @CONFIRM_YN      nvarchar(1);
+        DECLARE @PROD_LVL2_CD    nvarchar(20);
+        DECLARE @SALES_PRICE_KRW numeric(21, 6);
+        
+#if($_parameter.menuParam == "CFM")
+        WITH W_CODE AS 
+        (
+            #set($_parameter.groupCd="DAY_INDEX")
+            <include refid="include.mstCode"/>
+        )
+        SELECT @CONFIRM_YN = CASE WHEN CD.ATTB_1_CD = 'N' THEN 'Y'
+                			      ELSE (
+						                  SELECT TOP 1 CASE WHEN PLAN_ID = @{planIdPast} THEN 'N' ELSE 'Y' END
+						                  FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+						                  WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+						                    AND BU_CD        = @{GV_BU_CD}
+						                    AND PLAN_TYPE_CD = 'DP_W'
+						                    AND RELEASE_FLAG = 'Y'
+						                  ORDER BY PLAN_ID DESC
+                						)
+                			  END
+		FROM W_CODE CD
+        JOIN TB_MST_CALENDAR CA WITH(NOLOCK)
+          ON CD.CODE_CD  = CA.DAY_NM
+		 AND CA.YYYYMMDD = CONVERT(VARCHAR(8), DBO.UFN_GETDATE(), 112)
+       	;
+        
+		SELECT @PROD_LVL2_CD    = IT.PROD_LVL2_CD
+             , @SALES_PRICE_KRW = ISNULL(CG.SALES_PRICE_KRW, 0)
+        FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+        JOIN TB_MST_ITEM IT WITH(NOLOCK)
+          ON CG.COMPANY_CD = IT.COMPANY_CD
+		 AND CG.BU_CD      = IT.BU_CD
+         AND CG.ITEM_CD    = IT.ITEM_CD
+         AND IT.VALID_FLAG = 'Y'
+         AND IT.USE_FLAG   = 'Y'
+		WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+          AND CG.BU_CD         = @{GV_BU_CD}
+          AND CG.ITEM_CD       = @{ITEM_CD}
+          AND CG.CUST_GROUP_CD = @{CUST_GROUP_CD}
+          #if($_parameter.pastFlag != "Y")
+	      AND CG.SALES_PLAN_YN = 'Y'
+	      #end
+          AND CG.VALID_FLAG    = 'Y'
+		;
+#else
+		
+		SELECT @CONFIRM_YN      = 
+        		#if($_parameter.menuParam == "AP2")
+        		ISNULL(CG.CONFIRM_YN_AP2, 'N')
+        		#end
+             , @PROD_LVL2_CD    = IT.PROD_LVL2_CD
+             , @SALES_PRICE_KRW = ISNULL(CG.SALES_PRICE_KRW, 0)
+		FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+        JOIN TB_MST_ITEM IT WITH(NOLOCK)
+          ON CG.COMPANY_CD = IT.COMPANY_CD
+		 AND CG.BU_CD      = IT.BU_CD
+         AND CG.ITEM_CD    = IT.ITEM_CD
+         AND IT.VALID_FLAG = 'Y'
+         AND IT.USE_FLAG   = 'Y'
+		WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+          AND CG.BU_CD         = @{GV_BU_CD}
+          AND CG.ITEM_CD       = @{ITEM_CD}
+          AND CG.CUST_GROUP_CD = @{CUST_GROUP_CD}
+		#if($_parameter.pastFlag != "Y")
+          AND CG.SALES_PLAN_YN = 'Y'
+		#end
+          AND CG.VALID_FLAG    = 'Y'
+		;
+#end
+
+        /* Check : Confirm Y/N ----------------------------------------------------- */
+        IF (@CONFIRM_YN != 'Y')
+            BEGIN
+                
+                /* Select : Frozen Week -------------------------------------------- */
+                DECLARE @FROZEN_WEEK     nvarchar(1000)
+                
+                WITH W_PWEEK AS 
+                (
+                    SELECT YEARWEEK, YEARPWEEK, DENSE_RANK() OVER(ORDER BY YEARWEEK ASC) AS RNUM
+                    FROM TB_MST_CALENDAR WITH(NOLOCK)
+                    WHERE YYYYMMDD BETWEEN @{planStartDay} AND @{toCal}
+                    GROUP BY YEARWEEK, YEARPWEEK
+                ),
+                W_CODE AS  
+                (
+                    #set($_parameter.groupCd="DMD_FROZEN_PERIOD")
+                    <include refid="include.mstCode"/>
+                ),
+                W_FROZEN AS 
+                (
+                    SELECT W.YEARPWEEK
+                    FROM W_PWEEK W
+                    WHERE W.RNUM <![CDATA[<=]]> 
+                    (
+                        SELECT CASE WHEN ISNUMERIC(MAX(CD.ATTB_1_CD)) = 1 THEN MAX(CD.ATTB_1_CD) ELSE 1 END AS FROZEN_WEEK
+                        FROM W_CODE CD WITH(NOLOCK)
+                        WHERE CD.CODE_CD  = @PROD_LVL2_CD
+                    )
+                )
+                SELECT @FROZEN_WEEK = STUFF((SELECT ',' + YEARPWEEK FROM W_FROZEN ORDER BY YEARPWEEK ASC FOR XML PATH ('')), 1, 1, '')
+                ;
+                
+                /* Week Cursor ----------------------------------------------------- */
+                DECLARE BUCKET_LIST CURSOR FOR
+                
+#foreach ($bucketMap in $_parameter.BUCKET_LIST)
+#if ($foreach.count != 1)
+				UNION ALL
+#end
+				SELECT '$bucketMap.YEARPWEEK' AS YEARPWEEK, '$bucketMap.YEARWEEK' AS YEARWEEK, $bucketMap.QTY AS QTY, '$bucketMap.MEAS' AS MEAS, $bucketMap.UPDATE_CNT AS UPDATE_CNT, CASE WHEN $bucketMap.QTY <![CDATA[<]]> 0 THEN 0 ELSE FLOOR($bucketMap.QTY) END QTY_CHANGE  
+#end
+                /* Open : Week Cursor ---------------------------------------------- */
+                OPEN BUCKET_LIST
+                
+                DECLARE @YEARPWEEK  	  nvarchar(7)
+                DECLARE @YEARWEEK   	  nvarchar(6)
+                DECLARE @MEAS       	  nvarchar(12)
+                DECLARE @QTY        	  numeric(21,6)
+                DECLARE @QTY_CHANGE    	  numeric(21,6)
+                DECLARE @UPDATE_CNT 	  numeric(2)
+                DECLARE @DMD_YN     	  nvarchar(1)
+                DECLARE @CUST_LVL2_CD_YN  nvarchar(10)
+                DECLARE @DMD1_YN 		  nvarchar(1)
+                DECLARE @DMD2_YN 		  nvarchar(1)
+                DECLARE @DMD3_YN 		  nvarchar(1)
+                DECLARE @EXCEL_FLAG       nvarchar(1)
+        		DECLARE @EXCEL_UPDATE_CNT int
+        		DECLARE @ALL_QTY 		  numeric(21,6)
+        		DECLARE @ALL_AMT 		  numeric(21,6)
+                
+                FETCH NEXT FROM BUCKET_LIST INTO @YEARPWEEK, @YEARWEEK, @QTY, @MEAS, @UPDATE_CNT, @QTY_CHANGE
+                
+                WHILE (@@FETCH_STATUS = 0)
+                    BEGIN
+                        
+                        /* Check : Frozen Week ------------------------------------- */
+                        IF (CHARINDEX(@YEARPWEEK, @FROZEN_WEEK) = 0)
+                          BEGIN
+
+                            /* Start Save : Sales Plan ----------------------------- */
+                            SELECT @EXCEL_FLAG = @{excelFlag}
+							     , @EXCEL_UPDATE_CNT = @{excelUpdateCnt}
+							;
+                            
+                            /*새로운 권한 확인용 데이터*/
+			                SELECT @CUST_LVL2_CD_YN = A1.REP_CUST_GROUP_CD 
+							     , @DMD1_YN = A2.ATTB_1_CD
+							     , @DMD2_YN = A2.ATTB_2_CD
+							     , @DMD3_YN = A2.ATTB_3_CD
+							FROM TB_MST_REP_CUST_GROUP A1 WITH(NOLOCK)
+							INNER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+							   ON A1.BU_CD = A2.BU_CD
+							  AND A2.GROUP_CD = 'CUST_CATE'
+							  AND A1.CUST_CATE = A2.CODE_CD
+							WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+							  AND A1.BU_CD = @{GV_BU_CD}
+							  AND A1.REP_CUST_GROUP_CD = @{CUST_LVL2_CD}
+							  AND A1.USE_FLAG = 'Y'
+							  AND A2.USE_FLAG = 'Y'
+							ORDER BY A1.SORT;
+                            
+                            /*추수 AP2, 확정에 대한 WHEN 조건절 추가*/
+                            SET @DMD_YN = CASE WHEN @MEAS = 'AP2_DMD1_SP' THEN @DMD1_YN
+                                               WHEN @MEAS = 'AP2_DMD2_SP' THEN @DMD2_YN
+                                               WHEN @MEAS = 'AP2_DMD3_SP' THEN @DMD3_YN
+                                               WHEN @MEAS = 'AP2_SP' THEN 'Y'
+                                               WHEN @MEAS = 'CFM_DMD1_SP' THEN @DMD1_YN
+                                               WHEN @MEAS = 'CFM_DMD2_SP' THEN @DMD2_YN
+                                               WHEN @MEAS = 'CFM_DMD3_SP' THEN @DMD3_YN
+                                               WHEN @MEAS = 'CFM_SP' THEN 'Y'
+                                               ELSE 'N'
+                                           END     
+                            
+                            /*새로운 권한 CHKECK START */
+                            IF (@DMD_YN = 'Y')
+                            	
+	                            IF (@QTY IS NULL)
+	                              BEGIN
+	                                
+	                                UPDATE TB_DYN_SALES_PLAN
+	                                   SET QTY           = NULL
+	                                     , AMT           = 0
+	                                     , UPDATE_ID   = CASE WHEN QTY = @QTY_CHANGE THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                                     , UPDATE_DTTM = CASE WHEN QTY = @QTY_CHANGE THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	                                 WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+	                                   AND BU_CD         = @{GV_BU_CD}
+	                                   AND ITEM_CD       = @{ITEM_CD}
+	                                   AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+	                                   AND MEAS_CD       = @MEAS
+	                                   AND YEARPWEEK     = @YEARPWEEK;
+	                              END
+	                            ELSE
+	                              BEGIN
+	                                MERGE TB_DYN_SALES_PLAN AS A
+	                                USING (SELECT 'X' AS DUAL) AS B 
+	                                   ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+	                                     AND BU_CD         = @{GV_BU_CD}
+	                                     AND ITEM_CD       = @{ITEM_CD}
+	                                     AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+	                                     AND MEAS_CD       = @MEAS
+	                                     AND YEARPWEEK     = @YEARPWEEK
+	                                   )
+	                                 WHEN MATCHED THEN
+	                                   UPDATE
+	                                      SET QTY         = @QTY_CHANGE
+	                                        , AMT         = CASE WHEN QTY = @QTY_CHANGE THEN AMT ELSE (@QTY_CHANGE * @SALES_PRICE_KRW) END
+	                                        , UPDATE_ID   = CASE WHEN QTY = @QTY_CHANGE THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                                        , UPDATE_DTTM = CASE WHEN QTY = @QTY_CHANGE THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	                                 WHEN NOT MATCHED THEN
+	                                   INSERT 
+	                                   (
+	                                       COMPANY_CD
+	                                     , BU_CD
+	                                     , ITEM_CD
+	                                     , CUST_GROUP_CD
+	                                     , MEAS_CD
+	                                     , YEARPWEEK
+	                                     , YEARWEEK
+	                                     , QTY
+	                                     , AMT
+	                                     , CREATE_ID
+	                                     , CREATE_DTTM
+	                                     , UPDATE_ID
+	                                     , UPDATE_DTTM
+	                                   ) VALUES (
+	                                       @{GV_COMPANY_CD}
+	                                     , @{GV_BU_CD}
+	                                     , @{ITEM_CD}
+	                                     , @{CUST_GROUP_CD}
+	                                     , @MEAS
+	                                     , @YEARPWEEK
+	                                     , @YEARWEEK
+	                                     , @QTY_CHANGE
+	                                     , (@QTY_CHANGE * @SALES_PRICE_KRW)
+	                                     , @{GV_USER_ID}
+	                                     , DBO.UFN_GETDATE()
+	                                     , @{GV_USER_ID}
+	                                     , DBO.UFN_GETDATE()
+	                                   );
+	                              END
+                            /*새로운 권한 CHKECK START */  
+                              
+                            /* End Save   : Sales Plan ----------------------------- */
+							IF (@EXCEL_FLAG = 'N')
+								IF (@UPDATE_CNT = 4)
+							  		BEGIN
+							  			MERGE TB_DYN_SALES_PLAN AS A
+			                            USING (SELECT 'X' AS DUAL) AS B 
+			                               ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+			                                 AND BU_CD         = @{GV_BU_CD}
+			                                 AND ITEM_CD       = @{ITEM_CD}
+			                                 AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+			                                 AND MEAS_CD       = 'SALES_PRICE_KRW'
+			                                 AND YEARPWEEK     = @YEARPWEEK
+			                               )
+			                             WHEN MATCHED THEN
+			                               UPDATE
+			                                  SET AMT         = @SALES_PRICE_KRW
+			                                    , UPDATE_ID   = CASE WHEN AMT = @SALES_PRICE_KRW THEN UPDATE_ID ELSE @{GV_USER_ID} END
+			                                    , UPDATE_DTTM = CASE WHEN AMT = @SALES_PRICE_KRW THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+			                             WHEN NOT MATCHED THEN
+			                               INSERT 
+			                               (
+			                                   COMPANY_CD
+			                                 , BU_CD
+			                                 , ITEM_CD
+			                                 , CUST_GROUP_CD
+			                                 , MEAS_CD
+			                                 , YEARPWEEK
+			                                 , YEARWEEK
+			                                 , QTY
+			                                 , AMT
+			                                 , CREATE_ID
+			                                 , CREATE_DTTM
+			                                 , UPDATE_ID
+			                                 , UPDATE_DTTM
+			                               ) VALUES (
+			                                   @{GV_COMPANY_CD}
+			                                 , @{GV_BU_CD}
+			                                 , @{ITEM_CD}
+			                                 , @{CUST_GROUP_CD}
+			                                 , 'SALES_PRICE_KRW'
+			                                 , @YEARPWEEK
+			                                 , @YEARWEEK
+			                                 , NULL
+			                                 , @SALES_PRICE_KRW
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                               );
+			                               
+			                            SELECT @ALL_QTY = SUM(QTY)
+			                                 , @ALL_AMT = SUM(AMT)
+						                FROM TB_DYN_SALES_PLAN WITH(NOLOCK)
+						                WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+				                          AND BU_CD         = @{GV_BU_CD}
+				                          AND ITEM_CD       = @{ITEM_CD}
+				                          AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+				                          #if($_parameter.menuParam == "AP2")
+				                          	AND MEAS_CD IN ('AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP')
+				                          #elseif($_parameter.menuParam == "CFM")
+				                          	AND MEAS_CD IN ('CFM_DMD1_SP', 'CFM_DMD2_SP', 'CFM_DMD3_SP')
+				                          #end
+						                  AND YEARPWEEK     = @YEARPWEEK 
+			                           	;
+			                           	 
+										MERGE TB_DYN_SALES_PLAN AS A
+			                            USING (SELECT 'X' AS DUAL) AS B 
+			                               ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+			                                 AND BU_CD         = @{GV_BU_CD}
+			                                 AND ITEM_CD       = @{ITEM_CD}
+			                                 AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+			                                 AND MEAS_CD       = @MEAS
+			                                 AND YEARPWEEK     = @YEARPWEEK
+			                               )
+			                             WHEN MATCHED THEN
+			                               UPDATE
+			                                  SET QTY = @ALL_QTY
+										        , AMT = @ALL_AMT
+										        , UPDATE_ID = CASE WHEN QTY = @ALL_QTY THEN UPDATE_ID ELSE @{GV_USER_ID} END
+										        , UPDATE_DTTM = CASE WHEN QTY = @ALL_QTY THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+			                             WHEN NOT MATCHED THEN
+			                               INSERT 
+			                               (
+			                                   COMPANY_CD
+			                                 , BU_CD
+			                                 , ITEM_CD
+			                                 , CUST_GROUP_CD
+			                                 , MEAS_CD
+			                                 , YEARPWEEK
+			                                 , YEARWEEK
+			                                 , QTY
+			                                 , AMT
+			                                 , CREATE_ID
+			                                 , CREATE_DTTM
+			                                 , UPDATE_ID
+			                                 , UPDATE_DTTM
+			                               ) VALUES (
+			                                   @{GV_COMPANY_CD}
+			                                 , @{GV_BU_CD}
+			                                 , @{ITEM_CD}
+			                                 , @{CUST_GROUP_CD}
+			                                 , @MEAS
+			                                 , @YEARPWEEK
+			                                 , @YEARWEEK
+			                                 , @ALL_QTY
+			                                 , @ALL_AMT
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                               );	   
+							  		END	
+						  	
+						  	IF (@EXCEL_FLAG = 'Y')
+					  			IF (@UPDATE_CNT = @EXCEL_UPDATE_CNT)
+									BEGIN
+										MERGE TB_DYN_SALES_PLAN AS A
+			                            USING (SELECT 'X' AS DUAL) AS B 
+			                               ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+			                                 AND BU_CD         = @{GV_BU_CD}
+			                                 AND ITEM_CD       = @{ITEM_CD}
+			                                 AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+			                                 AND MEAS_CD       = 'SALES_PRICE_KRW'
+			                                 AND YEARPWEEK     = @YEARPWEEK
+			                               )
+			                             WHEN MATCHED THEN
+			                               UPDATE
+			                                  SET AMT         = @SALES_PRICE_KRW
+			                                    , UPDATE_ID   = CASE WHEN AMT = @SALES_PRICE_KRW THEN UPDATE_ID ELSE @{GV_USER_ID} END
+			                                    , UPDATE_DTTM = CASE WHEN AMT = @SALES_PRICE_KRW THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+			                             WHEN NOT MATCHED THEN
+			                               INSERT 
+			                               (
+			                                   COMPANY_CD
+			                                 , BU_CD
+			                                 , ITEM_CD
+			                                 , CUST_GROUP_CD
+			                                 , MEAS_CD
+			                                 , YEARPWEEK
+			                                 , YEARWEEK
+			                                 , QTY
+			                                 , AMT
+			                                 , CREATE_ID
+			                                 , CREATE_DTTM
+			                                 , UPDATE_ID
+			                                 , UPDATE_DTTM
+			                               ) VALUES (
+			                                   @{GV_COMPANY_CD}
+			                                 , @{GV_BU_CD}
+			                                 , @{ITEM_CD}
+			                                 , @{CUST_GROUP_CD}
+			                                 , 'SALES_PRICE_KRW'
+			                                 , @YEARPWEEK
+			                                 , @YEARWEEK
+			                                 , NULL
+			                                 , @SALES_PRICE_KRW
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                               );
+			                               
+			                            SELECT @ALL_QTY = SUM(QTY)
+			                                 , @ALL_AMT = SUM(AMT)
+						                FROM TB_DYN_SALES_PLAN WITH(NOLOCK)
+						                WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+				                          AND BU_CD         = @{GV_BU_CD}
+				                          AND ITEM_CD       = @{ITEM_CD}
+				                          AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+				                          #if($_parameter.menuParam == "AP2")
+				                          	AND MEAS_CD IN ('AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP')
+				                          #elseif($_parameter.menuParam == "CFM")
+				                          	AND MEAS_CD IN ('CFM_DMD1_SP', 'CFM_DMD2_SP', 'CFM_DMD3_SP')
+				                          #end
+						                  AND YEARPWEEK     = @YEARPWEEK 
+			                           	;
+			                           	 
+										MERGE TB_DYN_SALES_PLAN AS A
+			                            USING (SELECT 'X' AS DUAL) AS B 
+			                               ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+			                                 AND BU_CD         = @{GV_BU_CD}
+			                                 AND ITEM_CD       = @{ITEM_CD}
+			                                 AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+			                                 AND MEAS_CD       = @{apMeaCd}
+			                                 AND YEARPWEEK     = @YEARPWEEK
+			                               )
+			                             WHEN MATCHED THEN
+			                               UPDATE
+			                                  SET QTY = @ALL_QTY
+										        , AMT = @ALL_AMT
+										        , UPDATE_ID = CASE WHEN QTY = @ALL_QTY THEN UPDATE_ID ELSE @{GV_USER_ID} END
+										        , UPDATE_DTTM = CASE WHEN QTY = @ALL_QTY THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+			                             WHEN NOT MATCHED THEN
+			                               INSERT 
+			                               (
+			                                   COMPANY_CD
+			                                 , BU_CD
+			                                 , ITEM_CD
+			                                 , CUST_GROUP_CD
+			                                 , MEAS_CD
+			                                 , YEARPWEEK
+			                                 , YEARWEEK
+			                                 , QTY
+			                                 , AMT
+			                                 , CREATE_ID
+			                                 , CREATE_DTTM
+			                                 , UPDATE_ID
+			                                 , UPDATE_DTTM
+			                               ) VALUES (
+			                                   @{GV_COMPANY_CD}
+			                                 , @{GV_BU_CD}
+			                                 , @{ITEM_CD}
+			                                 , @{CUST_GROUP_CD}
+			                                 , @{apMeaCd}
+			                                 , @YEARPWEEK
+			                                 , @YEARWEEK
+			                                 , @ALL_QTY
+			                                 , @ALL_AMT
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                                 , @{GV_USER_ID}
+			                                 , DBO.UFN_GETDATE()
+			                               );	
+									END
+                          END
+                        
+                        FETCH NEXT FROM BUCKET_LIST INTO @YEARPWEEK, @YEARWEEK, @QTY, @MEAS, @UPDATE_CNT, @QTY_CHANGE
+                    
+                    END
+                    
+                CLOSE BUCKET_LIST
+                DEALLOCATE BUCKET_LIST
+                /* Close : Week Cursor --------------------------------------------- */
+            END
+    	END;    
+    </update>
+    
+    <update id="salesPlanRemarkUpdate" parameterType="map">
+	    /****** [ dp.planCommon.salesPlanRemarkUpdate ] ******/
+	    UPDATE TB_MAP_ITEM_CUST_GROUP
+	       SET UPDATE_ID     = CASE WHEN REMARK = @{REMARK_NM} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	         , UPDATE_DTTM   = CASE WHEN REMARK = @{REMARK_NM} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+			
+			---------20210329 김수호 수정: 박대길D 요청(비고컬럼 공백처리 후 저장시 저장안됨) => velocity 조건문 삭제함
+			 , REMARK        = NULLIF(@{REMARK_NM}, '')
+			
+			#if($_parameter.CFM_CHG_REASON_NM and $_parameter.CFM_CHG_REASON_NM != "")
+		     , CFM_CHG_REASON = NULLIF(@{CFM_CHG_REASON_NM}, '')
+			#end
+	     WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+	       AND BU_CD         = @{GV_BU_CD}
+	       AND ITEM_CD       = @{ITEM_CD_NM}
+	       AND CUST_GROUP_CD = @{CUST_GROUP_CD_NM}
+    </update>	
+	
+	<update id="salesPlanConfirmUpdate" parameterType="map">
+	    /****** [ dp.planCommon.salesPlanConfirmUpdate ] ******/
+	    UPDATE TB_MAP_ITEM_CUST_GROUP
+	       SET
+	       #if($_parameter.MENU_PARAM == "AP2")
+	           CONFIRM_YN_AP2 = @{CONFIRM_YN}
+	       	 , UPDATE_ID      = CASE WHEN CONFIRM_YN_AP2 = @{CONFIRM_YN} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	         , UPDATE_DTTM    = CASE WHEN CONFIRM_YN_AP2 = @{CONFIRM_YN} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	       #elseif($_parameter.MENU_PARAM == "CFM")
+	           CONFIRM_YN_CFM = @{CONFIRM_YN}
+	       	 , UPDATE_ID      = CASE WHEN CONFIRM_YN_CFM = @{CONFIRM_YN} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	         , UPDATE_DTTM    = CASE WHEN CONFIRM_YN_CFM = @{CONFIRM_YN} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	       #end
+	     WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+	       AND BU_CD         = @{GV_BU_CD}
+	       AND ITEM_CD       = @{ITEM_CD}
+	       AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+    </update>
+	
+	<select id="salesPlanSummaryMonthSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.salesPlanSummaryMonthSelect ] ******/
+		SELECT YEARMONTH
+		     , YEARPWEEK
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARMONTH BETWEEN @{currentMonthPop} AND @{currentMonthNextPop}
+		  AND YEARWEEK <![CDATA[>=]]> @{currentWeekPop}
+		  AND YYYYMMDD <![CDATA[<]]> @{currentMonthNextPop} + '01'
+		GROUP BY YEARMONTH, YEARPWEEK
+	</select>
+	
+	<select id="salesPlanSummaryDateSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.salesPlanSummaryDateSelect ] ******/
+		SELECT YEARPWEEK
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARWEEK <![CDATA[>=]]> @{currentWeekPop}
+  		  AND YEARWEEK <![CDATA[<]]> @{planIdOnePlusWeekPop}
+		GROUP BY YEARPWEEK
+		ORDER BY YEARPWEEK
+	</select>
+	
+	<select id="salesPlanSummaryBucketSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.salesPlanSummaryBucketSelect ] ******/
+		SELECT REP_CUST_GROUP_CD AS CD
+             , REP_CUST_GROUP_NM AS NM
+             , REP_CUST_GROUP_NM AS BUCKET_VAL
+             , 'group' AS TYPE
+             , 'M' + REP_CUST_GROUP_CD AS ROOT_CD
+             , NULL AS TOT_TYPE
+      	FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+      	WHERE USE_FLAG = 'Y'
+      	ORDER BY SORT
+	</select>
+	
+	<select id="salesPlanSummaryMeaListSelect" parameterType="map" resultType="map">
+		/****** [ dp.planCommon.salesPlanSummaryMeaListSelect ] ******/
+		SELECT *
+		FROM
+		(
+			SELECT CASE WHEN TRANS_ID = 'allocQty' THEN 'ALLOC_QTY'
+						#if($_parameter.measCd == "CFM_SP")
+							WHEN TRANS_ID = 'cfmCnt' THEN 'CFM_AP_SP'
+						#elseif($_parameter.measCd == "AP2_SP")
+							WHEN TRANS_ID = 'ap2Cnt' THEN 'CFM_AP_SP'
+						#end
+			            WHEN TRANS_ID = 'weekQty' THEN 'WEEK_QTY' 
+			            WHEN TRANS_ID = 'diff' THEN 'DIFF' 
+			        END CD
+			      , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN KR_TEXT
+			             WHEN UPPER(@{GV_LANG}) = 'CN' THEN CN_TEXT
+			             ELSE EN_TEXT
+			         END NM
+			      , CASE WHEN TRANS_ID = 'allocQty' THEN 1 
+	            		 #if($_parameter.measCd == "CFM_SP")
+							WHEN TRANS_ID = 'cfmCnt' THEN 2
+						 #elseif($_parameter.measCd == "AP2_SP")
+							WHEN TRANS_ID = 'ap2Cnt' THEN 2
+						 #end
+	            		 WHEN TRANS_ID = 'weekQty' THEN 3
+	            		 WHEN TRANS_ID = 'diff' THEN 4
+	        		 END SORT   
+			FROM TB_MST_TRANSLATE WITH(NOLOCK)
+			WHERE USE_FLAG = 'Y'
+			  AND TRANS_TYPE = 'lbl'
+			  #if($_parameter.measCd == "CFM_SP")
+			  	AND TRANS_ID IN ('allocQty', 'weekQty', 'diff', 'cfmCnt')
+			  #elseif($_parameter.measCd == "AP2_SP")
+			  	AND TRANS_ID IN ('allocQty', 'weekQty', 'diff', 'ap2Cnt')
+			  #end
+		) A1
+		ORDER BY SORT
+	</select>
+	
+	<select id="salesPlanSummarySelect" parameterType="map" resultType="map">
+	
+		/****** [ dp.planCommon.salesPlanSummarySelect ] ******/
+		
+		#set( $TMP_TAB = "#TMP_TAB" )
+		
+		BEGIN
+		
+			CREATE TABLE $TMP_TAB 
+			(
+		          COMPANY_CD      NVARCHAR(5)
+		        , BU_CD           NVARCHAR(3)
+		        , CUST_GROUP_CD   NVARCHAR(10)
+		        , ITEM_CD         NVARCHAR(18)
+		        , WEEK_INVEN_QTY  NUMERIC(21, 6)
+		    );
+		    
+		    /*foreach 에서 처음에는 현재주차의 주초재고를 가져오기
+		      그 현재 주초재고로 다음주차, 다다음주차를 순차적으로 계산한다.
+		      계산 로직은 MAX(현재주초 + 현재 PROD - 현재 AP2, 0) -> 32주차주초재고
+		    MAX(32주차주초재고 + 33주차 PROD - 33주차 AP2, 0) -> 33주차주초재고
+		    MAX(33주차주초재고 + 34주차 PROD - 34주차 AP2, 0) -> 34주차주초재고
+		   */
+		    
+		    #foreach($bucketMap in $_parameter.weekList)
+			#set($paramWeek = "$bucketMap.YEARPWEEK")
+				
+				#if($velocityCount == 1)
+	   				INSERT INTO $TMP_TAB
+	   				(
+						COMPANY_CD
+					  , BU_CD
+					  , CUST_GROUP_CD
+					  , ITEM_CD
+					  , WEEK_INVEN_QTY
+					)
+	   				SELECT A1.COMPANY_CD
+	   				     , A1.BU_CD
+	   				     , A1.CUST_GROUP_CD
+	   				     , A1.ITEM_CD
+	   				     , CASE WHEN ISNULL(A3.INV_QTY, 0) + ISNULL(A2.PROD_QTY, 0) - ISNULL(A1.AP2_QTY, 0) <![CDATA[>]]> 0 THEN ISNULL(A3.INV_QTY, 0) + ISNULL(A2.PROD_QTY, 0) - ISNULL(A1.AP2_QTY, 0)
+	   				            ELSE 0
+	   				        END WEEK_INVEN_QTY
+	   				FROM
+	   				(
+		   				SELECT COMPANY_CD
+					    	 , BU_CD
+					      	 , ITEM_CD
+					       	 , CUST_GROUP_CD
+					       	 , YEARWEEK
+					       	 , YEARPWEEK
+					       	 , QTY AS AP2_QTY
+					  	FROM TB_DYN_SALES_PLAN WITH(NOLOCK)
+					  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					      AND BU_CD = @{GV_BU_CD}
+					      AND MEAS_CD = @{measCd}
+		   				  AND YEARPWEEK = '$paramWeek'
+					) A1
+					LEFT OUTER JOIN 
+					(
+						SELECT COMPANY_CD 
+						     , BU_CD
+						     , ITEM_CD
+						     , YEARWEEK
+						     , YEARPWEEK
+						     , SUM(QTY) AS PROD_QTY
+						FROM TB_HIS_PROD_PLAN WITH(NOLOCK)
+						WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					      AND BU_CD = @{GV_BU_CD}
+						  AND PLAN_ID = (
+						                  SELECT TOP(1) PLAN_ID
+						                  FROM TB_MST_PLAN_VERSION
+						                  WHERE PLAN_TYPE_CD = 'MP'
+						                    AND CUT_OFF_FLAG = 'Y'
+						                  ORDER BY START_WEEK DESC
+						                )
+						  AND YEARPWEEK = '$paramWeek'
+						GROUP BY COMPANY_CD, BU_CD, ITEM_CD, YEARWEEK, YEARPWEEK
+					) A2
+					ON A1.COMPANY_CD = A2.COMPANY_CD
+	   				AND A1.BU_CD = A2.BU_CD
+	   				AND A1.ITEM_CD = A2.ITEM_CD
+	   				AND A1.YEARPWEEK = A2.YEARPWEEK
+	   				LEFT OUTER JOIN
+	   				(
+						SELECT COMPANY_CD
+						     , BU_CD
+						     , ITEM_CD
+						     , SUM(INV_QTY) AS INV_QTY
+						     , @{currentWeekPop} AS YEARPWEEK
+						FROM UV_DYN_INVENTORY WITH(NOLOCK)
+						WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					      AND BU_CD = @{GV_BU_CD}
+					      AND PLANT_CD = 'WF01'
+					      AND INV_DATE = (
+						                    SELECT YYYYMMDD
+						                    FROM TB_MST_CALENDAR
+						                    WHERE YEARPWEEK = '$paramWeek'
+						                      AND DAY_NM = 'SUN'
+						                 )
+						GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+	   				) A3
+	   				ON A1.COMPANY_CD = A3.COMPANY_CD
+	   				AND A1.BU_CD = A3.BU_CD
+	   				AND A1.ITEM_CD = A3.ITEM_CD
+	   				AND A1.YEARPWEEK = A3.YEARPWEEK
+	   				WHERE A1.YEARPWEEK = '$paramWeek'
+	   				;
+	   			#else
+	   				
+	   				UPDATE U1
+	   				   SET U1.WEEK_INVEN_QTY = U2.WEEK_INVEN_QTY
+	   				FROM $TMP_TAB U1, 
+	   				(
+		   				SELECT A1.COMPANY_CD
+		   				     , A1.BU_CD
+		   				     , A1.CUST_GROUP_CD
+		   				     , A1.ITEM_CD
+		   				     , CASE WHEN ISNULL(A3.WEEK_INVEN_QTY, 0) + ISNULL(A2.PROD_QTY, 0) - ISNULL(A1.AP2_QTY, 0) <![CDATA[>]]> 0 THEN ISNULL(A3.WEEK_INVEN_QTY, 0) + ISNULL(A2.PROD_QTY, 0) - ISNULL(A1.AP2_QTY, 0)
+		   				            ELSE 0
+		   				        END WEEK_INVEN_QTY
+		   				FROM
+		   				(
+			   				SELECT COMPANY_CD
+						    	 , BU_CD
+						      	 , ITEM_CD
+						       	 , CUST_GROUP_CD
+						       	 , YEARWEEK
+						       	 , YEARPWEEK
+						       	 , QTY AS AP2_QTY
+						  	FROM TB_DYN_SALES_PLAN WITH(NOLOCK)
+						  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+						      AND BU_CD = @{GV_BU_CD}
+						      AND MEAS_CD = @{measCd}
+			   				  AND YEARPWEEK = '$paramWeek'
+						) A1
+						LEFT OUTER JOIN 
+						(
+							SELECT COMPANY_CD 
+							     , BU_CD
+							     , ITEM_CD
+							     , YEARWEEK
+							     , YEARPWEEK
+							     , SUM(QTY) AS PROD_QTY
+							FROM TB_HIS_PROD_PLAN WITH(NOLOCK)
+							WHERE COMPANY_CD = @{GV_COMPANY_CD}
+						      AND BU_CD = @{GV_BU_CD}
+							  AND PLAN_ID = (
+							                  SELECT TOP(1) PLAN_ID
+							                  FROM TB_MST_PLAN_VERSION
+							                  WHERE PLAN_TYPE_CD = 'MP'
+							                    AND CUT_OFF_FLAG = 'Y'
+							                  ORDER BY START_WEEK DESC
+							                )
+							  AND YEARPWEEK = '$paramWeek'
+							GROUP BY COMPANY_CD, BU_CD, ITEM_CD, YEARWEEK, YEARPWEEK
+						) A2
+						ON A1.COMPANY_CD = A2.COMPANY_CD
+		   				AND A1.BU_CD = A2.BU_CD
+		   				AND A1.ITEM_CD = A2.ITEM_CD
+		   				AND A1.YEARPWEEK = A2.YEARPWEEK
+		   				LEFT OUTER JOIN #TMP_TAB A3
+		   				ON A1.COMPANY_CD = A3.COMPANY_CD
+		   				AND A1.BU_CD = A3.BU_CD
+		   				AND A1.ITEM_CD = A3.ITEM_CD
+		   				WHERE A1.YEARPWEEK = '$paramWeek'
+	   				) U2
+	   				WHERE U1.COMPANY_CD = U2.COMPANY_CD
+		   			  AND U1.BU_CD = U2.BU_CD
+		   			  AND U1.ITEM_CD = U2.ITEM_CD
+		   			  AND U1.CUST_GROUP_CD = U2.CUST_GROUP_CD
+		   			;
+	   			#end
+			#end
+		
+			WITH W_DIM AS 
+	    	(
+				SELECT CG.COMPANY_CD
+		             , CG.BU_CD
+		             , CG.CUST_GROUP_CD
+		             , IT.ITEM_CD
+		             , ISNULL(IT.PROD_LVL2_CD, ' ') AS PROD_LVL2_CD
+		             , ISNULL(IT.PROD_LVL2_NM, ' ') AS PROD_LVL2_NM
+		             , ISNULL(IT.PROD_LVL3_CD, ' ') AS PROD_LVL3_CD
+		             , ISNULL(IT.PROD_LVL3_NM, ' ') AS PROD_LVL3_NM
+		             , ISNULL(CM.CUST_LVL2_CD, ' ') AS CUST_LVL2_CD
+		             , ISNULL(CM.CUST_LVL2_NM, ' ') AS CUST_LVL2_NM
+		             , ISNULL(CM.CUST_NM     , ' ') AS CUST_GROUP_NM
+		             , ISNULL(IT.ITEM_NM     , ' ') AS ITEM_NM
+				FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+		        INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+		           ON CG.COMPANY_CD = IT.COMPANY_CD
+		          AND CG.BU_CD = IT.BU_CD
+		          AND CG.ITEM_CD = IT.ITEM_CD
+		        INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+		           ON CG.COMPANY_CD = CM.COMPANY_CD
+		          AND CG.BU_CD = CM.BU_CD
+		          AND CG.CUST_GROUP_CD = CM.CUST_CD
+				WHERE CG.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND CG.BU_CD = @{GV_BU_CD}
+		          AND CG.VALID_FLAG = 'Y'
+	              AND ISNULL(IT.PROD_LVL2_CD, '') <![CDATA[<>]]> ''
+			),
+	    	W_DIM_GROUP AS 
+	    	(
+		        SELECT COMPANY_CD
+		             , BU_CD
+		             , PROD_LVL2_CD
+		             , PROD_LVL2_NM
+		             , PROD_LVL3_CD
+		             , PROD_LVL3_NM
+		             , CUST_LVL2_CD
+		             , CUST_LVL2_NM
+				FROM W_DIM
+		        GROUP BY COMPANY_CD, BU_CD, PROD_LVL2_CD, PROD_LVL2_NM, PROD_LVL3_CD, PROD_LVL3_NM, CUST_LVL2_CD, CUST_LVL2_NM
+		    ),
+		    W_MEASURE AS 
+	    	(
+	    		SELECT CATEGORY_CD
+		    	     , CATEGORY_NM
+		    	     , CATEGORY_IDX 
+		        FROM 
+		        (
+		        	SELECT NULL AS CATEGORY_CD
+		        	     , NULL AS CATEGORY_NM
+		        	     , NULL AS CATEGORY_IDX
+					#foreach( $meaMap in $_parameter.meaList )
+		            UNION ALL 
+		            SELECT '$meaMap.CD'
+		                 , '$meaMap.NM'
+		                 , $velocityCount 
+					#end
+				) A
+		        WHERE CATEGORY_CD IS NOT NULL
+	    	),
+		    W_WEEK_WORKING_DAYS AS 
+			(
+    			SELECT *
+         			 , SUM(WORKING_WEEK) OVER(PARTITION BY YEARMONTH) AS WORKING_MONTH
+    			FROM 
+    			(
+    				SELECT YEARMONTH
+			             , YEARPWEEK
+			             , MAX(YEARWEEK) AS YEARWEEK
+			             , RANK() OVER(PARTITION BY YEARMONTH ORDER BY YEARPWEEK DESC) AS RN
+			             , SUM(CONVERT(NUMERIC(6,1), ISNULL(DAY_OFF_FLAG, '0'))) AS WORKING_WEEK
+			        FROM TB_MST_CALENDAR CD WITH(NOLOCK)
+			        WHERE YEARMONTH BETWEEN @{currentMonthPop} AND @{currentMonthNextPop}
+			        GROUP BY YEARMONTH, YEARPWEEK
+				) WW
+			),
+			W_WEEK_INVEN AS
+			(
+	        	SELECT A1.COMPANY_CD
+					 , A1.BU_CD
+					 , A1.PROD_LVL2_CD
+	            	 , A1.PROD_LVL3_CD
+	             	 , A1.CUST_LVL2_CD      
+	             	 , SUM(A2.WEEK_INVEN_QTY) AS WEEK_INVEN_QTY
+	             	 , 'WEEK_INVEN_FLAG' AS FLAG
+	        	FROM W_DIM A1 
+			  	INNER JOIN #TMP_TAB A2 WITH(NOLOCK)
+			  	   ON A1.COMPANY_CD = A2.COMPANY_CD
+	          	  AND A1.BU_CD = A2.BU_CD	              
+	          	  AND A1.CUST_GROUP_CD = A2.CUST_GROUP_CD
+	          	  AND A1.ITEM_CD = A2.ITEM_CD
+	        	GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.PROD_LVL2_CD, A1.PROD_LVL3_CD, A1.CUST_LVL2_CD
+			),
+			
+			#if($_parameter.flag == "week")
+				W_CFM_AP_SP AS
+				(
+					SELECT A1.COMPANY_CD
+				    	 , A1.BU_CD
+				    	 , A1.PROD_LVL2_CD
+		                 , A1.PROD_LVL3_CD
+		                 , A1.CUST_LVL2_CD
+				       	 , SUM(A2.QTY) AS AP2_QTY
+				       	 , 'CFM_AP_SP_FLAG' AS FLAG
+				  	FROM W_DIM A1 
+				  	INNER JOIN TB_DYN_SALES_PLAN A2 WITH(NOLOCK)
+				  	   ON A1.COMPANY_CD = A2.COMPANY_CD
+		              AND A1.BU_CD = A2.BU_CD	              
+		              AND A1.CUST_GROUP_CD = A2.CUST_GROUP_CD
+		              AND A1.ITEM_CD = A2.ITEM_CD
+				  	WHERE A2.MEAS_CD = @{measCd}
+		  			  AND A2.YEARWEEK = @{planIdOnePlusWeekPop}
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.PROD_LVL2_CD, A1.PROD_LVL3_CD, A1.CUST_LVL2_CD, A2.YEARWEEK
+				),
+				W_ALLOC_QTY AS
+				(
+					SELECT T.COMPANY_CD
+					     , T.BU_CD
+					     , T.PROD_LVL2_CD
+					     , T.PROD_LVL3_CD
+					     , T.CUST_LVL2_CD
+					     , SUM(ALLOC_QTY) AS ALLOC_QTY
+					     , 'ALLOC_FLAG' AS FLAG
+					FROM 
+					(
+						SELECT AQ.COMPANY_CD
+				             , AQ.BU_CD
+				             , AQ.PROD_LVL2_CD
+				             , AQ.PROD_LVL3_CD
+				             , AQ.CUST_LVL2_CD
+				             , AQ.YEARWEEK
+				             , CASE WHEN AQ.RN != 1 THEN AQ.ALLOC_QTY
+				                    ELSE AQ.ALLOC_QTY + AQ.ADJ_CAPA_QTY - SUM(AQ.ALLOC_QTY) OVER(PARTITION BY AQ.COMPANY_CD, AQ.BU_CD, AQ.PROD_LVL2_CD, AQ.PROD_LVL3_CD, AQ.CUST_LVL2_CD, AQ.YEARMONTH)
+				                END AS ALLOC_QTY
+				             
+						FROM 
+						(
+				            SELECT CG.COMPANY_CD
+				                 , CG.BU_CD
+				                 , CG.PROD_LVL2_CD
+				                 , CG.PROD_LVL3_CD
+				                 , CG.CUST_LVL2_CD
+				                 , WD.RN
+				                 , WD.YEARMONTH
+				                 , WD.YEARWEEK
+				                 , ISNULL(CS.ADJ_CAPA_QTY, 0) AS ADJ_CAPA_QTY
+				                 , ISNULL(ROUND(CS.ADJ_CAPA_QTY * WD.WORKING_WEEK / NULLIF(WD.WORKING_MONTH, 0), 1), 0) AS ALLOC_QTY
+							FROM W_DIM_GROUP CG
+				            INNER JOIN
+				            (
+				            	SELECT A1.COMPANY_CD
+						             , A1.BU_CD
+						             , A2.ATTB_1_CD AS PROD_LVL2_CD
+						             , A1.PROD_LVL3_CD
+						             , A1.CUST_LVL2_CD
+						             , A1.YEARMONTH
+						             , SUM(A1.ADJ_CAPA_QTY) AS ADJ_CAPA_QTY
+						        FROM TB_DYN_CAPA_ALLOC_SALES_LATEST A1 WITH(NOLOCK)
+						        INNER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+						           ON A1.BU_CD = A2.BU_CD
+						          AND A1.ROUTING_ID = A2.CODE_CD
+						        WHERE A2.GROUP_CD = 'PROD_L2'
+						        GROUP BY A1.COMPANY_CD, A1.BU_CD, A2.ATTB_1_CD, A1.PROD_LVL3_CD, A1.CUST_LVL2_CD, A1.YEARMONTH
+				            ) CS 
+				            ON CG.COMPANY_CD = CS.COMPANY_CD
+				            AND CG.BU_CD = CS.BU_CD
+				            AND CG.PROD_LVL2_CD = CS.PROD_LVL2_CD
+				            AND CG.PROD_LVL3_CD = CS.PROD_LVL3_CD
+				            AND CG.CUST_LVL2_CD = CS.CUST_LVL2_CD
+				            AND CS.YEARMONTH <![CDATA[>=]]> @{currentMonthPop} 
+				            AND CS.YEARMONTH <![CDATA[<=]]> @{currentMonthNextPop}
+				            INNER JOIN W_WEEK_WORKING_DAYS WD
+				               ON CS.YEARMONTH = WD.YEARMONTH
+				            
+						) AQ					  
+					) T
+					WHERE T.YEARWEEK = @{planIdOnePlusWeekPop}
+					GROUP BY T.COMPANY_CD, T.BU_CD, T.PROD_LVL2_CD, T.PROD_LVL3_CD, T.CUST_LVL2_CD
+				),
+			#elseif($_parameter.flag == "month")
+				W_CFM_AP_SP AS
+				(
+					SELECT A1.COMPANY_CD
+					  	 , A1.BU_CD
+					  	 , A1.PROD_LVL2_CD
+					     , A1.PROD_LVL3_CD
+					     , A1.CUST_LVL2_CD
+					     , SUM(A2.QTY) AS AP2_QTY
+					     , 'CFM_AP_SP_FLAG' AS FLAG
+					FROM W_DIM A1 
+					INNER JOIN TB_DYN_SALES_PLAN A2 WITH(NOLOCK)
+					   ON A1.COMPANY_CD = A2.COMPANY_CD
+					  AND A1.BU_CD = A2.BU_CD	              
+					  AND A1.CUST_GROUP_CD = A2.CUST_GROUP_CD
+					  AND A1.ITEM_CD = A2.ITEM_CD
+					WHERE A2.MEAS_CD = @{measCd}
+					  AND A2.YEARPWEEK IN (
+								          	SELECT DISTINCT YEARPWEEK
+								      		FROM TB_MST_CALENDAR
+								          	WHERE YEARMONTH = @{currentMonthNextPop}  
+					    				  )
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.PROD_LVL2_CD, A1.PROD_LVL3_CD, A1.CUST_LVL2_CD
+				),
+				W_ALLOC_QTY AS
+				(
+					SELECT CG.COMPANY_CD
+	                     , CG.BU_CD
+	                     , CG.PROD_LVL2_CD
+	                     , CG.PROD_LVL3_CD
+	                     , CG.CUST_LVL2_CD
+	                     , ISNULL(CS.ADJ_CAPA_QTY, 0) AS ALLOC_QTY
+	                     , 'ALLOC_FLAG' AS FLAG
+					FROM W_DIM_GROUP CG
+	                INNER JOIN
+	                (
+	                	SELECT A1.COMPANY_CD
+				             , A1.BU_CD
+				             , A2.ATTB_1_CD AS PROD_LVL2_CD
+				             , A1.PROD_LVL3_CD
+				             , A1.CUST_LVL2_CD
+				             , A1.YEARMONTH
+				             , SUM(A1.ADJ_CAPA_QTY) AS ADJ_CAPA_QTY
+				        FROM TB_DYN_CAPA_ALLOC_SALES_LATEST A1 WITH(NOLOCK)
+				        INNER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+				           ON A1.BU_CD = A2.BU_CD
+				          AND A1.ROUTING_ID = A2.CODE_CD
+				        WHERE A2.GROUP_CD = 'PROD_L2'
+				          AND A1.YEARMONTH = @{currentMonthNextPop}
+				        GROUP BY A1.COMPANY_CD, A1.BU_CD, A2.ATTB_1_CD, A1.PROD_LVL3_CD, A1.CUST_LVL2_CD, A1.YEARMONTH
+	                ) CS 
+	                ON CG.COMPANY_CD = CS.COMPANY_CD
+	                AND CG.BU_CD = CS.BU_CD
+	                AND CG.PROD_LVL2_CD = CS.PROD_LVL2_CD
+	                AND CG.PROD_LVL3_CD = CS.PROD_LVL3_CD
+	                AND CG.CUST_LVL2_CD = CS.CUST_LVL2_CD
+				),
+			
+			#end
+			
+			W_OMIT_DIM_GROUP AS
+			(
+				SELECT B2.*
+				FROM
+				(
+					SELECT A.*
+			        FROM 
+			        (
+				        SELECT COMPANY_CD
+				             , BU_CD
+				             , PROD_LVL2_CD
+				             , PROD_LVL3_CD
+				             , SUM(ALLOC_QTY) AS ALLOC_QTY
+				        FROM W_ALLOC_QTY
+				        GROUP BY COMPANY_CD, BU_CD, PROD_LVL2_CD, PROD_LVL3_CD
+			        ) A
+			        WHERE A.ALLOC_QTY <![CDATA[>]]> 0
+				) B1
+				INNER JOIN W_DIM_GROUP B2
+				   ON B1.COMPANY_CD = B2.COMPANY_CD
+		          AND B1.BU_CD = B2.BU_CD
+		          AND B1.PROD_LVL2_CD = B2.PROD_LVL2_CD
+		          AND B1.PROD_LVL3_CD = B2.PROD_LVL3_CD
+			),
+			W_ROW AS
+			(
+				SELECT A1.*
+		             , A2.PROD_LVL2_NM
+		             , A2.PROD_LVL3_NM
+		             , A2.CUST_LVL2_NM
+		        FROM
+		        (
+					SELECT *
+					FROM W_CFM_AP_SP
+					UNION ALL
+					SELECT *
+					FROM W_WEEK_INVEN
+					UNION ALL
+					SELECT *
+					FROM W_ALLOC_QTY
+				) A1
+		        INNER JOIN W_OMIT_DIM_GROUP A2
+		           ON A1.COMPANY_CD = A2.COMPANY_CD
+		          AND A1.BU_CD = A2.BU_CD
+		          AND A1.PROD_LVL2_CD = A2.PROD_LVL2_CD
+		          AND A1.PROD_LVL3_CD = A2.PROD_LVL3_CD
+		          AND A1.CUST_LVL2_CD = A2.CUST_LVL2_CD
+			),
+			W_ROW_GROUP AS
+			(
+				SELECT COMPANY_CD
+	                 , BU_CD
+	                 , PROD_LVL2_CD
+	                 , PROD_LVL3_CD
+	                 , MAX(PROD_LVL2_NM) AS PROD_LVL2_NM 
+	                 , MAX(PROD_LVL3_NM) AS PROD_LVL3_NM 
+	                 #foreach( $bucketMap in $_parameter.bucketList )
+	                 #set($paramVal = "$bucketMap.CD")
+	                 , ISNULL(SUM(CASE WHEN FLAG = 'ALLOC_FLAG' AND CUST_LVL2_CD = '$paramVal' THEN AP2_QTY END), 0) AS ${bucketMap.CD}_ALLOC_QTY
+	                 , ISNULL(SUM(CASE WHEN FLAG = 'CFM_AP_SP_FLAG' AND CUST_LVL2_CD = '$paramVal' THEN AP2_QTY END), 0) AS ${bucketMap.CD}_CFM_AP_SP
+	                 , ISNULL(SUM(CASE WHEN FLAG = 'WEEK_INVEN_FLAG' AND CUST_LVL2_CD = '$paramVal' THEN AP2_QTY END), 0) AS ${bucketMap.CD}_WEEK_QTY
+	                 , ISNULL(SUM(CASE WHEN FLAG = 'ALLOC_FLAG' AND CUST_LVL2_CD = '$paramVal' THEN AP2_QTY END), 0) - (ISNULL(SUM(CASE WHEN FLAG = 'CFM_AP_SP_FLAG' AND CUST_LVL2_CD = '$paramVal' THEN AP2_QTY END), 0) - ISNULL(SUM(CASE WHEN FLAG = 'WEEK_INVEN_FLAG' AND CUST_LVL2_CD = '$paramVal' THEN AP2_QTY END), 0)) AS ${bucketMap.CD}_DIFF 
+	                 #end
+	    		FROM W_ROW 
+	          	GROUP BY COMPANY_CD, BU_CD, PROD_LVL2_CD, PROD_LVL3_CD
+			),
+			W_MAIN AS
+			(
+				SELECT NULL AS TMP_COL 
+				     , COMPANY_CD
+	                 , BU_CD
+	                 , PROD_LVL2_CD
+	                 , CASE WHEN PROD_LVL3_CD IS NULL THEN 'Total' ELSE PROD_LVL3_CD END PROD_LVL3_CD
+	                 , PROD_LVL2_NM 
+	                 , PROD_LVL3_NM 
+	                 , M.CATEGORY_CD
+	             	 , M.CATEGORY_NM
+	             	 , M.CATEGORY_IDX
+	             	 #foreach( $bucketMap in $_parameter.bucketList )
+	             	 	, SUM(
+		             	CASE
+		  				#foreach( $meaMap in $_parameter.meaList )
+		                   	WHEN M.CATEGORY_CD = '${meaMap.CD}' THEN A.${bucketMap.CD}_${meaMap.CD}
+		  				#end
+		                   	ELSE 0
+		                END
+		             ) AS $bucketMap.CD
+	             	 #end
+				FROM W_ROW_GROUP A
+				CROSS JOIN W_MEASURE M
+				GROUP BY ROLLUP ((COMPANY_CD, BU_CD, PROD_LVL2_CD, PROD_LVL3_CD, PROD_LVL2_NM, PROD_LVL3_NM))
+				, M.CATEGORY_CD, M.CATEGORY_NM, M.CATEGORY_IDX
+			)
+			SELECT *
+			     , RCG001 + RCG002 + RCG003 + RCG004 + RCG005 + RCG006 + RCG007 AS OMIT_FLAG
+			FROM W_MAIN
+			ORDER BY COMPANY_CD, BU_CD, PROD_LVL2_CD, PROD_LVL3_CD, CATEGORY_IDX
+		END;
+		
+	</select>
+	
+	<select id="salesPlanSummaryExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ dp.planCommon.salesPlanSummaryExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+
+
+
+	
+</mapper>

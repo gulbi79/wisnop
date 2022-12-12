@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.meetingMng">
+	
+	<select id="meetingLogMngSelect" parameterType="map" resultType="map">
+	/****** [ snop.meetingMng.meetingLogMngSelect ] ******/
+    SELECT A.COMPANY_CD
+	     , A.BU_CD
+	     , A.PLAN_TYPE_CD
+	     , A.PLAN_ID
+	     , CONVERT(VARCHAR(30), CAST(A.SNOP_DATE AS DATE), 23) SNOP_DATE
+	     , A.FILE_NO
+	     , A.CREATE_ID
+	     , CONVERT(VARCHAR(30), A.CREATE_DTTM, 120) CREATE_DTTM
+	     , (SELECT TOP 1 FILE_NM_ORG 
+	        FROM TB_COMM_FILE 
+	        WHERE FILE_NO   = A.FILE_NO
+	          AND DEL_FLAG != 'Y' 
+	        ORDER BY FILE_SEQ) AS FILE_NM_ORG
+	FROM TB_KPI_SNOP A WITH(NOLOCK)
+    WHERE A.DEL_FLAG = 'N'
+#if($_parameter.PLAN_TYPE_CD and $_parameter.PLAN_TYPE_CD != "")
+      AND A.PLAN_TYPE_CD = @{PLAN_TYPE_CD}
+#end
+#if($_parameter.PLAN_ID and $_parameter.PLAN_ID != "")
+      AND A.PLAN_ID LIKE '%' + @{PLAN_ID} + '%'
+#end
+      AND A.SNOP_DATE BETWEEN @{fromCal} AND @{toCal} 
+    ORDER BY SNOP_DATE DESC
+           , UPDATE_DTTM DESC
+	</select>
+	
+	<update id="meetingLogMngInsert" parameterType="map">
+	/****** [ snop.meetingMng.meetingLogMngInsert ] ******/
+    INSERT INTO TB_KPI_SNOP (
+            COMPANY_CD
+          , BU_CD
+          , PLAN_TYPE_CD
+          , PLAN_ID
+          , SNOP_DATE
+          , FILE_NO
+          , DEL_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+    ) VALUES (
+    	    ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+          , ISNULL(@{BU_CD}, @{GV_BU_CD})
+          , @{PLAN_TYPE_CD}
+    	  , @{PLAN_ID}
+    	  , REPLACE (@{SNOP_DATE}, '-', '')
+    	  , @{FILE_NO}
+    	  , ISNULL(@{DEL_FLAG}, 'N')
+    	  , @{GV_USER_ID}
+    	  , DBO.UFN_GETDATE()
+    	  , @{GV_USER_ID}
+    	  , DBO.UFN_GETDATE()
+    )
+	</update>
+	
+	<update id="meetingLogMngUpdate" parameterType="map">
+	/****** [ snop.meetingMng.meetingLogMngUpdate ] ******/
+	UPDATE TB_KPI_SNOP 
+	   SET SNOP_DATE    = @{SNOP_DATE}
+	     , FILE_NO      = @{FILE_NO}
+	     , UPDATE_ID    = @{GV_USER_ID}
+	     , UPDATE_DTTM  = DBO.UFN_GETDATE()
+	 WHERE COMPANY_CD   = @{COMPANY_CD}
+	   AND BU_CD        = @{BU_CD}
+	   AND PLAN_TYPE_CD = @{PLAN_TYPE_CD}
+	   AND PLAN_ID      = @{PLAN_ID}
+	</update>
+	
+	<update id="meetingLogMngDelete" parameterType="map">
+	/****** [ snop.meetingMng.meetingLogMngDelete ] ******/
+	UPDATE TB_KPI_SNOP 
+	   SET DEL_FLAG     = 'Y'
+	 WHERE COMPANY_CD   = @{COMPANY_CD}
+	   AND BU_CD        = @{BU_CD}
+	   AND PLAN_TYPE_CD = @{PLAN_TYPE_CD}
+	   AND PLAN_ID      = @{PLAN_ID}
+	</update>
+
+	<select id="meetingLogMngExistPkInsert" parameterType="map" resultType="int">
+	/****** [ snop.meetingMng.meetingLogMngExistPkInsert ] ******/
+	SELECT COUNT(*)
+	  FROM TB_KPI_SNOP WITH(NOLOCK)
+	 WHERE COMPANY_CD   = @{COMPANY_CD}
+	   AND BU_CD        = @{BU_CD}
+	   AND PLAN_TYPE_CD = @{PLAN_TYPE_CD}
+	   AND PLAN_ID      = @{PLAN_ID}
+	</select>
+	
+	<update id="meetingLogMngFileNoUpdate" parameterType="map">
+	/****** [ snop.meetingMng.meetingLogMngFileNoUpdate ] ******/
+	UPDATE TB_KPI_SNOP
+	SET FILE_NO = @{FILE_NO}
+	WHERE COMPANY_CD   = @{COMPANY_CD}
+	  AND BU_CD        = @{BU_CD}
+	  AND PLAN_TYPE_CD = @{PLAN_TYPE_CD}
+	  AND PLAN_ID      = @{PLAN_ID}
+	</update>
+
+</mapper>

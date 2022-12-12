@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+	<!-- product hierarchy 조회  -->
+	<select id="producthrcySelect" parameterType="map" resultType="map">
+		/****** [ common.producthrcySelect ] ******/
+		<![CDATA[
+		SELECT A.*
+	         , ROW_NUMBER() OVER(ORDER BY A.id) AS ROW_IDX
+		FROM 
+		(
+			SELECT '-1'   AS id
+	             , NULL   AS pId
+	             , 'All'  AS name
+	             , 'TRUE' AS "open"
+	             , 'L0'   AS lvl
+			UNION ALL
+		    SELECT HIER_ID        AS id
+		         , PARENT_HIER_ID AS pid
+		         , HIER_NM        AS name
+		         , CASE WHEN LEVEL < 'L3' THEN 'TRUE' ELSE 'FALSE' END AS "open"
+		         , LEVEL          AS lvl
+			FROM UV_HIER_ITEM A
+		) A
+		ORDER BY id
+		]]> 
+	</select>
+
+	<!-- customer hierarchy 조회  -->
+	<select id="customerhrcySelect" parameterType="map" resultType="map">
+		/****** [ common.customerhrcySelect ] ******/
+		<![CDATA[
+		SELECT A.*
+	         , ROW_NUMBER() OVER(ORDER BY A.sort, A.id) AS ROW_IDX
+	    FROM 
+	    (
+			SELECT '-1'   AS id
+	             , NULL   AS pId
+	             , 'All'  AS name
+	             , 'TRUE' AS "open"
+	             , 'L0'   AS lvl
+	             , 0      AS sort
+			UNION ALL
+		    SELECT HIER_ID        AS id
+		         , PARENT_HIER_ID AS pid
+		         , HIER_NM        AS name
+		         , CASE WHEN LEVEL < 'L3' THEN 'TRUE' ELSE 'FALSE' END AS "open"
+		         , LEVEL          AS lvl
+		         , SORT           AS sort
+			FROM UV_HIER_CUST A
+	    ) A
+		ORDER BY sort, id
+	]]> 
+	</select>
+
+	<!-- sales Org hierarchy 조회  -->
+	<select id="salesOrghrcySelect" parameterType="map" resultType="map">
+		/****** [ common.salesOrghrcySelect ] ******/
+		<![CDATA[
+		SELECT A.*
+	         , ROW_NUMBER() OVER(ORDER BY A.id) AS ROW_IDX
+	    FROM 
+	    (
+			SELECT '-1'   AS id
+	             , NULL   AS pId
+	             , 'All'  AS name
+	             , 'TRUE' AS "open"
+	             , 'L0'   AS lvl
+		    UNION ALL
+		    SELECT HIER_ID        AS id
+		         , PARENT_HIER_ID AS pid
+		         , HIER_NM        AS name
+		         , CASE WHEN LEVEL < 'L5' THEN 'TRUE' ELSE 'FALSE' END AS "open"
+		         , LEVEL          AS lvl
+		    FROM UV_HIER_SALES_ORG A
+	    ) A
+		ORDER BY id
+		]]>
+	</select>
+
+</mapper>

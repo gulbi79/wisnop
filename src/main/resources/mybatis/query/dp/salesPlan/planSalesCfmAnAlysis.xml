@@ -1,0 +1,789 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPlan">
+	
+	<select id="planSalesCfmAnAlysisListPlanIdSelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPlan.planSalesCfmAnAlysisListPlanIdSelect ] ******/
+		SELECT B1.*
+		     , B1.PLAN_ID AS CODE_CD
+		     , B1.PLAN_ID AS CODE_NM
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.START_WEEK AND DAY_NM = 'SUN') AS START_DAY         
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.START_WEEK AND DAY_NM = 'SAT') AS END_DAY
+		FROM
+		(
+		  	SELECT PLAN_ID
+		         , START_WEEK
+		         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) AS END_WEEK
+		  	FROM TB_MST_PLAN_VERSION A1 WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND PLAN_TYPE_CD = 'DP_W'
+		      AND CUT_OFF_FLAG = 'Y'
+		) B1
+		ORDER BY B1.START_WEEK DESC
+	</select>
+	
+	<select id="planSalesCfmAnAlysisListBucketSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPlan.planSalesCfmAnAlysisListBucketSelect ] ******/
+    	WITH W_MEA_ALL AS 
+		(
+			SELECT 'M' + B.MEAS_CD AS BUCKET_ID
+			     , B.MEAS_CD AS BUCKET_VAL
+			     , B.MEAS_CD AS CD
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN A.MEAS_NM_KR
+		                WHEN 'cn' = @{GV_LANG} THEN A.MEAS_NM_CN
+		                ELSE A.MEAS_NM
+		           END NM
+			     , 'Q' + B.MEAS_CD AS ROOT_CD
+			     , 'group' AS TYPE
+		         , ISNULL(C.SORT, B.SORT) AS SORT
+		         , B.MAND_FLAG
+		         , B.DEFAULT_FLAG
+		         , CASE WHEN C.MEAS_CD IS NOT NULL THEN 'Y' 
+		                ELSE 'N'
+		           END AS MAPPING_FLAG
+		         , MAX(C.MEAS_CD) OVER() AS USER_FLAG
+		    FROM TB_MST_MEAS A WITH(NOLOCK)
+		    INNER JOIN TB_MAP_MENU_MEAS B WITH(NOLOCK)
+		        ON B.MEAS_CD    = A.MEAS_CD
+		       AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		       AND B.BU_CD      = @{GV_BU_CD}
+		       AND B.MENU_CD    = @{menuCd}
+		       AND B.USE_FLAG   = 'Y'
+		    LEFT JOIN TB_MAP_USER_MENU_MEAS C WITH(NOLOCK)
+		        ON C.COMPANY_CD = B.COMPANY_CD
+		       AND C.BU_CD      = B.BU_CD
+		       AND C.MENU_CD    = B.MENU_CD
+		       AND C.USER_ID    = @{GV_USER_ID}
+		       AND C.MEAS_CD    = B.MEAS_CD
+		       AND C.USE_FLAG   = 'Y'
+		    WHERE A.USE_FLAG = 'Y'
+		)
+		SELECT A.BUCKET_ID
+		     , A.BUCKET_VAL
+		     , A.CD
+		     , A.NM
+		     , A.ROOT_CD
+		     , A.TYPE
+		FROM W_MEA_ALL A
+		WHERE MAND_FLAG    = 'Y'
+		   OR MAPPING_FLAG = 'Y'
+		   OR (USER_FLAG IS NULL AND DEFAULT_FLAG = 'Y' AND MAPPING_FLAG = 'N')
+		ORDER BY SORT, CD
+    </select>
+	
+    <select id="planSalesCfmAnAlysisListSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPlan.planSalesCfmAnAlysisListSelect ] ******/
+    	BEGIN
+    		<include refid="include.macros"/>
+	    	#getProductTree()
+	    	#getSalesOrgTree()
+    	
+	    	SELECT NULL AS TMP_COL
+				<include refid="include.getCdDimTotal"/>
+				<include refid="include.getGrpLvlId"/>
+				#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramWeek = "$bucketMap.BUCKET_VAL")
+				 , SUM($bucketMap.CD) AS $bucketMap.CD
+				#end
+	    	FROM
+	    	(
+		    	SELECT ISNULL(MC.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+		    	     , ISNULL(MC.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+				     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+				     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+				     , ISNULL(MC.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+				     , ISNULL(MC.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+				     , ISNULL(MC.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+				     , ISNULL(MC.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+				     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+				     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+				     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+				     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+				     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD
+				     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD_NM
+				     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+				     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+				     , ISNULL(CAST (MICG.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+				     , ISNULL(CAST (MICG.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+				     , ISNULL(MI.SPEC, ' ') AS SPEC
+				     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+				     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO
+				     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO_NM
+				     , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID
+				     , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID_NM
+				     , ISNULL(CASE WHEN MC1.CODE_CD IS NOT NULL THEN 'Y' ELSE 'N' END, ' ') AS CLEANING_YN
+				     , ISNULL(CASE WHEN MC1.CODE_CD IS NOT NULL THEN 'Y' ELSE 'N' END, ' ') AS CLEANING_YN_NM
+				     , ISNULL(MI.CPFR_YN, 'N') AS CPFR_YN
+				     , ISNULL(MI.CPFR_YN, 'N') AS CPFR_YN_NM
+				     , DI.INV_QTY AS INV_QTY_SQTY
+				     
+				     
+                      /* 20210303 김수호 추가   */
+                     , ISNULL(SH.INV_QTY,0)                        AS INV_QTY_SUN_QTY_SQTY
+                     , ISNULL(SH.INV_QTY,0) * MICG.SALES_PRICE_KRW AS INV_QTY_SUN_QTY_SAMT
+                     , (ISNULL(SH.INV_QTY,0) - HSP.CALC_BOH_QTY)   AS INV_QTY_SUN_QTY_MINUS_CALC_BOH_QTY_SQTY
+                     , (ISNULL(SH.INV_QTY,0) - HSP.CALC_BOH_QTY) * MICG.SALES_PRICE_KRW AS INV_QTY_SUN_QTY_MINUS_CALC_BOH_QTY_SAMT
+                       
+                       ---------------------------------- 
+				     
+				     , HSP.SALES_REMAIN_QTY AS SALES_REMAIN_QTY_SQTY
+				     , HSP.PROD_REMAIN_QTY AS PROD_REMAIN_QTY_SQTY
+				     , HSP.AP2_DMD1_SP AS AP2_DMD1_SP_SQTY
+				     , HSP.AP2_DMD2_SP AS AP2_DMD2_SP_SQTY
+				     , HSP.AP2_DMD3_SP AS AP2_DMD3_SP_SQTY
+				     , HSP.AP2_SP AS AP2_SP_SQTY
+				     , HSP.CFM_DMD1_SP AS CFM_DMD1_SP_SQTY
+				     , HSP.CFM_DMD2_SP AS CFM_DMD2_SP_SQTY
+				     , HSP.CFM_DMD3_SP AS CFM_DMD3_SP_SQTY
+				     , HSP.CFM_SP AS CFM_SP_SQTY
+				     , HSP.CALC_BOH_QTY AS CALC_BOH_QTY_SQTY
+				     , HSP.INV_SALES_QTY AS INV_SALES_QTY_SQTY
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0) AS PROD_NEED_QTY_SQTY
+				     , DBO.UFN_LEAST(DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0), HSP.PROD_PLAN_QTY) AS PROD_QTY2_SQTY
+				     , HSP.AVAIL_QTY AS AVAIL_QTY_SQTY 
+				     , HSP.AVAIL_CFM_SP AS AVAIL_CFM_SP_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END AS NO_CFM_SP_CPFR_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END AS NO_CFM_SP_SQTY
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0) AS OVER_CFM_SP_SQTY
+				     , DBO.UFN_GREATEST(HSP.AVAIL_QTY - HSP.CFM_SP, 0) AS ADD_CFM_SP_SQTY
+				     , HSP.PROD_PLAN_QTY AS PROD_PLAN_QTY2_SQTY
+				     , HSP.PROD_1ST_QTY AS PROD_1ST_QTY_SQTY
+				     , HSP.PROD_2ND_QTY AS PROD_2ND_QTY_SQTY
+				     , HSP.PROD_3RD_QTY AS PROD_3RD_QTY_SQTY
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.AVAIL_QTY, 0) AS NO_PROD_QTY_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END AS PRE_PROD_QTY_CPFR_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END AS PRE_PROD_QTY_SQTY
+				     <!-- , DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0) AS NO_AVA_QTY_ADD_CONFIRM_SQTY -->
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AP2_SP - DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0), 0) AS AVA_QTY_ADD_CONFIRM_SQTY
+				     , DI.INV_QTY * MICG.SALES_PRICE_KRW AS INV_QTY_SAMT
+				     , HSP.SALES_REMAIN_QTY * MICG.SALES_PRICE_KRW  AS SALES_REMAIN_QTY_SAMT
+				     , HSP.PROD_REMAIN_QTY * MICG.SALES_PRICE_KRW  AS PROD_REMAIN_QTY_SAMT
+				     , HSP.AP2_DMD1_SP * MICG.SALES_PRICE_KRW  AS AP2_DMD1_SP_SAMT
+				     , HSP.AP2_DMD2_SP * MICG.SALES_PRICE_KRW  AS AP2_DMD2_SP_SAMT
+				     , HSP.AP2_DMD3_SP * MICG.SALES_PRICE_KRW  AS AP2_DMD3_SP_SAMT
+				     , HSP.AP2_SP * MICG.SALES_PRICE_KRW  AS AP2_SP_SAMT
+				     , HSP.CFM_DMD1_SP * MICG.SALES_PRICE_KRW  AS CFM_DMD1_SP_SAMT
+				     , HSP.CFM_DMD2_SP * MICG.SALES_PRICE_KRW  AS CFM_DMD2_SP_SAMT
+				     , HSP.CFM_DMD3_SP * MICG.SALES_PRICE_KRW  AS CFM_DMD3_SP_SAMT
+				     , HSP.CFM_SP * MICG.SALES_PRICE_KRW  AS CFM_SP_SAMT
+				     , HSP.CALC_BOH_QTY * MICG.SALES_PRICE_KRW  AS CALC_BOH_QTY_SAMT
+				     , HSP.INV_SALES_QTY * MICG.SALES_PRICE_KRW  AS INV_SALES_QTY_SAMT
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0) * MICG.SALES_PRICE_KRW  AS PROD_NEED_QTY_SAMT
+				     , DBO.UFN_LEAST(DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0), HSP.PROD_PLAN_QTY) * MICG.SALES_PRICE_KRW  AS PROD_QTY2_SAMT
+				     , HSP.AVAIL_QTY * MICG.SALES_PRICE_KRW  AS AVAIL_QTY_SAMT
+				     , HSP.AVAIL_CFM_SP * MICG.SALES_PRICE_KRW  AS AVAIL_CFM_SP_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END * MICG.SALES_PRICE_KRW AS NO_CFM_SP_CPFR_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END * MICG.SALES_PRICE_KRW AS NO_CFM_SP_SAMT
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0) * MICG.SALES_PRICE_KRW AS OVER_CFM_SP_SAMT
+				     , DBO.UFN_GREATEST(HSP.AVAIL_QTY - HSP.CFM_SP, 0) * MICG.SALES_PRICE_KRW AS ADD_CFM_SP_SAMT
+				     , HSP.PROD_PLAN_QTY * MICG.SALES_PRICE_KRW  AS PROD_PLAN_QTY2_SAMT
+				     , HSP.PROD_1ST_QTY * MICG.SALES_PRICE_KRW  AS PROD_1ST_QTY_SAMT
+				     , HSP.PROD_2ND_QTY * MICG.SALES_PRICE_KRW  AS PROD_2ND_QTY_SAMT
+				     , HSP.PROD_3RD_QTY * MICG.SALES_PRICE_KRW  AS PROD_3RD_QTY_SAMT
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.AVAIL_QTY, 0) * MICG.SALES_PRICE_KRW AS NO_PROD_QTY_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END * MICG.SALES_PRICE_KRW AS PRE_PROD_QTY_CPFR_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END * MICG.SALES_PRICE_KRW AS PRE_PROD_QTY_SAMT
+				     <!-- , DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0) * MICG.SALES_PRICE_KRW AS NO_AVA_QTY_ADD_CONFIRM_SAMT -->
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AP2_SP - DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0), 0) * MICG.SALES_PRICE_KRW AS AVA_QTY_ADD_CONFIRM_SAMT
+				FROM 
+				(
+					SELECT HSP.COMPANY_CD
+	                     , HSP.BU_CD
+	                     , HSP.ITEM_CD
+	                     , HSP.CUST_GROUP_CD
+	                     , HSP.SALES_REMAIN_QTY
+	                     , HSP.PROD_REMAIN_QTY
+	                     , HSP.AP2_DMD1_SP
+	                     , HSP.AP2_DMD2_SP
+	                     , HSP.AP2_DMD3_SP
+	                     , HSP.AP2_SP
+	                     , HSP.CFM_DMD1_SP
+	                     , HSP.CFM_DMD2_SP
+	                     , HSP.CFM_DMD3_SP
+	                     , HSP.CFM_SP
+	                     , dbo.UFN_LEAST(HSP.AP2_SP, HSP.CALC_BOH_QTY) AS INV_SALES_QTY
+	                     , HSP.CALC_BOH_QTY
+	                     , HSP.AVAIL_QTY
+	                     , dbo.UFN_LEAST(HSP.AP2_SP, HSP.AVAIL_QTY) AS AVAIL_CFM_SP
+	                     , HSP.PROD_PLAN_QTY
+	                     , HSP.PROD_1ST_QTY
+	                     , HSP.PROD_2ND_QTY
+	                     , HSP.PROD_3RD_QTY
+					FROM 
+					(
+						SELECT HSP.COMPANY_CD
+				             , HSP.BU_CD
+				             , HSP.ITEM_CD
+				             , HSP.CUST_GROUP_CD
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'SALES_REMAIN_QTY' THEN HSP.QTY ELSE 0 END) AS SALES_REMAIN_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'PROD_REMAIN_QTY' THEN HSP.QTY ELSE 0 END) AS PROD_REMAIN_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD1_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD1_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD2_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD3_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD3_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY ELSE 0 END) AS AP2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD1_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD1_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD2_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD3_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD3_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_SP' THEN HSP.QTY ELSE 0 END) AS CFM_SP
+				             <!-- , MIN(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY
+				                        WHEN HSP.MEAS_CD = 'CALC_BOH_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY
+				                        ELSE NULL
+				                   END) AS INV_SALES_QTY -->
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CALC_BOH_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS CALC_BOH_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AVAIL_QTY' THEN HSP.QTY ELSE 0 END) AS AVAIL_QTY
+				             <!-- , MIN(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY
+				                        WHEN HSP.MEAS_CD = 'AVAIL_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY
+				                        ELSE NULL
+				                   END) AS AVAIL_CFM_SP -->
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'PROD_PLAN_QTY' THEN HSP.QTY ELSE 0 END) AS PROD_PLAN_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'PROD_1ST_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS PROD_1ST_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'PROD_2ND_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS PROD_2ND_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'PROD_3RD_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS PROD_3RD_QTY
+						FROM TB_HIS_SALES_PLAN HSP WITH(NOLOCK)
+				        WHERE HSP.PLAN_ID = @{planId}
+				          AND HSP.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND HSP.BU_CD = @{GV_BU_CD}
+				          AND HSP.MEAS_CD IN ('SALES_REMAIN_QTY', 'PROD_REMAIN_QTY', 'AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP', 'AP2_SP', 'CFM_DMD1_SP', 'CFM_DMD2_SP', 'CFM_DMD3_SP', 'CFM_SP', 'CALC_BOH_QTY', 'AVAIL_QTY', 'PROD_PLAN_QTY', 'PROD_1ST_QTY', 'PROD_2ND_QTY', 'PROD_3RD_QTY')
+				          AND HSP.YEARWEEK = 
+				          (
+							SELECT YEARWEEK
+							FROM TB_MST_CALENDAR WITH(NOLOCK)
+							WHERE YYYYMMDD = 
+							(
+								SELECT MAX(CONVERT(VARCHAR, DATEADD(DD, 7, YYYYMMDD), 112)) AS YYYYMMDD
+								FROM TB_MST_CALENDAR WITH(NOLOCK)
+								WHERE YEARWEEK = 
+								(
+	  								SELECT START_WEEK
+									FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+									WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	  								  AND BU_CD = @{GV_BU_CD}
+	  								  AND PLAN_TYPE_CD = 'DP_W' 
+	  								  AND PLAN_ID = @{planId}
+								)
+							)
+				          )
+				        GROUP BY HSP.COMPANY_CD, HSP.BU_CD, HSP.ITEM_CD, HSP.CUST_GROUP_CD
+					) HSP
+				) HSP
+				INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+				   ON MI.COMPANY_CD = HSP.COMPANY_CD
+				  AND MI.BU_CD = HSP.BU_CD
+				  AND MI.ITEM_CD = HSP.ITEM_CD
+				INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				   ON MIP.COMPANY_CD = HSP.COMPANY_CD
+				  AND MIP.BU_CD = HSP.BU_CD
+				  AND MIP.PLANT_CD = 'WF01'
+				  AND MIP.ITEM_CD = HSP.ITEM_CD
+				LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+				  ON MIG.COMPANY_CD = MI.COMPANY_CD
+				 AND MIG.BU_CD = MI.BU_CD
+				 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+				INNER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+				   ON MC.COMPANY_CD = HSP.COMPANY_CD
+				  AND MC.BU_CD = HSP.BU_CD
+				  AND MC.CUST_CD = HSP.CUST_GROUP_CD
+				INNER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+				   ON MICG.COMPANY_CD = HSP.COMPANY_CD
+				  AND MICG.BU_CD = HSP.BU_CD
+				  AND MICG.ITEM_CD = HSP.ITEM_CD
+				  AND MICG.CUST_GROUP_CD =HSP.CUST_GROUP_CD
+				LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+				  ON MC1.BU_CD = MIP.BU_CD
+				 AND MC1.GROUP_CD = 'CL_SL_CD'
+				 AND MC1.CODE_CD = MIP.RCPT_SL_CD
+				 AND MC1.USE_FLAG = 'Y'
+				LEFT OUTER JOIN 
+				(
+					SELECT DI.COMPANY_CD
+		                 , DI.BU_CD
+		                 , DI.ITEM_CD
+		                 , SUM(DI.INV_QTY) AS INV_QTY
+					FROM UV_DYN_INVENTORY DI WITH(NOLOCK)
+		            WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND DI.BU_CD = @{GV_BU_CD}
+		              AND DI.PLANT_CD = 'WF01'
+		              AND DI.INV_DATE = (
+		                                  	SELECT MC.YYYYMMDD
+		                                    FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+		                                   INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+		                                      ON MC.YEARWEEK = MPV.START_WEEK
+		                                     AND MC.DAY_NM = 'FRI'
+		                                   WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+		                                     AND MPV.BU_CD = @{GV_BU_CD}
+		                                     AND MPV.PLAN_TYPE_CD = 'DP_W'
+		                                     AND MPV.PLAN_ID = @{planId}
+		                                )
+					GROUP BY DI.COMPANY_CD, DI.BU_CD, DI.ITEM_CD
+				) DI
+				ON DI.COMPANY_CD = HSP.COMPANY_CD
+				AND DI.BU_CD = HSP.BU_CD
+				AND DI.ITEM_CD = HSP.ITEM_CD
+				
+				/* 20210303 김수호 추가   */
+				LEFT OUTER JOIN 
+                (
+                    SELECT DI.COMPANY_CD
+                         , DI.BU_CD
+                         , DI.ITEM_CD
+                         , SUM(DI.INV_QTY) AS INV_QTY
+                    FROM UV_DYN_INVENTORY DI WITH(NOLOCK)
+                    WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND DI.BU_CD = @{GV_BU_CD}
+                      AND DI.PLANT_CD = 'WF01'
+                      AND DI.INV_DATE = CONVERT(NVARCHAR(8),DATEADD(DAY,2,(
+					                        SELECT MC.YYYYMMDD
+					                        FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+					                        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+					                        ON MC.YEARWEEK = MPV.START_WEEK
+					                        AND MC.DAY_NM = 'FRI'
+					                        WHERE MPV.COMPANY_CD = 'KO316'
+					                        AND MPV.BU_CD = 'QT'
+					                        AND MPV.PLAN_TYPE_CD = 'DP_W'
+					                        AND MPV.PLAN_ID = @{planId}
+					                     )),112)
+                    GROUP BY DI.COMPANY_CD, DI.BU_CD, DI.ITEM_CD
+                ) SH
+                ON SH.COMPANY_CD = HSP.COMPANY_CD
+                AND SH.BU_CD = HSP.BU_CD
+                AND SH.ITEM_CD = HSP.ITEM_CD
+                ------------------------------------------------------------------------
+				
+				LEFT OUTER JOIN UV_MAP_SALES_ORG SO WITH(NOLOCK)
+	          	  ON MICG.COMPANY_CD = SO.COMPANY_CD
+	         	 AND MICG.BU_CD = SO.BU_CD
+	         	 AND MICG.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+	         	 AND (
+	         			MICG.SALES_ORG_LVL5_CD IS NULL
+	                	OR (MICG.SALES_ORG_LVL5_CD IS NOT NULL AND MICG.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD)
+	             	 )
+				WHERE 1 = 1
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+		       	  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		  		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+				  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		  		#end
+				#if($_parameter.procurType and $_parameter.procurType != "")
+	              AND MIP.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+	  			#end
+				#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+	      		  AND MIG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+	  			#end
+				#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+	       		  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+	  			#end
+	  			#if($_parameter.route and $_parameter.route != "")
+	       		  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+	  			#end
+				#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+	       		  AND MC.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+	  			#end
+	  			#if($_parameter.custGroup and $_parameter.custGroup != "")
+	       		  AND MC.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+	  			#end
+	  			#if($_parameter.productList and $_parameter.productList.size() > 0)
+	  			#set($treeAlias = "MI")
+		        <include refid="include.productTree"/>
+		        #end
+		        #if($_parameter.salesOrgList and $_parameter.salesOrgList.size() > 0)
+				#set($treeAlias = "SO")
+				<include refid="include.salesOrgTree"/>
+				#end
+			) A
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+			ORDER BY TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+			  , A.$dimMap.DIM_CD
+			#end
+   		END;
+	</select>
+	
+	<select id="planSalesCfmAnAlysisListDetailSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPlan.planSalesCfmAnAlysisListDetailSelect ] ******/
+    	SELECT *
+    	FROM
+    	(
+	    	SELECT NULL AS TMP_COL
+				<include refid="include.getCdDimTotal"/>
+				<include refid="include.getGrpLvlId"/>
+				#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramWeek = "$bucketMap.BUCKET_VAL")
+				 , SUM($bucketMap.CD) AS $bucketMap.CD
+				#end
+				 , CASE WHEN GROUPING_ID(PROD_CATE_NM, REP_CUST_GROUP_NM) = 0 THEN MAX(SORT) 
+                        ELSE NULL
+                	END SORT
+             	, CASE WHEN MAX(PROD_CATE) = 'ETC' AND GROUPING_ID(PROD_CATE_NM, REP_CUST_GROUP_NM) = 1 THEN NULL ELSE MAX(PROD_CATE) END PROD_CATE  
+	    	FROM
+	    	(
+		    	SELECT MRCG.PROD_CATE 
+		    	     , ISNULL(CASE WHEN @{GV_LANG} = 'ko' THEN MC2.CODE_NM_KR
+	                        	   WHEN @{GV_LANG} = 'cn' THEN MC2.CODE_NM_CN
+	                        	   ELSE MC2.CODE_NM
+	                    	   END, ' ') AS PROD_CATE_NM
+				     , ISNULL(CASE WHEN @{GV_LANG} = 'ko' THEN MC2.CODE_NM_KR
+	                        	   WHEN @{GV_LANG} = 'cn' THEN MC2.CODE_NM_CN
+	                        	   ELSE MC2.CODE_NM
+	                    	   END, ' ') AS PROD_CATE_NM_NM
+				     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+				     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+				     , MRCG.SORT
+				     , HSP.AP2_DMD1_SP AS AP2_DMD1_SP_SQTY
+				     , HSP.AP2_DMD2_SP AS AP2_DMD2_SP_SQTY
+				     , HSP.AP2_DMD3_SP AS AP2_DMD3_SP_SQTY
+				     , HSP.AP2_SP AS AP2_SP_SQTY
+				     , HSP.CFM_DMD1_SP AS CFM_DMD1_SP_SQTY
+				     , HSP.CFM_DMD2_SP AS CFM_DMD2_SP_SQTY
+				     , HSP.CFM_DMD3_SP AS CFM_DMD3_SP_SQTY
+				     , HSP.CFM_SP AS CFM_SP_SQTY
+				     , HSP.CALC_BOH_QTY AS CALC_BOH_QTY_SQTY
+				     , HSP.INV_SALES_QTY AS INV_SALES_QTY_SQTY
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0) AS PROD_NEED_QTY_SQTY
+				     , DBO.UFN_LEAST(DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0), HSP.PROD_PLAN_QTY) AS PROD_QTY2_SQTY
+				     , HSP.AVAIL_QTY AS AVAIL_QTY_SQTY 
+				     , HSP.AVAIL_CFM_SP AS AVAIL_CFM_SP_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END AS NO_CFM_SP_CPFR_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END AS NO_CFM_SP_SQTY
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0) AS OVER_CFM_SP_SQTY
+				     , DBO.UFN_GREATEST(HSP.AVAIL_QTY - HSP.CFM_SP, 0) AS ADD_CFM_SP_SQTY
+				     , HSP.PROD_PLAN_QTY AS PROD_PLAN_QTY2_SQTY
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.AVAIL_QTY, 0) AS NO_PROD_QTY_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END AS PRE_PROD_QTY_CPFR_SQTY
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END AS PRE_PROD_QTY_SQTY
+				     <!-- , DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0) AS NO_AVA_QTY_ADD_CONFIRM_SQTY -->
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AP2_SP - DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0), 0) AS AVA_QTY_ADD_CONFIRM_SQTY
+				     , HSP.AP2_DMD1_SP * MICG.SALES_PRICE_KRW  AS AP2_DMD1_SP_SAMT
+				     , HSP.AP2_DMD2_SP * MICG.SALES_PRICE_KRW  AS AP2_DMD2_SP_SAMT
+				     , HSP.AP2_DMD3_SP * MICG.SALES_PRICE_KRW  AS AP2_DMD3_SP_SAMT
+				     , HSP.AP2_SP * MICG.SALES_PRICE_KRW  AS AP2_SP_SAMT
+				     , HSP.CFM_DMD1_SP * MICG.SALES_PRICE_KRW  AS CFM_DMD1_SP_SAMT
+				     , HSP.CFM_DMD2_SP * MICG.SALES_PRICE_KRW  AS CFM_DMD2_SP_SAMT
+				     , HSP.CFM_DMD3_SP * MICG.SALES_PRICE_KRW  AS CFM_DMD3_SP_SAMT
+				     , HSP.CFM_SP * MICG.SALES_PRICE_KRW  AS CFM_SP_SAMT
+				     , HSP.CALC_BOH_QTY * MICG.SALES_PRICE_KRW  AS CALC_BOH_QTY_SAMT
+				     , HSP.INV_SALES_QTY * MICG.SALES_PRICE_KRW  AS INV_SALES_QTY_SAMT
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0) * MICG.SALES_PRICE_KRW  AS PROD_NEED_QTY_SAMT
+				     , DBO.UFN_LEAST(DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0), HSP.PROD_PLAN_QTY) * MICG.SALES_PRICE_KRW  AS PROD_QTY2_SAMT
+				     , HSP.AVAIL_QTY * MICG.SALES_PRICE_KRW  AS AVAIL_QTY_SAMT
+				     , HSP.AVAIL_CFM_SP * MICG.SALES_PRICE_KRW  AS AVAIL_CFM_SP_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END * MICG.SALES_PRICE_KRW AS NO_CFM_SP_CPFR_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END * MICG.SALES_PRICE_KRW AS NO_CFM_SP_SAMT
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0) * MICG.SALES_PRICE_KRW AS OVER_CFM_SP_SAMT
+				     , DBO.UFN_GREATEST(HSP.AVAIL_QTY - HSP.CFM_SP, 0) * MICG.SALES_PRICE_KRW AS ADD_CFM_SP_SAMT
+				     , HSP.PROD_PLAN_QTY * MICG.SALES_PRICE_KRW  AS PROD_PLAN_QTY2_SAMT
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.AVAIL_QTY, 0) * MICG.SALES_PRICE_KRW AS NO_PROD_QTY_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END * MICG.SALES_PRICE_KRW AS PRE_PROD_QTY_CPFR_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END * MICG.SALES_PRICE_KRW AS PRE_PROD_QTY_SAMT
+				     <!-- , DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0) * MICG.SALES_PRICE_KRW AS NO_AVA_QTY_ADD_CONFIRM_SAMT -->
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AP2_SP - DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0), 0) * MICG.SALES_PRICE_KRW AS AVA_QTY_ADD_CONFIRM_SAMT
+				FROM 
+				(
+					SELECT HSP.COMPANY_CD
+	                     , HSP.BU_CD
+	                     , HSP.ITEM_CD
+	                     , HSP.CUST_GROUP_CD
+	                     , HSP.AP2_DMD1_SP
+	                     , HSP.AP2_DMD2_SP
+	                     , HSP.AP2_DMD3_SP
+	                     , HSP.AP2_SP
+	                     , HSP.CFM_DMD1_SP
+	                     , HSP.CFM_DMD2_SP
+	                     , HSP.CFM_DMD3_SP
+	                     , HSP.CFM_SP
+	                     , dbo.UFN_LEAST(HSP.AP2_SP, HSP.CALC_BOH_QTY) AS INV_SALES_QTY
+	                     , HSP.CALC_BOH_QTY
+	                     , HSP.AVAIL_QTY
+	                     , dbo.UFN_LEAST(HSP.AP2_SP, HSP.AVAIL_QTY) AS AVAIL_CFM_SP
+	                     , HSP.PROD_PLAN_QTY
+					FROM 
+					(
+						SELECT HSP.COMPANY_CD
+				             , HSP.BU_CD
+				             , HSP.ITEM_CD
+				             , HSP.CUST_GROUP_CD
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD1_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD1_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD2_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD3_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD3_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY ELSE 0 END) AS AP2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD1_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD1_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD2_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD3_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD3_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_SP' THEN HSP.QTY ELSE 0 END) AS CFM_SP
+				             <!-- , MIN(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY
+				                        WHEN HSP.MEAS_CD = 'CALC_BOH_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY
+				                        ELSE NULL
+				                   END) AS INV_SALES_QTY -->
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CALC_BOH_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS CALC_BOH_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AVAIL_QTY' THEN HSP.QTY ELSE 0 END) AS AVAIL_QTY
+				             <!-- , MIN(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY
+				                        WHEN HSP.MEAS_CD = 'AVAIL_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY
+				                        ELSE NULL
+				                   END) AS AVAIL_CFM_SP -->
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'PROD_PLAN_QTY' THEN HSP.QTY ELSE 0 END) AS PROD_PLAN_QTY
+						FROM TB_HIS_SALES_PLAN HSP WITH(NOLOCK)
+				        WHERE HSP.PLAN_ID = @{planId}
+				          AND HSP.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND HSP.BU_CD = @{GV_BU_CD}
+				          AND HSP.MEAS_CD IN ('AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP', 'AP2_SP', 'CFM_DMD1_SP', 'CFM_DMD2_SP', 'CFM_DMD3_SP', 'CFM_SP', 'CALC_BOH_QTY', 'AVAIL_QTY', 'PROD_PLAN_QTY')
+				          AND HSP.YEARWEEK = 
+				          (
+							SELECT YEARWEEK
+							FROM TB_MST_CALENDAR WITH(NOLOCK)
+							WHERE YYYYMMDD = 
+							(
+								SELECT MAX(CONVERT(VARCHAR, DATEADD(DD, 7, YYYYMMDD), 112)) AS YYYYMMDD
+								FROM TB_MST_CALENDAR WITH(NOLOCK)
+								WHERE YEARWEEK = 
+								(
+		 								SELECT START_WEEK
+									FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+									WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		 								  AND BU_CD = @{GV_BU_CD}
+		 								  AND PLAN_TYPE_CD = 'DP_W' 
+		 								  AND PLAN_ID = @{planId}
+								)
+							)
+				          )
+				        GROUP BY HSP.COMPANY_CD, HSP.BU_CD, HSP.ITEM_CD, HSP.CUST_GROUP_CD
+					) HSP
+				) HSP
+				INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+				   ON MI.COMPANY_CD = HSP.COMPANY_CD
+				  AND MI.BU_CD = HSP.BU_CD
+				  AND MI.ITEM_CD = HSP.ITEM_CD
+				INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				   ON MIP.COMPANY_CD = HSP.COMPANY_CD
+				  AND MIP.BU_CD = HSP.BU_CD
+				  AND MIP.PLANT_CD = 'WF01'
+				  AND MIP.ITEM_CD = HSP.ITEM_CD
+				LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+				  ON MIG.COMPANY_CD = MI.COMPANY_CD
+				 AND MIG.BU_CD = MI.BU_CD
+				 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+				INNER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+				   ON MC.COMPANY_CD = HSP.COMPANY_CD
+				  AND MC.BU_CD = HSP.BU_CD
+				  AND MC.CUST_CD = HSP.CUST_GROUP_CD
+				INNER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+				   ON MICG.COMPANY_CD = HSP.COMPANY_CD
+				  AND MICG.BU_CD = HSP.BU_CD
+				  AND MICG.ITEM_CD = HSP.ITEM_CD
+				  AND MICG.CUST_GROUP_CD = HSP.CUST_GROUP_CD
+				INNER JOIN TB_MST_REP_CUST_GROUP MRCG WITH(NOLOCK)
+	               ON MRCG.COMPANY_CD = MC.COMPANY_CD
+	              AND MRCG.BU_CD = MC.BU_CD
+	              AND MRCG.REP_CUST_GROUP_CD = MC.REP_CUST_GROUP_CD
+				LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+				  ON MC1.BU_CD = MIP.BU_CD
+				 AND MC1.GROUP_CD = 'CL_SL_CD'
+				 AND MC1.CODE_CD = MIP.RCPT_SL_CD
+				 AND MC1.USE_FLAG = 'Y'
+				INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+				   ON MC2.BU_CD = MRCG.BU_CD
+				  AND MC2.GROUP_CD = 'PROD_CATE'
+	 			  AND MC2.CODE_CD = MRCG.PROD_CATE
+				  AND MC2.USE_FLAG = 'Y'
+			) A
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+		) B
+		ORDER BY B.PROD_CATE_NM, B.GRP_LVL_ID DESC, B.SORT
+    </select>
+    
+    <select id="planSalesCfmAnAlysisChartSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPlan.planSalesCfmAnAlysisChartSelect ] ******/
+    	SELECT *
+    	FROM
+    	(
+	    	SELECT NULL AS TMP_COL
+	    	     , REP_CUST_GROUP_CD
+	    	     , GROUPING_ID(REP_CUST_GROUP_CD) AS GRP_LVL_ID
+	    	     , SUM(PROD_QTY2_SAMT) AS PROD_QTY2
+	    	     , SUM(PRE_PROD_QTY_CPFR_SAMT) AS PRE_PROD_QTY_CPFR
+	    	     , SUM(PRE_PROD_QTY_SAMT) AS PRE_PROD_QTY
+	    	     , SUM(INV_SALES_QTY_SAMT) AS INV_SALES_QTY
+	    	     , SUM(NO_PROD_QTY_SAMT) AS NO_PROD_QTY
+	    	     , SUM(AVAIL_CFM_SP_SAMT) AS AVAIL_CFM_SP
+	    	     , SUM(NO_CFM_SP_CPFR_SAMT) AS NO_CFM_SP_CPFR
+	    	     , SUM(NO_CFM_SP_SAMT) AS NO_CFM_SP
+	    	     , SUM(ISNULL(AVAIL_CFM_SP_SAMT, 0) - ISNULL(NO_CFM_SP_CPFR_SAMT, 0) - ISNULL(NO_CFM_SP_SAMT, 0)) AVAIL_QTY
+	    	     <!-- , SUM(NO_AVA_QTY_ADD_CONFIRM_SAMT) AS NO_AVA_QTY_ADD_CONFIRM -->
+	    	     , SUM(AVA_QTY_ADD_CONFIRM_SAMT) AS AVA_QTY_ADD_CONFIRM
+	    	     , SUM(OVER_CFM_SP_SAMT) AS OVER_CFM_SP
+	    	FROM
+	    	(
+		    	SELECT ISNULL(MC.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+		    	     , ISNULL(MC.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+				     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+				     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+				     , MRCG.SORT
+				     , DBO.UFN_LEAST(DBO.UFN_GREATEST(HSP.AP2_SP - HSP.INV_SALES_QTY, 0), HSP.PROD_PLAN_QTY) * MICG.SALES_PRICE_KRW  AS PROD_QTY2_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END * MICG.SALES_PRICE_KRW AS PRE_PROD_QTY_CPFR_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.PROD_PLAN_QTY - (HSP.AP2_SP - HSP.INV_SALES_QTY), 0) END * MICG.SALES_PRICE_KRW AS PRE_PROD_QTY_SAMT
+				     , HSP.INV_SALES_QTY * MICG.SALES_PRICE_KRW  AS INV_SALES_QTY_SAMT
+				     , DBO.UFN_GREATEST(HSP.AP2_SP - HSP.AVAIL_QTY, 0) * MICG.SALES_PRICE_KRW AS NO_PROD_QTY_SAMT
+				     , HSP.AVAIL_CFM_SP * MICG.SALES_PRICE_KRW  AS AVAIL_CFM_SP_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') = 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END * MICG.SALES_PRICE_KRW AS NO_CFM_SP_CPFR_SAMT
+				     , CASE WHEN ISNULL(MI.CPFR_YN, 'N') != 'Y' THEN DBO.UFN_GREATEST(HSP.AVAIL_CFM_SP - HSP.CFM_SP, 0) END * MICG.SALES_PRICE_KRW AS NO_CFM_SP_SAMT
+				     , HSP.AVAIL_QTY * MICG.SALES_PRICE_KRW  AS AVAIL_QTY_SAMT
+				     <!-- , DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0) * MICG.SALES_PRICE_KRW AS NO_AVA_QTY_ADD_CONFIRM_SAMT -->
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AP2_SP - DBO.UFN_GREATEST(DBO.UFN_LEAST(HSP.CFM_SP - HSP.AP2_SP, DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0)), 0), 0) * MICG.SALES_PRICE_KRW AS AVA_QTY_ADD_CONFIRM_SAMT
+				     , DBO.UFN_GREATEST(HSP.CFM_SP - HSP.AVAIL_QTY, 0) * MICG.SALES_PRICE_KRW AS OVER_CFM_SP_SAMT
+				FROM 
+				(
+					SELECT HSP.COMPANY_CD
+	                     , HSP.BU_CD
+	                     , HSP.ITEM_CD
+	                     , HSP.CUST_GROUP_CD
+	                     , HSP.AP2_DMD1_SP
+	                     , HSP.AP2_DMD2_SP
+	                     , HSP.AP2_DMD3_SP
+	                     , HSP.AP2_SP
+	                     , HSP.CFM_DMD1_SP
+	                     , HSP.CFM_DMD2_SP
+	                     , HSP.CFM_DMD3_SP
+	                     , HSP.CFM_SP
+	                     , dbo.UFN_LEAST(HSP.AP2_SP, HSP.CALC_BOH_QTY) AS INV_SALES_QTY
+	                     , HSP.CALC_BOH_QTY
+	                     , HSP.AVAIL_QTY
+	                     , dbo.UFN_LEAST(HSP.AP2_SP, HSP.AVAIL_QTY) AS AVAIL_CFM_SP
+	                     , HSP.PROD_PLAN_QTY
+					FROM 
+					(
+						SELECT HSP.COMPANY_CD
+				             , HSP.BU_CD
+				             , HSP.ITEM_CD
+				             , HSP.CUST_GROUP_CD
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD1_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD1_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD2_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_DMD3_SP' THEN HSP.QTY ELSE 0 END) AS AP2_DMD3_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY ELSE 0 END) AS AP2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD1_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD1_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD2_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD2_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_DMD3_SP' THEN HSP.QTY ELSE 0 END) AS CFM_DMD3_SP
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CFM_SP' THEN HSP.QTY ELSE 0 END) AS CFM_SP
+				             <!-- , MIN(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY
+				                        WHEN HSP.MEAS_CD = 'CALC_BOH_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY
+				                        ELSE NULL
+				                   END) AS INV_SALES_QTY -->
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'CALC_BOH_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS CALC_BOH_QTY
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'AVAIL_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS AVAIL_QTY
+				             <!-- , MIN(CASE WHEN HSP.MEAS_CD = 'AP2_SP' THEN HSP.QTY
+				                        WHEN HSP.MEAS_CD = 'AVAIL_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY
+				                        ELSE NULL
+				                   END) AS AVAIL_CFM_SP -->
+				             , SUM(CASE WHEN HSP.MEAS_CD = 'PROD_PLAN_QTY' AND HSP.YEARPWEEK NOT LIKE '%B' THEN HSP.QTY ELSE 0 END) AS PROD_PLAN_QTY
+						FROM TB_HIS_SALES_PLAN HSP WITH(NOLOCK)
+				        WHERE HSP.PLAN_ID = @{planId}
+				          AND HSP.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND HSP.BU_CD = @{GV_BU_CD}
+				          AND HSP.MEAS_CD IN ('AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP', 'AP2_SP', 'CFM_DMD1_SP', 'CFM_DMD2_SP', 'CFM_DMD3_SP', 'CFM_SP', 'CALC_BOH_QTY', 'AVAIL_QTY', 'PROD_PLAN_QTY')
+				          AND HSP.YEARWEEK = 
+				          (
+							SELECT YEARWEEK
+							FROM TB_MST_CALENDAR WITH(NOLOCK)
+							WHERE YYYYMMDD = 
+							(
+								SELECT MAX(CONVERT(VARCHAR, DATEADD(DD, 7, YYYYMMDD), 112)) AS YYYYMMDD
+								FROM TB_MST_CALENDAR WITH(NOLOCK)
+								WHERE YEARWEEK = 
+								(
+		 								SELECT START_WEEK
+									FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+									WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		 								  AND BU_CD = @{GV_BU_CD}
+		 								  AND PLAN_TYPE_CD = 'DP_W' 
+		 								  AND PLAN_ID = @{planId}
+								)
+							)
+				          )
+				        GROUP BY HSP.COMPANY_CD, HSP.BU_CD, HSP.ITEM_CD, HSP.CUST_GROUP_CD
+					) HSP
+				) HSP
+				INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+				   ON MI.COMPANY_CD = HSP.COMPANY_CD
+				  AND MI.BU_CD = HSP.BU_CD
+				  AND MI.ITEM_CD = HSP.ITEM_CD
+				INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				   ON MIP.COMPANY_CD = HSP.COMPANY_CD
+				  AND MIP.BU_CD = HSP.BU_CD
+				  AND MIP.PLANT_CD = 'WF01'
+				  AND MIP.ITEM_CD = HSP.ITEM_CD
+				LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+				  ON MIG.COMPANY_CD = MI.COMPANY_CD
+				 AND MIG.BU_CD = MI.BU_CD
+				 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+				INNER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+				   ON MC.COMPANY_CD = HSP.COMPANY_CD
+				  AND MC.BU_CD = HSP.BU_CD
+				  AND MC.CUST_CD = HSP.CUST_GROUP_CD
+				INNER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+				   ON MICG.COMPANY_CD = HSP.COMPANY_CD
+				  AND MICG.BU_CD = HSP.BU_CD
+				  AND MICG.ITEM_CD = HSP.ITEM_CD
+				  AND MICG.CUST_GROUP_CD = HSP.CUST_GROUP_CD
+				INNER JOIN TB_MST_REP_CUST_GROUP MRCG WITH(NOLOCK)
+	               ON MRCG.COMPANY_CD = MC.COMPANY_CD
+	              AND MRCG.BU_CD = MC.BU_CD
+	              AND MRCG.REP_CUST_GROUP_CD = MC.REP_CUST_GROUP_CD
+				LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+				  ON MC1.BU_CD = MIP.BU_CD
+				 AND MC1.GROUP_CD = 'CL_SL_CD'
+				 AND MC1.CODE_CD = MIP.RCPT_SL_CD
+				 AND MC1.USE_FLAG = 'Y'
+				INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+				   ON MC2.BU_CD = MRCG.BU_CD
+				  AND MC2.GROUP_CD = 'PROD_CATE'
+	 			  AND MC2.CODE_CD = MRCG.PROD_CATE
+				  AND MC2.USE_FLAG = 'Y'
+			) A
+			#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+			WHERE A.REP_CUST_GROUP_CD = @{reptCustGroup}
+			#end
+			GROUP BY ROLLUP((A.REP_CUST_GROUP_CD)) 
+		) B
+		#if($_parameter.reptCustGroup == "")
+		WHERE GRP_LVL_ID = 1
+		#end
+		
+    	
+    </select>
+    
+    
+    <select id="planSalesCfmAnAlysisListDetailExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ dp.salesPlan.planSalesCfmAnAlysisListDetailExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+    
+    
+</mapper>

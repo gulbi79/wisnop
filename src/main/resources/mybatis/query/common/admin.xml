@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+
+	<!-- portal 오늘일자 조회  -->
+	<select id="portalCurDateSelect" parameterType="map" resultType="map">
+	    /****** [ common.portalCurDateSelect ] ******/
+	    SELECT CONVERT(VARCHAR, DBO.UFN_GETDATE(), 23) AS CUR_DATE
+	         , DAY_NM
+	    FROM TB_MST_CALENDAR WITH(NOLOCK)
+	    WHERE YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112)
+	</select>
+
+	<!-- portal 시스템 담당자 조회  -->
+	<select id="portalSystemMngSelect" parameterType="map" resultType="map">
+	    /****** [ common.portalSystemMngSelect ] ******/
+	    SELECT BU_CD
+	         , ATTB_1_CD
+	    FROM TB_MST_CODE WITH(NOLOCK)
+	    WHERE GROUP_CD = 'SYSTEM_MNG'
+	      AND USE_FLAG = 'Y'
+	    ORDER BY SORT 
+	</select>
+	
+</mapper>

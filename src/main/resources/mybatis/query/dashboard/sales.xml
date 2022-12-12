@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.sales">
+
+	<!-- 당주 판매 진척률 -->
+	<select id="mainSelect"  parameterType="map" resultType="map">
+	/****** [ dashboard.sales.mainSelect ] ******/
+    SELECT MEAS_CD
+	     , ISNULL(CHART_1, 0)  AS CHART_1
+	     , ISNULL(CHART_2, 0)  AS CHART_2
+	     , ISNULL(CHART_3, 0)  AS CHART_3
+	     , ISNULL(CHART_4, 0)  AS CHART_4
+	     , ISNULL(CHART_T, 0)  AS CHART_T        
+	     , ISNULL(CHART_TT, 0)  AS CHART_TT
+	     , ISNULL(CHART_C, '') AS CHART_C
+	FROM 
+	(
+        /* 금주 출하 진척률(왼쪽)*/
+        SELECT 'SALES_PLAN'       AS MEAS_CD
+	         , SUM(A.PLAN_AMT1)   AS CHART_1
+	         , SUM(A.RESULT_AMT1) AS CHART_2
+	         , SUM(A.PLAN_AMT2)   AS CHART_3
+	         , SUM(A.RESULT_AMT2) AS CHART_4
+	         , SUM(A.RESULT_AMT1) / NULLIF(SUM(A.PLAN_AMT1),0) * 100  AS CHART_T
+	         , MAX(A.WORKING_DAY_RATE) AS CHART_TT
+	         , CASE WHEN SUM(A.RESULT_AMT1) / NULLIF(SUM(A.PLAN_AMT1), 0) * 100 <![CDATA[>=]]> AVG(A.WORKING_DAY_RATE) THEN 'green_f'
+	                ELSE 'red_f' 
+	           END AS CHART_C
+	    FROM TB_KPI_DASHBOARD_SALES A WITH(NOLOCK)
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.MEAS_CD    = 'SALES_PLAN'
+        /* 대표 거래처 그룹별 당월 출하 예상(왼쪽)*/
+        UNION ALL
+		SELECT A.MEAS_CD
+		     , A.PLAN_AMT2 + A.PLAN_AMT3 AS CHART_1
+		     , A.RESULT_AMT1 + A.RESULT_AMT2 AS CHART_2
+		     , A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2 AS CHART_3
+		     , A.PLAN_AMT1 AS CHART_4
+		     , (A.RESULT_AMT1 + A.RESULT_AMT2 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) / NULLIF(A.PLAN_AMT2 + A.PLAN_AMT3, 0) * 100 AS CHART_T
+		     , NULL AS CHART_TT
+		     , CASE WHEN A.RESULT_AMT1 + A.RESULT_AMT2 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2 <![CDATA[>=]]> A.PLAN_AMT2 + A.PLAN_AMT3 THEN 'green_f'
+					ELSE 'red_f' 
+			    END AS CHART_C
+		FROM
+		(
+			SELECT COMPANY_CD
+			     , BU_CD
+			     , MEAS_CD
+			     , SUM(PLAN_AMT1) AS PLAN_AMT1
+			     , SUM(PLAN_AMT2) AS PLAN_AMT2
+			     , SUM(PLAN_AMT3) AS PLAN_AMT3
+			     , SUM(RESULT_AMT1) AS RESULT_AMT1
+			     , SUM(RESULT_AMT2) AS RESULT_AMT2
+			     , SUM(EXP_RESULT_AMT1) AS EXP_RESULT_AMT1
+			     , SUM(EXP_RESULT_AMT2) AS EXP_RESULT_AMT2
+			FROM TB_KPI_DASHBOARD_SALES WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	      	  AND BU_CD      = @{GV_BU_CD} 
+			  AND MEAS_CD = 'ACTION_PLAN'
+			GROUP BY COMPANY_CD, BU_CD, MEAS_CD
+		) A
+        /* 연간 출하 예상(왼쪽) */
+        UNION ALL
+        SELECT 'BIZ_PLAN'             AS MEAS_CD
+	         , SUM(A.PLAN_AMT1)       AS CHART_1
+	         , SUM(A.RESULT_AMT1)     AS CHART_2
+	         , SUM(A.EXP_RESULT_AMT1) AS CHART_3
+	         , SUM(A.EXP_RESULT_AMT2) AS CHART_4
+	         , SUM(A.RESULT_AMT1 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) / NULLIF(SUM(A.PLAN_AMT1),0) * 100  AS CHART_T
+	         , NULL AS CHART_TT
+	         , CASE WHEN SUM(A.RESULT_AMT1 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) <![CDATA[>=]]> SUM(A.PLAN_AMT1) THEN 'green_f'
+	                ELSE 'red_f' 
+	           END AS CHART_C
+	    FROM TB_KPI_DASHBOARD_SALES A WITH(NOLOCK)
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.MEAS_CD    = 'BIZ_PLAN'
+	) A
+	</select>
+
+	<!-- 당주 판매 진척률 -->
+	<select id="subSelect"  parameterType="map" resultType="map">
+	/****** [ dashboard.sales.subSelect ] ******/
+    SELECT A.MEAS_CD
+         , A.REP_CUST_GROUP_CD
+         , B.REP_CUST_GROUP_NM
+         , ISNULL(A.CHART_1, 0) AS CHART_1
+         , ISNULL(A.CHART_2, 0) AS CHART_2
+         , ISNULL(A.CHART_3, 0) AS CHART_3
+         , ISNULL(A.CHART_4, 0) AS CHART_4
+         , ISNULL(A.CHART_T, 0) AS CHART_T
+         , A.CHART_CLS
+	FROM 
+	(
+        /* 금주 출하 진척률(오른쪽)*/
+	    SELECT A.MEAS_CD
+	         , A.REP_CUST_GROUP_CD
+	         , SUM(A.PLAN_AMT1)   AS CHART_1
+	         , SUM(A.RESULT_AMT1) AS CHART_2
+             , NULL               AS CHART_3
+             , NULL               AS CHART_4
+	         , SUM(A.RESULT_AMT1) / NULLIF(SUM(A.PLAN_AMT1),0) * 100  AS CHART_T
+	         , NULL              AS CHART_CLS
+	    FROM TB_KPI_DASHBOARD_SALES A WITH(NOLOCK)
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.MEAS_CD    = 'SALES_PLAN'
+	    GROUP BY A.MEAS_CD, A.REP_CUST_GROUP_CD
+	    		
+        /* 대표 거래처 그룹별 당월 출하 예상(오른쪽)*/
+        UNION ALL
+        SELECT A.MEAS_CD
+             , A.REP_CUST_GROUP_CD
+             
+             , SUM(A.PLAN_AMT2 + A.PLAN_AMT3) AS CHART_1
+		     , SUM(A.RESULT_AMT1 + A.RESULT_AMT2) AS CHART_2
+		     , SUM(A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) AS CHART_3
+		     , SUM(A.PLAN_AMT1) AS CHART_4
+		     , SUM(A.RESULT_AMT1 + A.RESULT_AMT2 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) / NULLIF(SUM(A.PLAN_AMT2 + A.PLAN_AMT3), 0) * 100 AS CHART_T
+		     , CASE WHEN SUM(A.RESULT_AMT1 + A.RESULT_AMT2 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) <![CDATA[>=]]> SUM(A.PLAN_AMT2 + A.PLAN_AMT3) THEN 'green_f'
+					ELSE 'red_f' 
+			    END AS CHART_CLS
+        FROM TB_KPI_DASHBOARD_SALES A WITH(NOLOCK)
+        WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+          AND A.BU_CD      = @{GV_BU_CD}
+          AND A.MEAS_CD    = 'ACTION_PLAN'
+        GROUP BY A.MEAS_CD, A.REP_CUST_GROUP_CD
+        
+        /* 연간 출하 예상(오른쪽) */
+        UNION ALL
+        SELECT A.MEAS_CD
+             , A.REP_CUST_GROUP_CD
+             , SUM(A.PLAN_AMT1)       AS CHART_1
+             , SUM(A.RESULT_AMT1)     AS CHART_2
+             , SUM(A.EXP_RESULT_AMT1) AS CHART_3
+             , SUM(A.EXP_RESULT_AMT2) AS CHART_4
+             , SUM(A.RESULT_AMT1 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) / NULLIF(SUM(A.PLAN_AMT1),0) * 100  AS CHART_T
+             , CASE WHEN SUM(A.RESULT_AMT1 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) <![CDATA[>=]]> SUM(A.PLAN_AMT1) THEN 'green_f'
+                    ELSE 'red_f' 
+               END AS CHART_CLS
+        FROM TB_KPI_DASHBOARD_SALES A WITH(NOLOCK)
+        WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+          AND A.BU_CD      = @{GV_BU_CD}
+          AND A.MEAS_CD    = 'BIZ_PLAN'
+        GROUP BY A.MEAS_CD, A.REP_CUST_GROUP_CD
+	) A
+    LEFT JOIN TB_MST_REP_CUST_GROUP B
+       ON B.COMPANY_CD        = @{GV_COMPANY_CD}
+      AND B.BU_CD             = @{GV_BU_CD}
+      AND B.REP_CUST_GROUP_CD = A.REP_CUST_GROUP_CD
+    ORDER BY A.MEAS_CD, A.REP_CUST_GROUP_CD
+	</select>
+
+</mapper>

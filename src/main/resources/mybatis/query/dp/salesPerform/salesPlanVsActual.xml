@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+    
+    <select id="salesPlanVsActualDateSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPerform.salesPlanVsActualDateSelect ] ******/
+    	WITH W_SYSDATE AS 
+    	(
+        	SELECT DBO.UFN_GETDATE() AS TODAY
+    	)
+    	SELECT CONVERT(VARCHAR( 8), DATEADD(M, -1, DATEADD(D, -DAY(TODAY)+1, TODAY)), 112) AS FROM_DATE
+        	 , CONVERT(VARCHAR( 8), DATEADD(D, -DATEPART(DW, TODAY), TODAY), 112) AS TO_DATE
+         	, CONVERT(VARCHAR(10), DATEADD(D, -DATEPART(DW, TODAY), TODAY),  23) AS MAX_DATE
+      	FROM W_SYSDATE
+    </select>
+    
+    <select id="salesPlanVsActualSelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.salesPlanVsActualSelect ] ******/
+	    <include refid="include.macros"/>
+	    #getProductTree()
+	    #getCustomerTree()
+	    #getSalesOrgTree()
+	    
+	    WITH W_ITEM_CUST_GROUP AS 
+	    (
+	        SELECT CG.COMPANY_CD
+	             , CG.BU_CD
+	             , CG.ITEM_CD
+	             , CG.CUST_GROUP_CD
+	             , CG.SALES_PRICE_KRW
+	             , ISNULL(IT.PROD_LVL2_CD     , ' ') AS PROD_LVL2_CD
+	             , ISNULL(IT.PROD_LVL2_NM     , ' ') AS PROD_LVL2_NM
+	             , ISNULL(IT.PROD_LVL3_CD     , ' ') AS PROD_LVL3_CD
+	             , ISNULL(IT.PROD_LVL3_NM     , ' ') AS PROD_LVL3_NM
+	             , ISNULL(IT.ITEM_NM          , ' ') AS ITEM_NM
+	             , ISNULL(IT.SPEC             , ' ') AS SPEC
+	             , ISNULL(IT.DRAW_NO          , ' ') AS DRAW_NO
+	             , ISNULL(CM.CUST_LVL2_CD     , ' ') AS CUST_LVL2_CD
+	             , ISNULL(CM.CUST_LVL2_NM     , ' ') AS CUST_LVL2_NM
+	             , ISNULL(CM.CUST_NM          , ' ') AS CUST_GROUP_NM
+	             , ISNULL(SO.SALES_ORG_LVL3_CD, ' ') AS SALES_ORG_LVL3_CD
+	             , ISNULL(SO.SALES_ORG_LVL3_NM, ' ') AS SALES_ORG_LVL3_NM
+	             , ISNULL(SO.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+	             , ISNULL(SO.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+	             , CASE WHEN CG.SALES_ORG_LVL5_CD IS NULL THEN ' ' ELSE ISNULL(SO.SALES_ORG_LVL5_CD, ' ') END AS SALES_ORG_LVL5_CD
+	             , CASE WHEN CG.SALES_ORG_LVL5_CD IS NULL THEN ' ' ELSE ISNULL(SO.SALES_ORG_LVL5_NM, ' ') END AS SALES_ORG_LVL5_NM
+	             , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+			FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+	        INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+	           ON CG.COMPANY_CD = IT.COMPANY_CD
+	          AND CG.BU_CD      = IT.BU_CD
+	          AND CG.ITEM_CD    = IT.ITEM_CD
+	          #set($treeAlias = "IT")
+	          <include refid="include.productTree"/>
+			INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+	           ON CG.COMPANY_CD    = CM.COMPANY_CD
+	          AND CG.BU_CD         = CM.BU_CD
+	          AND CG.CUST_GROUP_CD = CM.CUST_CD
+			LEFT OUTER JOIN UV_MAP_SALES_ORG SO WITH(NOLOCK)
+	          ON CG.COMPANY_CD          = SO.COMPANY_CD
+	         AND CG.BU_CD             = SO.BU_CD
+	         AND CG.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+	         AND ((CG.SALES_ORG_LVL5_CD IS NULL) OR (CG.SALES_ORG_LVL5_CD IS NOT NULL AND CG.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD))
+	        LEFT OUTER JOIN 
+			(
+				SELECT COMPANY_CD 
+			         , BU_CD 
+			         , ITEM_CD 
+			         , MAX(ROUTING_ID) AS ROUTING_ID 
+			         , MAX(PUR_LT) AS PUR_LT
+			         , MAX(MFG_LT) AS MFG_LT
+			         , SUM(SS_QTY) AS SS_QTY
+			         , MAX(PROCUR_TYPE) AS PROCUR_TYPE
+			         , MAX(RCPT_SL_CD) AS RCPT_SL_CD
+			    FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+			    WHERE PLANT_CD = 'WF01'
+			    GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+			) IP
+			ON CG.COMPANY_CD = IP.COMPANY_CD
+			AND CG.BU_CD = IP.BU_CD
+			AND CG.ITEM_CD = IP.ITEM_CD   
+		    LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+  			  ON MC1.BU_CD = IP.BU_CD
+			 AND MC1.GROUP_CD = 'CL_SL_CD'
+			 AND MC1.CODE_CD = IP.RCPT_SL_CD
+			 AND MC1.USE_FLAG = 'Y'   
+	         
+	         
+	         
+			WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+	          AND CG.BU_CD         = @{GV_BU_CD}
+	          AND CG.VALID_FLAG    = 'Y'
+			#if($_parameter.customerList and $_parameter.customerList.size() > 0)
+	          AND EXISTS (
+	             SELECT 1
+	               FROM TB_MST_CUSTOMER TT
+	              WHERE TT.COMPANY_CD    = CG.COMPANY_CD
+	                AND TT.BU_CD         = CG.BU_CD
+	                AND TT.CUST_GROUP_CD = CG.CUST_GROUP_CD
+	                #set($treeAlias = "TT")
+	                <include refid="include.customerTree"/>
+	           )
+			#end
+			#if($_parameter.salesOrgList and $_parameter.salesOrgList.size() > 0)
+				#set($treeAlias = "SO")
+				<include refid="include.salesOrgTree"/>
+			#end
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+	          AND CG.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+	          AND (IT.ITEM_CD   LIKE '%' + @{item_nm} + '%'
+	             OR IT.ITEM_NM   LIKE '%' + @{item_nm} + '%')
+			#end
+		),
+	    W_ITEM_CUST AS 
+	    (
+	        SELECT CG.COMPANY_CD
+	             , CG.BU_CD
+	             , CG.ITEM_CD
+	             , CG.CUST_GROUP_CD
+	             , CT.CUST_CD
+			FROM W_ITEM_CUST_GROUP CG
+	        INNER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+	           ON CG.COMPANY_CD    = CT.COMPANY_CD
+	          AND CG.BU_CD         = CT.BU_CD
+	          AND CG.CUST_GROUP_CD = CT.CUST_GROUP_CD
+	    ),
+	    W_SALES_PLAN AS 
+	    (
+	    	SELECT CG.COMPANY_CD
+	             , CG.BU_CD
+	             , CG.ITEM_CD
+	             , CG.CUST_GROUP_CD
+	             , SP.YEARPWEEK
+	             , ISNULL(SP.QTY, 0) AS CFM_SP
+	             , 0                 AS SALES_QTY
+	             , 0                 AS SALES_AMT_KRW
+	             , 0                 AS SALES_AMT_USD
+	             , 0                 AS BILLING_AMT_KRW
+	             , 0                 AS BILLING_AMT_USD
+	             , ISNULL(SP.QTY, 0) * CG.SALES_PRICE_KRW AS CFM_SP_KRW
+			FROM W_ITEM_CUST_GROUP CG
+	        INNER JOIN TB_KPI_SALES_PLAN SP WITH(NOLOCK)
+	           ON CG.COMPANY_CD    = SP.COMPANY_CD
+	          AND CG.BU_CD         = SP.BU_CD
+	          AND CG.ITEM_CD       = SP.ITEM_CD
+	          AND CG.CUST_GROUP_CD = SP.CUST_GROUP_CD
+	          AND SP.MEAS_CD       = 'CFM_SP'
+	          AND SP.YEARPWEEK BETWEEN @{fromPWeek} AND @{toPWeek}
+	    ),
+	    W_SALES_RESULT AS 
+	    (
+	        SELECT CG.COMPANY_CD
+	             , CG.BU_CD
+	             , CG.ITEM_CD
+	             , CG.CUST_GROUP_CD
+	             , CA.YEARPWEEK
+	             , 0                          AS CFM_SP
+	             , ISNULL(SUM(SR.QTY), 0)     AS SALES_QTY
+	             , ISNULL(SUM(SR.AMT_KRW), 0) AS SALES_AMT_KRW
+	             , ISNULL(SUM(SR.AMT_USD), 0) AS SALES_AMT_USD
+	             , 0                          AS BILLING_AMT_KRW
+	             , 0                          AS BILLING_AMT_USD
+	             , 0 AS CFM_SP_KRW
+			FROM W_ITEM_CUST_GROUP CG
+	        INNER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+	           ON CG.COMPANY_CD    = CT.COMPANY_CD
+	          AND CG.BU_CD         = CT.BU_CD
+	          AND CG.CUST_GROUP_CD = CT.CUST_GROUP_CD
+			INNER JOIN TB_DYN_SALES_RESULT SR WITH(NOLOCK)
+	           ON CG.COMPANY_CD = SR.COMPANY_CD
+			  AND CG.BU_CD      = SR.BU_CD
+	          AND CG.ITEM_CD    = SR.ITEM_CD
+	          AND CT.CUST_CD    = SR.CUST_CD
+	          AND SR.PLANT_CD   = 'WF01'
+	          AND SR.DEL_FLAG   = 'N'
+	          AND SR.SALES_DATE BETWEEN @{pwFromDate} AND @{pwToDate}
+			INNER JOIN TB_MST_CALENDAR CA WITH(NOLOCK)
+	           ON (SR.SALES_DATE = CA.YYYYMMDD)
+			GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.ITEM_CD, CG.CUST_GROUP_CD, CA.YEARPWEEK
+	    ),
+	    W_BILL_ORDER AS 
+	    (
+	        SELECT CG.COMPANY_CD
+	             , CG.BU_CD
+	             , CG.ITEM_CD
+	             , CG.CUST_GROUP_CD
+	             , CA.YEARPWEEK
+	             , 0                          AS CFM_SP
+	             , 0                          AS SALES_QTY
+	             , 0                          AS SALES_AMT_KRW
+	             , 0                          AS SALES_AMT_USD
+	             , ISNULL(SUM(BO.AMT_KRW), 0) AS BILLING_AMT_KRW
+	             , ISNULL(SUM(BO.AMT_USD), 0) AS BILLING_AMT_USD
+	             , 0 AS CFM_SP_KRW
+			FROM W_ITEM_CUST CG
+	        INNER JOIN TB_DYN_BILL_ORDER BO WITH(NOLOCK)
+	           ON CG.COMPANY_CD = BO.COMPANY_CD
+	          AND CG.BU_CD      = BO.BU_CD
+	          AND CG.ITEM_CD    = BO.ITEM_CD
+	          AND CG.CUST_CD    = BO.CUST_CD
+	          AND BO.DEL_FLAG   = 'N'
+	          AND BO.BILL_DATE  BETWEEN @{pwFromDate} AND @{pwToDate}
+			INNER JOIN TB_MST_CALENDAR CA WITH(NOLOCK)
+	           ON BO.BILL_DATE = CA.YYYYMMDD
+			GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.ITEM_CD, CG.CUST_GROUP_CD, CA.YEARPWEEK
+	    ),
+	    W_UNION_ROW AS 
+	    (
+	        SELECT COMPANY_CD
+	             , BU_CD
+	             , ITEM_CD
+	             , CUST_GROUP_CD
+	             , YEARPWEEK
+	             , SUM(CFM_SP)          AS CFM_SP
+	             , SUM(SALES_QTY)       AS SALES_QTY
+	             , SUM(SALES_AMT_KRW)   AS SALES_AMT_KRW
+	             , SUM(SALES_AMT_USD)   AS SALES_AMT_USD
+	             , SUM(BILLING_AMT_KRW) AS BILLING_AMT_KRW
+	             , SUM(BILLING_AMT_USD) AS BILLING_AMT_USD
+	             , SUM(CFM_SP_KRW) AS CFM_SP_KRW
+			FROM 
+			(
+	        	SELECT * 
+	        	FROM W_SALES_PLAN
+	            UNION ALL
+	            SELECT * 
+	            FROM W_SALES_RESULT
+	            UNION ALL
+	            SELECT * 
+	            FROM W_BILL_ORDER
+			) TM
+	        GROUP BY COMPANY_CD, BU_CD, ITEM_CD, CUST_GROUP_CD, YEARPWEEK
+		),
+	    W_ROW_GROUP AS 
+	    (
+			SELECT A.*
+				#foreach( $bucketMap in $_parameter.bucketList )
+	  			#if($bucketMap.TOT_TYPE != "MT")
+	             , ISNULL(A.${bucketMap.CD}_SALES_QTY, 0) - ISNULL(A.${bucketMap.CD}_CFM_SP, 0) AS ${bucketMap.CD}_DELTA
+	  			#end
+				#end
+			FROM 
+			(
+	        	SELECT NULL AS TMP_COL 
+					#foreach( $dimMap in $_parameter.dimList )
+	                 , CG.${dimMap.DIM_CD} 
+					#end
+					#foreach( $hiddenMap in $_parameter.hiddenList )
+	                 , MAX(CG.$hiddenMap.CD) AS $hiddenMap.CD
+					#end
+					#foreach( $bucketMap in $_parameter.bucketList )
+	  				#if($bucketMap.TOT_TYPE != "MT")
+	                 , SUM(CASE WHEN YEARPWEEK = '$bucketMap.NM' THEN UR.CFM_SP          ELSE 0 END) AS ${bucketMap.CD}_CFM_SP
+	                 , SUM(CASE WHEN YEARPWEEK = '$bucketMap.NM' THEN UR.SALES_QTY       ELSE 0 END) AS ${bucketMap.CD}_SALES_QTY
+	                 , SUM(CASE WHEN YEARPWEEK = '$bucketMap.NM' THEN UR.SALES_AMT_KRW   ELSE 0 END) AS ${bucketMap.CD}_SALES_AMT_KRW
+	                 , SUM(CASE WHEN YEARPWEEK = '$bucketMap.NM' THEN UR.SALES_AMT_USD   ELSE 0 END) AS ${bucketMap.CD}_SALES_AMT_USD
+	                 , SUM(CASE WHEN YEARPWEEK = '$bucketMap.NM' THEN UR.BILLING_AMT_KRW ELSE 0 END) AS ${bucketMap.CD}_BILLING_AMT_KRW
+	                 , SUM(CASE WHEN YEARPWEEK = '$bucketMap.NM' THEN UR.BILLING_AMT_USD ELSE 0 END) AS ${bucketMap.CD}_BILLING_AMT_USD
+	                 , SUM(CASE WHEN YEARPWEEK = '$bucketMap.NM' THEN UR.CFM_SP_KRW      ELSE 0 END) AS ${bucketMap.CD}_CFM_SP_KRW
+	  				#end
+					#end
+				FROM W_ITEM_CUST_GROUP CG
+	            INNER JOIN W_UNION_ROW UR
+	               ON CG.COMPANY_CD    = UR.COMPANY_CD
+	              AND CG.BU_CD         = UR.BU_CD
+	              AND CG.ITEM_CD       = UR.ITEM_CD
+	              AND CG.CUST_GROUP_CD = UR.CUST_GROUP_CD
+				GROUP BY
+				#foreach( $dimMap in $_parameter.dimList )
+				#if($velocityCount == 1)
+				  CG.${dimMap.DIM_CD}
+				#else
+	              , CG.${dimMap.DIM_CD}
+				#end
+				#end
+			) A
+	    ),
+	    W_MEASURE AS 
+	    (
+	    	SELECT CATEGORY_CD
+	    	     , CATEGORY_NM
+	    	     , CATEGORY_IDX 
+			FROM 
+			(
+				SELECT NULL AS CATEGORY_CD
+				     , NULL AS CATEGORY_NM
+				     , NULL AS CATEGORY_IDX
+				#foreach( $meaMap in $_parameter.meaList )
+	            UNION ALL 
+	            SELECT '$meaMap.CD'
+	                 , '$meaMap.NM'
+	                 , $velocityCount 
+				#end
+			) A
+	        WHERE CATEGORY_CD IS NOT NULL
+		),
+	    W_MAIN AS 
+	    (
+			SELECT NULL AS TMP_COL 
+				#foreach( $dimMap in $_parameter.dimList )
+	             , $dimMap.DIM_CD 
+	             , MAX($dimMap.DIM_CD) AS ${dimMap.DIM_CD}_NM
+				#end
+	             <include refid="include.getGrpLvlId"/>
+	             , M.CATEGORY_CD
+	             , M.CATEGORY_NM
+	             , M.CATEGORY_IDX
+				#foreach( $bucketMap in $_parameter.bucketList )
+	  			#if($bucketMap.TOT_TYPE != "MT")
+	             , SUM(
+	                 CASE
+	    		#foreach( $meaMap in $_parameter.meaList )
+	                      WHEN M.CATEGORY_CD = '${meaMap.CD}' THEN A.${bucketMap.CD}_${meaMap.CD}
+	    		#end
+	                      ELSE 0
+	                  END
+	             ) AS $bucketMap.CD
+	  			#end
+				#end
+			FROM W_ROW_GROUP A
+	        CROSS JOIN W_MEASURE M
+	        WHERE 1 = 1
+			#if($_parameter.deltaFrom != "" and $_parameter.deltaTo != "")
+	          AND ((1=2)
+		  		#foreach( $bucketMap in $_parameter.bucketList )
+		    	#if($bucketMap.TOT_TYPE != "MT")
+		           OR (${bucketMap.CD}_DELTA BETWEEN @{deltaFrom} AND @{deltaTo})
+		    	#end
+	  			#end
+	           )
+			#elseif ($_parameter.deltaFrom != "" and $_parameter.deltaTo == "")
+	           AND ((1=2)
+		  		#foreach( $bucketMap in $_parameter.bucketList )
+		    	#if($bucketMap.TOT_TYPE != "MT")
+		             OR (${bucketMap.CD}_DELTA >= @{deltaFrom})
+		    	#end
+		  		#end
+	           )
+			#elseif ($_parameter.deltaFrom == "" and $_parameter.deltaTo != "")
+	          AND ((1=2)
+		  		#foreach( $bucketMap in $_parameter.bucketList )
+		    	#if($bucketMap.TOT_TYPE != "MT")
+		           OR (${bucketMap.CD}_DELTA <![CDATA[<=]]> @{deltaTo})
+		    	#end
+		  		#end
+	           )
+			#end
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), M.CATEGORY_CD, M.CATEGORY_NM, M.CATEGORY_IDX
+	    )
+	    SELECT NULL AS TMP_COL
+	          <include refid="include.getDimTotal"/>
+	         , GRP_LVL_ID
+	         , CATEGORY_CD
+	         , CATEGORY_NM
+	         , CATEGORY_IDX
+			#set($strInBucket = "")         
+			#foreach( $bucketMap in $_parameter.bucketList )
+	  		#if($bucketMap.TOT_TYPE != "MT")
+	         , $bucketMap.CD
+	    	#set($strInBucket = $strInBucket + "," +$bucketMap.CD)
+	  		#else
+	         , ISNULL($strInBucket.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+	    	#set($strInBucket = "") 
+	  		#end
+			#end
+	         , 0 AS TOTAL
+	         , 0
+			#foreach( $bucketMap in $_parameter.bucketList )
+	  		#if($bucketMap.TOT_TYPE != "MT")
+	         + ISNULL(ABS($bucketMap.CD),0)
+	  		#end
+			#end AS OMIT_FLAG
+		FROM W_MAIN A
+	    ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+	      , A.$dimMap.DIM_CD, A.${dimMap.DIM_CD}_NM 
+		#end
+	      , A.CATEGORY_IDX
+    </select>
+    
+</mapper>

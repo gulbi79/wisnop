@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+
+	<select id="workCalendarShiftSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarShiftSelect ] ******/
+		SELECT A.PROD_PART
+			 , A.WC_MGR
+			 , B.CODE_NM AS WC_MGR_NM
+			 , MAX(CASE WHEN A.WC_SHIFT ='A' THEN A.VALID_FLAG ELSE NULL END ) AS A
+			 , MAX(CASE WHEN A.WC_SHIFT ='B' THEN A.VALID_FLAG ELSE NULL END ) AS B
+		FROM TB_MST_WC_SHIFT A WITH (NOLOCK)
+     	LEFT OUTER JOIN 
+     	(
+			SELECT CODE_CD  
+            	 , CASE	WHEN 'KO' = UPPER(@{GV_LANG}) THEN CODE_NM_KR
+           			    WHEN 'CN' = UPPER(@{GV_LANG}) THEN CODE_NM_CN
+           				ELSE CODE_NM
+        		    END AS CODE_NM
+			FROM TB_MST_CODE WITH (NOLOCK)
+            WHERE GROUP_CD ='RESOURCE_TYPE'
+              AND USE_FLAG= 'Y'
+     	) B
+     	ON A.WC_MGR = B.CODE_CD
+		GROUP BY A.PROD_PART, A.WC_MGR, B.CODE_NM
+  		ORDER BY A.PROD_PART DESC
+	</select>
+	
+	<update id="workCalendarShiftUpdate" parameterType="map">
+		/****** [ aps.static.workCalendarShiftUpdate ] ******/
+      	UPDATE TB_MST_WC_SHIFT 
+           SET VALID_FLAG = '$_parameter.VALID_FLAG'
+             , UPDATE_ID = '$_parameter.GV_USER_ID'
+             , UPDATE_DTTM = DBO.UFN_GETDATE() 
+		WHERE COMPANY_CD ='$_parameter.GV_COMPANY_CD'   
+          AND BU_CD = '$_parameter.GV_BU_CD'
+          AND PROD_PART = '$_parameter.PROD_PART'
+          AND WC_MGR = '$_parameter.WC_MGR'
+          AND WC_SHIFT =  '$_parameter.WC_SHIFT'
+      	;
+	</update>
+	
+</mapper>

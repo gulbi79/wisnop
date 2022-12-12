@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	<select id="meaMapMenuSelect" parameterType="map" resultType="map">
+		/****** [ admin.meaMapMenuSelect ] ******/
+		SELECT B.COMPANY_CD
+		     , B.BU_CD
+		     , B.MENU_CD
+		     , B.MEAS_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN A.MEAS_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A.MEAS_NM_CN
+	                ELSE A.MEAS_NM
+	           END AS MEAS_NM
+		     , B.SORT
+		     , B.MAND_FLAG 
+		     , B.DEFAULT_FLAG
+		FROM TB_MST_MEAS A WITH(NOLOCK)
+		INNER JOIN TB_MAP_MENU_MEAS B WITH(NOLOCK)
+		   ON B.MEAS_CD    = A.MEAS_CD
+		  AND B.COMPANY_CD = @{SEARCH_COMPANY_CD}
+		  AND B.BU_CD      = @{SEARCH_BU_CD}
+		  AND B.MENU_CD    = @{SEARCH_MENU_CD}
+		  AND B.USE_FLAG   = 'Y'
+		WHERE A.USE_FLAG = 'Y'
+		ORDER BY B.SORT, B.MEAS_CD
+	</select>
+	
+	<insert id="meaMapMenuMerge" parameterType="map">
+		/****** [ admin.meaMapMenuMerge ] ******/
+		MERGE TB_MAP_MENU_MEAS AS A
+		USING 
+		(
+			SELECT @{COMPANY_CD}    AS COMPANY_CD
+		     	 , @{BU_CD}         AS BU_CD
+		     	 , @{MENU_CD}       AS MENU_CD
+		     	 , @{MEAS_CD}       AS MEAS_CD
+		     	 , @{SORT}          AS SORT
+		     	 , ISNULL(@{MAND_FLAG}   , 'N') AS MAND_FLAG
+		     	 , ISNULL(@{DEFAULT_FLAG}, 'N') AS DEFAULT_FLAG
+		     	 , 'Y' AS USE_FLAG
+		) B
+		ON 
+		(
+			A.COMPANY_CD = B.COMPANY_CD   
+		   	AND A.BU_CD      = B.BU_CD   
+			AND A.MENU_CD    = B.MENU_CD   
+			AND A.MEAS_CD    = B.MEAS_CD
+		)   
+		WHEN MATCHED THEN
+		UPDATE 
+		SET A.SORT         = B.SORT
+		  , A.MAND_FLAG    = B.MAND_FLAG
+		  , A.DEFAULT_FLAG = B.DEFAULT_FLAG
+		  , A.UPDATE_DTTM  = DBO.UFN_GETDATE()
+		  , A.UPDATE_ID    = @{GV_USER_ID}
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+		    COMPANY_CD
+		  , BU_CD
+		  , MENU_CD
+		  , MEAS_CD
+		  , SORT         
+		  , MAND_FLAG    
+		  , DEFAULT_FLAG 
+		  , USE_FLAG   
+ 		  , UPDATE_DTTM
+	      , UPDATE_ID  
+		  , CREATE_DTTM
+		  , CREATE_ID
+		) VALUES (
+		    B.COMPANY_CD
+		  , B.BU_CD
+		  , B.MENU_CD
+		  , B.MEAS_CD
+		  , B.SORT         
+		  , B.MAND_FLAG    
+		  , B.DEFAULT_FLAG 
+		  , B.USE_FLAG
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		);
+	</insert>
+	
+	<delete id="meaMapMenuDelete" parameterType="map">
+		/****** [ admin.meaMapMenuDelete ] ******/
+		DELETE FROM TB_MAP_MENU_MEAS 
+		WHERE COMPANY_CD = @{COMPANY_CD}   
+		  AND BU_CD      = @{BU_CD}
+		  AND MENU_CD    = @{MENU_CD}   
+		  AND MEAS_CD    = @{MEAS_CD}
+	</delete>
+</mapper>

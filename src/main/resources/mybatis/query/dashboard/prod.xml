@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.prod">
+
+	<!-- 주간 진척률 -->
+	<select id="chart1Select"  parameterType="map" resultType="map">
+	/****** [ dashboard.prod.chart1Select ]  [ 주간 진척률 ] ******/
+	   SELECT ISNULL(SUM(A.PLAN_AMT_W), 0) AS CHART_1 -- 주간목표
+	        , ISNULL(SUM(A.RESULT_AMT_W), 0) AS CHART_2 -- 주간실적
+	        , ISNULL(SUM(A.PLAN_AMT_M), 0) AS CHART_3 -- 월간목표
+	        , ISNULL(SUM(A.RESULT_AMT_M), 0) AS CHART_4 -- 월간실적
+	        , ISNULL(SUM(A.RESULT_AMT_W) / NULLIF(SUM(A.PLAN_AMT_W), 0) * 100,0) AS CHART_T -- 주간진척률
+	        , ISNULL(SUM(A.RESULT_AMT_M) / NULLIF(SUM(A.PLAN_AMT_M), 0) * 100,0) AS CHART_TT -- 월간진척률
+	        , CASE WHEN ISNULL(SUM(A.RESULT_AMT_W) / NULLIF(SUM(A.PLAN_AMT_W), 0) * 100,0) <![CDATA[>=]]> AVG(A.WORKING_DAY_RATE_W) THEN 'green_f'
+	               ELSE 'red_f' 
+	          END AS CHART_C1 -- 주간진척률 색상
+	        , CASE WHEN ISNULL(SUM(A.RESULT_AMT_M) / NULLIF(SUM(A.PLAN_AMT_M), 0) * 100,0) <![CDATA[>=]]> AVG(A.WORKING_DAY_RATE_M) THEN 'green_f'
+	               ELSE 'red_f' 
+	          END AS CHART_C2 -- 월간간진척률 색상
+	   FROM TB_KPI_DASHBOARD_PROD A WITH(NOLOCK)
+	   WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	     AND A.BU_CD      = @{GV_BU_CD}
+	<!-- SELECT ISNULL(SUM(A.PLAN_AMT_W), 0)   AS CHART_1
+	     , ISNULL(SUM(A.RESULT_AMT_W), 0) AS CHART_2
+	     , ISNULL(SUM(A.RESULT_AMT_W) / NULLIF(SUM(A.PLAN_AMT_W), 0) * 100,0) AS CHART_T
+	     , ISNULL(MAX(A.WORKING_DAY_RATE_W), 0) AS CHART_TT
+	     , CASE WHEN ISNULL(SUM(A.RESULT_AMT_W) / NULLIF(SUM(A.PLAN_AMT_W), 0) * 100,0) >= AVG(A.WORKING_DAY_RATE_W) THEN 'green_f'
+	            ELSE 'red_f' 
+	       END AS CHART_C
+	FROM TB_KPI_DASHBOARD_PROD A WITH(NOLOCK)
+	WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	  AND A.BU_CD      = @{GV_BU_CD} -->
+	</select>
+
+	<!-- ROUTING 별 주간 진척률, 주간 현황 -->
+	<select id="chart2Select"  parameterType="map" resultType="map">
+	/****** [ dashboard.prod.chart2Select ] [ ROUTING 별 주간 진척률 , 주간 현황 ] ******/
+   WITH W_ROUTING AS (
+       SELECT '1-L' AS ROUTING_ID, 0 AS ORD, 'L-LATHE' AS ROUTING_NM
+       UNION ALL SELECT '1-S', 1, 'S-LATHE'
+       UNION ALL SELECT '1-B', 2, 'BENCH'
+       UNION ALL SELECT '2-L', 3, 'LAM'
+       UNION ALL SELECT '2-T', 4, 'TEL'
+       UNION ALL SELECT '2-M', 5, 'MACHINING'
+   )
+   SELECT A.ROUTING_ID
+        , A.ROUTING_NM
+        , A.ORD
+        , A.ROUTING_NM + CHAR(13)+CHAR(10) + '(' + A.ROUTING_ID + ')' AS CHART_TXT
+        , ISNULL(A.CHART_1          , 0) AS CHART_1
+        , ISNULL(A.CHART_2          , 0) AS CHART_2
+        , ISNULL(A.CHART_3          , 0) AS CHART_3
+        , ISNULL(A.CHART_T1          , 0) AS CHART_T1
+        , ISNULL(A.CHART_T2          , 0) AS CHART_T2
+        , ISNULL(SUM(CHART_1) OVER(), 0) AS CHART_1_SUM
+        , ISNULL(SUM(CHART_2) OVER(), 0) AS CHART_2_SUM
+        , ISNULL(SUM(CHART_3) OVER(), 0) AS CHART_3_SUM
+   FROM 
+   (
+       SELECT A.ROUTING_ID
+            , A.ROUTING_NM
+            , A.ORD
+            , SUM(B.NON_DEPLOY_ORDER_CNT) AS CHART_1
+            , SUM(ISNULL(B.DEFECT_QTY, 0)) AS CHART_2
+            , SUM(ISNULL(B.DEFECT_QTY_W, 0)) AS CHART_3
+            , SUM(B.RESULT_AMT_W) / NULLIF(SUM(B.PLAN_AMT_W), 0) * 100 AS CHART_T1
+            , SUM(B.RESULT_AMT_M) / NULLIF(SUM(B.PLAN_AMT_M), 0) * 100 AS CHART_T2
+       FROM W_ROUTING A WITH(NOLOCK)
+       LEFT JOIN TB_KPI_DASHBOARD_PROD B
+           ON B.ROUTING_ID = A.ROUTING_ID
+          AND B.COMPANY_CD = 'KO316'
+         AND B.BU_CD      = 'QT'  
+       GROUP BY A.ROUTING_ID, A.ROUTING_NM, A.ORD
+   ) A
+   ORDER BY A.ORD
+	<!-- WITH W_ROUTING AS (
+	    SELECT '1-L' AS ROUTING_ID, 0 AS ORD, 'L-LATHE' AS ROUTING_NM
+	    UNION ALL SELECT '1-S', 1, 'S-LATHE'
+	    UNION ALL SELECT '1-B', 2, 'BENCH'
+	    UNION ALL SELECT '2-L', 3, 'LAM'
+	    UNION ALL SELECT '2-T', 4, 'TEL'
+	    UNION ALL SELECT '2-M', 5, 'MACHINING'
+	)
+	SELECT A.ROUTING_ID
+	     , A.ROUTING_NM
+	     , A.ORD
+	     , A.ROUTING_NM + CHAR(13)+CHAR(10) + '(' + A.ROUTING_ID + ')' AS CHART_TXT
+	     , ISNULL(A.CHART_1          , 0) AS CHART_1
+	     , ISNULL(A.CHART_2          , 0) AS CHART_2
+	     , ISNULL(A.CHART_3          , 0) AS CHART_3
+	     , ISNULL(A.CHART_T          , 0) AS CHART_T
+	     , ISNULL(SUM(CHART_1) OVER(), 0) AS CHART_1_SUM
+	     , ISNULL(SUM(CHART_2) OVER(), 0) AS CHART_2_SUM
+	     , ISNULL(SUM(CHART_3) OVER(), 0) AS CHART_3_SUM
+	FROM 
+	(
+	    SELECT A.ROUTING_ID
+	         , A.ROUTING_NM
+	         , A.ORD
+	         , SUM(B.NON_DEPLOY_ORDER_CNT) AS CHART_1
+	         , SUM(ISNULL(B.DEFECT_QTY, 0)) AS CHART_2
+	         , SUM(ISNULL(B.DEFECT_QTY_W, 0)) AS CHART_3
+	         , SUM(B.RESULT_AMT_W) / NULLIF(SUM(B.PLAN_AMT_W), 0) * 100 AS CHART_T
+	    FROM W_ROUTING A WITH(NOLOCK)
+	    LEFT JOIN TB_KPI_DASHBOARD_PROD B
+           ON B.ROUTING_ID = A.ROUTING_ID
+          AND B.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND B.BU_CD      = @{GV_BU_CD}  
+	    GROUP BY A.ROUTING_ID, A.ROUTING_NM, A.ORD
+	) A
+	ORDER BY A.ORD -->
+	</select>
+	
+	<!-- 품목 그룹별 생산 현황  -->
+	<select id="chart3Select"  parameterType="map" resultType="map">
+	/****** [ dashboard.prod.chart3Select ]  [ 품목 그룹별 생산 현황 ] ******/
+	SELECT A.ITEM_GROUP_CD
+	     , A.ITEM_GROUP_NM
+	     , ISNULL(SUM(B.PLAN_QTY_W  ), 0) AS CHART_1_W
+	     , ISNULL(SUM(B.PLAN_QTY_M  ), 0) AS CHART_1_M
+	     , ISNULL(SUM(B.RESULT_QTY_W), 0) AS CHART_2_W
+	     , ISNULL(SUM(B.RESULT_QTY_M), 0) AS CHART_2_M
+	     , ISNULL(SUM(B.WIP_QC_QTY_W), 0) AS CHART_3_W
+	     , ISNULL(SUM(B.WIP_QC_QTY_M), 0) AS CHART_3_M
+	     , ISNULL(SUM(B.RESULT_QTY_W) / NULLIF(SUM(B.PLAN_QTY_W),0) * 100, 0) AS CHART_T_W
+	     , ISNULL(SUM(B.RESULT_QTY_M) / NULLIF(SUM(B.PLAN_QTY_M),0) * 100, 0) AS CHART_T_M
+	     , CASE WHEN ISNULL(SUM(B.RESULT_QTY_W) / NULLIF(SUM(B.PLAN_QTY_W), 0) * 100, 0) >= AVG(B.WORKING_DAY_RATE_W) THEN 'green_f'
+	            ELSE 'red_f' 
+	       END AS CHART_C_W
+	     , CASE WHEN ISNULL(SUM(B.RESULT_QTY_M) / NULLIF(SUM(B.PLAN_QTY_M), 0) * 100, 0) >= AVG(B.WORKING_DAY_RATE_M) THEN 'green_f'
+	            ELSE 'red_f' 
+	       END AS CHART_C_M
+	FROM TB_MST_ITEM_GROUP A WITH(NOLOCK)
+	LEFT JOIN TB_KPI_DASHBOARD_PROD B WITH(NOLOCK)
+	   ON B.COMPANY_CD    = A.COMPANY_CD
+	  AND B.BU_CD         = A.BU_CD
+	  AND B.ITEM_GROUP_CD = A.ITEM_GROUP_CD
+	WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	  AND A.BU_CD      = @{GV_BU_CD}  
+      AND A.ITEM_GROUP_CD IN ('1TOT','1TIT','1TPT','1BLB','1BRB','1ELE','1ETE')
+	GROUP BY A.ITEM_GROUP_CD, A.ITEM_GROUP_NM
+    ORDER BY CASE WHEN A.ITEM_GROUP_CD = '1TOT' THEN 0
+                  WHEN A.ITEM_GROUP_CD = '1TIT' THEN 1
+                  WHEN A.ITEM_GROUP_CD = '1TPT' THEN 2
+                  WHEN A.ITEM_GROUP_CD = '1BLB' THEN 3
+                  WHEN A.ITEM_GROUP_CD = '1BRB' THEN 4
+                  WHEN A.ITEM_GROUP_CD = '1ELE' THEN 5
+                  WHEN A.ITEM_GROUP_CD = '1ETE' THEN 6
+             END
+	</select>
+
+</mapper>

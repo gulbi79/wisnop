@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.popup">
+
+	<select id="copyWeekSelect" parameterType="map" resultType="map">
+		/****** [ dp.popup.copyWeekSelect ] ******/
+#if($_parameter.menuCd == "DP101")
+		SELECT YEARMONTH AS CODE_CD
+		     , YEARMONTH AS CODE_NM
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEAR = @{year}
+		GROUP BY YEARMONTH
+		ORDER BY YEARMONTH ASC
+#else	
+		SELECT YEARPWEEK AS CODE_CD
+		     , YEARPWEEK AS CODE_NM
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARPWEEK BETWEEN @{fromWeek} AND @{toWeek}
+		GROUP BY YEARPWEEK
+		ORDER BY YEARPWEEK ASC
+#end
+	</select>
+	
+</mapper>

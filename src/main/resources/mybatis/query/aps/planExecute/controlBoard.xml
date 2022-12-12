@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planExecute">
+	<select id="controlBoardAPopSelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.controlBoardAPopSelect ] ******/
+		SELECT A1.STEP_NO
+		     , CASE WHEN A1.EXEC_YN = 'Y' THEN CASE WHEN 'ko' = @{GV_LANG} THEN A3.CODE_NM_KR
+													WHEN 'cn' = @{GV_LANG} THEN A3.CODE_NM_CN
+													ELSE A3.CODE_NM
+				       							END 
+					ELSE ' ┗ ' + CASE WHEN 'ko' = @{GV_LANG} THEN A3.CODE_NM_KR
+				            		  WHEN 'cn' = @{GV_LANG} THEN A3.CODE_NM_CN
+				            		  ELSE A3.CODE_NM
+								  END 
+				END CB_TASK_CD_NM
+		     , A1.START_DTTM 
+		     , A1.END_DTTM 
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN A2.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN A2.CODE_NM_CN
+				    ELSE A2.CODE_NM
+				END CB_STATUS_CD_NM
+		     , A1.REMARK
+		FROM TB_HIS_CONTROL_BOARD_PLAN A1 WITH(NOLOCK)
+		LEFT OUTER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+		  ON A1.BU_CD = A2.BU_CD
+		 AND A1.CB_STATUS_CD = A2.CODE_CD
+		 AND A2.GROUP_CD = 'CB_STATUS_CD'
+		 AND A2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE A3 WITH(NOLOCK)
+		  ON A1.BU_CD = A3.BU_CD
+		 AND A1.CB_TASK_CD = A3.CODE_CD
+		 AND A3.GROUP_CD = 'CB_TASK_CD'
+		 AND A3.USE_FLAG = 'Y'
+		WHERE A1.COMPANY_CD = @{company_cd}
+		  AND A1.BU_CD = @{bu_cd}
+		  AND A1.PLAN_ID = @{plan_id}
+		  AND A1.PROD_PART = @{prod_part}
+		  AND A1.VERSION_ID = @{version_id}
+		  AND (A1.UPPER_STEP_NO = '10' OR A1.STEP_NO = '10')
+    	ORDER BY A1.STEP_NO
+	</select>
+	
+	<select id="controlBoardAIntervalSelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.controlBoardAIntervalSelect ] ******/
+		SELECT B1.*
+		FROM
+		(
+			SELECT A1.COMPANY_CD
+			     , A1.BU_CD
+			     , A1.PLAN_ID
+			     , A1.PROD_PART
+			     , A1.VERSION_ID
+			     , CB_TASK_CD
+			     , CB_STATUS_CD
+			     , CASE WHEN A1.EXEC_YN = 'Y' THEN 'Y' ELSE 'N' END EXEC_YN
+			     , ROW_NUMBER() OVER(ORDER BY A1.COMPANY_CD, A1.BU_CD, A1.PLAN_ID, A1.PROD_PART, A1.VERSION_ID, A1.STEP_NO) AS RN
+			FROM TB_HIS_CONTROL_BOARD_PLAN A1 WITH(NOLOCK)
+			LEFT OUTER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+			  ON A1.BU_CD = A2.BU_CD
+			 AND A1.CB_STATUS_CD = A2.CODE_CD
+			 AND A2.GROUP_CD = 'CB_STATUS_CD'
+			 AND A2.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE A3 WITH(NOLOCK)
+			  ON A1.BU_CD = A3.BU_CD
+			 AND A1.CB_TASK_CD = A3.CODE_CD
+			 AND A3.GROUP_CD = 'CB_TASK_CD'
+			 AND A3.USE_FLAG = 'Y'
+			WHERE A1.COMPANY_CD = @{company_cd}
+			  AND A1.BU_CD = @{bu_cd}
+			  AND A1.PLAN_ID = @{plan_id}
+			  AND A1.PROD_PART = @{prod_part}
+			  AND A1.VERSION_ID = @{version_id}
+		) B1
+		WHERE B1.RN = @{row_id}
+	</select>
+	<select id="planIdControlSelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.planIdControlSelect ] ******/
+		SELECT B1.*
+		     , B1.PLAN_ID AS CODE_CD
+		     , B1.PLAN_ID AS CODE_NM
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_START_WEEK AND DAY_NM = 'SUN')), 102) AS START_DAY         
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_END_WEEK AND DAY_NM = 'SAT')), 102) AS END_DAY
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_CLOSE_WEEK AND DAY_NM = 'SAT')), 102) AS CLOSE_DAY
+		FROM
+		(
+		  	SELECT PLAN_ID
+		         , APS_START_WEEK
+		         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 14, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.APS_START_WEEK AND DAY_NM = 'SUN')) AS APS_END_WEEK
+		         , APS_END_WEEK AS APS_CLOSE_WEEK
+		         , CUT_OFF_FLAG
+		         , APS_START_DATE
+		  	FROM TB_MST_PLAN_VERSION A1 WITH(NOLOCK) 
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND PLAN_TYPE_CD = @{weekly_daily}
+		) B1
+		#if($_parameter.weekly_daily == "MP")
+		ORDER BY B1.APS_START_WEEK DESC
+		#elseif($_parameter.weekly_daily == "FP")
+		ORDER BY B1.APS_START_DATE DESC
+		#end
+	</select>			
+	
+	<select id="planVersionControlSelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.planVersionControlSelect ] ******/
+		SELECT VERSION_ID AS CODE_CD
+		     , VERSION_ID AS CODE_NM
+		     , VERSION_TYPE_CD
+		     , CUT_OFF_FLAG
+		     , BAL_WEEK
+		     , PLAN_OPTION
+		     , BAL_WEEK
+		     , PRIORITY_OPTION
+		     , WO_RELEASE_WEEK
+		     , (SELECT CUT_OFF_FLAG FROM TB_MST_PLAN_VERSION WHERE COMPANY_CD = A1.COMPANY_CD AND BU_CD = A1.BU_CD AND PLAN_TYPE_CD = A1.PLAN_TYPE_CD AND PLAN_ID = A1.PLAN_ID) AS MASTER_CUT_OFF_FLAG
+		FROM TB_MST_PLAN_VERSION_SUB A1 WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_ID = @{planId}
+		  AND PROD_PART = @{prodPart}
+		ORDER BY SEQ DESC
+	</select>
+	
+	<select id="planOptionSelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.planOptionSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+		            ELSE CODE_NM
+		        END CODE_NM
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE BU_CD = @{GV_BU_CD}
+		  AND GROUP_CD = 'CB_PLAN_OPTION'
+		  AND ATTB_1_CD = @{prodPart}
+		  AND USE_FLAG = 'Y'
+		ORDER BY SORT
+	</select>
+	
+	<select id="controllAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.controllAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS40501', 'APS40502', 'APS40503', 'APS40504')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<select id="controlBoardASelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.controlBoardASelect ] ******/
+		SELECT A1.COMPANY_CD
+		     , A1.BU_CD
+		     , A1.PLAN_ID
+		     , A1.PROD_PART
+		     , A1.VERSION_ID
+		     , A1.STEP_NO AS STEP_NO_NM
+		     , CB_TASK_CD
+		     , CASE WHEN A1.EXEC_YN  = 'Y' THEN CASE WHEN 'ko' = @{GV_LANG} THEN A3.CODE_NM_KR
+											         WHEN 'cn' = @{GV_LANG} THEN A3.CODE_NM_CN
+											         ELSE A3.CODE_NM
+		       									 END 
+		            ELSE ' ┗ ' + CASE WHEN 'ko' = @{GV_LANG} THEN A3.CODE_NM_KR
+		            				  WHEN 'cn' = @{GV_LANG} THEN A3.CODE_NM_CN
+		            				  ELSE A3.CODE_NM
+		       					  END 
+		        END CB_TASK_CD_NM
+		     , CASE WHEN A1.EXEC_YN = 'Y' THEN '▶' ELSE '' END EXEC_YN_NM
+		     , A1.CB_STATUS_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN A2.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN A2.CODE_NM_CN
+		            ELSE A2.CODE_NM
+		       END CB_STATUS_CD_NM
+		     , A1.START_DTTM AS START_DTTM_NM
+		     , A1.END_DTTM AS END_DTTM_NM
+		     , A1.REMARK AS REMARK_NM
+		     , CASE WHEN A1.EXEC_YN = 'Y' THEN 'Y' ELSE 'N' END EXEC_YN_NM_HD
+		FROM TB_HIS_CONTROL_BOARD_PLAN A1 WITH(NOLOCK)
+		LEFT OUTER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+		  ON A1.BU_CD = A2.BU_CD
+		 AND A1.CB_STATUS_CD = A2.CODE_CD
+		 AND A2.GROUP_CD = 'CB_STATUS_CD'
+		 AND A2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE A3 WITH(NOLOCK)
+		  ON A1.BU_CD = A3.BU_CD
+		 AND A1.CB_TASK_CD = A3.CODE_CD
+		 AND A3.GROUP_CD = 'CB_TASK_CD'
+		 AND A3.USE_FLAG = 'Y'
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A1.BU_CD = @{GV_BU_CD}
+		  AND A1.PLAN_ID = @{planId}
+		  AND A1.PROD_PART = @{prodPart}
+		  AND A1.VERSION_ID = @{planVersion}
+		ORDER BY A1.COMPANY_CD, A1.BU_CD, A1.PLAN_ID, A1.PROD_PART, A1.VERSION_ID, A1.STEP_NO
+	</select>
+	
+	<select id="controlBoardBSelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.controlBoardBSelect ] ******/
+		SELECT A.INDX
+		     , A.FR_SYS_CD
+		     , A.TO_SYS_CD
+		     , A.MODUAL_FLAG
+		     , A.MODUAL_DESC
+		     , A.RCV_FLAG
+		     , A.RCV_DT
+		     , A.IF_FLAG
+		     , A.IF_DTTM 
+		     , A.INSRT_USER_ID
+		FROM IF_B_MANUAL_IF_MNG A WITH(NOLOCK) 
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD = @{GV_BU_CD}
+		  AND CONVERT(VARCHAR, A.RCV_DT, 112) BETWEEN CONVERT(VARCHAR, DATEADD(DAY, -7, CONVERT(DATETIME, @{searchCal})), 112) AND @{searchCal}
+	</select>
+	
+	<update id="savePriorityOptionUpdate" parameterType="map">
+		/****** [ aps.planExecute.savePriorityOptionUpdate ] ******/
+		UPDATE TB_MST_PLAN_VERSION_SUB
+		   SET PRIORITY_OPTION = @{priorityOption}
+		     , UPDATE_ID = @{GV_USER_ID}
+             , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_TYPE_CD = @{weeklyDaily}
+		  AND PLAN_ID = @{planId}
+		  AND PROD_PART = @{prodPart}
+		  AND VERSION_ID = @{planVersion} 
+	</update>
+	
+	<update id="savePlanOptionUpdate" parameterType="map">
+		/****** [ aps.planExecute.savePlanOptionUpdate ] ******/
+		UPDATE TB_MST_PLAN_VERSION_SUB
+		   SET PLAN_OPTION = @{planOption}
+		     , UPDATE_ID = @{GV_USER_ID}
+             , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_TYPE_CD = @{weeklyDaily}
+		  AND PLAN_ID = @{planId}
+		  AND PROD_PART = @{prodPart}
+		  AND VERSION_ID = @{planVersion} 
+	</update>
+	
+	<update id="savePrecedeLimitUpdate" parameterType="map">
+		/****** [ aps.planExecute.savePrecedeLimitUpdate ] ******/
+		UPDATE TB_MST_PLAN_VERSION_SUB
+		   SET BAL_WEEK = @{precedeLimit}
+		     , UPDATE_ID = @{GV_USER_ID}
+             , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_TYPE_CD = @{weeklyDaily}
+		  AND PLAN_ID = @{planId}
+		  AND PROD_PART = @{prodPart}
+		  AND VERSION_ID = @{planVersion} 
+	</update>
+	
+	<update id="saveWoReleaseWeekUpdate" parameterType="map">
+		/****** [ aps.planExecute.saveWoReleaseWeekUpdate ] ******/
+		
+		  
+		  UPDATE TB_MST_PLAN_VERSION_SUB
+		   SET WO_RELEASE_WEEK = @{woReleaseWeek} -- 선택한 값
+		     , UPDATE_ID = @{GV_USER_ID} -- 로그인유저ID
+		     , UPDATE_DTTM = DBO.UFN_GETDATE()
+		 WHERE COMPANY_CD = @{GV_COMPANY_CD} -- SESSION
+		   AND BU_CD = @{GV_BU_CD} -- SESSION
+		   AND PLAN_TYPE_CD = 'MP'
+		   AND PLAN_ID = @{planId}     -- 조회한 PLAN_ID
+		   AND PROD_PART = @{prodPart} -- 조회한 PROD_PART
+		   AND VERSION_ID = @{planVersion} -- 조회한 VERSION_ID
+		  
+		  
+		  
+	</update>
+	
+	<update id="saveConfrimUpdate" parameterType="map">
+		/****** [ aps.planExecute.saveConfrimUpdate ] ******/
+		BEGIN
+			UPDATE TB_MST_PLAN_VERSION_SUB
+			   SET CUT_OFF_FLAG = @{cutOffFlag}
+			     , UPDATE_ID = @{GV_USER_ID}
+	             , UPDATE_DTTM = DBO.UFN_GETDATE()
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND PLAN_TYPE_CD = @{weeklyDaily}
+			  AND PLAN_ID = @{planId}
+			  AND PROD_PART = @{prodPart}
+			  AND VERSION_ID = @{planVersion}
+			;
+			
+			exec dbo.USP_TB_MST_PLAN_VERSION_SUB @{GV_COMPANY_CD}, @{GV_BU_CD}, @{weeklyDaily}, @{planId}, @{prodPart}, 'F';
+			exec dbo.USP_TB_HIS_APS_FINAL_COPY @{GV_COMPANY_CD}, @{GV_BU_CD}, @{weeklyDaily}, @{planId}, @{prodPart};
+		END
+	</update>
+	
+	<update id="saveConfrimCancelUpdate" parameterType="map">
+		/****** [ aps.planExecute.saveConfrimCancelUpdate ] ******/
+		BEGIN
+			UPDATE TB_MST_PLAN_VERSION_SUB
+			   SET CUT_OFF_FLAG = @{cutOffFlag}
+			     , UPDATE_ID = @{GV_USER_ID}
+	             , UPDATE_DTTM = DBO.UFN_GETDATE()
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND PLAN_TYPE_CD = @{weeklyDaily}
+			  AND PLAN_ID = @{planId}
+			  AND PROD_PART = @{prodPart}
+			  AND VERSION_TYPE_CD = (SELECT VERSION_TYPE_CD FROM TB_MST_PLAN_VERSION_SUB WHERE COMPANY_CD = @{GV_COMPANY_CD} AND BU_CD = @{GV_BU_CD} AND PLAN_TYPE_CD = @{weeklyDaily} AND PLAN_ID = @{planId} AND PROD_PART = @{prodPart} AND VERSION_ID = @{planVersion})
+			;
+			
+			exec dbo.USP_TB_HIS_APS_FINAL_DELETE @{GV_COMPANY_CD}, @{GV_BU_CD}, @{weeklyDaily}, @{planId}, @{prodPart};
+			
+			DELETE
+			FROM TB_MST_PLAN_VERSION_SUB
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND PLAN_TYPE_CD = @{weeklyDaily}
+			  AND PLAN_ID = @{planId}
+			  AND PROD_PART = @{prodPart}
+			  AND VERSION_TYPE_CD = 'F'
+			;
+		END	   
+	</update>
+	
+	<select id="executeACallCheckSelect" parameterType="map" resultType="map">
+		/****** [ aps.planExecute.executeACallCheckSelect ] ******/
+		SELECT COUNT(*) AS CHECK_CNT
+		FROM TB_MST_PLAN_VERSION_SUB
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_ID = @{PLAN_ID}
+		  AND PROD_PART = @{PROD_PART}
+		  AND VERSION_TYPE_CD = @{VERSION_TYPE_CD}
+		  AND CUT_OFF_FLAG = 'Y'
+	</select>
+	
+	<select id="executeACallSelect"  parameterType="map" resultType="String" statementType="CALLABLE">
+		BEGIN
+		    exec dbo.USP_TB_HIS_CONTROL_BOARD_PLAN_UPDATE @{COMPANY_CD}, @{BU_CD}, @{PLAN_ID}, @{PROD_PART}, @{VERSION_ID}, @{CB_TASK_CD}, @{GV_USER_ID};
+		END
+	</select>
+	
+	<update id="executeBCallUpdate" parameterType="map">
+		/****** [ aps.planExecute.executeBCallUpdate ] ******/
+		BEGIN
+		    exec dbo.USP_TB_HIS_CONTROL_BOARD_IF_UPDATE @{COMPANY_CD}, @{BU_CD}, @{PLAN_ID}, @{CB_TASK_CD};
+		END 
+	</update>
+	
+	<update id="versionProdUpdate" parameterType="map">
+		/****** [ aps.planExecute.versionProdUpdate ] ******/
+		BEGIN
+		    exec dbo.USP_TB_MST_PLAN_VERSION_SUB @{GV_COMPANY_CD}, @{GV_BU_CD}, @{weeklyDaily}, @{planId}, @{prodPart}, 'M';
+		END
+	</update>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</mapper>

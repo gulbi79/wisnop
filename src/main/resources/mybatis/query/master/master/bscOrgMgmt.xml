@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+	
+	<select id="bscOrgMgmtSelect" parameterType="map" resultType="map">
+		/****** [ master.master.bscOrgMgmtSelect ] ******/
+		WITH W_CODE AS 
+		(
+			#set($_parameter.groupCd = "BU_CD,DIV_CD,TEAM_CD,PART_CD,DATA_SCOPE_TYPE")
+		  	#set($_parameter.buAllYn = "Y")
+		  	<include refid="include.mstCode"/>
+		)
+		SELECT A.COMPANY_CD
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN A.COMPANY_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A.COMPANY_NM_CN
+	                ELSE A.COMPANY_NM
+	           END COMPANY_NM
+     		 , A.BU_CD
+     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A.BU_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A.BU_NM_CN
+	                ELSE A.BU_NM
+	           END BU_NM
+     		 , A.DIV_CD
+     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A.DIV_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A.DIV_NM_CN
+	                ELSE A.DIV_NM
+	           END DIV_NM
+     		 , A.TEAM_CD
+     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A.TEAM_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A.TEAM_NM_CN
+	                ELSE A.TEAM_NM
+	           END TEAM_NM
+     		 , A.PART_CD
+     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A.PART_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A.PART_NM_CN
+	                ELSE A.PART_NM
+	           END PART_NM
+			 , C.ATTB_1_CD AS DATA_SCOPE_TYPE
+		     , D.CODE_NM   AS DATA_SCOPE_TYPE_NM
+	         , NULL AS DATA_SCOPE_ID
+		     , NULL AS KPI_ID
+		     , NULL AS SCM_SCORE_ID
+		FROM UV_MST_ORG A WITH(NOLOCK)
+		INNER JOIN W_CODE C
+		   ON C.BU_CD    = A.BU_CD
+		  AND C.CODE_CD  = A.TEAM_CD
+		  AND C.GROUP_CD = 'TEAM_CD' 
+		LEFT JOIN W_CODE D
+		   ON D.BU_CD    = C.BU_CD
+		  AND D.CODE_CD  = C.ATTB_1_CD
+		  AND D.GROUP_CD = 'DATA_SCOPE_TYPE'   
+		ORDER BY A.COMPANY_SORT, A.BU_SORT, A.DIV_SORT, A.TEAM_SORT, A.PART_SORT
+	    <!-- INNER JOIN W_CODE B
+		   ON B.BU_CD    = 'ALL'
+	      AND B.CODE_CD  = A.BU_CD
+	      AND B.GROUP_CD = 'BU_CD'
+	    INNER JOIN W_CODE E
+		   ON E.BU_CD    = A.BU_CD
+	      AND E.CODE_CD  = A.DIV_CD
+	      AND E.GROUP_CD = 'DIV_CD'  
+		INNER JOIN W_CODE C
+		   ON C.BU_CD    = A.BU_CD
+		  AND C.CODE_CD  = A.TEAM_CD
+		  AND C.GROUP_CD = 'TEAM_CD'   
+	    INNER JOIN W_CODE F
+		   ON F.BU_CD    = A.BU_CD
+		  AND F.CODE_CD  = A.PART_CD
+		  AND F.GROUP_CD = 'PART_CD'   
+		LEFT JOIN W_CODE D
+		   ON D.BU_CD    = C.BU_CD
+		  AND D.CODE_CD  = C.ATTB_1_CD
+		  AND D.GROUP_CD = 'DATA_SCOPE_TYPE'   
+		ORDER BY A.COMPANY_CD, B.SORT, E.SORT, C.SORT, F.SORT -->
+	</select>
+	
+	<select id="bscOrgMgmtScopeSelect" parameterType="map" resultType="map">
+		/****** [ master.master.bscOrgMgmtScopeSelect ] ******/
+		WITH W_ROUNTING AS 
+		(
+			SELECT ROUTING_ID AS CODE_CD
+			     , ROUTING_ID AS CODE_NM
+			FROM TB_MST_ITEM_PLANT WITH(NOLOCK)
+			WHERE COMPANY_CD = @{COMPANY_CD}
+		      AND BU_CD      = @{BU_CD}
+		      AND PLANT_CD = 'WF01'
+		      AND VALID_FLAG = 'Y'
+		      AND ISNULL(ROUTING_ID,' ') != ' '
+			GROUP BY ROUTING_ID
+		), 
+		W_BU_ITEM_TYPE AS 
+		(
+		    #set($_parameter.groupCd = "BU_CD,ITEM_TYPE")
+		    #set($_parameter.buAllYn = "Y")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.DIV_CD
+		     , A.TEAM_CD
+		     , A.PART_CD
+		     , @{DATA_SCOPE_TYPE} AS DATA_SCOPE_TYPE
+		     , B.CODE_CD AS DATA_SCOPE_ID
+		     , B.CODE_NM AS DATA_SCOPE_NM
+		     , CASE WHEN ISNULL(C.DATA_SCOPE_ID,' ') != ' ' THEN 'Y' ELSE 'N' END AS CHK_YN_ORG
+		     , CASE WHEN ISNULL(C.DATA_SCOPE_ID,' ') != ' ' THEN 'Y' ELSE 'N' END AS CHK_YN
+		FROM UV_MST_ORG A WITH(NOLOCK)
+		#if($_parameter.DATA_SCOPE_TYPE == "ROUTING")
+		INNER JOIN W_ROUNTING B
+		   ON 1 = 1
+		#elseif($_parameter.DATA_SCOPE_TYPE == "BU_CD")
+		INNER JOIN W_BU_ITEM_TYPE B
+		   ON B.GROUP_CD = 'BU_CD'
+		  AND B.CODE_CD != 'ALL'
+		#elseif($_parameter.DATA_SCOPE_TYPE == "ITEM_TYPE")
+		INNER JOIN W_BU_ITEM_TYPE B
+		   ON B.GROUP_CD = 'ITEM_TYPE'
+		#end
+		LEFT JOIN TB_MST_ORG_SCOPE C WITH(NOLOCK)
+		   ON C.COMPANY_CD      = A.COMPANY_CD
+		  AND C.BU_CD           = A.BU_CD
+		  AND C.PART_CD         = A.PART_CD
+		  AND C.DATA_SCOPE_TYPE = @{DATA_SCOPE_TYPE}
+		  AND C.DATA_SCOPE_ID   = B.CODE_CD
+		  AND C.USE_FLAG        = 'Y'
+		  AND C.DEL_FLAG        = 'N'
+		WHERE A.COMPANY_CD = @{COMPANY_CD}
+		  AND A.BU_CD      = @{BU_CD}
+		  AND A.DIV_CD     = @{DIV_CD}
+		  AND A.TEAM_CD    = @{TEAM_CD}
+		  AND A.PART_CD    = @{PART_CD}
+	</select>
+	
+	<select id="bscOrgMgmtKpiSelect" parameterType="map" resultType="map">
+		/****** [ master.master.bscOrgMgmtKpiSelect ] ******/
+		WITH W_BSC_KPI AS 
+		(
+		    #set($_parameter.groupCd = "KPI_ID")
+		    #set($_parameter.buAllYn = "Y")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.DIV_CD
+		     , A.TEAM_CD
+		     , A.PART_CD
+		     , B.CODE_CD AS KPI_ID
+		     , B.CODE_NM AS KPI_NM
+		     , CASE WHEN ISNULL(C.KPI_ID,' ') != ' ' THEN 'Y' ELSE 'N' END AS CHK_YN
+		     , CASE WHEN ISNULL(C.KPI_ID,' ') != ' ' THEN 'Y' ELSE 'N' END AS CHK_YN_ORG
+		FROM UV_MST_ORG A WITH(NOLOCK)
+		INNER JOIN W_BSC_KPI B 
+		   ON 1 = 1
+		LEFT JOIN TB_MST_ORG_KPI C WITH(NOLOCK)
+		  ON C.COMPANY_CD = A.COMPANY_CD
+		 AND C.BU_CD      = A.BU_CD
+		 AND C.PART_CD    = A.PART_CD
+		 AND C.KPI_ID     = B.CODE_CD
+		 AND C.DEL_FLAG   = 'N'
+		 AND C.USE_FLAG   = 'Y'
+		WHERE A.COMPANY_CD = @{COMPANY_CD}
+		  AND A.BU_CD      = @{BU_CD}
+		  AND A.DIV_CD     = @{DIV_CD}
+		  AND A.TEAM_CD    = @{TEAM_CD}
+		  AND A.PART_CD    = @{PART_CD}
+	</select>
+	
+	<insert id="bscOrgMgmtScopeMerge" parameterType="map">
+		/****** [ master.master.bscOrgMgmtScopeMerge ] ******/
+		MERGE TB_MST_ORG_SCOPE AS A
+		USING 
+		(
+			SELECT @{COMPANY_CD     } AS COMPANY_CD
+		         , @{BU_CD          } AS BU_CD
+		         , @{PART_CD        } AS PART_CD
+		         , @{DATA_SCOPE_TYPE} AS DATA_SCOPE_TYPE
+		         , @{DATA_SCOPE_ID  } AS DATA_SCOPE_ID
+		         , @{CHK_YN         } AS USE_FLAG
+		         , 'N' AS DEL_FLAG
+		         , @{GV_USER_ID     } AS CREATE_ID
+		         , DBO.UFN_GETDATE() AS CREATE_DTTM
+		) B
+		ON (
+			    A.COMPANY_CD      = B.COMPANY_CD   
+		   	AND A.BU_CD           = B.BU_CD   
+			AND A.PART_CD         = B.PART_CD
+			AND A.DATA_SCOPE_TYPE = B.DATA_SCOPE_TYPE
+			AND A.DATA_SCOPE_ID   = B.DATA_SCOPE_ID
+		)   
+		WHEN MATCHED THEN
+			UPDATE 
+			SET A.USE_FLAG    = B.USE_FLAG
+			  , A.DEL_FLAG    = B.DEL_FLAG
+			  , A.UPDATE_ID   = B.CREATE_ID
+			  , A.UPDATE_DTTM = B.CREATE_DTTM
+		WHEN NOT MATCHED THEN
+			INSERT (
+			    COMPANY_CD
+			  , BU_CD
+			  , PART_CD         
+			  , DATA_SCOPE_TYPE        
+			  , DATA_SCOPE_ID        
+			  , USE_FLAG          
+			  , DEL_FLAG          
+			  , CREATE_ID
+			  , CREATE_DTTM
+			  , UPDATE_ID  
+			  , UPDATE_DTTM
+			) VALUES (
+			    B.COMPANY_CD
+			  , B.BU_CD
+			  , B.PART_CD         
+			  , B.DATA_SCOPE_TYPE        
+			  , B.DATA_SCOPE_ID        
+			  , B.USE_FLAG          
+			  , B.DEL_FLAG          
+			  , B.CREATE_ID
+			  , B.CREATE_DTTM
+			  , B.CREATE_ID  
+			  , B.CREATE_DTTM
+			);
+	</insert>
+	
+	<delete id="bscOrgMgmtScopeDelete" parameterType="map">
+		/****** [ master.master.bscOrgMgmtScopeDelete ] ******/
+	</delete>
+
+	<select id="bscOrgMgmtScopeExistPkMerge" parameterType="map" resultType="int">
+		/****** [ master.master.bscOrgMgmtScopeExistPkMerge ] ******/
+		WITH W_CODE AS 
+		(
+			#set($_parameter.groupCd = "TEAM_CD")
+		  	#set($_parameter.buAllYn = "N")
+		  	<include refid="include.mstCode"/>
+		)
+		SELECT COUNT(*)
+		FROM TB_MST_ORG_SCOPE A WITH(NOLOCK)
+		INNER JOIN W_CODE B
+		   ON B.CODE_CD = @{TEAM_CD}
+		  AND ISNULL(B.ATTB_2_CD, ' ') != ' '
+		WHERE A.COMPANY_CD      = @{COMPANY_CD}
+		  AND A.BU_CD           = @{BU_CD}
+		  AND A.DATA_SCOPE_TYPE = @{DATA_SCOPE_TYPE}
+		  AND A.DATA_SCOPE_ID   = @{DATA_SCOPE_ID}
+		  AND 'Y'               = @{CHK_YN}
+		  AND A.USE_FLAG        = 'Y'
+		  AND A.DEL_FLAG        = 'N'
+	</select>
+
+	<insert id="bscOrgMgmtKpiMerge" parameterType="map">
+		/****** [ master.master.bscOrgMgmtKpiMerge ] ******/
+		MERGE TB_MST_ORG_KPI AS A
+		USING 
+		(
+			SELECT @{COMPANY_CD   } AS COMPANY_CD
+		         , @{BU_CD        } AS BU_CD
+		         , @{PART_CD      } AS PART_CD
+		         , @{KPI_ID       } AS KPI_ID
+		         , @{CHK_YN       } AS USE_FLAG
+		         , 'N' AS DEL_FLAG
+		         , @{GV_USER_ID   } AS CREATE_ID
+		         , DBO.UFN_GETDATE() AS CREATE_DTTM
+		) B
+		ON (
+			    A.COMPANY_CD  = B.COMPANY_CD   
+		   	AND A.BU_CD       = B.BU_CD   
+			AND A.PART_CD     = B.PART_CD
+			AND A.KPI_ID      = B.KPI_ID
+		)   
+		WHEN MATCHED THEN
+			UPDATE 
+			SET A.USE_FLAG    = B.USE_FLAG
+			  , A.DEL_FLAG    = B.DEL_FLAG
+			  , A.UPDATE_ID   = B.CREATE_ID
+			  , A.UPDATE_DTTM = B.CREATE_DTTM
+		WHEN NOT MATCHED THEN
+			INSERT (
+			    COMPANY_CD
+			  , BU_CD
+			  , PART_CD         
+			  , KPI_ID        
+			  , USE_FLAG          
+			  , DEL_FLAG          
+			  , CREATE_ID
+			  , CREATE_DTTM
+			  , UPDATE_ID  
+			  , UPDATE_DTTM
+			) VALUES (
+			    B.COMPANY_CD
+			  , B.BU_CD
+			  , B.PART_CD         
+			  , B.KPI_ID        
+			  , B.USE_FLAG          
+			  , B.DEL_FLAG          
+			  , B.CREATE_ID
+			  , B.CREATE_DTTM
+			  , B.CREATE_ID  
+			  , B.CREATE_DTTM
+			);
+	</insert>
+	
+	<delete id="bscOrgMgmtKpiDelete" parameterType="map">
+		/****** [ master.master.bscOrgMgmtKpiDelete ] ******/
+	</delete>
+
+	<select id="bscOrgMgmtKpiExistPkMerge" parameterType="map" resultType="int">
+		/****** [ master.master.bscOrgMgmtKpiExistPkMerge ] ******/
+		SELECT COUNT(*)
+		FROM TB_MST_ORG_KPI WITH(NOLOCK)
+		WHERE COMPANY_CD = @{COMPANY_CD}
+		  AND BU_CD      = @{BU_CD}
+		  AND PART_CD    = @{PART_CD}
+		  AND KPI_ID     = @{KPI_ID}
+		  AND 'Y'        = @{CHK_YN}
+		  AND USE_FLAG   = 'Y'
+		  AND DEL_FLAG   = 'N'
+	</select>
+		
+	<select id="scmScoreSelect" parameterType="map" resultType="map">
+		/****** [ master.master.scmScoreSelect ] ******/
+		WITH W_SCM_SCORE_ID AS 
+		(
+		    #set($_parameter.groupCd = "SCM_SCORE_ID")
+		    #set($_parameter.buAllYn = "Y")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.DIV_CD
+		     , A.TEAM_CD
+		     , A.PART_CD
+		     , B.CODE_CD AS SCM_SCORE_ID
+		     , B.CODE_NM AS SCM_SCORE_NM
+		     , CASE WHEN ISNULL(C.SCM_SCORE_ID,' ') != ' ' THEN 'Y' ELSE 'N' END AS CHK_YN
+		     , CASE WHEN ISNULL(C.SCM_SCORE_ID,' ') != ' ' THEN 'Y' ELSE 'N' END AS CHK_YN_ORG
+		FROM UV_MST_ORG A WITH(NOLOCK)
+		INNER JOIN W_SCM_SCORE_ID B 
+		   ON 1 = 1
+		LEFT JOIN TB_MST_ORG_SCM C WITH(NOLOCK)
+		  ON C.COMPANY_CD   = A.COMPANY_CD
+		 AND C.BU_CD        = A.BU_CD
+		 AND C.PART_CD      = A.PART_CD
+		 AND C.SCM_SCORE_ID = B.CODE_CD
+		 AND C.USE_FLAG     = 'Y'
+		WHERE A.COMPANY_CD = @{COMPANY_CD}
+		  AND A.BU_CD      = @{BU_CD}
+		  AND A.DIV_CD     = @{DIV_CD}
+		  AND A.TEAM_CD    = @{TEAM_CD}
+		  AND A.PART_CD    = @{PART_CD}
+	</select>
+	
+	<insert id="scmScoreMerge" parameterType="map">
+		/****** [ master.master.scmScoreMerge ] ******/
+		MERGE TB_MST_ORG_SCM AS A
+		USING 
+		(
+			SELECT @{COMPANY_CD   } AS COMPANY_CD
+		         , @{BU_CD        } AS BU_CD
+		         , @{PART_CD      } AS PART_CD
+		         , @{SCM_SCORE_ID } AS SCM_SCORE_ID
+		         , @{CHK_YN       } AS USE_FLAG
+		         , @{GV_USER_ID   } AS CREATE_ID
+		         , DBO.UFN_GETDATE() AS CREATE_DTTM
+		) B
+		ON (
+			    A.COMPANY_CD   = B.COMPANY_CD   
+		   	AND A.BU_CD        = B.BU_CD   
+			AND A.PART_CD      = B.PART_CD
+			AND A.SCM_SCORE_ID = B.SCM_SCORE_ID
+		)   
+		WHEN MATCHED THEN
+			UPDATE 
+			SET A.USE_FLAG    = B.USE_FLAG
+			  , A.UPDATE_ID   = B.CREATE_ID
+			  , A.UPDATE_DTTM = B.CREATE_DTTM
+		WHEN NOT MATCHED THEN
+			INSERT (
+			    COMPANY_CD
+			  , BU_CD
+			  , PART_CD         
+			  , SCM_SCORE_ID        
+			  , USE_FLAG          
+			  , CREATE_ID
+			  , CREATE_DTTM
+			  , UPDATE_ID  
+			  , UPDATE_DTTM
+			) VALUES (
+			    B.COMPANY_CD
+			  , B.BU_CD
+			  , B.PART_CD         
+			  , B.SCM_SCORE_ID        
+			  , B.USE_FLAG          
+			  , B.CREATE_ID
+			  , B.CREATE_DTTM
+			  , B.CREATE_ID  
+			  , B.CREATE_DTTM
+			);
+	</insert>
+	
+	<delete id="scmScoreDelete" parameterType="map">
+		/****** [ master.master.scmScoreDelete ] ******/
+	</delete>
+
+	<select id="scmScoreExistPkMerge" parameterType="map" resultType="int">
+		/****** [ master.master.scmScoreExistPkMerge ] ******/
+		SELECT COUNT(*)
+		FROM TB_MST_ORG_SCM WITH(NOLOCK)
+		WHERE COMPANY_CD   = @{COMPANY_CD}
+		  AND BU_CD        = @{BU_CD}
+		  AND PART_CD      = @{PART_CD}
+		  AND SCM_SCORE_ID = @{SCM_SCORE_ID}
+		  AND 'Y'          = @{CHK_YN}
+		  AND USE_FLAG     = 'Y'
+	</select>
+
+</mapper>

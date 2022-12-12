@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+
+	<select id="supplyPresentListSelect" parameterType="map" resultType="map">
+		/****** [ supply.supplyPresentListSelect ] ******/
+		WITH W_DYN_MASTER AS 
+		(
+			SELECT DWR.COMPANY_CD
+            	 , DWR.BU_CD
+                 , DPOH.ITEM_CD
+                 , DWR.WIP_DATE
+                 , SUM(DWR.REMAIN_QTY) AS WIP_QTY
+                 , SUM(DWR.REMAIN_QTY * MICG.SALES_PRICE_KRW) AS WIP_AMT_KRW
+			FROM TB_DYN_WIP_ROUTING DWR WITH(NOLOCK)
+			INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+               ON DPOH.COMPANY_CD = DWR.COMPANY_CD
+              AND DPOH.BU_CD = DWR.BU_CD
+              AND DPOH.PROD_ORDER_NO = DWR.PROD_ORDER_NO
+              <!-- AND DPOH.ORDER_STATUS IN ('ST', 'RL') -->
+			INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+               ON MI.COMPANY_CD = DPOH.COMPANY_CD
+              AND MI.BU_CD = DPOH.BU_CD
+              AND MI.ITEM_CD = DPOH.ITEM_CD
+            LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+              ON MRC.COMPANY_CD = MI.COMPANY_CD
+			 AND MRC.BU_CD = MI.BU_CD
+             AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+			LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+              ON MICG.COMPANY_CD = DPOH.COMPANY_CD
+			 AND MICG.BU_CD = DPOH.BU_CD
+             AND MICG.ITEM_CD = DPOH.ITEM_CD
+             AND MICG.CUST_GROUP_CD = MRC.CUST_GROUP_CD
+			WHERE DWR.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DWR.BU_CD = @{GV_BU_CD}
+              AND DWR.WIP_DATE <![CDATA[>=]]> CONVERT(VARCHAR, DATEADD(wk, -8, @{swFromDate}), 112)
+			  AND DWR.WIP_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112)
+			  AND DWR.ORDER_STATUS IN ('ST', 'RL')
+			#if($_parameter.wipCd and $_parameter.wipCd != "")
+			  AND EXISTS (
+							SELECT 1
+							FROM TB_DYN_PROD_ORDER B WITH(NOLOCK)
+                            WHERE B.COMPANY_CD = DWR.COMPANY_CD
+                              AND B.BU_CD = DWR.BU_CD
+                              AND B.PROD_ORDER_NO = DWR.PROD_ORDER_NO
+                              AND B.ITEM_CD = DPOH.ITEM_CD
+							#if($_parameter.wipCd == "A")
+                              AND B.RELEASE_DATE <![CDATA[>]]> CONVERT(NVARCHAR, DATEADD(DD, -30, DWR.WIP_DATE), 112)
+                            #elseif($_parameter.wipCd == "B")
+                              AND B.RELEASE_DATE <![CDATA[<=]]> CONVERT(NVARCHAR, DATEADD(DD, -30, DWR.WIP_DATE), 112)
+                              AND B.RELEASE_DATE <![CDATA[>]]> CONVERT(NVARCHAR, DATEADD(DD, -60, DWR.WIP_DATE), 112)
+                            #elseif($_parameter.wipCd == "C")
+                         	  AND B.RELEASE_DATE <![CDATA[<=]]> CONVERT(NVARCHAR, DATEADD(DD, -60, DWR.WIP_DATE), 112)
+                            #end
+                         )
+			#end
+			GROUP BY DWR.COMPANY_CD, DWR.BU_CD, DPOH.ITEM_CD, DWR.WIP_DATE
+		)
+		SELECT NULL AS TMP_COL
+	    	<include refid="include.getCdDimTotal"/>
+	    	<include refid="include.getGrpLvlId"/>
+	    	#foreach($bucketMap in $_parameter.bucketList)
+		    #set($paramData = "$bucketMap.BUCKET_VAL")
+		    	#if($bucketMap.CD.indexOf("_QTY") > -1)
+		    		, SUM(CASE WHEN A.YEARWEEK = '$paramData' THEN WIP_QTY END) $bucketMap.CD
+		    	#elseif($bucketMap.CD.indexOf("_AMT") > -1)
+		    		, SUM(CASE WHEN A.YEARWEEK = '$paramData' THEN WIP_AMT_KRW END) $bucketMap.CD
+		    	#end
+		    #end
+		    #foreach($bucketMap in $_parameter.bucketList)
+		    #set($paramData = "$bucketMap.BUCKET_VAL")
+		    	#if($velocityCount > 1)
+		    		#if($bucketMap.CD.indexOf("_QTY") > -1)
+			    		+ ISNULL(ABS(SUM(CASE WHEN A.YEARWEEK = '$paramData' THEN WIP_QTY END)), 0)
+			    	#elseif($bucketMap.CD.indexOf("_AMT") > -1)
+			    		+ ISNULL(ABS(SUM(CASE WHEN A.YEARWEEK = '$paramData' THEN WIP_AMT_KRW END)), 0)
+			    	#end
+			    #else
+			    	#if($bucketMap.CD.indexOf("_QTY") > -1)
+			    		, ISNULL(ABS(SUM(CASE WHEN A.YEARWEEK = '$paramData' THEN WIP_QTY END)), 0)
+			    	#end
+			    #end
+		    #end AS OMIT_FLAG
+		    , ISNULL(SUM(CASE WHEN WIP_DATE = @{toCal} AND FLAG = 'ORIGINAL' THEN WIP_QTY END), 0) - ISNULL(SUM(CASE WHEN FLAG = 'EIGHT' THEN WIP_QTY END), 0) / NULLIF(SUM(CASE WHEN FLAG = 'EIGHT' THEN CNT END), 0) AS EIGHT_WIP_QTY
+		    , ISNULL(SUM(CASE WHEN WIP_DATE = @{toCal} AND FLAG = 'ORIGINAL' THEN WIP_QTY END), 0) - ISNULL(SUM(CASE WHEN FLAG = 'ONE' THEN WIP_QTY END), 0) AS ONE_WIP_QTY
+		    , ISNULL(SUM(CASE WHEN WIP_DATE = @{toCal} AND FLAG = 'ORIGINAL' THEN WIP_AMT_KRW END), 0) - ISNULL(SUM(CASE WHEN FLAG = 'EIGHT' THEN WIP_AMT_KRW END), 0) / NULLIF(SUM(CASE WHEN FLAG = 'EIGHT' THEN CNT END), 0) AS EIGHT_WIP_AMT_KRW
+		    , ISNULL(SUM(CASE WHEN WIP_DATE = @{toCal} AND FLAG = 'ORIGINAL' THEN WIP_AMT_KRW END), 0) - ISNULL(SUM(CASE WHEN FLAG = 'ONE' THEN WIP_AMT_KRW END), 0) AS ONE_WIP_AMT_KRW
+		FROM
+		(
+			SELECT C1.COMPANY_CD
+			     , C1.BU_CD
+			     , ISNULL(C2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(C2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(C2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			     , ISNULL(C2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			     , ISNULL(C2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+			     , ISNULL(C2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+			     , ISNULL(C2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+			     , ISNULL(C2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+			     , ISNULL(C1.ITEM_CD, ' ') AS ITEM_CD 			      
+			     , ISNULL(C1.ITEM_CD, ' ') AS ITEM_CD_NM 	
+			     , ISNULL(C2.ITEM_NM, ' ') AS ITEM_NM 			      
+			     , ISNULL(C2.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(C2.SPEC, ' ') AS SPEC
+			     , ISNULL(C2.SPEC, ' ') AS SPEC_NM
+			     , ISNULL(C2.DRAW_NO, ' ') AS DRAW_NO
+			     , ISNULL(C2.DRAW_NO, ' ') AS DRAW_NO_NM
+			     , ISNULL(C2.ROUTING_ID, ' ') AS ROUTING_ID 
+			     , ISNULL(C2.ROUTING_ID, ' ') AS ROUTING_ID_NM 
+			     , ISNULL(C2.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+			     , ISNULL(C2.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+			     , ISNULL(C2.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+			     , ISNULL(C2.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+			     , ISNULL(C2.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD 
+			     , ISNULL(C2.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM 
+			     , ISNULL(C2.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM 
+			     , ISNULL(C2.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM 	
+			     , ISNULL(C2.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+			     , ISNULL(C2.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+			     , ISNULL(C2.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+			     , ISNULL(C2.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+			     , ISNULL(C2.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+			     , ISNULL(C2.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+			     , ISNULL(C2.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+			     , ISNULL(C2.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+			     , ISNULL(CAST (C2.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+                 , ISNULL(CAST (C2.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+			     , ISNULL(C2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD
+			     , ISNULL(C2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM
+			     , ISNULL(C2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM
+			     , ISNULL(C2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+			     , ISNULL(C2.MFG_LT, ' ') AS MFG_LT
+			     , ISNULL(C2.MFG_LT, ' ') AS MFG_LT_NM
+			     , C1.WIP_QTY 
+			     , C1.WIP_AMT_KRW
+			     , C1.YEARWEEK
+			     , C1.WIP_DATE
+			     , C1.FLAG
+			     , C1.CNT
+			FROM
+			(
+		    	SELECT A2.WIP_DATE
+			         , A1.YEARWEEK
+			         , A2.COMPANY_CD
+			         , A2.BU_CD
+			         , A2.ITEM_CD
+			         , A2.WIP_QTY 
+			         , 0 AS CNT
+			         , A2.WIP_AMT_KRW
+			         , 'ORIGINAL' AS FLAG
+			    FROM
+			    (
+			    	SELECT YEARWEEK
+			    	     , MIN(WIP_DATE) AS WIP_DATE
+			    	FROM
+			    	(
+				    	SELECT CONVERT(VARCHAR, DATEADD(wk, 0, YYYYMMDD), 112) AS WIP_DATE
+				         	 , YEARWEEK
+				      	FROM TB_MST_CALENDAR WITH(NOLOCK)
+				      	WHERE YEARWEEK <![CDATA[>=]]> @{fromWeek}
+					      AND YEARWEEK <![CDATA[<=]]> @{toWeek}
+				          AND DAY_NM = 'SAT'
+				      	UNION ALL
+				      	SELECT YYYYMMDD AS WIP_DATE
+				             , YEARWEEK
+				      	FROM TB_MST_CALENDAR WITH(NOLOCK)
+				      	WHERE YYYYMMDD = @{toCal}
+					) S
+					GROUP BY YEARWEEK
+		    	) A1
+		    	INNER JOIN W_DYN_MASTER A2 WITH(NOLOCK)
+		       	   ON A1.WIP_DATE = A2.WIP_DATE
+		       	UNION ALL   
+			  	SELECT A2.WIP_DATE
+			  	     , ' ' AS YEARWEEK
+			  	     , A2.COMPANY_CD
+			    	 , A2.BU_CD
+			         , A2.ITEM_CD
+			         , SUM(A2.WIP_QTY) AS EIGHT_WIP_QTY
+			         , COUNT(*) AS CNT
+			         , SUM(A2.WIP_AMT_KRW) AS EIGHT_WIP_AMT_KRW
+			         , 'EIGHT' AS FLAG
+			  	FROM
+		      	(
+		      		SELECT YYYYMMDD AS WIP_DATE
+					FROM TB_MST_CALENDAR WITH(NOLOCK)
+					WHERE YEARWEEK <![CDATA[>=]]> (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -8, @{swToDate}), 112))
+				  	  AND YEARWEEK <![CDATA[<=]]> (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -1, @{swToDate}), 112))
+				  	  AND DAY_NM = 'SAT'
+			  	) A1
+		      	INNER JOIN W_DYN_MASTER A2 WITH(NOLOCK)
+		           ON A1.WIP_DATE = A2.WIP_DATE
+		      	GROUP BY A2.COMPANY_CD, A2.BU_CD, A2.ITEM_CD, A2.WIP_DATE
+		      	UNION ALL
+		  		SELECT A2.WIP_DATE
+		  		     , ' ' AS YEARWEEK
+		  		     , A2.COMPANY_CD
+				     , A2.BU_CD
+				     , A2.ITEM_CD
+				     , SUM(A2.WIP_QTY) AS ONE_WIP_QTY
+				     , COUNT(*) AS CNT
+				     , SUM(A2.WIP_AMT_KRW) AS ONE_WIP_AMT_KRW
+				     , 'ONE' AS FLAG 
+				FROM
+				(
+					SELECT YYYYMMDD AS WIP_DATE
+				  	FROM TB_MST_CALENDAR WITH(NOLOCK)
+				  	WHERE YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -1, @{swToDate}), 112))
+				      AND DAY_NM = 'SAT'
+				) A1
+				INNER JOIN W_DYN_MASTER A2 WITH(NOLOCK)
+				   ON A1.WIP_DATE = A2.WIP_DATE
+				GROUP BY A2.COMPANY_CD, A2.BU_CD, A2.ITEM_CD, A2.WIP_DATE
+			) C1
+			INNER JOIN
+			( 
+				<include refid="snop.common.t_itemCust" />
+			) C2
+			ON C1.COMPANY_CD = C2.COMPANY_CD
+			AND C1.BU_CD = C2.BU_CD
+			AND C1.ITEM_CD = C2.ITEM_CD
+			WHERE C1.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND C1.BU_CD = @{GV_BU_CD}   
+		) A
+		GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+	    ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    	, A.$dimMap.DIM_CD
+		#end
+	</select>
+	
+	
+	
+	
+</mapper>

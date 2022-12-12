@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+	<select id="dayEmgReqJobListSelect" parameterType="map" resultType="map">
+		/****** [ asp.dynamic.dayEmgReqJobListSelect ] ******/
+		SELECT DPOH.COMPANY_CD
+		     , DPOH.BU_CD
+		     , DPOH.PROD_ORDER_NO
+		     , DPOH.ITEM_CD
+		     , MI.ITEM_NM
+		     , MI.SPEC
+		     , MC1.CODE_NM AS ITEM_TYPE
+		     , MIG.ITEM_GROUP_NM
+		     , DPOH.PROD_ORDER_QTY
+		     , ISNULL(DPOH.PROD_ORDER_QTY, 0) - ISNULL(DRP.RESULT_QTY, 0) AS REMAIN_QTY
+		     , CONVERT(VARCHAR(10), CONVERT(DATE, DPOH.RELEASE_DATE), 120) AS RELEASE_DATE
+		     , MC2.CODE_NM AS ORDER_STATUS
+		     , HSPUP.USE_FLAG
+		     , HSPUP.PLAN_DATE_1ST
+		     , HSPUP.PLAN_QTY_1ST
+		     , HSPUP.PLAN_DATE_2ND
+		     , HSPUP.PLAN_QTY_2ND
+		     , ISNULL(HSPUP.PLAN_ID, @{planId}) AS PLAN_ID
+		     , ISNULL(HSPUP.SEQ, @{seq}) AS SEQ
+		     , CASE WHEN HSPUP.PROD_ORDER_NO IS NOT NULL AND HSPUP.USE_FLAG = 'Y' THEN 'Y' ELSE 'N' END AS CHECK_YN
+		FROM TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+		LEFT OUTER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+		  ON DPOD.COMPANY_CD = DPOH.COMPANY_CD
+		 AND DPOD.BU_CD = DPOH.BU_CD
+		 AND DPOD.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+		 AND DPOD.ROUTE_ORDER IN ('L', 'S')
+		LEFT OUTER JOIN TB_DYN_ROUTING_PERFORMANCE DRP WITH(NOLOCK)
+		  ON DRP.COMPANY_CD = DPOD.COMPANY_CD
+		 AND DRP.BU_CD = DPOD.BU_CD
+		 AND DRP.PROD_ORDER_NO = DPOD.PROD_ORDER_NO
+		 AND DRP.OPERATION_NO = DPOD.OPERATION_NO
+		LEFT OUTER JOIN TB_HIS_SALES_PLAN_URGENT_PROD HSPUP WITH(NOLOCK)
+		  ON HSPUP.PLAN_ID = @{planId}
+		 AND HSPUP.COMPANY_CD = DPOD.COMPANY_CD
+		 AND HSPUP.BU_CD = DPOD.BU_CD
+		 AND HSPUP.ITEM_CD = @{itemCd}
+		 AND HSPUP.SEQ = @{seq}
+		 AND HSPUP.PROD_ORDER_NO = DPOD.PROD_ORDER_NO
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = DPOH.COMPANY_CD
+		  AND MI.BU_CD = DPOH.BU_CD
+		  AND MI.ITEM_CD = DPOH.ITEM_CD
+		LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		  ON MIG.COMPANY_CD = MI.COMPANY_CD
+		 AND MIG.BU_CD = MI.BU_CD
+		 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		LEFT OUTER JOIN 
+		(
+			SELECT BU_CD
+                 , GROUP_CD
+                 , CODE_CD
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                        ELSE CODE_NM
+                    END AS CODE_NM
+                 , SORT
+                 , USE_FLAG
+			FROM TB_MST_CODE WITH(NOLOCK)
+		) MC1
+		ON MC1.BU_CD = 'ALL'
+		AND MC1.GROUP_CD = 'ITEM_TYPE'
+		AND MC1.CODE_CD = MI.ITEM_TYPE
+		AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN 
+		(
+			SELECT BU_CD
+                 , GROUP_CD
+                 , CODE_CD
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                        ELSE CODE_NM
+                   END AS CODE_NM
+                 , SORT
+                 , USE_FLAG
+			FROM TB_MST_CODE WITH(NOLOCK)
+		) MC2
+		ON MC2.BU_CD = DPOH.BU_CD
+		AND MC2.GROUP_CD = 'ORDER_STATUS'
+		AND MC2.CODE_CD = DPOH.ORDER_STATUS
+		AND MC2.USE_FLAG = 'Y'
+		WHERE DPOH.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND DPOH.BU_CD = @{GV_BU_CD}
+		  AND DPOH.ITEM_CD = @{itemCd}
+		  AND DPOH.DEL_FLAG = 'N'
+		  AND MI.ITEM_TYPE = @{itemType}
+		#if($_parameter.useFlag and $_parameter.useFlag != "")
+		  AND ISNULL(HSPUP.USE_FLAG, 'N') = @{useFlag}
+		#end
+		#if($_parameter.orderStatus and $_parameter.orderStatus != "")
+		  AND DPOH.ORDER_STATUS IN ('$_parameter.orderStatus.replace(",","','")')
+		#end
+		  AND NOT EXISTS (
+							SELECT 1
+                            FROM TB_HIS_SALES_PLAN_URGENT HSPU1 WITH(NOLOCK)
+                            INNER JOIN TB_HIS_SALES_PLAN_URGENT_PROD HSPUP WITH(NOLOCK)
+                               ON HSPUP.PLAN_ID = HSPU1.PLAN_ID
+                              AND HSPUP.COMPANY_CD = HSPU1.COMPANY_CD
+                              AND HSPUP.BU_CD = HSPU1.BU_CD
+                              AND HSPUP.ITEM_CD = HSPU1.ITEM_CD
+                              AND HSPUP.SEQ =HSPU1.SEQ
+                              AND HSPUP.USE_FLAG = 'Y'
+                              AND HSPUP.COMPANY_CD = DPOH.COMPANY_CD
+                              AND HSPUP.BU_CD = DPOH.BU_CD
+                              AND HSPUP.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+							WHERE HSPU1.PLAN_ID = @{planId}
+                              AND HSPU1.COMPANY_CD = @{GV_COMPANY_CD}
+                              AND HSPU1.BU_CD = @{GV_BU_CD}
+                              AND HSPU1.DEL_FLAG = 'N'
+		                      AND NOT EXISTS (
+		                                      SELECT 1
+		                                        FROM TB_HIS_SALES_PLAN_URGENT HSPU2 WITH(NOLOCK)
+		                                       WHERE HSPU2.PLAN_ID = HSPU1.PLAN_ID
+                                                 AND HSPU2.COMPANY_CD = HSPU1.COMPANY_CD
+                                                 AND HSPU2.BU_CD = HSPU1.BU_CD
+                                                 AND HSPU2.ITEM_CD = HSPU1.ITEM_CD
+                                                 AND HSPU2.SEQ = HSPU1.SEQ
+                                                 AND HSPU2.PLAN_ID = @{planId}
+                                                 AND HSPU2.COMPANY_CD = @{GV_COMPANY_CD}
+                                                 AND HSPU2.BU_CD = @{GV_BU_CD}
+                                                 AND HSPU2.ITEM_CD = @{itemCd}
+                                                 AND HSPU2.SEQ = @{seq}
+		                                     )
+		                  )
+	</select>
+	
+	<insert id="dayEmgReqJobListMerge" parameterType="map">
+		/****** [ asp.dynamic.dayEmgReqJobListMerge ] ******/
+		MERGE TB_HIS_SALES_PLAN_URGENT_PROD A
+		USING 
+		(
+			SELECT @{PLAN_ID} AS PLAN_ID
+	             , @{COMPANY_CD} AS COMPANY_CD
+	             , @{BU_CD} AS BU_CD
+	             , @{ITEM_CD} AS ITEM_CD
+	             , @{SEQ} AS SEQ
+	             , @{PROD_ORDER_NO} AS PROD_ORDER_NO
+		) B
+		ON 
+		(
+			A.PLAN_ID       = B.PLAN_ID
+		    AND A.COMPANY_CD    = B.COMPANY_CD
+		    AND A.BU_CD         = B.BU_CD
+		    AND A.ITEM_CD       = B.ITEM_CD
+		    AND A.SEQ           = B.SEQ
+		    AND A.PROD_ORDER_NO = B.PROD_ORDER_NO
+		)
+		WHEN MATCHED THEN
+		UPDATE SET USE_FLAG    = @{USE_FLAG}
+		         , UPDATE_ID   = @{GV_USER_ID}
+		         , UPDATE_DTTM = dbo.UFN_GETDATE() 
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+			PLAN_ID
+	      , COMPANY_CD
+	      , BU_CD
+	      , ITEM_CD
+	      , SEQ
+	      , PROD_ORDER_NO
+	      , USE_FLAG
+	      , CREATE_ID
+	      , CREATE_DTTM
+		)VALUES(
+			B.PLAN_ID
+		  , B.COMPANY_CD
+		  , B.BU_CD
+		  , B.ITEM_CD
+		  , B.SEQ
+		  , B.PROD_ORDER_NO
+		  , @{USE_FLAG}
+		  , @{GV_USER_ID}
+		  , dbo.UFN_GETDATE() 
+		);
+	</insert>
+	
+	<select id="dayEmgReqJobListExcelSqlSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.dayEmgReqJobListExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	</select>
+	
+</mapper>

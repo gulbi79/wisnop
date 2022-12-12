@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="quality">
+	<select id="defectStatusDetailDateSelect" parameterType="map" resultType="map">
+		/****** [ quality.defectStatusDetailDateSelect ] ******/
+		WITH W_SYSDATE AS 
+		(
+		  	SELECT DBO.UFN_GETDATE() AS TODAY
+		)
+		SELECT CONVERT(VARCHAR(8), DATEADD(DD, A.GIGAN, A.FROM_DATE), 112) AS FROM_DATE
+		     , A.TO_DATE
+		     , A.MAX_DATE
+		FROM 
+		(
+			SELECT CONVERT(VARCHAR(8),  TODAY, 112) AS TO_DATE
+	    		 , CONVERT(VARCHAR(10), TODAY,  23) AS MAX_DATE
+	             , DATEADD(dd, @@DATEFIRST - DATEPART(dw, TODAY) - 6 , TODAY) AS FROM_DATE
+	             , CONVERT(INT, (SELECT ATTB_1_CD FROM TB_MST_CODE WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'INSP_PERIOD' AND CODE_CD = 'INSP_REQ')) AS GIGAN
+			FROM W_SYSDATE
+		) A
+    </select>
+    	
+    <select id="defectStatusDetailSelect" parameterType="map" resultType="map">
+	    /****** [ quality.defectStatusDetailSelect ] ******/
+		WITH W_ITEM AS 
+		(
+		    <include refid="snop.common.t_itemCust" />
+		),
+		W_MAIN AS 
+		(
+			SELECT ISP.COMPANY_CD
+				 , ISP.BU_CD
+				 , ISP.PROD_ORDER_NO
+				 , CONVERT(VARCHAR(10), CONVERT(DATETIME, ISP.ADJ_INSP_REQ_DATE), 120) AS ADJ_INSP_REQ_DATE
+				 , CONVERT(VARCHAR(10), CONVERT(DATETIME, ISP.INSP_DATE)        , 120) AS INSP_DATE
+				 , CONVERT(VARCHAR(10), CONVERT(DATETIME, ISP.RELEASE_DATE)     , 120) AS RELEASE_DATE
+				 , ISP.LOT_NO
+				 , ISP.ITEM_CD
+				 , DPOH.ROUTING_ID
+				 , ISP.LOT_SIZE
+				 , ISP.GOODS_QTY
+				 , ISP.DEFECT_QTY
+				 , ISP.SPEC_QTY
+				 , ISP.INSP_QTY
+				 , ISP.INSP_QTY - (ISP.GOODS_QTY + ISP.DEFECT_QTY - ISP.SPEC_QTY) AS NOT_EXAM_QTY
+				 , CASE WHEN 'ko' = 'ko' THEN ISP.PRICE_KRW
+				        WHEN 'cn' = 'ko' THEN ISP.PRICE_USD
+				        ELSE ISP.PRICE_USD
+				   END AS PRICE
+				 , ISP.INSP_USER_ID
+				 , ISP.REMARK
+				 , CONVERT(VARCHAR(30), ISP.UPDATE_DTTM, 120) AS UPDATE_DTTM 
+         	FROM TB_DYN_INSPECTION ISP WITH(NOLOCK)
+     		INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+        	   ON DPOH.COMPANY_CD = ISP.COMPANY_CD
+       		  AND DPOH.BU_CD = ISP.BU_CD
+       		  AND DPOH.PROD_ORDER_NO = ISP.PROD_ORDER_NO
+          	WHERE ISP.COMPANY_CD = @{GV_COMPANY_CD}
+              AND ISP.BU_CD      = @{GV_BU_CD}
+              AND ISP.PLANT_CD   = 'WF01'
+              AND ISP.RELEASE_DATE BETWEEN @{fromCal} AND @{toCal}  
+              AND ISP.DEL_FLAG   = 'N'
+			#if($_parameter.firstYn2 == "FIRST" and $_parameter.firstYn1 == "AS" and $_parameter.firstYn3 == "NORMAL")
+			#elseif($_parameter.firstYn1 == "AS" and $_parameter.firstYn3 == "NORMAL")
+			  AND (ISNULL(ISP.FIRST_INSP_YN, 'N') != 'Y' OR ISP.ITEM_CD LIKE 'AC%')
+			#elseif($_parameter.firstYn2 == "FIRST" and $_parameter.firstYn3 == "NORMAL")
+			  AND (ISNULL(ISP.FIRST_INSP_YN, 'N') = 'Y' OR ISP.ITEM_CD NOT LIKE 'AC%')
+			#elseif($_parameter.firstYn2 == "FIRST" and $_parameter.firstYn1 == "AS")
+			  AND (ISNULL(ISP.FIRST_INSP_YN, 'N') = 'Y' OR ISP.ITEM_CD LIKE 'AC%')
+			#elseif($_parameter.firstYn3 == "NORMAL")
+			  AND (ISNULL(ISP.FIRST_INSP_YN, 'N') != 'Y' AND ISP.ITEM_CD NOT LIKE 'AC%')
+			#elseif($_parameter.firstYn1 == "AS")
+			  AND ISP.ITEM_CD LIKE 'AC%'
+			#elseif($_parameter.firstYn2 == "FIRST")
+			  AND ISNULL(ISP.FIRST_INSP_YN, 'N') = 'Y'
+			#end 
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+	          AND ISP.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+	        #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+	          AND (ISP.ITEM_CD LIKE '%'+@{item_nm}+'%')
+	        #end
+                
+	        #if($_parameter.firstYn2 == "FIRST" and $_parameter.firstYn1 == "" and $_parameter.firstYn3 == "")
+            #else
+				UNION ALL
+				SELECT DPR.COMPANY_CD
+		           , DPR.BU_CD
+		           , NULL AS PROD_ORDER_NO
+		           , DPR.RECV_DATE AS ADJ_INSP_REQ_DATE
+		           , DPR.RECV_DATE AS INSP_DATE
+		           , DPR.RECV_DATE AS RELEASE_DATE
+		           , NULL AS LOT_NO
+		           , DPR.ITEM_CD
+		           , MIP.ROUTING_ID
+		           , DPR.RECV_QC_OK_QTY + DPR.RECV_QC_SPE_QTY + DPR.RECV_QC_NG_QTY AS LOT_SIZE
+		           , DPR.RECV_QC_OK_QTY AS GOODS_QTY
+		           , DPR.RECV_QC_NG_QTY AS DEFECT_QTY
+		           , DPR.RECV_QC_SPE_QTY AS SPEC_QTY
+		           , DPR.RECV_QC_OK_QTY + DPR.RECV_QC_SPE_QTY + DPR.RECV_QC_NG_QTY AS INSP_QTY
+		           , NULL AS NOT_EXAM_QTY
+		           , MI.ITEM_COST_KRW AS PRICE
+		           , NULL AS INSP_USER_ID
+		           , NULL AS REMARK
+		           , NULL AS UPDATE_DTTM
+				FROM TB_DYN_PUR_RECV DPR WITH(NOLOCK)
+				INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+          		   ON MIP.COMPANY_CD = DPR.COMPANY_CD
+         		  AND MIP.BU_CD = DPR.BU_CD
+         		  AND MIP.PLANT_CD = 'WF01'
+         	 	  AND MIP.ITEM_CD = DPR.ITEM_CD
+		       	INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		           ON MI.COMPANY_CD = DPR.COMPANY_CD
+		          AND MI.BU_CD = DPR.BU_CD
+		          AND MI.ITEM_CD = DPR.ITEM_CD
+		          AND ISNULL(MI.REC_INSP_YN, 'N') = 'Y'
+		       	WHERE DPR.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND DPR.BU_CD = @{GV_BU_CD}
+		          AND DPR.RECV_DATE BETWEEN @{fromCal} AND @{toCal}
+				#if($_parameter.firstYn2 == "FIRST" and $_parameter.firstYn1 == "AS" and $_parameter.firstYn3 == "NORMAL")
+				#elseif($_parameter.firstYn1 == "AS" and $_parameter.firstYn3 == "NORMAL")
+				#elseif($_parameter.firstYn2 == "FIRST" and $_parameter.firstYn3 == "NORMAL")
+				  AND DPR.ITEM_CD NOT LIKE 'AC%'
+				#elseif($_parameter.firstYn2 == "FIRST" and $_parameter.firstYn1 == "AS")
+				  AND DPR.ITEM_CD LIKE 'AC%'
+				#elseif($_parameter.firstYn3 == "NORMAL")
+				  AND DPR.ITEM_CD NOT LIKE 'AC%'
+				#elseif($_parameter.firstYn1 == "AS")
+				  AND DPR.ITEM_CD LIKE 'AC%'
+				#end
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+		          AND DPR.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		        #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		          AND (DPR.ITEM_CD LIKE '%'+@{item_nm}+'%')
+		        #end
+			#end
+		)
+		SELECT TT.*
+		     , ISNULL (ABS (GOODS_QTY), 0) + ISNULL (ABS (DEFECT_QTY), 0) + ISNULL (ABS (SPEC_QTY), 0) AS OMIT_FLAG
+		FROM 
+		(
+			SELECT NULL AS TMP_COL
+			     <include refid="include.getCdDimTotal"/>
+			     <include refid="include.getGrpLvlId"/>
+			     , SUM(A.LOT_SIZE) AS LOT_SIZE
+			     , SUM(A.GOODS_QTY) AS GOODS_QTY
+			     , SUM(A.DEFECT_QTY) AS DEFECT_QTY
+			     , SUM(A.SPEC_QTY) AS SPEC_QTY
+			     , SUM(A.INSP_QTY) AS INSP_QTY
+			     , NULLIF(SUM(A.NOT_EXAM_QTY),0) AS NOT_EXAM_QTY
+			     , SUM(A.PASS_AMT) AS PASS_AMT
+			     , SUM(A.NOT_EXAM_AMT) AS NOT_EXAM_AMT
+			     , CASE WHEN <include refid="quality.getGrpLvlId_defect"/> = 0 THEN MAX(A.INSP_USER_ID) ELSE NULL END AS INSP_USER_ID 
+			     , CASE WHEN <include refid="quality.getGrpLvlId_defect"/> = 0 THEN MAX(A.REMARK) ELSE NULL END AS REMARK
+			     , CASE WHEN <include refid="quality.getGrpLvlId_defect"/> = 0 THEN MAX(A.UPDATE_DTTM) ELSE NULL END AS UPDATE_DTTM
+			FROM 
+			(
+				SELECT IT.COMPANY_CD
+		             , IT.BU_CD
+		             , ISNULL (IT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+		             , ISNULL (IT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+		             , ISNULL (IT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+		             , ISNULL (IT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+		             , ISNULL (ISP.ROUTING_ID, ' ')       AS ROUTING_ID
+		             , ISNULL (ISP.ROUTING_ID, ' ')       AS ROUTING_ID_NM
+		             , ISNULL (IT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+		             , ISNULL (IT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+		             , ISNULL (IT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+		             , ISNULL (IT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+		             , ISNULL (IT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+		             , ISNULL (IT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+		             , ISNULL (IT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+		             , ISNULL (IT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+		             , ISNULL (IT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+		             , ISNULL (IT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+		             , ISNULL (IT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+		             , ISNULL (IT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+		             , ISNULL (IT.ITEM_CD, ' ')           AS ITEM_CD
+		             , ISNULL (IT.ITEM_CD, ' ')           AS ITEM_CD_NM
+		             , ISNULL (IT.ITEM_NM, ' ')           AS ITEM_NM
+		             , ISNULL (IT.ITEM_NM, ' ')           AS ITEM_NM_NM
+		             , ISNULL (IT.SPEC, ' ')              AS SPEC
+		             , ISNULL (IT.SPEC, ' ')              AS SPEC_NM
+		             , ISNULL (IT.DRAW_NO, ' ')           AS DRAW_NO
+		             , ISNULL (IT.DRAW_NO, ' ')           AS DRAW_NO_NM
+		             , ISNULL (IT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+		             , ISNULL (IT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+		             , ISNULL (IT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+		             , ISNULL (IT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+		             , ISNULL (IT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+		             , ISNULL (IT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+		             , ISNULL (IT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+		             , ISNULL (IT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+		             , ISNULL (IT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+		             , ISNULL (IT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+		             , ISNULL (IT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+		             , ISNULL (IT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+		             , ISNULL (ISP.PROD_ORDER_NO, ' ')    AS PROD_ORDER_NO
+		             , ISNULL (ISP.PROD_ORDER_NO, ' ')    AS PROD_ORDER_NO_NM
+		             , ISNULL(ISP.ADJ_INSP_REQ_DATE, ' ') AS ADJ_INSP_REQ_DATE
+		             , ISNULL(ISP.ADJ_INSP_REQ_DATE, ' ') AS ADJ_INSP_REQ_DATE_NM
+		             , ISNULL(ISP.INSP_DATE, ' ')         AS INSP_DATE
+		             , ISNULL(ISP.INSP_DATE, ' ')         AS INSP_DATE_NM
+		             , ISNULL(ISP.RELEASE_DATE, ' ')      AS RELEASE_DATE
+		             , ISNULL(ISP.RELEASE_DATE, ' ')      AS RELEASE_DATE_NM
+		             , ISNULL(ISP.LOT_NO, ' ')            AS LOT_NO
+		             , ISNULL(ISP.LOT_NO, ' ')            AS LOT_NO_NM
+		             , ISNULL (CAST (ISP.PRICE AS NVARCHAR(20)), ' ') AS PRICE
+		             , ISNULL (CAST (ISP.PRICE AS NVARCHAR(20)), ' ') AS PRICE_NM
+		             , ISP.LOT_SIZE
+		             , ISP.GOODS_QTY
+		             , ISP.DEFECT_QTY
+		             , ISP.SPEC_QTY
+		             , ISP.INSP_QTY
+		             , ISP.NOT_EXAM_QTY
+		             , NULLIF(ISP.PRICE,0) * NULLIF(ISP.GOODS_QTY,0) AS PASS_AMT
+		             , NULLIF(ISP.PRICE,0) * NULLIF(ISP.NOT_EXAM_QTY,0) AS NOT_EXAM_AMT
+		             , ISP.INSP_USER_ID
+		             , ISP.REMARK
+		             , ISP.UPDATE_DTTM 
+				FROM W_ITEM IT
+		        INNER JOIN W_MAIN ISP WITH(NOLOCK)
+		           ON IT.COMPANY_CD = ISP.COMPANY_CD
+		          AND IT.BU_CD      = ISP.BU_CD
+		          AND IT.ITEM_CD    = ISP.ITEM_CD
+		        WHERE IT.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND IT.BU_CD      = @{GV_BU_CD}
+		          AND IT.ITEM_TYPE IN ('10','50','20','30')
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+		          AND IT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		        #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		          AND (IT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR IT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		        #end
+		        #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		          AND IT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+				#end
+				#if($_parameter.route and $_parameter.route != "")
+		          AND ISP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+		         #end
+				#if($_parameter.reptItemGroup and $_parameter.reptItemGroup != "")
+		          AND IT.REP_ITEM_GROUP_CD IN ('$_parameter.reptItemGroup.replace(",","','")')
+		        #end
+		        #if($_parameter.keyGroupYn and $_parameter.keyGroupYn != "")
+		          AND IT.KEY_GROUP_YN  = @{keyGroupYn}
+		        #end
+			) A
+			GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+		) TT
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+			, TT.$dimMap.DIM_CD
+		#end
+    </select>
+
+	<sql id="getGrpLvlId_defect">
+#set($grpLvlId = "")
+#set($rollupDot = ".")
+#if(!$rollupAlias or $rollupAlias == "")
+#set($rollupAlias = "")
+#set($rollupDot = "")
+#end
+#foreach( $dimMap in $_parameter.dimList )
+#if($velocityCount == 1)
+#set($grpLvlId = ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+#else
+#set($grpLvlId = ${grpLvlId} + ", " + ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+#end
+#end
+		 GROUPING_ID(${grpLvlId})
+	</sql>
+
+</mapper>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+
+	<select id="customerSelect" parameterType="map" resultType="map">
+		/****** [ master.master.customerSelect ] ******/
+		<include refid="include.macros"/>
+		#getCustomerTree()
+		
+		SELECT C.COMPANY_CD
+		     , C.CUST_CD
+		     , C.CUST_NM
+		     , C.CUST_TYPE
+		     , C.CUST_TYPE_NM
+		     , C.COUNTRY_CD
+		     , C.CURRENCY
+		     , C.CUST_GROUP_CD
+		     , C.CUST_GROUP_NM
+		     , C.REP_CUST_GROUP_CD
+		     , C.REP_CUST_GROUP_NM
+		     , C.CUST_LVL1_CD
+		     , C.CUST_LVL1_NM
+		     , C.CUST_LVL2_CD
+		     , C.CUST_LVL2_NM
+		     , C.CUST_LVL3_CD
+		     , C.CUST_LVL3_NM
+		     , C.CUST_LVL4_CD
+		     , C.CUST_LVL4_NM
+		     , C.VALID_FLAG
+		     , CONVERT(VARCHAR(19), C.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , C.CREATE_ID
+		     , CONVERT(VARCHAR(19), C.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , C.UPDATE_ID
+		FROM TB_MST_CUSTOMER C WITH (NOLOCK)
+		WHERE C.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND C.BU_CD      = @{GV_BU_CD}
+		#if($_parameter.customer_cd and $_parameter.customer_cd != "")
+		  AND C.CUST_CD IN ('$_parameter.customer_cd.replace(",","','")')
+		#elseif($_parameter.customer_nm and $_parameter.customer_nm != "")
+		  AND (C.CUST_CD LIKE '%' + @{customer_nm} + '%'
+		   OR C.CUST_NM LIKE '%' + @{customer_nm} + '%')
+		#end
+		#if($_parameter.validYnERP and $_parameter.validYnERP != "")
+		  AND C.VALID_FLAG = @{validYnERP}
+		#end
+		#set($treeAlias = "C")
+		<include refid="include.customerTree"/>
+		ORDER BY C.CUST_CD ASC
+	</select>
+
+</mapper>

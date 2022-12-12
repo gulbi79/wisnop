@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.oprtKpi">
+	<select id="bizPlanHitAchieListSelect" parameterType="map" resultType="map">
+		/****** [ snop.bizPlanHitAchieListSelect ] ******/
+		<include refid="snop.common.w_cust" />
+		,
+		W_MAIN AS
+		(
+			SELECT COMPANY_CD
+			     , BU_CD
+			     , ITEM_CD
+			     , CUST_GROUP_CD
+			     , YEARMONTH
+			     , AMT
+			     , QTY
+			     , 'PLAN' AS FLAG
+			FROM TB_KPI_ACTION_PLAN WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+       		  AND BU_CD = @{GV_BU_CD}
+			  AND YEARMONTH <![CDATA[>=]]> @{fromMon}
+			  AND YEARMONTH <![CDATA[<=]]> @{toMon}
+			  AND MEAS_CD = @{pageFlag}
+			UNION ALL
+			SELECT A1.COMPANY_CD
+			     , A1.BU_CD
+			     , A1.ITEM_CD
+			     , A3.CUST_GROUP_CD
+			     , A2.YEARMONTH
+			     , SUM(A1.AMT_KRW) AS AMT
+			   	 , SUM(A1.QTY) AS QTY
+			   	 , 'RES' AS FLAG 
+			#if ($_parameter.cutOff == "Y")
+				FROM TB_DYN_SALES_RESULT_MONTHLY A1 WITH(NOLOCK)
+			#else
+				FROM TB_DYN_SALES_RESULT A1 WITH(NOLOCK)
+			#end   	 
+			
+			INNER JOIN TB_MST_CALENDAR A2 WITH(NOLOCK)
+			   ON A1.SALES_DATE = A2.YYYYMMDD
+			INNER JOIN TB_MST_CUSTOMER A3 WITH(NOLOCK)
+			   ON A1.COMPANY_CD = A3.COMPANY_CD
+			  AND A1.BU_CD = A3.BU_CD
+			  AND A1.CUST_CD = A3.CUST_CD
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.PLANT_CD = 'WF01'
+			  AND A1.DEL_FLAG = 'N'
+			  AND A2.YEARMONTH <![CDATA[>=]]> @{fromMon}
+			  AND A2.YEARMONTH <![CDATA[<=]]> @{toMon}
+			GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A3.CUST_GROUP_CD, A2.YEARMONTH
+		) 
+		SELECT NULL AS TMP_COL
+	    	<include refid="include.getCdDimTotal"/>
+	    	<include refid="include.getGrpLvlId"/>
+	    	#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramMonth = "$bucketMap.BUCKET_VAL")
+				#if($_parameter.pageFlag == "M3")
+					#if($_parameter.rdoAqType == "QTY")
+						#if($bucketMap.CD.indexOf("_PLAN") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RES") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) 
+							  / NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END), 0) * 100 AS $bucketMap.CD
+						#end
+					#elseif ($_parameter.rdoAqType == "AMT")
+						#if($bucketMap.CD.indexOf("_PLAN") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RES") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) 
+							  / NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END), 0) * 100 AS $bucketMap.CD
+						#end
+					#end
+				#elseif($_parameter.pageFlag == "M0")
+					#if($_parameter.rdoAqType == "QTY")
+						#if($bucketMap.CD.indexOf("_PLAN") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RES") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+							, CASE WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) <![CDATA[>=]]>
+							            SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) 
+							       THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) /
+	                   					NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END), 0) * 100
+								   WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) <![CDATA[<]]>
+								   		SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END)
+				              	   THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) /
+				                   		NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END), 0) * 100
+				               END $bucketMap.CD
+						#end
+					#elseif ($_parameter.rdoAqType == "AMT")
+						#if($bucketMap.CD.indexOf("_PLAN") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RES") > -1)
+							, SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) AS $bucketMap.CD
+						#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+							, CASE WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) <![CDATA[>=]]>
+							            SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) 
+							       THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) /
+	                   					NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END), 0) * 100
+								   WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) <![CDATA[<]]>
+								   		SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END)
+				              	   THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) /
+				                   		NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END), 0) * 100
+				               END $bucketMap.CD
+						#end
+					#end
+				#end
+			#end
+			
+			#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramMonth = "$bucketMap.BUCKET_VAL")
+				#if($velocityCount > 1)
+					#if($_parameter.pageFlag == "M3")
+						#if($_parameter.rdoAqType == "QTY")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RES") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) 
+								  / NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END), 0) * 100), 0)
+							#end
+						#elseif ($_parameter.rdoAqType == "AMT")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RES") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) 
+								  / NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END), 0) * 100), 0)
+							#end
+						#end
+					#elseif($_parameter.pageFlag == "M0")
+						#if($_parameter.rdoAqType == "QTY")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RES") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+								+ ISNULL(ABS(CASE WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) <![CDATA[>=]]>
+								            SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) 
+								       THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END) /
+		                   					NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END), 0) * 100
+									   WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) <![CDATA[<]]>
+									   		SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END)
+					              	   THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END) /
+					                   		NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN QTY END), 0) * 100
+					               END), 0)
+							#end
+						#elseif ($_parameter.rdoAqType == "AMT")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RES") > -1)
+								+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END)), 0)
+							#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+								+ ISNULL(ABS(CASE WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) <![CDATA[>=]]>
+								            SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) 
+								       THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END) /
+		                   					NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END), 0) * 100
+									   WHEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) <![CDATA[<]]>
+									   		SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END)
+					              	   THEN SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END) /
+					                   		NULLIF(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'RES' THEN AMT END), 0) * 100
+					               END), 0)
+							#end
+						#end
+					#end
+				#else
+					#if($_parameter.pageFlag == "M3")
+						#if($_parameter.rdoAqType == "QTY")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END)), 0)
+							#end
+						#elseif ($_parameter.rdoAqType == "AMT")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END)), 0)
+							#end
+						#end
+					#elseif($_parameter.pageFlag == "M0")
+						#if($_parameter.rdoAqType == "QTY")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN QTY END)), 0)
+							#end
+						#elseif ($_parameter.rdoAqType == "AMT")
+							#if($bucketMap.CD.indexOf("_PLAN") > -1)
+								, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramMonth' AND FLAG = 'PLAN' THEN AMT END)), 0)
+							#end
+						#end
+					#end
+				#end
+			#end AS OMIT_FLAG
+	    FROM
+	    (
+			SELECT T1.COMPANY_CD
+			     , T1.BU_CD
+			     , ISNULL(T1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(T1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(T1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			     , ISNULL(T1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			     , ISNULL(T1.ITEM_CD, ' ') AS ITEM_CD 			      
+			     , ISNULL(T1.ITEM_CD, ' ') AS ITEM_CD_NM 	
+			     , ISNULL(T1.ITEM_NM, ' ') AS ITEM_NM 			      
+			     , ISNULL(T1.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(T1.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+			     , ISNULL(T1.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+			     , ISNULL(T1.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+			     , ISNULL(T1.ITEM_TYPE_NM , ' ') AS ITEM_TYPE_NM_NM
+			     , ISNULL(T1.SPEC, ' ') AS SPEC
+			     , ISNULL(T1.SPEC, ' ') AS SPEC_NM
+			     , ISNULL(T1.DRAW_NO, ' ') AS DRAW_NO
+			     , ISNULL(T1.DRAW_NO, ' ') AS DRAW_NO_NM
+			     , ISNULL(T1.ROUTING_ID, ' ') AS ROUTING_ID 
+			     , ISNULL(T1.ROUTING_ID, ' ') AS ROUTING_ID_NM 
+			     , ISNULL(T1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+			     , ISNULL(T1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+			     , ISNULL(T1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+			     , ISNULL(T1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+			     , ISNULL(T1.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+			     , ISNULL(T1.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM     
+			     , ISNULL(T1.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM     
+			     , ISNULL(T1.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+			     , ISNULL(T1.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+			     , ISNULL(T1.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+			     , ISNULL(T1.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+			     , ISNULL(T1.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+			     , ISNULL(T1.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+			     , ISNULL(T1.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+			     , ISNULL(T1.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+			     , ISNULL(T1.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+			     , ISNULL (CAST (T1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+                 , ISNULL (CAST (T1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+			     , ISNULL(T1.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD
+			     , ISNULL(T1.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM
+			     , ISNULL(T1.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM
+			     , ISNULL(T1.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+			     , ISNULL(T1.CLEANING_YN, ' ') AS CLEANING_YN
+			     , ISNULL(T1.CLEANING_YN, ' ') AS CLEANING_YN_NM
+			     , T2.YEARMONTH AS YEARMONTH
+			     , T2.QTY 
+			     , T2.AMT 
+			     , T2.FLAG
+			FROM W_CUST T1
+			LEFT OUTER JOIN W_MAIN T2
+			  ON T1.COMPANY_CD = T2.COMPANY_CD
+			 AND T1.BU_CD = T2.BU_CD
+			 AND T1.CUST_GROUP_CD = T2.CUST_GROUP_CD
+			 AND T1.ITEM_CD = T2.ITEM_CD
+		) A		  
+		GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+	    ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    	, A.$dimMap.DIM_CD
+		#end
+	</select>
+	
+	
+	
+</mapper>

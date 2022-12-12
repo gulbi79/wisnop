@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+	<select id="planIdSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.planIdSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd = "PLAN_ID_CNT")
+		       <include refid="include.mstCode"/>
+		)
+		, W_PLAN AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.PLAN_TYPE_CD
+		         , A.PLAN_ID
+		         , A.START_WEEK
+		         , B.YEARWEEK
+			FROM TB_MST_PLAN_VERSION A WITH(NOLOCK)
+		    , 
+		    (
+		    	SELECT YEARWEEK
+		        FROM TB_MST_CALENDAR B WITH(NOLOCK)
+		        WHERE B.YYYYMMDD = CONVERT(VARCHAR(30), DBO.UFN_GETDATE(), 112)
+			) B
+			WHERE A.COMPANY_CD   = @{GV_COMPANY_CD}
+		      AND A.BU_CD        = @{GV_BU_CD}
+		      AND A.PLAN_TYPE_CD = @{planTypeCd}
+		)
+		SELECT TOP (SELECT CONVERT(INT, CASE @{planTypeCd} WHEN 'DP_W' THEN ATTB_1_CD WHEN 'DP_M' THEN ATTB_2_CD ELSE ATTB_3_CD END) FROM W_CODE)
+		       A.COMPANY_CD
+		     , A.BU_CD
+		     , A.PLAN_TYPE_CD
+		     , A.PLAN_ID
+		     , A.PLAN_ID AS CODE_CD
+		     , A.PLAN_ID AS CODE_NM
+		     , A.START_WEEK
+		     , A.YEARWEEK
+		     , CASE WHEN A.START_WEEK = A.YEARWEEK THEN 'Y' ELSE 'N' END AS CUD_TYPE
+		FROM W_PLAN A
+		WHERE A.START_WEEK <![CDATA[<=]]> A.YEARWEEK
+		ORDER BY A.START_WEEK DESC
+	</select>
+	
+	<select id="dayEmgReqAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.dayEmgReqAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS30101', 'APS30102', 'APS30103','APS30104','APS30105')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<select id="dayEmgReqAuthorityConfirmSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.dayEmgReqAuthorityConfirmSelect ] ******/
+		SELECT COUNT(*) AS CNT
+		FROM TB_MAP_USER_ROLE
+		WHERE USER_ID = @{GV_USER_ID}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND ROLE_CD IN ('SALES002', 'GOCQT0001')
+		  AND USE_FLAG = 'Y'
+	</select>
+	
+	<select id="dayEmgReqSelect" parameterType="map" resultType="map">
+		/****** [ asp.aps.dynamic.dayEmgReqSelect ] ******/
+		WITH W_ITEM_P AS 
+		(
+			SELECT T.COMPANY_CD 
+			     , T.BU_CD 
+			     , T.ITEM_CD 
+			     , MAX (T.ROUTING_ID)  AS ROUTING_ID 
+			     , MAX (T.PUR_LT)      AS PUR_LT
+			     , MAX (T.MFG_LT)      AS MFG_LT
+			     , SUM (T.SS_QTY)      AS SS_QTY
+			     , MAX (T.PROCUR_TYPE) AS PROCUR_TYPE
+			     , MAX (T.PROCUR_TYPE_NM) AS PROCUR_TYPE_NM
+			FROM 
+			(
+				SELECT A.COMPANY_CD
+			         , A.BU_CD
+			         , A.ITEM_CD
+			         , A.ROUTING_ID
+			         , A.PUR_LT
+			         , A.MFG_LT
+			         , A.SS_QTY
+			         , A.PROCUR_TYPE
+			         , (
+			            SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+			                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+			                        ELSE CODE_NM
+			                   END AS CODE_NM
+			            FROM TB_MST_CODE WITH(NOLOCK)
+			            WHERE GROUP_CD = 'PROCUR_TYPE'
+			              AND USE_FLAG = 'Y'
+			              AND CODE_CD = A.PROCUR_TYPE
+			           ) AS PROCUR_TYPE_NM
+				FROM TB_MST_ITEM_PLANT A WITH(NOLOCK)
+			    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND A.BU_CD = @{GV_BU_CD}
+			      AND A.VALID_FLAG = 'Y'
+			) T
+			GROUP BY T.COMPANY_CD, T.BU_CD, T.ITEM_CD 
+		),
+		W_ITEM AS 
+		(
+			SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.ITEM_CD
+		         , A.ITEM_NM
+		         , A.SPEC
+		         , E.ROUTING_ID
+		         , B.ITEM_GROUP_CD
+		         , B.ITEM_GROUP_NM
+		         , B.UPPER_ITEM_GROUP_CD
+		         , B.UPPER_ITEM_GROUP_NM
+		         , A.ITEM_GRADE
+		         , H.REP_CUST_GROUP_CD
+		         , H.REP_CUST_GROUP_NM
+		         , C.CUST_GROUP_CD
+		         , G.CUST_GROUP_NM
+		         , A.ITEM_TYPE
+		         , (
+			          	SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+			                        WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+			                        ELSE CODE_NM
+			                    END AS CODE_NM
+						FROM TB_MST_CODE MC WITH(NOLOCK)
+			           WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+			             AND MC.GROUP_CD = 'ITEM_TYPE'
+			             AND MC.CODE_CD  = A.ITEM_TYPE
+			             AND MC.USE_FLAG = 'Y'
+			         ) AS ITEM_TYPE_NM
+			FROM TB_MST_ITEM A WITH(NOLOCK)
+		    LEFT JOIN TB_MST_ITEM_GROUP B WITH(NOLOCK)
+		      ON A.COMPANY_CD    = B.COMPANY_CD
+		     AND A.BU_CD         = B.BU_CD
+	         AND A.ITEM_GROUP_CD = B.ITEM_GROUP_CD
+	         AND B.DEL_FLAG      = 'N'
+	        LEFT JOIN TB_MST_REP_CUST C WITH(NOLOCK)
+	          ON A.COMPANY_CD    = C.COMPANY_CD
+	         AND A.BU_CD         = C.BU_CD
+	         AND A.REP_CUST_CD   = C.REP_CUST_CD
+	        LEFT JOIN TB_MAP_ITEM_CUST_GROUP D WITH(NOLOCK)
+	          ON A.COMPANY_CD    = D.COMPANY_CD
+	         AND A.BU_CD         = D.BU_CD
+	         AND A.ITEM_CD       = D.ITEM_CD
+	         AND C.CUST_GROUP_CD = D.CUST_GROUP_CD
+	        LEFT JOIN W_ITEM_P E
+	          ON A.COMPANY_CD = E.COMPANY_CD
+	         AND A.BU_CD      = E.BU_CD
+	         AND A.ITEM_CD    = E.ITEM_CD
+	        LEFT JOIN TB_MST_CUSTOMER F WITH (NOLOCK)
+	          ON C.COMPANY_CD    = F.COMPANY_CD
+	         AND C.BU_CD         = F.BU_CD
+	         AND C.REP_CUST_CD   = F.CUST_CD
+	         AND F.VALID_FLAG    = 'Y'
+	        LEFT JOIN TB_MST_CUST_GROUP G WITH(NOLOCK)
+	          ON G.COMPANY_CD    = C.COMPANY_CD
+	         AND G.BU_CD         = C.BU_CD
+	         AND G.CUST_GROUP_CD = C.CUST_GROUP_CD
+	         AND G.USE_FLAG      = 'Y'
+	        LEFT JOIN TB_MST_REP_CUST_GROUP H WITH(NOLOCK)
+	          ON H.COMPANY_CD        = G.COMPANY_CD
+	         AND H.BU_CD             = G.BU_CD
+	         AND H.REP_CUST_GROUP_CD = G.REP_CUST_GROUP_CD
+			WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	          AND A.BU_CD      = @{GV_BU_CD}
+	          AND A.USE_FLAG   = 'Y'
+		)
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.PLAN_ID
+		     , A.SEQ
+		     , MC2.CODE_CD AS PROD_PART_CD -- 생산파트 코드
+		     , MC2.CODE_NM AS PROD_PART_NM -- 생산파트명
+		     , B.ITEM_CD
+		     , B.ITEM_NM
+		     , B.SPEC
+		     , B.ROUTING_ID
+		     , B.ITEM_GROUP_CD
+		     , B.ITEM_GROUP_NM
+		     , B.UPPER_ITEM_GROUP_CD
+		     , B.UPPER_ITEM_GROUP_NM
+		     , B.ITEM_GRADE
+		     , B.REP_CUST_GROUP_CD
+		     , B.REP_CUST_GROUP_NM
+		     , B.CUST_GROUP_CD
+		     , B.CUST_GROUP_NM
+		     , A.URGENT_REASON_CD
+		     , CONVERT(VARCHAR(10), CONVERT(DATE, A.DUE_DATE), 20) AS DUE_DATE
+		     , A.REQ_QTY
+		     , A.URGENT_REASON
+		     , A.CREATE_ID
+		     , dbo.UFN_GET_USER_NAME(A.CREATE_ID) AS CREATE_NM
+		     , CONVERT(VARCHAR(30), A.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , A.URGENT_STATUS_CD
+		     , C.PROD_ORDER_QTY
+		     , C.RESULT_QTY
+		     , C.PROD_ODER_CNT
+		     , C.PROD_ORDER_NO
+		     , dbo.UFN_GET_USER_NAME(A.ACCEPT_ID) AS ACCEPT_NM
+		     , CONVERT(VARCHAR(30), A.ACCEPT_DTTM, 120) AS ACCEPT_DTTM -- 접수일자
+		     , A.REMARK
+		     , CASE WHEN A.CREATE_ID = @{GV_USER_ID} THEN 'Y' ELSE 'N' END AS CREATE_YN
+		     , B.ITEM_TYPE
+		     , B.ITEM_TYPE_NM
+		     , ISNULL(A.CONFIRM_YN, 'N') AS CONFIRM_YN 
+		     , A.CONFIRM_ID
+		     , A.CONFIRM_DTTM
+		     , CONVERT(VARCHAR(10), CONVERT(DATE, A.CONF_DATE), 20) AS CONF_DATE
+		     , CASE WHEN A.DID_WRITE_YN = 'Y' THEN 'Y' ELSE 'N' END AS DID_WRITE_YN
+		FROM TB_HIS_SALES_PLAN_URGENT A WITH(NOLOCK)
+		INNER JOIN W_ITEM B
+		   ON A.COMPANY_CD = B.COMPANY_CD
+		  AND A.BU_CD = B.BU_CD
+		  AND A.ITEM_CD = B.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = A.BU_CD
+		 AND MC1.GROUP_CD = 'PROD_L2'
+		 AND MC1.CODE_CD = B.ROUTING_ID
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN 
+		(
+			SELECT BU_CD
+				 , CODE_CD
+			     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+			            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+			            ELSE CODE_NM
+			       END AS CODE_NM
+			     , GROUP_CD
+			     , SORT
+			FROM TB_MST_CODE WITH(NOLOCK)
+			WHERE USE_FLAG = 'Y'
+		) MC2
+		ON MC2.BU_CD = MC1.BU_CD
+		AND MC2.GROUP_CD = 'PROD_PART'
+		AND MC2.CODE_CD = MC1.ATTB_2_CD
+		LEFT OUTER JOIN 
+		(
+			SELECT HSPUP.PLAN_ID
+                 , HSPUP.COMPANY_CD
+                 , HSPUP.BU_CD
+                 , HSPUP.ITEM_CD
+                 , HSPUP.SEQ
+                 , MIN(HSPUP.PROD_ORDER_NO) AS PROD_ORDER_NO
+                 , SUM(DPOH.PROD_ORDER_QTY) AS PROD_ORDER_QTY
+                 , SUM(DRP.RESULT_QTY) AS RESULT_QTY
+                 , COUNT(HSPUP.PROD_ORDER_NO) AS PROD_ODER_CNT
+			FROM TB_HIS_SALES_PLAN_URGENT_PROD HSPUP WITH(NOLOCK)
+            INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+               ON DPOH.COMPANY_CD = HSPUP.COMPANY_CD
+              AND DPOH.BU_CD = HSPUP.BU_CD
+              AND DPOH.PROD_ORDER_NO = HSPUP.PROD_ORDER_NO
+            LEFT OUTER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+              ON DPOD.COMPANY_CD = DPOH.COMPANY_CD
+             AND DPOD.BU_CD = DPOH.BU_CD
+             AND DPOD.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+             AND DPOD.ROUTE_ORDER IN ('L', 'S')
+            LEFT OUTER JOIN TB_DYN_ROUTING_PERFORMANCE DRP WITH(NOLOCK)
+              ON DRP.COMPANY_CD = DPOD.COMPANY_CD
+             AND DRP.BU_CD = DPOD.BU_CD
+             AND DRP.PROD_ORDER_NO = DPOD.PROD_ORDER_NO
+             AND DRP.OPERATION_NO = DPOD.OPERATION_NO
+            WHERE HSPUP.COMPANY_CD = @{GV_COMPANY_CD}
+              AND HSPUP.BU_CD = @{GV_BU_CD}
+              AND HSPUP.PLAN_ID = @{planId}
+              AND HSPUP.USE_FLAG = 'Y'
+			GROUP BY HSPUP.PLAN_ID, HSPUP.COMPANY_CD, HSPUP.BU_CD, HSPUP.ITEM_CD, HSPUP.SEQ
+		) C
+		ON C.PLAN_ID = A.PLAN_ID
+		AND C.COMPANY_CD = A.COMPANY_CD
+		AND C.BU_CD = A.BU_CD
+		AND C.ITEM_CD = A.ITEM_CD
+		AND C.SEQ = A.SEQ
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD = @{GV_BU_CD}
+		  AND A.DEL_FLAG = 'N'
+		#if($_parameter.planId and $_parameter.planId != "")
+		  AND A.PLAN_ID = @{planId}
+		#end
+		#if($_parameter.item_cd and $_parameter.item_cd != "")
+		  AND B.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		  AND (B.ITEM_CD LIKE '%' + @{item_nm} + '%' OR B.ITEM_NM LIKE '%' + @{item_nm} + '%')
+		#end
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+		  AND MC2.CODE_CD IN ('$_parameter.prodPart.replace(",","','")')
+		#end
+		#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		  AND B.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+		#end
+		#if($_parameter.route and $_parameter.route != "")
+		  AND B.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+		#end
+		#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+		  AND B.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+		#end
+		#if($_parameter.custGroup and $_parameter.custGroup != "")
+		  AND B.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+		#end
+		#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+		  AND B.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+		#end
+		#if($_parameter.urgentStatusCd and $_parameter.urgentStatusCd != "")
+		  AND A.URGENT_STATUS_CD IN ('$_parameter.urgentStatusCd.replace(",","','")')
+		#end
+	</select>
+	
+	<insert id="dayEmgReqInsert" parameterType="map">
+		/****** [ asp.aps.dynamic.dayEmgReqInsert ] ******/
+		INSERT INTO TB_HIS_SALES_PLAN_URGENT
+		(
+			PLAN_ID
+		  , COMPANY_CD
+		  , BU_CD
+		  , ITEM_CD
+		  , DUE_DATE
+		  , URGENT_REASON_CD
+		  , REQ_QTY
+		  , URGENT_REASON
+		  , URGENT_STATUS_CD
+		  , DEL_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		  , CONF_DATE
+		  , DID_WRITE_YN
+		)VALUES(
+			@{PLAN_ID}
+		  , @{GV_COMPANY_CD}
+		  , @{GV_BU_CD}
+		  , @{ITEM_CD}
+		  , '$_parameter.DUE_DATE.replace("-","")'
+		  , @{URGENT_REASON_CD}
+		  , @{REQ_QTY}
+		  , @{URGENT_REASON}
+		  , 'NEW'
+		  , 'N'
+		  , @{GV_USER_ID}
+		  , dbo.UFN_GETDATE()
+		  , CASE WHEN @{CONF_DATE} IS NULL THEN NULL ELSE '$_parameter.CONF_DATE.replace("-","")' END
+		  , CASE WHEN @{CONF_DATE} IS NOT NULL THEN 'Y' ELSE NULL END 
+		)
+	</insert>
+	
+	<update id="dayEmgReqUpdate" parameterType="map">
+		/****** [ asp.aps.dynamic.dayEmgReqUpdate ] ******/
+		UPDATE TB_HIS_SALES_PLAN_URGENT
+		   SET DUE_DATE         = '$_parameter.DUE_DATE.replace("-","")'
+		     , URGENT_REASON_CD = @{URGENT_REASON_CD}
+		     , REQ_QTY          = @{REQ_QTY}
+		     , URGENT_REASON    = @{URGENT_REASON}
+		     , URGENT_STATUS_CD = @{URGENT_STATUS_CD}
+		     , REMARK           = @{REMARK}
+		     , UPDATE_ID        = @{GV_USER_ID}
+		     , UPDATE_DTTM      = dbo.UFN_GETDATE()
+		     , ACCEPT_ID		= @{ACCEPT_NM}
+		     , ACCEPT_DTTM		= @{ACCEPT_DTTM}
+		     , CONF_DATE        = CASE WHEN @{CONF_DATE} IS NULL THEN NULL ELSE '$_parameter.CONF_DATE.replace("-","")' END
+		     , DID_WRITE_YN     = CASE WHEN @{CONF_DATE} IS NOT NULL THEN 'Y' ELSE NULL END 
+		     
+			#if($_parameter.authConfirm == "Y")
+		     , CONFIRM_YN = @{CONFIRM_YN}
+		     , CONFIRM_ID = @{GV_USER_ID}
+		     , CONFIRM_DTTM = dbo.UFN_GETDATE() 
+		    #end
+		WHERE PLAN_ID          = @{PLAN_ID}
+		  AND COMPANY_CD       = @{COMPANY_CD}
+		  AND BU_CD            = @{BU_CD}
+		  AND ITEM_CD          = @{ITEM_CD}
+		  AND SEQ              = @{SEQ}
+	</update>
+	
+	<delete id="dayEmgReqDelete" parameterType="map">
+		/****** [ asp.aps.dynamic.dayEmgReqDelete ] ******/
+		UPDATE TB_HIS_SALES_PLAN_URGENT
+		   SET DEL_FLAG         = 'Y'
+		     , UPDATE_ID        = @{GV_USER_ID}
+		     , UPDATE_DTTM      = dbo.UFN_GETDATE()
+		WHERE PLAN_ID          = @{PLAN_ID}
+		  AND COMPANY_CD       = @{COMPANY_CD}
+		  AND BU_CD            = @{BU_CD}
+		  AND ITEM_CD          = @{ITEM_CD}
+		  AND SEQ              = @{SEQ}
+	</delete>
+</mapper>

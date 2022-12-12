@@ -1,0 +1,1320 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static.facilityMappingProductCate">
+    <select id="bucketGroupSelect" parameterType="map" resultType="map">
+        /****** [ aps.static.facilityMappingProductCate.bucketGroupSelect ] ******/
+        SELECT B1.ROOT_CD
+             , B1.CD
+             , B1.NM
+             , B1.BUCKET_ID
+             , B1.BUCKET_VAL
+             , B1.TYPE
+             , B1.TOT_TYPE
+        FROM
+        (
+            SELECT NULL AS ROOT_CD
+                 , 'G' + CODE_CD AS CD
+                 , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                        WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                        ELSE CODE_NM
+                   END AS NM
+                 , 'G' + CODE_CD AS BUCKET_ID
+                 , CODE_CD AS BUCKET_VAL
+                 , 'group' AS TYPE
+                 , NULL AS TOT_TYPE
+                 , SORT
+            FROM TB_MST_CODE WITH(NOLOCK)
+            WHERE BU_CD = @{GV_BU_CD}
+              AND GROUP_CD  = 'PROD_ITEM_GROUP_LIST'
+              AND ATTB_1_CD = @{prodPart}
+              AND ATTB_2_CD = @{prodItemGroupMst}
+            #if($_parameter.prodItemGroupDet and $_parameter.prodItemGroupDet != "")
+              AND CODE_CD IN ('$_parameter.prodItemGroupDet.replace(",","','")')
+            #end
+              AND USE_FLAG  = 'Y'
+        ) B1
+        INNER JOIN
+        (
+            SELECT ROOT_CD
+            FROM 
+            (
+                SELECT 'G' + PROD_GROUP_DET AS ROOT_CD
+                     , MAX(CASE WHEN MR.JOB_CD IS NOT NULL THEN 'Y'
+                            ELSE 'N'
+                       END) AS EDIT_YN
+                FROM TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+                INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                   ON MC.BU_CD = MIPG.BU_CD
+                  AND MC.GROUP_CD = 'ROUTE_CD'
+                  AND MIPG.DEL_FLAG = 'N' 
+                #if ($_parameter.prodPart == "TEL")
+                  AND MC.ATTB_5_CD = MIPG.PROD_GROUP
+                #end
+                #if ($_parameter.prodPart == "LAM")
+                  AND MC.ATTB_6_CD = MIPG.PROD_GROUP
+                #end
+                #if ($_parameter.prodPart == "DIFFUSION")
+                  AND MC.ATTB_7_CD = MIPG.PROD_GROUP
+                #end
+                #if ($_parameter.prodPart == "MATERIAL")
+                  AND MC.ATTB_8_CD = MIPG.PROD_GROUP
+                #end
+                LEFT OUTER JOIN TB_MST_ROUTING MR WITH(NOLOCK)
+                  ON MR.COMPANY_CD = MIPG.COMPANY_CD
+                 AND MR.BU_CD = MIPG.BU_CD
+                 AND MR.ITEM_CD = MIPG.ITEM_CD
+                 AND MR.JOB_CD = MC.CODE_CD
+                WHERE MIPG.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND MIPG.BU_CD = @{GV_BU_CD}
+                  AND MIPG.PROD_GROUP = @{prodItemGroupMst}
+                #if($_parameter.prodItemGroupDet and $_parameter.prodItemGroupDet != "")
+                  AND MIPG.PROD_GROUP_DET IN ('$_parameter.prodItemGroupDet.replace(",","','")')
+                #end
+                GROUP BY MIPG.COMPANY_CD, MIPG.BU_CD, MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD, MIPG.PROD_GROUP_DET, MC.CODE_CD
+            ) A
+            WHERE A.EDIT_YN = 'Y'
+              AND A.ROOT_CD IS NOT NULL
+            GROUP BY ROOT_CD
+        ) B2
+        ON B1.CD = B2.ROOT_CD
+        ORDER BY B1.SORT
+    </select>
+    
+    <select id="bucketGroupDetailSelect" parameterType="map" resultType="map">
+        /****** [ aps.static.facilityMappingProductCate.bucketGroupDetailSelect ] ******/
+        SELECT *
+        FROM 
+        (
+            SELECT 'G' + PROD_GROUP_DET AS ROOT_CD
+                 , 'G' + MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD AS CD
+                 , MAX(CASE WHEN 'ko' = @{GV_LANG} THEN MC.CODE_NM_KR
+                        WHEN 'cn' = @{GV_LANG} THEN MC.CODE_NM_CN
+                        ELSE MC.CODE_NM
+                   END) AS NM
+                 , 'G' + MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD AS BUCKET_ID
+                 , PROD_GROUP_DET AS BUCKET_VAL
+                 , MAX(CASE WHEN MR.JOB_CD IS NOT NULL THEN 'Y'
+                        ELSE 'N'
+                   END) AS EDIT_YN
+            FROM TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+            INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+               ON MC.BU_CD = MIPG.BU_CD
+              AND MC.GROUP_CD = 'ROUTE_CD'
+              AND MIPG.DEL_FLAG = 'N' 
+           	#if ($_parameter.prodPart == "TEL")
+           	  AND MC.ATTB_5_CD = MIPG.PROD_GROUP
+           	#end
+           	#if ($_parameter.prodPart == "LAM")
+              AND MC.ATTB_6_CD = MIPG.PROD_GROUP
+           	#end
+           	#if ($_parameter.prodPart == "DIFFUSION")
+              AND MC.ATTB_7_CD = MIPG.PROD_GROUP
+           	#end
+           	#if ($_parameter.prodPart == "MATERIAL")
+              AND MC.ATTB_8_CD = MIPG.PROD_GROUP
+           	#end
+          	LEFT OUTER JOIN TB_MST_ROUTING MR WITH(NOLOCK)
+              ON MR.COMPANY_CD = MIPG.COMPANY_CD
+             AND MR.BU_CD = MIPG.BU_CD
+             AND MR.ITEM_CD = MIPG.ITEM_CD
+             AND MR.JOB_CD = MC.CODE_CD
+         	WHERE MIPG.COMPANY_CD = @{GV_COMPANY_CD}
+              AND MIPG.BU_CD = @{GV_BU_CD}
+              AND MIPG.PROD_GROUP = @{prodItemGroupMst}
+            #if($_parameter.prodItemGroupDet and $_parameter.prodItemGroupDet != "")
+              AND MIPG.PROD_GROUP_DET IN ('$_parameter.prodItemGroupDet.replace(",","','")')
+            #end
+            GROUP BY MIPG.COMPANY_CD, MIPG.BU_CD, MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD, MIPG.PROD_GROUP_DET, MC.CODE_CD
+        ) A
+        WHERE A.EDIT_YN = 'Y'
+          AND A.ROOT_CD IS NOT NULL
+    </select>
+    
+    <select id="toolListSelect" parameterType="map" resultType="map">
+        /****** [ aps.static.facilityMappingProductCate.toolListSelect ] ******/
+        SELECT CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+                    WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+                    ELSE MC1.CODE_NM
+                END AS PROD_PART_NM 
+              , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+                    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+                    ELSE MC2.CODE_NM
+                END AS PROD_GROUP_NM 
+              , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+                     WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+                     ELSE MC3.CODE_NM
+                 END AS PROD_GROUP_DET_NM 
+             , MIPG.ITEM_CD AS ITEM_CD_NM
+             , MI.ITEM_NM AS ITEM_NM_NM
+             , MI.SPEC AS SPEC_NM
+             , MI.DRAW_NO AS DRAW_NO_NM
+        FROM TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+        INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+           ON MI.COMPANY_CD = MIPG.COMPANY_CD
+          AND MI.BU_CD = MIPG.BU_CD
+          AND MI.ITEM_CD = MIPG.ITEM_CD
+        INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+           ON MIP.COMPANY_CD = MIPG.COMPANY_CD
+          AND MIP.BU_CD = MIPG.BU_CD
+          AND MIP.PLANT_CD = 'WF01'
+          AND MIP.ITEM_CD = MIPG.ITEM_CD
+        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+           ON MC.BU_CD = MIP.BU_CD
+          AND MC.GROUP_CD = 'PROD_L2'
+          AND MC.CODE_CD = MIP.ROUTING_ID
+        INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+           ON MC1.BU_CD = MC.BU_CD
+          AND MC1.GROUP_CD = 'PROD_PART'
+          AND MC1.CODE_CD = MC.ATTB_2_CD
+        INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+           ON MC2.BU_CD = MIPG.BU_CD
+          AND MC2.GROUP_CD = 'PROD_ITEM_GROUP_MST'
+          AND MC2.CODE_CD = MIPG.PROD_GROUP
+        INNER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+           ON MC3.BU_CD = MIPG.BU_CD
+          AND MC3.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+          AND MC3.CODE_CD = MIPG.PROD_GROUP_DET
+        WHERE MIPG.COMPANY_CD = @{GV_COMPANY_CD}
+          AND MIPG.BU_CD = @{GV_BU_CD}
+          AND MIPG.PROD_GROUP = @{prodItemGroupMst}
+          AND MIPG.PROD_GROUP_DET = @{prodGroupDet}
+          AND MIPG.DEL_FLAG = 'N'
+        ORDER BY MC1.CODE_NM, MC2.CODE_NM, MC3.CODE_NM, MIPG.ITEM_CD
+        
+    </select>
+    
+    <select id="listSelect" parameterType="map" resultType="map">
+        /****** [ aps.static.facilityMappingProductCate.listSelect ] ******/
+        
+	DECLARE 
+	 @V_PROD_PLAN_ID    NVARCHAR(8)
+	, @P_START_WEEK     NVARCHAR(6)
+	
+	
+	
+	SET @V_PROD_PLAN_ID = @{planId}
+	
+	SELECT @P_START_WEEK =A.START_WEEK
+	FROM TB_MST_PLAN_VERSION A WITH(NOLOCK)
+	WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	    AND A.BU_CD = @{GV_BU_CD}
+	    AND A.PLAN_TYPE_CD = 'MP'
+	    AND A.PLAN_ID      = @V_PROD_PLAN_ID;
+    
+	        
+        WITH W_MAIN AS
+        (
+            SELECT MR.COMPANY_CD
+                 , MR.BU_CD
+                 , MR.PLANT_CD
+                 , MR.RESOURCE_CD
+                 , MC4.CODE_CD AS PROD_GROUP
+                 , MRPG.PROD_GROUP_DET
+                 , MC2.CODE_CD AS PROD_PART_CD
+                 , MC2.CODE_NM AS PROD_PART_NM
+                 , MWC.WC_CD
+                 , MWC.WC_NM
+                 , MWC.WC_MGR
+                 , (
+                      SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                  WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                  ELSE CODE_NM
+                             END AS CODE_NM
+                        FROM TB_MST_CODE WITH(NOLOCK)
+                       WHERE BU_CD    = @{GV_BU_CD}
+                         AND GROUP_CD = 'RESOURCE_TYPE'
+                         AND CODE_CD  = MWC.WC_MGR
+                         AND USE_FLAG = 'Y'
+                   ) AS WC_MGR_NM                
+                 , MR.RESOURCE_NM
+                 , MR.CAMPUS_CD
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN MC3.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN MC3.CODE_NM_CN
+                        ELSE MC3.CODE_NM
+                   END AS CAMPUS_NM
+                 , MRPG.JOB_CD
+                 , MRPG.PRIORITY
+            FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+            INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+               ON MWC.COMPANY_CD = MR.COMPANY_CD
+              AND MWC.BU_CD = MR.BU_CD
+              AND MWC.PLANT_CD = MR.PLANT_CD
+              AND MWC.WC_CD = MR.WC_CD
+            LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+              ON MC3.BU_CD = MR.BU_CD
+             AND MC3.GROUP_CD = 'CAMPUS_CD'
+             AND MC3.CODE_CD = MR.CAMPUS_CD
+             AND MC3.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+              ON MC4.BU_CD = MWC.BU_CD
+             AND MC4.GROUP_CD = 'PROD_ITEM_GROUP_MST'
+             AND MC4.ATTB_3_CD = MWC.WC_CD
+             AND MC4.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+              ON MC2.BU_CD = MC4.BU_CD
+             AND MC2.GROUP_CD = 'PROD_PART'
+             AND MC2.CODE_CD = MC4.ATTB_1_CD
+             AND MC2.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_RESOURCE_PROD_GROUP MRPG WITH(NOLOCK)
+              ON MRPG.COMPANY_CD = MR.COMPANY_CD
+             AND MRPG.BU_CD = MR.BU_CD
+             AND MRPG.PLANT_CD = MR.PLANT_CD
+             AND MRPG.RESOURCE_CD = MR.RESOURCE_CD
+             AND MRPG.PROD_GROUP = MC4.CODE_CD
+            WHERE MR.RESOURCE_TYPE = 'M'
+              AND MR.VALID_FROM_DATE <![CDATA[<=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+              AND MR.VALID_TO_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+        )
+        
+        , W_JIG AS (
+        
+                SELECT MR.COMPANY_CD
+                              , MR.BU_CD
+                              , MR.PLANT_CD
+                              , MC4.CODE_CD AS PROD_GROUP
+                              , MJPG.PROD_GROUP_DET
+                              , MC2.CODE_CD AS PROD_PART_CD
+                              , MC2.CODE_NM AS PROD_PART_NM
+                              , MJPG.JOB_CD
+                              , MAX(MJPG.JIG_QTY) AS JIG_QTY
+                FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+                INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+                   ON MWC.COMPANY_CD = MR.COMPANY_CD
+                  AND MWC.BU_CD = MR.BU_CD
+                  AND MWC.PLANT_CD = MR.PLANT_CD
+                  AND MWC.WC_CD = MR.WC_CD
+                LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+                  ON MC4.BU_CD = MWC.BU_CD
+                 AND MC4.GROUP_CD = 'PROD_ITEM_GROUP_MST'
+                 AND MC4.ATTB_3_CD = MWC.WC_CD
+                 AND MC4.USE_FLAG = 'Y'
+                LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+                  ON MC2.BU_CD = MC4.BU_CD
+                 AND MC2.GROUP_CD = 'PROD_PART'
+                 AND MC2.CODE_CD = MC4.ATTB_1_CD
+                 AND MC2.USE_FLAG = 'Y'
+                LEFT OUTER JOIN TB_MST_JIG_PROD_GROUP MJPG WITH(NOLOCK)
+                  ON MJPG.COMPANY_CD = MR.COMPANY_CD
+                 AND MJPG.BU_CD = MR.BU_CD
+                 AND MJPG.PLANT_CD = MR.PLANT_CD
+                 AND MJPG.PROD_GROUP = MC4.CODE_CD
+                WHERE MR.RESOURCE_TYPE = 'M'
+                  AND MR.VALID_FROM_DATE <![CDATA[<=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+                  AND MR.VALID_TO_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+                GROUP BY MR.COMPANY_CD, MR.BU_CD, MR.PLANT_CD, MC4.CODE_CD, MJPG.PROD_GROUP_DET, MC2.CODE_CD, MC2.CODE_NM, MJPG.JOB_CD
+        )
+
+        #if(($_parameter.prodItemGroupMst and $_parameter.prodItemGroupMst == "TEL_CNC") 
+        || ($_parameter.prodItemGroupMst and $_parameter.prodItemGroupMst == "TEL_MCT")
+        || ($_parameter.prodItemGroupMst and $_parameter.prodItemGroupMst == "LAM_MCT")
+        || ($_parameter.prodItemGroupMst and $_parameter.prodItemGroupMst == "LAM_CNC"))
+        
+        
+    , TEMP_A AS (
+          SELECT B1.ROOT_CD
+             , B1.CD
+             , B1.NM
+             , B1.BUCKET_ID
+             , B1.BUCKET_VAL
+             , B1.TYPE
+             , B1.TOT_TYPE
+        FROM
+        (
+            SELECT NULL AS ROOT_CD
+                 , 'G' + CODE_CD AS CD
+                 , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                        WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                        ELSE CODE_NM
+                   END AS NM
+                 , 'G' + CODE_CD AS BUCKET_ID
+                 , CODE_CD AS BUCKET_VAL
+                 , 'group' AS TYPE
+                 , NULL AS TOT_TYPE
+                 , SORT
+            FROM TB_MST_CODE WITH(NOLOCK)
+            WHERE BU_CD = @{GV_BU_CD}
+              AND GROUP_CD  = 'PROD_ITEM_GROUP_LIST'
+              AND ATTB_1_CD = @{prodPart}
+              AND ATTB_2_CD = @{prodItemGroupMst}
+            #if($_parameter.prodItemGroupDet and $_parameter.prodItemGroupDet != "")
+              AND CODE_CD IN ('$_parameter.prodItemGroupDet.replace(",","','")')
+            #end
+              AND USE_FLAG  = 'Y'
+        ) B1
+        INNER JOIN
+        (
+            SELECT ROOT_CD
+            FROM 
+            (
+                SELECT 'G' + PROD_GROUP_DET AS ROOT_CD
+                     , MAX(CASE WHEN MR.JOB_CD IS NOT NULL THEN 'Y'
+                            ELSE 'N'
+                       END) AS EDIT_YN
+                FROM TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+                INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                   ON MC.BU_CD = MIPG.BU_CD
+                  AND MC.GROUP_CD = 'ROUTE_CD'
+                  AND MIPG.DEL_FLAG = 'N' 
+                #if ($_parameter.prodPart == "TEL")
+                  AND MC.ATTB_5_CD = MIPG.PROD_GROUP
+                #end
+                #if ($_parameter.prodPart == "LAM")
+                  AND MC.ATTB_6_CD = MIPG.PROD_GROUP
+                #end
+                #if ($_parameter.prodPart == "DIFFUSION")
+                  AND MC.ATTB_7_CD = MIPG.PROD_GROUP
+                #end
+                #if ($_parameter.prodPart == "MATERIAL")
+                  AND MC.ATTB_8_CD = MIPG.PROD_GROUP
+                #end
+                LEFT OUTER JOIN TB_MST_ROUTING MR WITH(NOLOCK)
+                  ON MR.COMPANY_CD = MIPG.COMPANY_CD
+                 AND MR.BU_CD = MIPG.BU_CD
+                 AND MR.ITEM_CD = MIPG.ITEM_CD
+                 AND MR.JOB_CD = MC.CODE_CD
+                WHERE MIPG.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND MIPG.BU_CD = @{GV_BU_CD}
+                  AND MIPG.PROD_GROUP = @{prodItemGroupMst}
+                #if($_parameter.prodItemGroupDet and $_parameter.prodItemGroupDet != "")
+                  AND MIPG.PROD_GROUP_DET IN ('$_parameter.prodItemGroupDet.replace(",","','")')
+                #end
+                GROUP BY MIPG.COMPANY_CD, MIPG.BU_CD, MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD, MIPG.PROD_GROUP_DET, MC.CODE_CD
+            ) A
+            WHERE A.EDIT_YN = 'Y'
+            AND A.ROOT_CD IS NOT NULL
+            GROUP BY ROOT_CD
+        ) B2
+        ON B1.CD = B2.ROOT_CD
+      
+    
+)
+, TEMP_B AS (
+
+        SELECT *
+        FROM 
+        (
+            SELECT 'G' + PROD_GROUP_DET AS ROOT_CD
+                 , 'G' + MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD AS CD
+                 , MAX(CASE WHEN 'ko' = @{GV_LANG} THEN MC.CODE_NM_KR
+                        WHEN 'cn' = @{GV_LANG} THEN MC.CODE_NM_CN
+                        ELSE MC.CODE_NM
+                   END) AS NM
+                 , 'G' + MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD AS BUCKET_ID
+                 , PROD_GROUP_DET AS BUCKET_VAL
+                 , MC.CODE_CD AS JOB_CD
+                 , MAX(CASE WHEN MR.JOB_CD IS NOT NULL THEN 'Y'
+                        ELSE 'N'
+                   END) AS EDIT_YN
+            FROM TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+            INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+               ON MC.BU_CD = MIPG.BU_CD
+              AND MC.GROUP_CD = 'ROUTE_CD'
+              AND MIPG.DEL_FLAG = 'N' 
+            #if ($_parameter.prodPart == "TEL")
+              AND MC.ATTB_5_CD = MIPG.PROD_GROUP
+            #end
+            #if ($_parameter.prodPart == "LAM")
+              AND MC.ATTB_6_CD = MIPG.PROD_GROUP
+            #end
+            #if ($_parameter.prodPart == "DIFFUSION")
+              AND MC.ATTB_7_CD = MIPG.PROD_GROUP
+            #end
+            #if ($_parameter.prodPart == "MATERIAL")
+              AND MC.ATTB_8_CD = MIPG.PROD_GROUP
+            #end
+            LEFT OUTER JOIN TB_MST_ROUTING MR WITH(NOLOCK)
+              ON MR.COMPANY_CD = MIPG.COMPANY_CD
+             AND MR.BU_CD = MIPG.BU_CD
+             AND MR.ITEM_CD = MIPG.ITEM_CD
+             AND MR.JOB_CD = MC.CODE_CD
+            WHERE MIPG.COMPANY_CD = @{GV_COMPANY_CD}
+              AND MIPG.BU_CD = @{GV_BU_CD}
+              AND MIPG.PROD_GROUP = @{prodItemGroupMst}
+            #if($_parameter.prodItemGroupDet and $_parameter.prodItemGroupDet != "")
+              AND MIPG.PROD_GROUP_DET IN ('$_parameter.prodItemGroupDet.replace(",","','")')
+            #end
+            GROUP BY MIPG.COMPANY_CD, MIPG.BU_CD, MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD, MIPG.PROD_GROUP_DET, MC.CODE_CD
+        ) A
+        WHERE A.EDIT_YN = 'Y'
+          AND A.ROOT_CD IS NOT NULL      
+        
+        
+)
+
+, TEMP_C AS (
+    
+        SELECT MR.COMPANY_CD
+        , MR.BU_CD
+        , MR.PLANT_CD
+        , MR.RESOURCE_CD
+        , MC4.CODE_CD AS PROD_GROUP
+        , MRPG.PROD_GROUP_DET
+        , MC2.CODE_CD AS PROD_PART_CD
+        , MC2.CODE_NM AS PROD_PART_NM
+        , MWC.WC_CD
+        , MWC.WC_NM
+        , MWC.WC_MGR
+        , (
+                      SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                  WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                  ELSE CODE_NM
+                             END AS CODE_NM
+                        FROM TB_MST_CODE WITH(NOLOCK)
+                       WHERE BU_CD    = @{GV_BU_CD}
+                         AND GROUP_CD = 'RESOURCE_TYPE'
+                         AND CODE_CD  = MWC.WC_MGR
+                         AND USE_FLAG = 'Y'
+        ) AS WC_MGR_NM
+        , MR.RESOURCE_NM
+        , MR.CAMPUS_CD
+        
+        ,  CASE WHEN @{GV_LANG} = 'ko' THEN MC3.CODE_NM_KR
+             WHEN @{GV_LANG} = 'cn' THEN MC3.CODE_NM_CN
+             ELSE MC3.CODE_NM
+            END AS CAMPUS_NM
+        , MRPG.JOB_CD
+        , MRPG.PRIORITY
+        FROM TB_MST_RESOURCE MR WITH (NOLOCK)
+        INNER JOIN TB_MST_WORK_CENTER MWC WITH (NOLOCK)
+        ON MWC.COMPANY_CD = MR.COMPANY_CD
+        AND MWC.BU_CD = MR.BU_CD
+        AND MWC.PLANT_CD = MR.PLANT_CD
+        AND MWC.WC_CD = MR.WC_CD
+        LEFT OUTER JOIN TB_MST_CODE MC3 WITH (NOLOCK)
+        ON MC3.BU_CD = MR.BU_CD
+        AND MC3.GROUP_CD = 'CAMPUS_CD'
+        AND MC3.CODE_CD = MR.CAMPUS_CD
+        AND MC3.USE_FLAG = 'Y'
+        LEFT OUTER JOIN TB_MST_CODE MC4 WITH (NOLOCK)
+        ON MC4.BU_CD = MWC.BU_CD
+        AND MC4.GROUP_CD = 'PROD_ITEM_GROUP_MST'
+        AND MC4.ATTB_3_CD = MWC.WC_CD
+        AND MC4.USE_FLAG = 'Y'
+        LEFT OUTER JOIN TB_MST_CODE MC2 WITH (NOLOCK)
+        ON MC2.BU_CD = MC4.BU_CD
+        AND MC2.GROUP_CD = 'PROD_PART'
+        AND MC2.CODE_CD = MC4.ATTB_1_CD
+        AND MC2.USE_FLAG = 'Y'
+        LEFT OUTER JOIN TB_MST_RESOURCE_PROD_GROUP MRPG WITH (NOLOCK)
+        ON MRPG.COMPANY_CD = MR.COMPANY_CD
+        AND MRPG.BU_CD = MR.BU_CD
+        AND MRPG.PLANT_CD = MR.PLANT_CD
+        AND MRPG.RESOURCE_CD = MR.RESOURCE_CD
+        AND MRPG.PROD_GROUP = MC4.CODE_CD
+        WHERE MR.RESOURCE_TYPE = 'M'
+        AND MR.VALID_FROM_DATE <![CDATA[<=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+        AND MR.VALID_TO_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+        AND MR.COMPANY_CD =  @{GV_COMPANY_CD}
+        AND MR.BU_CD      =  @{GV_BU_CD}
+        AND MC2.CODE_CD = @{prodPart}
+        AND MC4.CODE_CD = @{prodItemGroupMst}
+
+)
+, TEMP_C_C AS(
+
+        
+
+            SELECT A.COMPANY_CD
+            , A.BU_CD
+            , A.PLANT_CD
+            , A.PROD_GROUP
+            , A.PROD_GROUP_DET
+            
+            , SUM( CASE WHEN A.PRIORITY <![CDATA[>= 1]]> THEN 1 ELSE 0 END ) AS SUM_PRIORITY
+            , MAX('G'+A.PROD_GROUP_DET+'_'+A.JOB_CD) AS 'BUCKET_ID'
+            FROM TEMP_C A
+            WHERE A.COMPANY_CD = 'KO316'
+            AND A.BU_CD = 'QT'
+            AND A.PROD_PART_CD = @{prodPart}
+            AND A.PROD_GROUP = @{prodItemGroupMst}
+            GROUP BY A.COMPANY_CD
+            , A.BU_CD
+            , A.PLANT_CD
+            , A.PROD_GROUP
+            , A.PROD_GROUP_DET
+            , ('G'+A.PROD_GROUP_DET+'_'+A.JOB_CD)
+
+)
+
+    ,
+    W_DATA
+    AS
+    (
+    
+                    
+            
+            SELECT 
+            EURW.COMPANY_CD
+            , EURW.BU_CD
+            , EURW.PLAN_ID
+            , EURW.SP_WEEK
+            , A.NM  AS 'PRODUCT_CATE'         --제품 분류
+            , C.JIG_QTY AS 'JIG_HOLDING_QTY' -- 지그 보유 수량
+            , B.NM      AS 'PROCESS'         -- 공정
+            , D.SUM_PRIORITY AS 'ALLOCATED_FACILITY_QTY' -- 할당 설비 대수
+            , B.BUCKET_VAL AS PROD_GROUP_DET
+            , B.JOB_CD
+            , EURW.MEAS_CD
+            , EURW.VALUE
+            FROM TEMP_A       A WITH(NOLOCK)
+            INNER JOIN TEMP_B B WITH(NOLOCK)
+            ON A.CD = B.ROOT_CD
+            CROSS APPLY (
+            
+                    SELECT 'G'+PROD_GROUP_DET+'_'+JOB_CD  AS  BUCKET_ID
+                    , PROD_GROUP_DET
+                    , JIG_QTY
+                    FROM TB_MST_JIG_PROD_GROUP C WITH(NOLOCK)
+                    WHERE PROD_GROUP = @{prodItemGroupMst}
+                    AND B.BUCKET_ID = ('G'+PROD_GROUP_DET+'_'+JOB_CD) 
+            
+            ) C 
+            CROSS APPLY  
+            (
+                SELECT * 
+                FROM TEMP_C_C D WITH(NOLOCK)
+                WHERE B.BUCKET_ID = D.BUCKET_ID
+            )  D
+            
+            
+            INNER JOIN (
+            
+                SELECT COMPANY_CD
+                , BU_CD
+                , PLAN_ID
+                , SP_WEEK
+                , PROD_GROUP_DET
+                , JOB_CD
+                , MEAS_CD
+                , VALUE
+                FROM TB_HIS_MAIN_FACILITY_EXP_UTIL_RATE_WEEKLY EURW WITH(NOLOCK)
+                WHERE EURW.PLAN_ID =  @V_PROD_PLAN_ID -- PLAN_ID
+                AND EURW.COMPANY_CD = @{GV_COMPANY_CD}
+                AND EURW.BU_CD      =  @{GV_BU_CD} 
+                AND EURW.SP_WEEK    =  @P_START_WEEK     -- PLAN_ID 기준 첫주 WEEK 
+            ) EURW
+            ON B.BUCKET_VAL = EURW.PROD_GROUP_DET
+            AND B.JOB_CD    = EURW.JOB_CD
+    
+    
+    
+    )
+    ,
+    COL
+    AS
+    (
+        SELECT T1.COMPANY_CD
+        , T1.BU_CD
+        , T1.PLAN_ID
+        , T1.SP_WEEK
+        , T1.PRODUCT_CATE
+        , T1.JIG_HOLDING_QTY -- 지그보유수량
+        , T1.PROCESS
+        , T1.ALLOCATED_FACILITY_QTY -- 할당설비대수
+        , T1.PROD_GROUP_DET
+        , T1.JOB_CD
+        , MAX(CASE 
+                WHEN T1.MEAS_CD = 'AP2_SP_QTY'
+                    THEN T1.VALUE
+                ELSE NULL
+                END) AP2_SP_QTY
+        , MAX(CASE 
+                WHEN T1.MEAS_CD = 'REQ_PROCESS_T_AP2'
+                    THEN T1.VALUE
+                ELSE NULL
+                END) REQ_PROCESS_T_AP2
+        , MAX(CASE 
+                WHEN T1.MEAS_CD = 'REQ_PROD_QTY'
+                    THEN T1.VALUE
+                ELSE NULL
+                END) REQ_PROD_QTY
+        , MAX(CASE 
+                WHEN T1.MEAS_CD = 'REQ_PROCESS_T_PROD'
+                    THEN T1.VALUE
+                ELSE NULL
+                END) REQ_PROCESS_T_PROD
+        , MAX(CASE 
+                WHEN T1.MEAS_CD = 'FACILITY_AVAIL_TIME'
+                    THEN T1.VALUE
+                ELSE NULL
+                END) FACILITY_AVAIL_TIME
+        FROM W_DATA T1
+        GROUP BY T1.COMPANY_CD
+        ,T1.BU_CD
+        ,T1.PLAN_ID
+        ,T1.SP_WEEK
+        ,T1.PRODUCT_CATE
+        ,T1.JIG_HOLDING_QTY -- 지그보유수량
+        ,T1.PROCESS
+        ,T1.ALLOCATED_FACILITY_QTY -- 할당설비대수
+        ,T1.PROD_GROUP_DET
+        ,T1.JOB_CD
+    )
+    ,
+    COL_ADD
+    AS
+    (
+            
+       
+       
+        SELECT T1.COMPANY_CD
+        , T1.BU_CD
+        , T1.PLAN_ID
+        , T1.SP_WEEK
+        , T1.PRODUCT_CATE
+        , T1.JIG_HOLDING_QTY -- 지그보유수량
+        , T1.PROCESS
+        , T1.ALLOCATED_FACILITY_QTY -- 할당설비대수
+        , T1.PROD_GROUP_DET
+        , T1.JOB_CD
+        , 'G'+T1.PROD_GROUP_DET+'_'+T1.JOB_CD AS BUCKET_ID
+        , T1.AP2_SP_QTY
+        , T1.REQ_PROCESS_T_AP2
+        , T1.REQ_PROD_QTY
+        , T1.REQ_PROCESS_T_PROD
+        , T1.FACILITY_AVAIL_TIME
+        , ROUND(CASE 
+                WHEN T1.FACILITY_AVAIL_TIME = 0
+                    THEN 0
+                WHEN T1.REQ_PROCESS_T_PROD = 0
+                    THEN 0
+                ELSE T1.REQ_PROCESS_T_PROD / T1.FACILITY_AVAIL_TIME
+                END, 2) * 100 AS EXP_UTIL_RATE
+
+        
+        , ROUND(CASE 
+                WHEN T1.FACILITY_AVAIL_TIME = 0
+                    THEN 0
+                WHEN T1.REQ_PROCESS_T_PROD = 0
+                    THEN 0
+                ELSE T1.ALLOCATED_FACILITY_QTY * (T1.REQ_PROCESS_T_PROD / T1.FACILITY_AVAIL_TIME)
+                END, 1) AS EXP_REQ_EQUIPT_QTY
+        
+        ,ROUND(CASE 
+                WHEN T1.ALLOCATED_FACILITY_QTY = 0
+                    THEN 0
+                WHEN T1.FACILITY_AVAIL_TIME = 0
+                    THEN - T1.ALLOCATED_FACILITY_QTY
+                WHEN T1.REQ_PROCESS_T_PROD = 0
+                    THEN - T1.ALLOCATED_FACILITY_QTY
+                ELSE T1.ALLOCATED_FACILITY_QTY * (T1.REQ_PROCESS_T_PROD / T1.FACILITY_AVAIL_TIME) - T1.ALLOCATED_FACILITY_QTY
+                END, 1) AS ADD_REQ_EQUIPT_QTY
+        
+        ,ROUND(CASE 
+                WHEN T1.ALLOCATED_FACILITY_QTY = 0
+                    THEN - T1.JIG_HOLDING_QTY
+                WHEN T1.FACILITY_AVAIL_TIME = 0
+                    THEN - T1.JIG_HOLDING_QTY
+                WHEN T1.REQ_PROCESS_T_PROD = 0
+                    THEN - T1.JIG_HOLDING_QTY
+                ELSE T1.ALLOCATED_FACILITY_QTY * (T1.REQ_PROCESS_T_PROD / T1.FACILITY_AVAIL_TIME) - T1.JIG_HOLDING_QTY
+                END, 1) AS ADD_REQ_JIG_QTY
+
+        
+        FROM COL T1
+       
+    
+    )
+    
+    , COL_BUCKET_ID AS(
+    
+    
+    SELECT T1.COMPANY_CD
+        , T1.BU_CD
+        , T1.PLAN_ID
+        , T1.SP_WEEK
+
+        #foreach($bucketMap in $_parameter.bucketList)
+        , MAX(CASE WHEN T1.BUCKET_ID = '$bucketMap.CD' THEN T1.EXP_REQ_EQUIPT_QTY ELSE NULL END)  AS $bucketMap.CD 
+         #end
+
+    FROM COL_ADD T1
+    GROUP BY
+    T1.COMPANY_CD
+        , T1.BU_CD
+        , T1.PLAN_ID
+        , T1.SP_WEEK
+
+    
+    )
+    
+    , COL_ADD_REQ_EQUIPT_QTY AS(
+    
+    
+    SELECT T1.COMPANY_CD
+        , T1.BU_CD
+        , T1.PLAN_ID
+        , T1.SP_WEEK
+
+        #foreach($bucketMap in $_parameter.bucketList)
+        , MAX(CASE WHEN T1.BUCKET_ID = '$bucketMap.CD' THEN T1.ADD_REQ_EQUIPT_QTY ELSE NULL END)  AS $bucketMap.CD 
+         #end
+
+    FROM COL_ADD T1
+    GROUP BY
+    T1.COMPANY_CD
+        , T1.BU_CD
+        , T1.PLAN_ID
+        , T1.SP_WEEK
+
+    
+    )
+    
+
+    
+   
+    
+        SELECT NULL AS TMP_COL
+        , 'NEXT_WEEK_JIG_REQ_QTY' AS PROD_PART_NM
+        , '차주 JIG 필요수량'+'('+@V_PROD_PLAN_ID+', 버전유형:Pre, 주차:'+@P_START_WEEK+')' AS PROD_PART_NM_NM
+        , NULL AS WC_CD
+        , NULL AS WC_CD_NM
+        , NULL AS WC_NM
+        , NULL AS WC_NM_NM
+        , NULL AS WC_MGR_NM
+        , NULL AS WC_MGR_NM_NM
+        , NULL AS RESOURCE_CD
+        , NULL AS RESOURCE_CD_NM
+        , NULL AS RESOURCE_NM
+        , NULL AS RESOURCE_NM_NM
+        , NULL AS CAMPUS_NM
+        , NULL AS CAMPUS_NM_NM
+        , NULL AS GRP_LVL_ID
+        , NULL AS COMPANY_CD
+        , NULL AS BU_CD
+        , NULL AS PLANT_CD
+        , NULL AS PROD_GROUP
+        , NULL AS PROD_PART_CD
+       #foreach($bucketMap in $_parameter.bucketList)
+        , ISNULL(T.$bucketMap.CD,0) AS $bucketMap.CD
+       #end
+        , 0 
+       #foreach($bucketMap in $_parameter.bucketList)
+             + ISNULL($bucketMap.CD, 0)
+       #end
+       AS TOTAL
+       FROM COL_BUCKET_ID  T
+        
+        UNION ALL
+        
+            SELECT NULL AS TMP_COL
+        , 'NEXT_ADD_REQ_EQUIPT_QTY' AS PROD_PART_NM
+        , '추가 필요 설비수'+'('+@V_PROD_PLAN_ID+', 버전유형:Pre, 주차:'+@P_START_WEEK+')' AS PROD_PART_NM_NM
+        , NULL AS WC_CD
+        , NULL AS WC_CD_NM
+        , NULL AS WC_NM
+        , NULL AS WC_NM_NM
+        , NULL AS WC_MGR_NM
+        , NULL AS WC_MGR_NM_NM
+        , NULL AS RESOURCE_CD
+        , NULL AS RESOURCE_CD_NM
+        , NULL AS RESOURCE_NM
+        , NULL AS RESOURCE_NM_NM
+        , NULL AS CAMPUS_NM
+        , NULL AS CAMPUS_NM_NM
+        , NULL AS GRP_LVL_ID
+        , NULL AS COMPANY_CD
+        , NULL AS BU_CD
+        , NULL AS PLANT_CD
+        , NULL AS PROD_GROUP
+        , NULL AS PROD_PART_CD
+       #foreach($bucketMap in $_parameter.bucketList)
+        , ISNULL(T.$bucketMap.CD,0) AS $bucketMap.CD
+       #end
+        , 0 
+       #foreach($bucketMap in $_parameter.bucketList)
+             + ISNULL($bucketMap.CD, 0)
+       #end
+       AS TOTAL
+       FROM COL_ADD_REQ_EQUIPT_QTY  T
+        
+        
+        
+        UNION ALL
+        
+        SELECT NULL AS TMP_COL
+             , 'JIG_HOLDING_QTY' AS PROD_PART_NM
+             , 'JIG 보유수량' AS PROD_PART_NM_NM
+             , NULL AS WC_CD
+             , NULL AS WC_CD_NM
+             , NULL AS WC_NM
+             , NULL AS WC_NM_NM
+             , NULL AS WC_MGR_NM
+             , NULL AS WC_MGR_NM_NM
+             , NULL AS RESOURCE_CD
+             , NULL AS RESOURCE_CD_NM
+             , NULL AS RESOURCE_NM
+             , NULL AS RESOURCE_NM_NM
+             , NULL AS CAMPUS_NM
+             , NULL AS CAMPUS_NM_NM
+             , GRP_LVL_ID
+             , @{GV_COMPANY_CD} AS COMPANY_CD
+             , @{GV_BU_CD} AS BU_CD
+             , 'WF01' AS PLANT_CD
+             , @{prodItemGroupMst} AS PROD_GROUP
+             , NULL AS PROD_PART_CD
+            #foreach($bucketMap in $_parameter.bucketList)
+             , $bucketMap.CD
+            #end
+             , 0
+             #foreach($bucketMap in $_parameter.bucketList)
+             + ISNULL($bucketMap.CD, 0)
+            #end
+            AS TOTAL
+            
+            FROM 
+        (
+            SELECT NULL AS TMP_COL
+                #foreach( $dimMap in $_parameter.dimList )
+                 , $dimMap.DIM_CD 
+                 , MAX($dimMap.DIM_CD) AS ${dimMap.DIM_CD}_NM 
+                #end
+                <include refid="include.getGrpLvlId"/>
+                #foreach($bucketMap in $_parameter.bucketList)
+                 , SUM($bucketMap.CD) AS $bucketMap.CD
+                #end   
+            FROM
+            (
+                SELECT NULL AS TMP_COL
+                     , B.PROD_PART_NM
+                     , MAX(B.PROD_PART_NM_NM) AS PROD_PART_NM_NM
+                     , B.WC_CD
+                     , MAX(B.WC_CD_NM) AS WC_CD_NM
+                     , B.WC_NM
+                     , MAX(B.WC_NM_NM) AS WC_NM_NM
+                     , WC_MGR_NM
+                     , MAX(B.WC_MGR_NM_NM) AS WC_MGR_NM_NM
+                     , B.RESOURCE_CD
+                     , MAX(B.RESOURCE_CD_NM) AS RESOURCE_CD_NM
+                     , B.RESOURCE_NM
+                     , MAX(B.RESOURCE_NM_NM) AS RESOURCE_NM_NM
+                     , B.CAMPUS_NM
+                     , MAX(B.CAMPUS_NM_NM) AS CAMPUS_NM_NM
+                     , B.COMPANY_CD
+                     , B.BU_CD
+                     , B.PLANT_CD
+                     , B.PROD_GROUP
+                     , B.PROD_PART_CD
+                    #foreach($bucketMap in $_parameter.bucketList)
+                     , SUM(CASE WHEN B.PROD_GROUP_DET = '$bucketMap.BUCKET_VAL' AND B.JOB_CD = RIGHT('$bucketMap.CD',2) THEN B.JIG_QTY ELSE NULL END)  $bucketMap.CD
+                    #end
+                FROM
+                (
+                    SELECT A.COMPANY_CD
+                         , A.BU_CD
+                         , A.PLANT_CD
+                         , A.PROD_GROUP
+                         , A.PROD_GROUP_DET
+                         , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD
+                         , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD_NM
+                         , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+                         , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+                         , ' '        AS WC_CD
+                         , ' '        AS WC_CD_NM
+                         , ' '        AS WC_NM
+                         , ' '        AS WC_NM_NM
+                         , ' '    AS WC_MGR_NM
+                         , ' '    AS WC_MGR_NM_NM
+                         , ' '  AS RESOURCE_CD
+                         , ' '  AS RESOURCE_CD_NM
+                         , ' '  AS RESOURCE_NM
+                         , ' '  AS RESOURCE_NM_NM
+                         , ' '    AS CAMPUS_CD
+                         , ' '    AS CAMPUS_CD_NM
+                         , ' '    AS CAMPUS_NM
+                         , ' '    AS CAMPUS_NM_NM
+                         , A.JOB_CD
+                         , A.JIG_QTY
+                    FROM W_JIG A
+                    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND A.BU_CD = @{GV_BU_CD}
+                      AND A.PROD_PART_CD = @{prodPart}
+                      AND A.PROD_GROUP = @{prodItemGroupMst}
+                    
+                ) B
+                GROUP BY B.PROD_PART_NM, B.WC_CD, B.WC_NM, B.WC_MGR_NM, B.RESOURCE_CD, B.RESOURCE_NM, B.CAMPUS_NM, B.COMPANY_CD, B.BU_CD, B.PLANT_CD, B.PROD_GROUP, B.PROD_PART_CD
+            ) C
+            GROUP BY ROLLUP(<include refid="include.getCdRollup"/>)
+                         , C.COMPANY_CD
+                         , C.BU_CD
+                         , C.PLANT_CD
+                         , C.PROD_GROUP
+                         , C.PROD_PART_CD
+        ) T1
+        WHERE T1.GRP_LVL_ID != 0
+        
+        UNION ALL
+        
+        #end
+        
+        SELECT NULL AS TMP_COL
+             , NULL AS PROD_PART_NM
+             , 'Total' AS PROD_PART_NM_NM
+             , NULL AS WC_CD
+             , NULL AS WC_CD_NM
+             , NULL AS WC_NM
+             , NULL AS WC_NM_NM
+             , NULL AS WC_MGR_NM
+             , NULL AS WC_MGR_NM_NM
+             , NULL AS RESOURCE_CD
+             , NULL AS RESOURCE_CD_NM
+             , NULL AS RESOURCE_NM
+             , NULL AS RESOURCE_NM_NM
+             , NULL AS CAMPUS_NM
+             , NULL AS CAMPUS_NM_NM
+             , GRP_LVL_ID
+             , NULL AS COMPANY_CD
+             , NULL AS BU_CD
+             , NULL AS PLANT_CD
+             , NULL AS PROD_GROUP
+             , NULL AS PROD_PART_CD
+            #foreach($bucketMap in $_parameter.bucketList)
+             , $bucketMap.CD
+            #end
+             , 0
+            #foreach($bucketMap in $_parameter.bucketList)
+             + ISNULL($bucketMap.CD, 0)
+            #end
+            AS TOTAL
+        FROM 
+        (
+            SELECT NULL AS TMP_COL
+                #foreach( $dimMap in $_parameter.dimList )
+                 , $dimMap.DIM_CD 
+                 , MAX($dimMap.DIM_CD) AS ${dimMap.DIM_CD}_NM 
+                #end
+                <include refid="include.getGrpLvlId"/>
+                #foreach($bucketMap in $_parameter.bucketList)
+                 , SUM($bucketMap.CD) AS $bucketMap.CD
+                #end   
+            FROM
+            (
+                SELECT NULL AS TMP_COL
+                     , B.PROD_PART_NM
+                     , MAX(B.PROD_PART_NM_NM) AS PROD_PART_NM_NM
+                     , B.WC_CD
+                     , MAX(B.WC_CD_NM) AS WC_CD_NM
+                     , B.WC_NM
+                     , MAX(B.WC_NM_NM) AS WC_NM_NM
+                     , WC_MGR_NM
+                     , MAX(B.WC_MGR_NM_NM) AS WC_MGR_NM_NM
+                     , B.RESOURCE_CD
+                     , MAX(B.RESOURCE_CD_NM) AS RESOURCE_CD_NM
+                     , B.RESOURCE_NM
+                     , MAX(B.RESOURCE_NM_NM) AS RESOURCE_NM_NM
+                     , B.CAMPUS_NM
+                     , MAX(B.CAMPUS_NM_NM) AS CAMPUS_NM_NM
+                     , B.COMPANY_CD
+                     , B.BU_CD
+                     , B.PLANT_CD
+                     , B.PROD_GROUP
+                     , B.PROD_PART_CD
+                    #foreach($bucketMap in $_parameter.bucketList)
+                     , CASE WHEN SUM(CASE WHEN 'G' + B.PROD_GROUP_DET + '_' + B.JOB_CD = '$bucketMap.CD' THEN B.PRIORITY ELSE NULL END) <![CDATA[>=]]> 1 THEN 1 ELSE NULL END $bucketMap.CD
+                    #end
+                FROM
+                (
+                    SELECT A.COMPANY_CD
+                         , A.BU_CD
+                         , A.PLANT_CD
+                         , A.PROD_GROUP
+                         , A.PROD_GROUP_DET
+                         , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD
+                         , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD_NM
+                         , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+                         , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+                         , ISNULL(A.WC_CD, ' ')        AS WC_CD
+                         , ISNULL(A.WC_CD, ' ')        AS WC_CD_NM
+                         , ISNULL(A.WC_NM, ' ')        AS WC_NM
+                         , ISNULL(A.WC_NM, ' ')        AS WC_NM_NM
+                         , ISNULL(A.WC_MGR_NM, ' ')    AS WC_MGR_NM
+                         , ISNULL(A.WC_MGR_NM, ' ')    AS WC_MGR_NM_NM
+                         , ISNULL(A.RESOURCE_CD, ' ')  AS RESOURCE_CD
+                         , ISNULL(A.RESOURCE_CD, ' ')  AS RESOURCE_CD_NM
+                         , ISNULL(A.RESOURCE_NM, ' ')  AS RESOURCE_NM
+                         , ISNULL(A.RESOURCE_NM, ' ')  AS RESOURCE_NM_NM
+                         , ISNULL(A.CAMPUS_CD, ' ')    AS CAMPUS_CD
+                         , ISNULL(A.CAMPUS_CD, ' ')    AS CAMPUS_CD_NM
+                         , ISNULL(A.CAMPUS_NM, ' ')    AS CAMPUS_NM
+                         , ISNULL(A.CAMPUS_NM, ' ')    AS CAMPUS_NM_NM
+                         , A.JOB_CD
+                         , A.PRIORITY
+                    FROM W_MAIN A
+                    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND A.BU_CD = @{GV_BU_CD}
+                      AND A.PROD_PART_CD = @{prodPart}
+                      AND A.PROD_GROUP = @{prodItemGroupMst}
+                    #if($_parameter.campus and $_parameter.campus != "")
+                      AND A.CAMPUS_CD IN ('$_parameter.campus.replace(",","','")')
+                    #end
+                    #if($_parameter.resource and $_parameter.resource != "")
+                      AND (A.RESOURCE_CD LIKE '%' + @{resource} + '%' OR A.RESOURCE_NM  LIKE '%' + @{resource} + '%')
+                    #end
+                    #if($_parameter.workplaces and $_parameter.workplaces != "")
+                      AND A.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+                    #end
+                ) B
+                GROUP BY B.PROD_PART_NM, B.WC_CD, B.WC_NM, B.WC_MGR_NM, B.RESOURCE_CD, B.RESOURCE_NM, B.CAMPUS_NM, B.COMPANY_CD, B.BU_CD, B.PLANT_CD, B.PROD_GROUP, B.PROD_PART_CD
+            ) C
+            GROUP BY ROLLUP(<include refid="include.getCdRollup"/>)
+                         , C.COMPANY_CD
+                         , C.BU_CD
+                         , C.PLANT_CD
+                         , C.PROD_GROUP
+                         , C.PROD_PART_CD
+        ) T1
+        WHERE T1.GRP_LVL_ID != 0
+        UNION ALL
+        SELECT NULL AS TMP_COL
+            #foreach( $dimMap in $_parameter.dimList )
+             , $dimMap.DIM_CD 
+             , $dimMap.DIM_CD AS ${dimMap.DIM_CD}_NM 
+            #end
+             , GRP_LVL_ID
+             , COMPANY_CD
+             , BU_CD
+             , PLANT_CD
+             , PROD_GROUP
+             , PROD_PART_CD
+            #foreach($bucketMap in $_parameter.bucketList)
+             , $bucketMap.CD
+            #end    
+             , 0
+            #foreach($bucketMap in $_parameter.bucketList)
+             + CASE WHEN $bucketMap.CD <![CDATA[>=]]> 1 THEN 1 ELSE 0 END 
+            #end    
+            AS TOTAL
+        FROM 
+        (
+            SELECT NULL AS TMP_COL
+                 <include refid="include.getCdDimTotal"/>
+                 <include refid="include.getGrpLvlId"/>
+                 , T.COMPANY_CD
+                 , T.BU_CD
+                 , T.PLANT_CD
+                 , T.PROD_GROUP
+                 , T.PROD_PART_CD
+                #foreach($bucketMap in $_parameter.bucketList)
+                 , SUM(CASE WHEN 'G' + T.PROD_GROUP_DET + '_' + T.JOB_CD = '$bucketMap.CD' THEN T.PRIORITY ELSE NULL END) AS $bucketMap.CD
+                #end
+            FROM 
+            (
+                SELECT A.COMPANY_CD
+                     , A.BU_CD
+                     , A.PLANT_CD
+                     , A.PROD_GROUP
+                     , A.PROD_GROUP_DET
+                     , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD
+                     , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD_NM
+                     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+                     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+                     , ISNULL(A.WC_CD, ' ')        AS WC_CD
+                     , ISNULL(A.WC_CD, ' ')        AS WC_CD_NM
+                     , ISNULL(A.WC_NM, ' ')        AS WC_NM
+                     , ISNULL(A.WC_NM, ' ')        AS WC_NM_NM
+                     , ISNULL(A.WC_MGR_NM, ' ')    AS WC_MGR_NM
+                     , ISNULL(A.WC_MGR_NM, ' ')    AS WC_MGR_NM_NM
+                     , ISNULL(A.RESOURCE_CD, ' ')  AS RESOURCE_CD
+                     , ISNULL(A.RESOURCE_CD, ' ')  AS RESOURCE_CD_NM
+                     , ISNULL(A.RESOURCE_NM, ' ')  AS RESOURCE_NM
+                     , ISNULL(A.RESOURCE_NM, ' ')  AS RESOURCE_NM_NM
+                     , ISNULL(A.CAMPUS_CD, ' ')    AS CAMPUS_CD
+                     , ISNULL(A.CAMPUS_CD, ' ')    AS CAMPUS_CD_NM
+                     , ISNULL(A.CAMPUS_NM, ' ')    AS CAMPUS_NM
+                     , ISNULL(A.CAMPUS_NM, ' ')    AS CAMPUS_NM_NM
+                     , A.JOB_CD
+                     , A.PRIORITY
+                FROM W_MAIN A
+                WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND A.BU_CD = @{GV_BU_CD}
+                  AND A.PROD_PART_CD = @{prodPart}
+                  AND A.PROD_GROUP = @{prodItemGroupMst}
+                #if($_parameter.campus and $_parameter.campus != "")
+                  AND A.CAMPUS_CD IN ('$_parameter.campus.replace(",","','")')
+                #end
+                #if($_parameter.resource and $_parameter.resource != "")
+                  AND (A.RESOURCE_CD LIKE '%' + @{resource} + '%' OR A.RESOURCE_NM  LIKE '%' + @{resource} + '%')
+                #end
+                #if($_parameter.workplaces and $_parameter.workplaces != "")
+                  AND A.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+                #end
+            ) T
+            GROUP BY ROLLUP(<include refid="include.getCdRollup"/>)
+                     , T.COMPANY_CD
+                     , T.BU_CD
+                     , T.PLANT_CD
+                     , T.PROD_GROUP
+                     , T.PROD_PART_CD
+        ) T1
+        WHERE T1.GRP_LVL_ID = 0
+        
+        
+        
+        <!-- ORDER BY TMP_COL
+        #foreach( $dimMap in $_parameter.dimList )
+               , T1.$dimMap.DIM_CD
+        #end -->
+    </select>
+    
+    <select id="authoritySelect" parameterType="map" resultType="map">
+        /****** [ aps.static.facilityMappingProductCate.authoritySelect ] ******/
+        SELECT A2.MENU_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD IN ('APS10701', 'APS10702', 'APS10703','APS10704')
+              AND ACTION_CD = 'SAVE'
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+    </select>
+    
+    <insert id="resourceProdGroupMerge" parameterType="map">
+        /****** [ aps.static.facilityMappingProductCate.resourceProdGroupMerge ] ******/
+        
+        #if($_parameter.JIG_HOLDING_QTY and $_parameter.JIG_HOLDING_QTY == 'JIG_HOLDING_QTY')
+        
+              MERGE TB_MST_JIG_PROD_GROUP A
+                        USING 
+                        (
+                            SELECT @{COMPANY_CD}     AS COMPANY_CD
+                                 , @{BU_CD}          AS BU_CD
+                                 , @{PLANT_CD}       AS PLANT_CD
+                                 , @{PROD_GROUP}     AS PROD_GROUP
+                                 , @{PROD_GROUP_DET} AS PROD_GROUP_DET
+                                 , @{JOB_CD}         AS JOB_CD
+                                 
+                        ) B
+                        ON 
+                        (
+                            A.COMPANY_CD     = B.COMPANY_CD
+                        AND A.BU_CD          = B.BU_CD
+                        AND A.PLANT_CD       = B.PLANT_CD
+                        AND A.PROD_GROUP     = B.PROD_GROUP
+                        AND A.PROD_GROUP_DET = B.PROD_GROUP_DET
+                        AND A.JOB_CD         = B.JOB_CD
+                        )
+                        WHEN MATCHED THEN
+                        UPDATE
+                           SET A.UPDATE_ID   = @{GV_USER_ID}
+                             , A.UPDATE_DTTM = dbo.UFN_GETDATE()
+                             #if($_parameter.PRIORITY and $_parameter.PRIORITY != "")
+                             , A.JIG_QTY    = @{PRIORITY}
+                             #else
+                             , A.JIG_QTY    = NULL
+                             #end
+                        WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                            COMPANY_CD
+                          , BU_CD
+                          , PLANT_CD
+                          , PROD_GROUP
+                          , PROD_GROUP_DET
+                          , JOB_CD
+                          , JIG_QTY
+                          , CREATE_ID
+                          , CREATE_DTTM
+                        )VALUES(
+                            B.COMPANY_CD
+                          , B.BU_CD
+                          , B.PLANT_CD
+                          , B.PROD_GROUP
+                          , B.PROD_GROUP_DET
+                          , B.JOB_CD
+                        #if($_parameter.PRIORITY and $_parameter.PRIORITY != "")
+                          , @{PRIORITY}
+                        #else
+                          , NULL
+                        #end
+                          , @{GV_USER_ID}
+                          , dbo.UFN_GETDATE()
+                        );
+        
+                        
+        
+        #else
+        
+              MERGE TB_MST_RESOURCE_PROD_GROUP A
+                        USING 
+                        (
+                            SELECT @{COMPANY_CD}     AS COMPANY_CD
+                                 , @{BU_CD}          AS BU_CD
+                                 , @{PLANT_CD}       AS PLANT_CD
+                                 , @{RESOURCE_CD}    AS RESOURCE_CD
+                                 , @{PROD_GROUP}     AS PROD_GROUP
+                                 , @{PROD_GROUP_DET} AS PROD_GROUP_DET
+                                 , @{JOB_CD}         AS JOB_CD
+                        ) B
+                        ON 
+                        (
+                            A.COMPANY_CD     = B.COMPANY_CD
+                        AND A.BU_CD          = B.BU_CD
+                        AND A.PLANT_CD       = B.PLANT_CD
+                        AND A.RESOURCE_CD    = B.RESOURCE_CD
+                        AND A.PROD_GROUP     = B.PROD_GROUP
+                        AND A.PROD_GROUP_DET = B.PROD_GROUP_DET
+                        AND A.JOB_CD         = B.JOB_CD
+                        )
+                        WHEN MATCHED THEN
+                        UPDATE
+                           SET A.UPDATE_ID   = @{GV_USER_ID}
+                             , A.UPDATE_DTTM = dbo.UFN_GETDATE()
+                             #if($_parameter.PRIORITY and $_parameter.PRIORITY != "")
+                             , A.PRIORITY    = @{PRIORITY}
+                             #else
+                             , A.PRIORITY    = NULL
+                             #end
+                        WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                            COMPANY_CD
+                          , BU_CD
+                          , PLANT_CD
+                          , RESOURCE_CD
+                          , PROD_GROUP
+                          , PROD_GROUP_DET
+                          , JOB_CD
+                          , PRIORITY
+                          , CREATE_ID
+                          , CREATE_DTTM
+                        )VALUES(
+                            B.COMPANY_CD
+                          , B.BU_CD
+                          , B.PLANT_CD
+                          , B.RESOURCE_CD
+                          , B.PROD_GROUP
+                          , B.PROD_GROUP_DET
+                          , B.JOB_CD
+                        #if($_parameter.PRIORITY and $_parameter.PRIORITY != "")
+                          , @{PRIORITY}
+                        #else
+                          , NULL
+                        #end
+                          , @{GV_USER_ID}
+                          , dbo.UFN_GETDATE()
+                        );
+        
+        
+        #end
+        
+    </insert>
+</mapper>

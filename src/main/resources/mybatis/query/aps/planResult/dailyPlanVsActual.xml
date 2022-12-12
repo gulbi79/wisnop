@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+
+	<select id="jobCdSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.jobCdSelectSelect ] ******/
+		SELECT A.CODE_CD
+		     , A.CODE_NM
+		FROM TB_MST_CODE A WITH(NOLOCK)
+		WHERE A.GROUP_CD = 'ROUTE_CD' 
+		  AND A.USE_FLAG = 'Y'
+		UNION ALL
+		SELECT A.CODE_CD
+		     , A.CODE_NM_KR
+		FROM TB_MST_CODE A WITH(NOLOCK)
+		WHERE A.GROUP_CD = 'FQC_ROUTE_CD' 
+		  AND A.USE_FLAG = 'Y'
+	</select>
+
+   <select id="dailyPlanVsActualSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.dailyPlanVsActualList ] ******/		
+		WITH W_MAIN AS 
+		(
+			SELECT ISNULL(A.PROD_PART, ' ') AS PART_CD
+			     , ISNULL(A.PROD_PART, ' ') AS PART_CD_NM
+			     , ISNULL(A.WC_CD, ' ') AS WC_CD_PE
+			     , ISNULL(A.WC_CD, ' ') AS WC_CD_PE_NM
+			     , ISNULL(MWC.WC_NM, ' ') AS WC_NM_PE
+			     , ISNULL(MWC.WC_NM, ' ') AS WC_NM_PE_NM
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN ISNULL(MC1.CODE_NM_KR, ' ')
+			    	    WHEN 'cn' = @{GV_LANG} THEN ISNULL(MC1.CODE_NM_CN, ' ')
+			  	   		ELSE ISNULL(MC1.CODE_NM, ' ')
+			       END AS WORKER_GROUP
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN ISNULL(MC1.CODE_NM_KR, ' ')
+			    	    WHEN 'cn' = @{GV_LANG} THEN ISNULL(MC1.CODE_NM_CN, ' ')
+			  	   		ELSE ISNULL(MC1.CODE_NM, ' ')
+			       END AS WORKER_GROUP_NM
+			     , ISNULL(A.RESOURCE_CD, ' ') AS RESOURCE_CD
+			     , ISNULL(A.RESOURCE_CD, ' ') AS RESOURCE_CD_NM
+			     , ISNULL(MR.RESOURCE_NM, ' ') AS RESOURCE_NM
+			     , ISNULL(MR.RESOURCE_NM, ' ') AS RESOURCE_NM_NM
+			     , ISNULL(A.JOB_CD, ' ') AS JOB_CD
+			     , ISNULL(A.JOB_CD, ' ') AS JOB_CD_NM
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN ISNULL(MC2.CODE_NM_KR, ' ')
+			    	    WHEN 'cn' = @{GV_LANG} THEN ISNULL(MC2.CODE_NM_CN, ' ')
+			  	   		ELSE ISNULL(MC2.CODE_NM, ' ')
+			       END AS JOB_NM
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN ISNULL(MC2.CODE_NM_KR, ' ')
+			    	    WHEN 'cn' = @{GV_LANG} THEN ISNULL(MC2.CODE_NM_CN, ' ')
+			  	   		ELSE ISNULL(MC2.CODE_NM, ' ')
+			       END AS JOB_NM_NM
+			     , ISNULL(A.PROD_ORDER_NO, ' ') AS PROD_ORDER_NO
+			     , ISNULL(A.PROD_ORDER_NO, ' ') AS PROD_ORDER_NO_NM
+			     , ISNULL(A.OPERATION_NO, ' ') AS OPERATION_NO
+			     , ISNULL(A.OPERATION_NO, ' ') AS OPERATION_NO_NM
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN ISNULL(MC3.CODE_NM_KR, ' ')
+			    	    WHEN 'cn' = @{GV_LANG} THEN ISNULL(MC3.CODE_NM_CN, ' ')
+			  	   		ELSE ISNULL(MC3.CODE_NM, ' ')
+			       END AS PROD_GROUP_DET
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN ISNULL(MC3.CODE_NM_KR, ' ')
+			    	    WHEN 'cn' = @{GV_LANG} THEN ISNULL(MC3.CODE_NM_CN, ' ')
+			  	   		ELSE ISNULL(MC3.CODE_NM, ' ')
+			       END AS PROD_GROUP_DET_NM
+			     , ISNULL(A.ITEM_CD, ' ') AS ITEM_CD
+			     , ISNULL(A.ITEM_CD, ' ') AS ITEM_CD_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(MI.SPEC, ' ') AS SPEC
+			     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+			     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(MIP.CLEANING_FLAG, ' ') AS CLEANING_YN
+			     , ISNULL(MIP.CLEANING_FLAG, ' ') AS CLEANING_YN_NM
+			     , A.PLAN_QTY
+			     ,CASE WHEN A.PLAN_QTY IS NOT NULL THEN A.GOODS_QTY ELSE NULL END 'TEMP_GOODS_QTY'
+				 ,CASE WHEN A.PLAN_QTY IS NOT NULL THEN A.PRE_PROD_QTY ELSE NULL END 'TEMP_PRE_PROD_QTY'
+			     /* 210128 이큰산 추가 */
+				 , A.PROD_ORDER_QTY
+				 , A.REMARKS_PP
+				 -----------------------
+			     
+			     , A.PRE_PROD_QTY
+			     , A.GOODS_QTY
+			     
+			     , A.YYYYMMDD AS PLAN_DATE
+			     , A.START_DTTM
+			     , A.END_DTTM
+			FROM 
+			(
+				SELECT ISNULL(KAPPDD.COMPANY_CD, DPRD.COMPANY_CD) AS COMPANY_CD
+		             , ISNULL(KAPPDD.BU_CD, DPRD.BU_CD) AS BU_CD
+		             , ISNULL(KAPPDD.PROD_PART, DPRD.PROD_PART) AS PROD_PART
+		             , ISNULL(KAPPDD.WC_CD, DPRD.WC_CD) AS WC_CD
+		             , KAPPDD.WORKER_GROUP
+		             , KAPPDD.RESOURCE_CD
+		             , ISNULL(KAPPDD.JOB_CD, DPRD.JOB_CD) AS JOB_CD
+		             , ISNULL(KAPPDD.PROD_ORDER_NO, DPRD.PROD_ORDER_NO) AS PROD_ORDER_NO
+		             , ISNULL(KAPPDD.OPERATION_NO, DPRD.OPERATION_NO) AS OPERATION_NO
+		             , KAPPDD.PROD_GROUP_DET
+		             , ISNULL(KAPPDD.ITEM_CD, DPRD.ITEM_CD) AS ITEM_CD
+		             , KAPPDD.PLAN_QTY
+		             
+		             /* 210128 이큰산 추가 */
+					 , KAPPDD.PROD_ORDER_QTY
+					 , KAPPDD.REMARKS_PP
+					 -----------------------
+				             
+		             , DPRD.GOODS_QTY
+                  	 , DPRD.PRE_PROD_QTY
+                     , ISNULL(KAPPDD.YYYYMMDD, DPRD.YYYYMMDD) AS YYYYMMDD
+		             , KAPPDD.START_DTTM
+		             , KAPPDD.END_DTTM
+				FROM 
+				(
+					SELECT KAPPDD.COMPANY_CD
+		                 , KAPPDD.BU_CD
+		                 , KAPPDD.PROD_PART
+		                 , KAPPDD.WC_CD
+		                 , KAPPDD.WORKER_GROUP
+		                 , KAPPDD.RESOURCE_CD
+		                 , KAPPDD.JOB_CD
+		                 , KAPPDD.PROD_ORDER_NO
+		                 , KAPPDD.OPERATION_NO
+		                 , KAPPDD.PROD_GROUP_DET
+		                 , KAPPDD.ITEM_CD
+		                 
+		                 /* 210128 이큰산 수정 */
+						 ----DPOH.PROD_ORDER_QTY AS PLAN_QTY,
+						 , DPOH.PROD_ORDER_QTY		----- 추가
+						 , KAPPDD.PLAN_QTY 			----- 수정
+						 , KAPPDD.REMARKS_PP		----- 추가
+						 ------------------------
+		                 
+		                 , KAPPDD.YYYYMMDD
+		                 , KAPPDD.START_DTTM
+		                 , KAPPDD.END_DTTM
+					FROM 
+					(
+						SELECT KAPPDD.COMPANY_CD
+	                         , KAPPDD.BU_CD
+	                         , KAPPDD.PROD_PART
+	                         , KAPPDD.WC_CD
+	                         , KAPPDD.WORKER_GROUP
+	                         , KAPPDD.RESOURCE_CD
+	                         , KAPPDD.JOB_CD
+	                         , KAPPDD.PROD_ORDER_NO
+	                         , KAPPDD.OPERATION_NO
+	                         , KAPPDD.PROD_GROUP_DET
+	                         , KAPPDD.ITEM_CD
+	                         , KAPPDD.YYYYMMDD
+	                         , KAPPDD.START_DTTM
+	                         , KAPPDD.END_DTTM
+	                         
+	                         /* 210128 이큰산 추가 */
+							 , KAPPDD.PLAN_QTY
+							 , KAPPDD.REMARKS_PP
+							 -----------------------
+			                         
+	                         , RANK() OVER(PARTITION BY KAPPDD.COMPANY_CD, KAPPDD.BU_CD, KAPPDD.YYYYMMDD, KAPPDD.PROD_PART, KAPPDD.PROD_ORDER_NO, KAPPDD.OPERATION_NO ORDER BY KAPPDD.RESOURCE_CD) AS RNK
+						FROM TB_KPI_APS_PROD_PLAN_DAILY_DET KAPPDD WITH(NOLOCK)
+	                    WHERE KAPPDD.COMPANY_CD = @{GV_COMPANY_CD}
+	                      AND KAPPDD.BU_CD = @{GV_BU_CD}
+	                      AND KAPPDD.YYYYMMDD = @{fromCal}
+	                      AND KAPPDD.JOB_CD != 'TR'
+					) KAPPDD
+		          	INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+		               ON DPOH.COMPANY_CD = KAPPDD.COMPANY_CD
+		              AND DPOH.BU_CD = KAPPDD.BU_CD
+		              AND DPOH.PROD_ORDER_NO = KAPPDD.PROD_ORDER_NO
+		          	WHERE KAPPDD.RNK = 1
+				) KAPPDD
+			    FULL OUTER JOIN 
+			    (
+			    	SELECT DPRD1.COMPANY_CD
+		                 , DPRD1.BU_CD
+		                 , DPRD1.YYYYMMDD
+		                 , MC.ATTB_2_CD AS PROD_PART
+		                 , DPOD.WC_CD
+		                 , DPRD1.PROD_ORDER_NO
+		                 , DPRD1.ITEM_CD
+		                 , DPRD1.OPERATION_NO
+		                 , DPRD1.JOB_CD
+		                 , DPRD1.GOODS_QTY
+		                 , DPRD1.DEFECT_QTY
+		                 , DPRD1.PRE_PROD_QTY
+					FROM TB_DYN_PROD_RESULT_DAILY DPRD1 WITH(NOLOCK)
+					INNER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+                       ON DPOD.COMPANY_CD = DPRD1.COMPANY_CD
+                      AND DPOD.BU_CD = DPRD1.BU_CD
+                      AND DPOD.PROD_ORDER_NO = DPRD1.PROD_ORDER_NO
+                      AND DPOD.OPERATION_NO = DPRD1.OPERATION_NO
+					INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+               		   ON MWC.COMPANY_CD = DPOD.COMPANY_CD
+	                  AND MWC.BU_CD = DPOD.BU_CD
+	                  AND MWC.PLANT_CD = 'WF01'
+	                  AND MWC.WC_CD = DPOD.WC_CD
+                    INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                       ON MC.BU_CD = MWC.BU_CD
+                      AND MC.GROUP_CD = 'PROD_L2'
+                      AND MC.CODE_CD = MWC.ROUTING_ID
+                      AND MC.USE_FLAG = 'Y'
+					
+                    WHERE DPRD1.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND DPRD1.BU_CD = @{GV_BU_CD}
+                      AND DPRD1.YYYYMMDD = @{fromCal}
+				) DPRD
+				ON DPRD.COMPANY_CD = KAPPDD.COMPANY_CD
+			    AND DPRD.BU_CD = KAPPDD.BU_CD
+			    AND DPRD.YYYYMMDD = KAPPDD.YYYYMMDD
+			    AND DPRD.PROD_PART = KAPPDD.PROD_PART
+			    AND DPRD.PROD_ORDER_NO = KAPPDD.PROD_ORDER_NO
+			    AND DPRD.OPERATION_NO = KAPPDD.OPERATION_NO
+			) A
+			LEFT OUTER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+			  ON MI.COMPANY_CD = A.COMPANY_CD
+			 AND MI.BU_CD = A.BU_CD
+			 AND MI.ITEM_CD = A.ITEM_CD
+			LEFT OUTER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+           	  ON MIP.COMPANY_CD = A.COMPANY_CD
+          	 AND MIP.BU_CD = A.BU_CD
+       		 AND MIP.PLANT_CD = 'WF01'
+             AND MIP.ITEM_CD = A.ITEM_CD
+			LEFT OUTER JOIN TB_MST_RESOURCE MR WITH(NOLOCK)
+			  ON MR.COMPANY_CD = A.COMPANY_CD
+			 AND MR.BU_CD = A.BU_CD
+			 AND MR.RESOURCE_CD = A.RESOURCE_CD
+			LEFT OUTER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+			  ON MWC.COMPANY_CD = A.COMPANY_CD
+			 AND MWC.BU_CD = A.BU_CD
+			 AND MWC.WC_CD = A.WC_CD
+			LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			  ON MC1.BU_CD = A.BU_CD
+			 AND MC1.GROUP_CD = 'WORKER_GROUP'
+			 AND MC1.CODE_CD = A.WORKER_GROUP
+			LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			  ON MC2.BU_CD = A.BU_CD
+			 AND MC2.GROUP_CD = 'ROUTE_CD'
+			 AND MC2.CODE_CD = A.JOB_CD
+			LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+			  ON MC3.BU_CD = A.BU_CD
+			 AND MC3.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			 AND MC3.CODE_CD = A.PROD_GROUP_DET
+			WHERE 1 = 1 
+			#if($_parameter.prodPart and $_parameter.prodPart != "")
+			  AND A.PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+			#end 
+			#if($_parameter.workplaces and $_parameter.workplaces != "")
+			  AND (A.WC_CD LIKE '%'+@{workplaces}+'%' OR MWC.WC_NM LIKE '%'+@{workplaces}+'%')
+			#end
+			#if($_parameter.resource2 and $_parameter.resource2 != "")
+			  AND (A.RESOURCE_CD LIKE '%'+@{resource2}+'%' OR MR.RESOURCE_NM LIKE '%'+@{resource2}+'%')
+			#end
+			#if($_parameter.workerGroup and $_parameter.workerGroup != "")
+			  AND A.WORKER_GROUP IN ('$_parameter.workerGroup.replace(",","','")') 
+			#end
+			#if($_parameter.jobCd and $_parameter.jobCd != "")
+			  AND A.JOB_CD IN ('$_parameter.jobCd.replace(",","','")')
+			#end
+			#if($_parameter.woNo and $_parameter.woNo != "")
+			  AND A.PROD_ORDER_NO LIKE '%$_parameter.woNo%' 
+			#end
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+			  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			#end
+			#if($_parameter.item_nm and $_parameter.item_nm != ""  )
+			  AND (A.ITEM_CD LIKE '%'+'$_parameter.item_nm'+'%' OR MI.ITEM_NM LIKE '%'+'$_parameter.item_nm'+'%' OR 
+				    A.ITEM_CD IN ('$_parameter.item_nm.replace(",","','")') )
+			#end
+		)
+	
+		
+		SELECT NULL AS TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+	         , $dimMap.DIM_CD 
+	         , ${dimMap.DIM_CD}_NM AS ${dimMap.DIM_CD}_NM
+			#end
+             , GRP_LVL_ID
+             , EXECUTION_RATE
+             , PLAN_QTY
+             , PROD_ORDER_QTY
+             , PRE_PROD_QTY
+             , GOODS_QTY
+             , CONVERT(VARCHAR(30), CAST(PLAN_DATE AS DATE), 23) AS PLAN_DATE
+            
+             , START_DTTM
+             , END_DTTM
+             , REMARKS_PP
+		FROM
+		(
+			SELECT NULL AS TMP_COL
+				<include refid="include.getCdDimTotal"/>
+		    	<include refid="include.getGrpLvlId"/>
+		    	, SUM(PLAN_QTY) AS PLAN_QTY
+		    	
+		    	/* 210128 이큰산 추가 */
+				, SUM(PROD_ORDER_QTY) AS PROD_ORDER_QTY
+				-----------------------
+		    	
+		    	, SUM(PRE_PROD_QTY) AS PRE_PROD_QTY
+			    , SUM(GOODS_QTY) AS GOODS_QTY
+			    
+			    	#set($grpLvlId = "")
+					#set($rollupDot = ".")
+					#if(!$rollupAlias or $rollupAlias == "")
+					#set($rollupAlias = "")
+					#set($rollupDot = "")
+					#end
+					#foreach( $dimMap in $_parameter.dimList )
+					#if($velocityCount == 1)
+					#set($grpLvlId = ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+					#else
+					#set($grpLvlId = ${grpLvlId} + ", " + ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+					#end
+					#end
+			    ,(
+			    	CASE GROUPING_ID(${grpLvlId})
+				    WHEN 0 THEN
+						CASE 
+							WHEN SUM(PLAN_QTY) > 0 THEN SUM(ISNULL(GOODS_QTY, 0) + ISNULL(PRE_PROD_QTY, 0)) / SUM(PLAN_QTY) * 100
+						ELSE NULL
+						END
+				  	ELSE
+				  		CASE 
+							WHEN SUM(PLAN_QTY) > 0
+											THEN SUM(ISNULL(TEMP_GOODS_QTY, 0) + ISNULL(TEMP_PRE_PROD_QTY, 0)) / SUM(PLAN_QTY) * 100
+						END
+				  	END			 
+				) AS EXECUTION_RATE
+	
+			    , PLAN_DATE
+			    , START_DTTM
+			    , END_DTTM
+			    /* 210128 이큰산 추가 */
+				, REMARKS_PP
+				----------------------
+			FROM W_MAIN T1
+		    GROUP BY ROLLUP
+		    (
+		    	#set($rollupDot = ".")
+				#if(!$rollupAlias or $rollupAlias == "")
+				  #set($rollupAlias = "")
+				  #set($rollupDot = "")
+				#end
+				#foreach( $dimMap in $_parameter.dimList )
+				  #if($velocityCount == 1)
+				               (${rollupAlias}${rollupDot}$dimMap.DIM_CD
+				  #elseif($preLvl == $dimMap.LVL or $totalFlag != "Y")
+				              , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+				  #elseif($preLvl != $dimMap.LVL and $totalFlag == "Y")
+				             ), (${rollupAlias}${rollupDot}$dimMap.DIM_CD
+				  #end
+				  #if($preLvl != $dimMap.LVL)
+				    #set($totalFlag = $dimMap.SQL_TOTAL_FLAG)
+				  #end
+				  #set($preLvl = $dimMap.LVL)
+				#end
+				, PLAN_DATE
+			    , START_DTTM
+			    , END_DTTM
+			    , REMARKS_PP
+		          )
+		    )
+		) A1
+	    ORDER BY TMP_COL
+	    #foreach($dimMap in $_parameter.dimList)
+	    	, A1.$dimMap.DIM_CD
+		#end
+			
+		
+	</select>
+	
+	<update id="dailyPlanVsActualUpdate" parameterType="map">
+	/****** [ aps.planResult.dailyPlanVsActualUpdate ] ******/
+
+			UPDATE TB_KPI_APS_PROD_PLAN_DAILY_DET
+			SET REMARKS_PP 			  =   @{REMARKS_PP}
+			   , UPDATE_ID 			  =   @{UPDATE_ID}
+			   , UPDATE_DTTM 		  =   DBO.UFN_GETDATE()
+			WHERE COMPANY_CD		  =	  @{GV_COMPANY_CD}
+					AND BU_CD 		  =	  @{GV_BU_CD}
+					AND YYYYMMDD 	  =   REPLACE(@{PLAN_DATE},'-','')  
+					AND PROD_PART     =   @{PART_CD}
+					AND PROD_ORDER_NO =   @{PROD_ORDER_NO}
+					AND OPERATION_NO  =   @{OPERATION_NO} 
+					AND RESOURCE_CD   =   @{RESOURCE_CD}
+			
+	</update>
+	
+
+	  	
+</mapper>

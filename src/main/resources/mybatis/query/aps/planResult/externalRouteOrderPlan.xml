@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+
+   <select id="externalRouteOrderPlanSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.externalRouteOrderPlanList ] ******/
+		
+		  DECLARE @V_PLAN_WEEK_THU_YYYYMMDD      NVARCHAR(8)
+         , @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD  NVARCHAR(8)
+         
+         SELECT @V_PLAN_WEEK_THU_YYYYMMDD =  YYYYMMDD
+        FROM TB_MST_CALENDAR
+        WHERE YEARWEEK=
+        (
+            SELECT APS_START_WEEK
+            FROM TB_MST_PLAN_VERSION
+            WHERE 1=1
+            AND PLAN_TYPE_CD = 'MP'
+            AND COMPANY_CD  = @{GV_COMPANY_CD}
+            AND BU_CD       = @{GV_BU_CD}
+            AND PLAN_ID     =  @{planId}
+        )       
+        AND DAY_NM = 'THU'
+        
+        SELECT @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD =  YYYYMMDD
+        FROM TB_MST_CALENDAR
+        WHERE YEARWEEK=
+        (
+            SELECT YEARWEEK
+            FROM TB_MST_CALENDAR
+            WHERE YYYYMMDD = CONVERT(NVARCHAR,DATEADD(WEEK,1,@V_PLAN_WEEK_THU_YYYYMMDD),112)
+        )       
+        AND DAY_NM = 'WED'
+		
+		
+		
+		SELECT HAOP.ITEM_CD
+		     , HAOP.ITEM_CD AS ITEM_CD_NM
+		     , MI.ITEM_NM
+		     , MI.ITEM_NM AS ITEM_NM_NM
+		     , MI.SPEC
+		     , MI.SPEC AS SPEC_NM
+   		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+	            	ELSE MC1.CODE_NM
+		       END ITEM_TYPE_CD
+   		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+	            	ELSE MC1.CODE_NM
+		       END ITEM_TYPE_CD_NM
+   		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+	            	ELSE MC2.CODE_NM
+		       END PROCUR_TYPE
+   		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+	            	ELSE MC2.CODE_NM
+		       END PROCUR_TYPE_NM
+		     , MI.ITEM_GROUP_CD
+		     , MI.ITEM_GROUP_CD AS ITEM_GROUP_CD_NM
+		     , MIP.ROUTING_ID
+		     , MIP.ROUTING_ID AS ROUTING_ID_NM
+		     , MI.REP_CUST_CD
+		     , MI.REP_CUST_CD AS REP_CUST_CD_NM
+		     , MC.CUST_NM
+		     , MC.CUST_NM AS REP_CUST_NM_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+	            	ELSE MC4.CODE_NM
+		       END MEAS_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+	            	ELSE MC4.CODE_NM
+		       END OS_PLAN_TYPE_NM
+		     , HAOP.PROD_ORDER_NO
+		     , HAOP.PROD_ORDER_NO AS PROD_ORDER_NO_NM 
+		     , HAOP.ROUTING_NO
+		     , HAOP.ROUTING_NO AS ROUTING_NO_NM
+		     , HAOP.OPERATION_NO
+		     , HAOP.OPERATION_NO AS OPERATION_NO_NM
+		     , ROUND(HAOP.PROCESS_TIME / 3600.0, 1) AS PROCESS_TIME
+		     , ROUND(HAOP.PROCESS_TIME / 3600.0, 1) AS PROCESS_LT_NM
+		     , HAOP.URGENT_YN
+		     , HAOP.URGENT_YN AS URGENT_YN_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+	            	ELSE MC3.CODE_NM
+		       END ORDER_STATUS
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+	            	ELSE MC3.CODE_NM
+		       END ORDER_STATUS_NM
+		     , HAOP.PROD_ORDER_QTY
+		     , HAOP.PROD_ORDER_QTY AS PROD_ORDER_QTY_NM 
+		     , HAOP.REMAIN_QTY
+		     , HAOP.REMAIN_QTY AS REMAIN_QTY_NM 
+		     , HAOP.GI_DATE
+		     , HAOP.GI_DATE AS PLAN_PO_START_DATE_NM
+		     
+		     /* 210119 이큰산 - 납기예정일이 주말인 경우 다음 워킹데이로 변경 */
+		     --, HAOP.GR_DATE
+		     --, HAOP.GR_DATE AS PLAN_WAREHOUSING_DATE_NM 
+		     , HAOP.GR_DATE AS GR_DATE
+			 , HAOP.GR_DATE AS PLAN_WAREHOUSING_DATE_NM		
+			 , CASE WHEN HAOP.PLAN_DATE = '19000101' THEN NULL ELSE HAOP.PLAN_DATE END BP_RETURN_DATE_NM
+			 ------------------
+	         , HAOP.BUFFER_GR_DATE -- 계획 입고일자 (버퍼)
+	         , HAOP.BUFFER_GR_DATE AS BUFFER_GR_DATE_NM -- 계획 입고일자 (버퍼)
+		     , HAOP.GR_QTY
+		     , HAOP.GR_QTY AS PLAN_QTY_NM 
+		     , HAOP.PLAN_DATE
+		     , HAOP.PLAN_DATE AS PROD_END_DATE_NM
+		     , MBP.BP_NM
+		     , MBP.BP_NM AS BP_NM_NM 
+		     , CASE WHEN MC5.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN_NM
+		     
+		     , CONVERT(VARCHAR, DATEADD(DAY, (ROUND(HAOP.PROCESS_TIME / 3600.0, 1) / 24), HAOP.GI_DATE), 112) AS QNC_REQ_DATE_NM	-- 원익요청일자
+		     
+		     , CASE WHEN HAOP.PLAN_DATE = '19000101' OR HAOP.PLAN_DATE = '' THEN NULL 
+		     		ELSE DATEDIFF(DAY, CONVERT(VARCHAR, DATEADD(DAY, (ROUND(HAOP.PROCESS_TIME / 3600.0, 1) / 24), HAOP.GI_DATE), 112), HAOP.PLAN_DATE) END BP_RETURN_DATE_GAP_NM		-- 원익요청대비 회신일자
+		     , EXTN.GOODS_QTY AS EXTERN_INPUT_QTY_NM								-- 입고수량
+		     , CONVERT(VARCHAR, EXTN.UPDATE_DTTM, 112) AS EXTERN_INPUT_DATE_NM 		-- 입고일(실적) 
+		     , CASE WHEN HAOP.PLAN_DATE = '19000101' OR HAOP.PLAN_DATE = '' THEN NULL  
+		            WHEN ISNULL(EXTN.UPDATE_DTTM, '') = '' THEN NULL 
+		    		ELSE DATEDIFF(DAY, HAOP.PLAN_DATE, CONVERT(VARCHAR, EXTN.UPDATE_DTTM, 112)) END EXTERN_INPUT_GAP_NM -- 차질
+		     , CASE WHEN HAOP.MEAS_CD <![CDATA[<>]]> 'GR_PLAN' THEN NULL
+		            WHEN HAOP.PLAN_DATE = '19000101' OR HAOP.PLAN_DATE = '' THEN NULL  
+		            WHEN ISNULL(EXTN.UPDATE_DTTM, '') = '' THEN NULL
+		     		WHEN HAOP.MEAS_CD = 'GR_PLAN' AND HAOP.GR_QTY = EXTN.GOODS_QTY AND HAOP.PLAN_DATE <![CDATA[>=]]> CONVERT(VARCHAR, EXTN.UPDATE_DTTM, 112) THEN 'Y' 
+		     		ELSE NULL END EXTERN_COMPLY_Y_NM
+		     
+             , CASE WHEN HAOP.MEAS_CD <![CDATA[<>]]> 'GR_PLAN' THEN NULL
+             WHEN HAOP.PLAN_DATE = '19000101' OR HAOP.PLAN_DATE = '' THEN NULL
+             --WHEN ISNULL(EXTN.UPDATE_DTTM, '') = '' THEN NULL 
+             WHEN HAOP.MEAS_CD = 'GR_PLAN' AND HAOP.GR_QTY = EXTN.GOODS_QTY AND HAOP.PLAN_DATE <![CDATA[>=]]> CONVERT(VARCHAR, EXTN.UPDATE_DTTM, 112) THEN NULL 
+             WHEN HAOP.PLAN_DATE <![CDATA[<]]>  @V_PLAN_WEEK_THU_YYYYMMDD AND    HAOP.PLAN_DATE <![CDATA[>]]>   @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD THEN 'Y'
+             ELSE 'Y' END EXTERN_COMPLY_N_NM
+		     , ORDE.SUBCONTRACT_PRC AS SUBCONTRACT_PRC_NM
+		     , ORDE.SUBCONTRACT_AMT AS SUBCONTRACT_AMT_NM
+		FROM TB_HIS_APS_OS_PLAN HAOP WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = HAOP.COMPANY_CD
+		  AND MI.BU_CD = HAOP.BU_CD
+		  AND MI.ITEM_CD = HAOP.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MI.COMPANY_CD
+		 AND MC.BU_CD = MI.BU_CD
+		 AND MC.CUST_CD = MI.REP_CUST_CD
+		LEFT OUTER JOIN TB_MST_BIZ_PARTNER MBP WITH(NOLOCK)
+		  ON MBP.COMPANY_CD = HAOP.COMPANY_CD
+		 AND MBP.BU_CD = HAOP.BU_CD
+		 AND MBP.BP_CD = HAOP.BP_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = 'ALL'
+		 AND MC1.GROUP_CD = 'ITEM_TYPE'
+		 AND MC1.CODE_CD = MI.ITEM_TYPE
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = 'ALL'
+		 AND MC2.GROUP_CD = 'PROCUR_TYPE'
+		 AND MC2.CODE_CD = MIP.PROCUR_TYPE
+		 AND MC2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		  ON MC3.BU_CD = HAOP.BU_CD
+		 AND MC3.GROUP_CD = 'ORDER_STATUS'
+		 AND MC3.CODE_CD = HAOP.ORDER_STATUS
+		 AND MC3.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+		  ON MC4.BU_CD = HAOP.BU_CD
+		 AND MC4.GROUP_CD = 'OS_PLAN_TYPE'
+		 AND MC4.CODE_CD = HAOP.MEAS_CD
+		 AND MC4.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+ 		  ON MC5.BU_CD = MIP.BU_CD
+		 AND MC5.GROUP_CD = 'CL_SL_CD'
+		 AND MC5.CODE_CD = MIP.RCPT_SL_CD
+		 AND MC5.USE_FLAG = 'Y'    
+		LEFT OUTER JOIN (SELECT COMPANY_CD, 
+								BU_CD, 
+								PROD_ORDER_NO,
+								OPERATION_NO,
+								SUM(RESULT_QTY) AS RESULT_QTY,
+								SUM(GOODS_QTY) AS GOODS_QTY,
+								SUM(DEFECT_QTY) AS DEFECT_QTY,
+								MAX(UPDATE_DTTM) AS UPDATE_DTTM
+						FROM TB_DYN_ROUTING_PERFORMANCE
+						WHERE JOB_CD = 'AZ'
+						AND UPDATE_DTTM BETWEEN @{fromCal} AND @{toCal}
+						<!-- AND DEFECT_QTY = 0 -->
+						GROUP BY COMPANY_CD, BU_CD, PROD_ORDER_NO, OPERATION_NO) EXTN
+		   ON HAOP.COMPANY_CD = EXTN.COMPANY_CD 
+		  AND HAOP.BU_CD = EXTN.BU_CD 
+		  AND HAOP.PROD_ORDER_NO = EXTN.PROD_ORDER_NO
+		  AND HAOP.OPERATION_NO  = EXTN.OPERATION_NO 
+		  AND HAOP.MEAS_CD = 'GR_PLAN'
+		 LEFT OUTER JOIN (SELECT A.COMPANY_CD, 
+		 						 A.BU_CD, 
+		 						 A.PROD_ORDER_NO, 
+		 						 A.ROUTING_NO, 
+		 						 B.OPERATION_NO, 
+		 						 B.BP_CD, 
+		 						 B.SUBCONTRACT_PRC, 
+		 						 B.SUBCONTRACT_AMT  
+		 				   FROM TB_DYN_PROD_ORDER_HDR A INNER JOIN TB_DYN_PROD_ORDER_DTL B 
+		 				     ON A.COMPANY_CD = B.COMPANY_CD 
+		 				    AND A.BU_CD = B.BU_CD 
+		 				    AND A.PROD_ORDER_NO = B.PROD_ORDER_NO 
+		 				  WHERE B.JOB_CD = 'AZ') ORDE
+		  ON HAOP.COMPANY_CD = ORDE.COMPANY_CD 
+		  AND HAOP.BU_CD = ORDE.BU_CD 
+		  AND HAOP.PROD_ORDER_NO = ORDE.PROD_ORDER_NO
+		  AND HAOP.ROUTING_NO = ORDE.ROUTING_NO 
+		  AND HAOP.OPERATION_NO  = ORDE.OPERATION_NO
+		  AND HAOP.BP_CD = ORDE.BP_CD
+		  
+		WHERE HAOP.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND HAOP.BU_CD = @{GV_BU_CD}
+		  AND HAOP.PLAN_ID = @{planId}
+		  AND HAOP.PROD_PART = @{prodPart}
+		  AND HAOP.VERSION_ID = @{planVersion}
+		  AND HAOP.GI_DATE BETWEEN @{fromCal} AND @{toCal}
+		#if($_parameter.route and $_parameter.route != "")
+		  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+		#end
+		#if($_parameter.item_nm and $_parameter.item_nm != ""  )
+		  AND (HAOP.ITEM_CD  LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		#end
+		#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+		#end
+		#if($_parameter.procurType and $_parameter.procurType != ""  )
+          AND MC2.CODE_CD IN ('$_parameter.procurType.replace(",","','")')
+        #end
+        #if($_parameter.woNo and $_parameter.woNo != "")
+	      AND HAOP.PROD_ORDER_NO LIKE '%$_parameter.woNo%'  
+	  	#end
+	  	#if($_parameter.woStatus and $_parameter.woStatus != "")
+	  	  AND MC3.CODE_CD IN ('$_parameter.woStatus.replace(",","','")') 
+	  	#end
+	  	#if($_parameter.customer and $_parameter.customer != ""  )
+          AND (MBP.BP_NM LIKE '%'+@{customer}+'%' OR MBP.BP_CD LIKE '%'+@{customer}+'%')
+        #end
+        #if($_parameter.urgentFlag and $_parameter.urgentFlag != ""  )
+        	AND HAOP.URGENT_YN IN ('$_parameter.urgentFlag.replace(",","','")')
+        #end
+        #if($_parameter.osPlanType and $_parameter.osPlanType != ""  )
+        	AND HAOP.MEAS_CD IN ('$_parameter.osPlanType.replace(",","','")')
+        #end
+	   ORDER BY HAOP.ITEM_CD,MC4.CODE_CD,HAOP.PLAN_DATE
+   
+	</select>
+	
+	<select id="externalRouteOrderPlanCmpRateSelect" parameterType="map" resultType="map">
+    /****** [ aps.planResult.externalRouteOrderPlanCmpRate ] ******/
+	       
+	       
+	     DECLARE @V_PLAN_WEEK_THU_YYYYMMDD      NVARCHAR(8)
+	     , @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD  NVARCHAR(8)
+	     
+	     SELECT @V_PLAN_WEEK_THU_YYYYMMDD =  YYYYMMDD
+        FROM TB_MST_CALENDAR
+        WHERE YEARWEEK=
+        (
+		    SELECT APS_START_WEEK
+			FROM TB_MST_PLAN_VERSION
+			WHERE 1=1
+			AND PLAN_TYPE_CD = 'MP'
+			AND COMPANY_CD  = @{GV_COMPANY_CD}
+			AND BU_CD       = @{GV_BU_CD}
+			AND PLAN_ID     =  @{planId}
+        )	    
+	    AND DAY_NM = 'THU'
+        
+        SELECT @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD =  YYYYMMDD
+        FROM TB_MST_CALENDAR
+        WHERE YEARWEEK=
+        (
+            SELECT YEARWEEK
+            FROM TB_MST_CALENDAR
+            WHERE YYYYMMDD = CONVERT(NVARCHAR,DATEADD(WEEK,1,@V_PLAN_WEEK_THU_YYYYMMDD),112)
+        )       
+        AND DAY_NM = 'WED'
+        
+        
+        
+        
+	     SELECT HAOP.BP_NM
+	     , HAOP.BP_CD
+	     , BP_RETURN_DATE.FOLLOW_CNT
+	     , BP_RETURN_DATE.NOT_FOLLOW_CNT
+         , ROUND(CONVERT(NUMERIC, BP_RETURN_DATE.FOLLOW_CNT) / NULLIF((CONVERT(NUMERIC,BP_RETURN_DATE.FOLLOW_CNT)+CONVERT(NUMERIC,BP_RETURN_DATE.NOT_FOLLOW_CNT)),0)*100,2) AS  PLAN_CMP_RATE
+	     FROM 
+	     (
+	        SELECT 
+	        HAOP.COMPANY_CD
+	        , HAOP.BU_CD
+	        , MBP.BP_NM
+	        , MBP.BP_CD      
+	               
+			FROM TB_HIS_APS_OS_PLAN HAOP WITH (NOLOCK)
+			INNER JOIN TB_MST_ITEM MI WITH (NOLOCK) 
+			ON MI.COMPANY_CD = HAOP.COMPANY_CD
+			AND MI.BU_CD = HAOP.BU_CD
+			AND MI.ITEM_CD = HAOP.ITEM_CD
+			
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH (NOLOCK) 
+			ON MIP.COMPANY_CD = MI.COMPANY_CD
+			AND MIP.BU_CD = MI.BU_CD
+			AND MIP.PLANT_CD = 'WF01'
+			AND MIP.ITEM_CD = MI.ITEM_CD
+			
+			LEFT OUTER JOIN TB_MST_BIZ_PARTNER MBP WITH (NOLOCK) 
+			ON MBP.COMPANY_CD = HAOP.COMPANY_CD
+			AND MBP.BU_CD = HAOP.BU_CD
+			AND MBP.BP_CD = HAOP.BP_CD
+			
+		
+		
+		   WHERE HAOP.COMPANY_CD = @{GV_COMPANY_CD}
+	       AND HAOP.BU_CD = @{GV_BU_CD}
+	       AND HAOP.PLAN_ID = @{planId}
+	       AND HAOP.PROD_PART = @{prodPart}
+	       AND HAOP.VERSION_ID = @{planVersion}
+	       AND HAOP.GI_DATE BETWEEN @{fromCal} AND @{toCal}   
+		   AND MBP.BP_NM IS NOT NULL
+		  
+		   GROUP BY HAOP.COMPANY_CD
+		   , HAOP.BU_CD
+		   , MBP.BP_CD
+		   , MBP.BP_NM
+
+	   ) HAOP
+	   LEFT OUTER JOIN (
+        
+        
+	       SELECT BP_RETURN_DATE.COMPANY_CD
+	       , BP_RETURN_DATE.BU_CD
+	       , BP_RETURN_DATE.BP_NM
+	       , BP_RETURN_DATE.BP_CD
+	       , ISNULL(BP_RETURN_DATE.FOLLOW_CNT,0)     FOLLOW_CNT
+	       , ISNULL(BP_RETURN_DATE.NOT_FOLLOW_CNT,0) NOT_FOLLOW_CNT
+	       
+	       
+	       FROM(
+	       
+	            SELECT HAOP.COMPANY_CD
+	            , HAOP.BU_CD
+	            , HAOP.BP_NM
+	            , HAOP.BP_CD
+	            , SUM( 
+	                  CASE WHEN HAOP.PLAN_DATE <![CDATA[>=]]>  @V_PLAN_WEEK_THU_YYYYMMDD AND    HAOP.PLAN_DATE <![CDATA[<=]]>   @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD THEN
+	                      CASE WHEN HAOP.EXTERN_COMPLY_Y = 'Y' THEN 1 
+	                      ELSE 0 
+	                      END
+                      END
+                  ) FOLLOW_CNT -- 준수 갯수
+                        
+                , SUM( 
+                      CASE WHEN HAOP.PLAN_DATE <![CDATA[>=]]>  @V_PLAN_WEEK_THU_YYYYMMDD AND    HAOP.PLAN_DATE <![CDATA[<=]]>   @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD THEN 
+                          CASE WHEN HAOP.EXTERN_COMPLY_N = 'Y' THEN 1
+                          ELSE 0
+                          END
+                      END
+                  ) NOT_FOLLOW_CNT -- 미준수 갯수
+	            FROM
+	            (
+			            SELECT 
+			            HAOP.COMPANY_CD
+			            , HAOP.BU_CD
+			            , MBP.BP_NM
+			            , MBP.BP_CD      
+			            , HAOP.PLAN_DATE
+			            , CASE WHEN HAOP.MEAS_CD <![CDATA[<>]]> 'GR_PLAN' THEN NULL
+		                    WHEN HAOP.PLAN_DATE = '19000101' OR HAOP.PLAN_DATE = '' THEN NULL  
+		                    WHEN ISNULL(EXTN.UPDATE_DTTM, '') = '' THEN NULL
+		                    WHEN HAOP.MEAS_CD = 'GR_PLAN' AND HAOP.GR_QTY = EXTN.GOODS_QTY AND HAOP.PLAN_DATE <![CDATA[>=]]> CONVERT(VARCHAR, EXTN.UPDATE_DTTM, 112) THEN 'Y' 
+		                    ELSE NULL END EXTERN_COMPLY_Y
+		                , CASE WHEN HAOP.MEAS_CD <![CDATA[<>]]> 'GR_PLAN' THEN NULL
+		                    WHEN HAOP.PLAN_DATE = '19000101' OR HAOP.PLAN_DATE = '' THEN NULL
+		                    --WHEN ISNULL(EXTN.UPDATE_DTTM, '') = '' THEN NULL 
+		                    WHEN HAOP.MEAS_CD = 'GR_PLAN' AND HAOP.GR_QTY = EXTN.GOODS_QTY AND HAOP.PLAN_DATE <![CDATA[>=]]> CONVERT(VARCHAR, EXTN.UPDATE_DTTM, 112) THEN NULL 
+		                    WHEN HAOP.PLAN_DATE <![CDATA[<]]>  @V_PLAN_WEEK_THU_YYYYMMDD AND    HAOP.PLAN_DATE <![CDATA[>]]>   @V_PLAN_WEEK_NEXT_WEEK_WED_YYYYMMDD THEN 'Y'
+		                    ELSE 'Y' END EXTERN_COMPLY_N
+		                FROM TB_HIS_APS_OS_PLAN HAOP WITH (NOLOCK)
+			            INNER JOIN TB_MST_ITEM MI WITH (NOLOCK) 
+			            ON MI.COMPANY_CD = HAOP.COMPANY_CD
+			            AND MI.BU_CD = HAOP.BU_CD
+			            AND MI.ITEM_CD = HAOP.ITEM_CD
+			            
+			            INNER JOIN TB_MST_ITEM_PLANT MIP WITH (NOLOCK) 
+			            ON MIP.COMPANY_CD = MI.COMPANY_CD
+			            AND MIP.BU_CD = MI.BU_CD
+			            AND MIP.PLANT_CD = 'WF01'
+			            AND MIP.ITEM_CD = MI.ITEM_CD
+			            
+			            LEFT OUTER JOIN TB_MST_BIZ_PARTNER MBP WITH (NOLOCK) 
+			            ON MBP.COMPANY_CD = HAOP.COMPANY_CD
+			            AND MBP.BU_CD = HAOP.BU_CD
+			            AND MBP.BP_CD = HAOP.BP_CD
+			            
+			            LEFT OUTER JOIN (
+		                         
+		                        SELECT COMPANY_CD, 
+		                        BU_CD, 
+		                        PROD_ORDER_NO,
+		                        OPERATION_NO,
+		                        SUM(RESULT_QTY) AS RESULT_QTY,
+		                        SUM(GOODS_QTY) AS GOODS_QTY,
+		                        SUM(DEFECT_QTY) AS DEFECT_QTY,
+		                        MAX(UPDATE_DTTM) AS UPDATE_DTTM
+		                        FROM TB_DYN_ROUTING_PERFORMANCE
+		                        WHERE JOB_CD = 'AZ'
+		                        AND UPDATE_DTTM BETWEEN @{fromCal} AND @{toCal}
+		                        <!-- AND DEFECT_QTY = 0 -->
+		                        GROUP BY COMPANY_CD, BU_CD, PROD_ORDER_NO, OPERATION_NO
+			           
+			           ) EXTN
+			           ON HAOP.COMPANY_CD = EXTN.COMPANY_CD 
+			           AND HAOP.BU_CD = EXTN.BU_CD 
+			           AND HAOP.PROD_ORDER_NO = EXTN.PROD_ORDER_NO
+			           AND HAOP.OPERATION_NO  = EXTN.OPERATION_NO 
+			           AND HAOP.MEAS_CD = 'GR_PLAN'
+			            
+			            
+			                    
+			            WHERE HAOP.COMPANY_CD = @{GV_COMPANY_CD}
+			           AND HAOP.BU_CD = @{GV_BU_CD}
+			           AND HAOP.PLAN_ID = @{planId}
+			           AND HAOP.PROD_PART = @{prodPart}
+			           AND HAOP.VERSION_ID = @{planVersion}
+			           AND HAOP.GI_DATE BETWEEN @{fromCal} AND @{toCal}   
+			           AND MBP.BP_NM IS NOT NULL
+			           
+			       ) HAOP
+		           GROUP BY 
+		           HAOP.COMPANY_CD
+		           , HAOP.BU_CD
+		           , HAOP.BP_NM
+		           , HAOP.BP_CD
+	           
+            ) BP_RETURN_DATE
+        
+        ) BP_RETURN_DATE
+        ON BP_RETURN_DATE.COMPANY_CD = HAOP.COMPANY_CD
+        AND BP_RETURN_DATE.BU_CD     = HAOP.BU_CD
+        AND BP_RETURN_DATE.BP_CD     = HAOP.BP_CD
+        
+	
+	
+	
+	</select>
+	
+</mapper>

@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	
+	<select id="workCalDaySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalDaySelect ] ******/
+		SELECT 'D' + RTRIM(YYYYMMDD) AS YYYYMMDD   
+		     , RTRIM(DAY_OFF_FLAG) AS DAY_OFF_FLAG   
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YYYYMMDD BETWEEN @{fromCal} AND @{toCal}
+	</select>
+
+	<select id="workCalendarSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarSelect ] ******/
+		WITH W_CAL AS 
+		(
+			SELECT RTRIM(YYYYMMDD     ) AS YYYYMMDD   
+			     , RTRIM(DAY          ) AS DAY        
+			     , RTRIM(DAY_NM       ) AS DAY_NM     
+			     , RTRIM(YEAR         ) AS YEAR       
+			     , RTRIM(YEARWEEK     ) AS YEARWEEK   
+			     , RTRIM(YEARPWEEK    ) AS YEARPWEEK
+			     , RTRIM(YEARMONTH    ) AS YEARMONTH  
+			     , RTRIM(YEARMONTH_STD) AS YEARMONTH_STD  
+			     , RTRIM(YEARQUARTER  ) AS YEARQUARTER
+			     , RTRIM(YEARHALF     ) AS YEARHALF   
+			     , RTRIM(MONTH        ) AS MONTH      
+			     , RTRIM(WEEKOFYEAR   ) AS WEEKOFYEAR 
+			     , RTRIM(WEEKOFMONTH  ) AS WEEKOFMONTH
+			     , RTRIM(QUARTER      ) AS QUARTER    
+			     , RTRIM(HALF         ) AS HALF       
+			     , RTRIM(MONTH_NM     ) AS MONTH_NM   
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YYYYMMDD BETWEEN @{fromCal} AND @{toCal}
+		)
+		SELECT NULL AS TMP_COL
+			 , BU_CD
+	         , PART_CD AS PART_CD
+	         , PART_NM AS PART_CD_NM
+	         , TIME_TYPE_CD AS TIME_TYPE_CD
+	         , TIME_TYPE_NM AS TIME_TYPE_CD_NM
+	         , CODE_CD AS CODE_NM
+	         , CODE_NM AS CODE_NM_NM
+	         , USE_FLAG AS USE_YN
+	         , USE_FLAG AS USE_YN_NM
+	         , POQ_CD AS POQ_CD
+	         , POQ_NM AS POQ_CD_NM
+	         , RESOURCE_CD AS RESOURCE_TYPE_CD
+	         , RESOURCE_NM AS RESOURCE_TYPE_CD_NM
+	         , START_END_TYPE AS START_END_TYPE 
+	         , START_END_TYPE AS START_END_TYPE_NM 
+	       	#foreach($bucketMap in $_parameter.bucketList)
+			#set($paramDay = "$bucketMap.BUCKET_VAL")
+				#if($bucketMap.CD.indexOf("_A") > -1)
+				, MAX (CASE WHEN SHIFT_CODE_CD = 'A' AND YYYYMMDD = '$paramDay'
+							THEN CASE WHEN START_END_TYPE = 'Start' THEN START_TIME
+								      ELSE END_TIME
+								  END
+							ELSE NULL
+						END) AS $bucketMap.CD
+				#elseif($bucketMap.CD.indexOf("_B") > -1)
+				, MAX (CASE WHEN SHIFT_CODE_CD = 'B' AND YYYYMMDD = '$paramDay'
+							THEN CASE WHEN START_END_TYPE = 'Start' THEN START_TIME
+								      ELSE END_TIME
+								  END
+							ELSE NULL
+						END) AS $bucketMap.CD 
+				#end
+			#end
+			 , MAX(SORT)
+		FROM 
+		(
+			SELECT D.BU_CD
+	             , D.PART_CD
+	             , D.PART_NM
+	             , D.TIME_TYPE_CD
+	             , D.TIME_TYPE_NM
+	             , D.CODE_CD
+	             , D.CODE_NM
+	             , D.SHIFT_CODE_CD
+	             , D.START_END_TYPE
+	             , W.START_TIME
+	             , W.END_TIME
+	             , D.YYYYMMDD
+	             , D.MD
+	             , D.SORT
+	             , D.USE_FLAG
+	             , D.POQ_CD
+                 , D.POQ_NM
+                 , D.RESOURCE_CD
+                 , D.RESOURCE_NM
+                 , D.PART_SORT
+			FROM 
+			(
+				SELECT A.YYYYMMDD
+                     , A.MONTH + '/' + A.DAY + ' (' + A.DAY_NM + ')' AS MD
+                     , B.PART_CD
+                     , F.CODE_NM AS PART_NM
+                     , B.TIME_TYPE_CD
+                     , K.CODE_NM AS TIME_TYPE_NM
+                     , B.BU_CD
+                     , B.CODE_CD
+                     , B.CODE_NM
+                     , B.SORT
+                     , B.USE_FLAG
+                     , C.SHIFT_CODE_CD
+                     , C.SHIFT_CODE_NM
+                     , E.START_END_TYPE
+                     , S.POQ_CD
+                     , S.POQ_NM
+                     , T.RESOURCE_CD
+                     , T.RESOURCE_NM
+                     , F.PART_SORT
+				FROM W_CAL AS A
+				CROSS JOIN
+				(
+					SELECT CODE_CD
+                         , CASE WHEN 'KO' = UPPER(@{GV_LANG}) THEN CODE_NM_KR
+                                WHEN 'CN' = UPPER(@{GV_LANG}) THEN CODE_NM_CN
+                                ELSE CODE_NM
+                            END AS CODE_NM
+                         , ATTB_1_CD AS PART_CD
+                         , ATTB_2_CD AS TIME_TYPE_CD
+                         , BU_CD
+                         , SORT
+                         , ATTB_3_CD
+                         , ATTB_4_CD
+                         , USE_FLAG
+					FROM TB_MST_CODE WITH (NOLOCK)
+					WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+					#if($_parameter.useFlag and $_parameter.useFlag != '' )
+					  AND USE_FLAG IN ('$_parameter.useFlag.replace(",","','")')
+					#end
+					  AND GROUP_CD = 'WC_TIME_MANAGEMENT'
+				) B
+				CROSS JOIN
+				(
+					SELECT CODE_CD AS SHIFT_CODE_CD
+                         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN CODE_NM_KR
+                                WHEN UPPER(@{GV_LANG}) = 'CN' THEN CODE_NM_CN
+                                ELSE CODE_NM
+                            END AS SHIFT_CODE_NM
+					FROM TB_MST_CODE WITH (NOLOCK)
+				    WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+					  AND USE_FLAG != 'N'
+					  AND GROUP_CD = 'WC_SHIFT'
+				) C
+				LEFT OUTER JOIN 
+				(
+					SELECT 'Start' AS START_END_TYPE
+				    UNION ALL
+				    SELECT 'End' AS START_END_TYPE
+				) E
+				ON 1 = 1
+				LEFT OUTER JOIN 
+				(
+					SELECT CODE_CD
+			         	 , CASE	WHEN UPPER(@{GV_LANG}) = 'KO' THEN CODE_NM_KR
+			           			WHEN UPPER(@{GV_LANG}) = 'CN' THEN CODE_NM_CN
+			           			ELSE CODE_NM
+			        		END CODE_NM
+			        	 , SORT AS PART_SORT
+			   		FROM TB_MST_CODE WITH (NOLOCK)
+			  		WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+			          AND USE_FLAG != 'N'
+			          AND GROUP_CD = 'PROD_PART'
+				) F
+			    ON ( B.PART_CD = F.CODE_CD )
+			    LEFT OUTER JOIN 
+			    (
+					SELECT CODE_CD
+					     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN CODE_NM_KR
+					          	WHEN UPPER(@{GV_LANG}) = 'CN' THEN CODE_NM_CN
+					          	ELSE CODE_NM
+					        END CODE_NM
+  					FROM TB_MST_CODE WITH (NOLOCK)
+ 					WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+       				  AND USE_FLAG != 'N'
+       				  AND GROUP_CD = 'WC_TIME_TYPE'
+				) K
+				ON B.TIME_TYPE_CD = K.CODE_CD     
+			    INNER JOIN 
+			    (
+		        	SELECT CODE_CD AS POQ_CD
+						 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN CODE_NM_KR
+							    WHEN UPPER(@{GV_LANG}) = 'CN' THEN CODE_NM_CN
+							    ELSE CODE_NM
+							END AS POQ_NM
+					FROM TB_MST_CODE WITH (NOLOCK)
+					WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+					  AND USE_FLAG != 'N'
+					  AND GROUP_CD = 'PROD_OR_QC'
+				) S
+				ON B.ATTB_3_CD = S.POQ_CD     
+	            INNER JOIN 
+	            (
+		        	SELECT CODE_CD AS RESOURCE_CD
+						 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN CODE_NM_KR
+							    WHEN UPPER(@{GV_LANG}) = 'CN' THEN CODE_NM_CN
+							    ELSE CODE_NM
+							END AS RESOURCE_NM
+					FROM TB_MST_CODE WITH (NOLOCK)
+					WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+					  AND USE_FLAG != 'N'
+					  AND GROUP_CD = 'RESOURCE_TYPE'
+				) T
+		        ON B.ATTB_4_CD = T.RESOURCE_CD     
+				WHERE 1 = 1
+			) D
+			LEFT OUTER JOIN
+			(
+				SELECT *
+				#if($_parameter.cutOffFlag == "Y" )
+				FROM TB_HIS_WORK_CALENDAR
+				#else
+				FROM TB_MST_WORK_CALENDAR
+				#end
+				WHERE YYYYMMDD BETWEEN @{fromCal} AND @{toCal}
+				#if($_parameter.cutOffFlag == "Y" and $_parameter.planId and $_parameter.planId != '' )
+        		  AND PLAN_ID = '$_parameter.planId'
+    			#end
+ 			) W
+ 			ON D.BU_CD = W.BU_CD
+		    AND D.PART_CD = W.PROD_PART
+		    AND D.CODE_CD = W.WC_TIME_CD
+		    AND D.TIME_TYPE_CD = W.WC_TIME_TYPE
+		    AND D.POQ_CD = W.PROD_OR_QC
+		    AND D.RESOURCE_CD = W.RESOURCE_TYPE
+		    AND D.SHIFT_CODE_CD = W.WC_SHIFT
+		    AND D.YYYYMMDD = W.YYYYMMDD
+		) Z
+		WHERE 1 = 1
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+          AND Z.PART_CD IN ('$_parameter.prodPart.replace(",","','")')
+        #end  
+        #if($_parameter.prodOrQc and $_parameter.prodOrQc != "")
+          AND Z.POQ_CD IN ('$_parameter.prodOrQc.replace(",","','")')
+        #end
+        #if($_parameter.resourceType and $_parameter.resourceType != "")
+          AND Z.RESOURCE_CD IN ('$_parameter.resourceType.replace(",","','")')
+        #end
+        GROUP BY Z.BU_CD, Z.PART_CD, Z.PART_NM, Z.TIME_TYPE_CD, Z.TIME_TYPE_NM, Z.CODE_CD, Z.CODE_NM, Z.START_END_TYPE, Z.SORT
+               , Z.USE_FLAG, Z.POQ_CD, Z.POQ_NM, Z.RESOURCE_CD, Z.RESOURCE_NM, Z.PART_SORT
+		ORDER BY Z.PART_SORT,Z.POQ_CD,Z.RESOURCE_CD,Z.SORT, Z.START_END_TYPE DESC
+		   
+	</select>
+	
+	<select id="workCalendarAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarAuthoritySelect ] ******/
+		
+		DECLARE @COMMON_DETAIL_ROLE_CNT INT; -- 사용자가 가진 공통권한과 세부권한 개수를 세어 공통권한과 세부권한을 2개 이상가지고 있을 경우 권한 부여하지 않기 위한변수
+            
+        
+        
+        
+        SELECT @COMMON_DETAIL_ROLE_CNT = COUNT(*)
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0006','PRO0007', 'PRO0008', 'PRO0009','PRO0010', 'PRO0011')
+		
+        IF @COMMON_DETAIL_ROLE_CNT <![CDATA[>=]]> 1 AND @COMMON_DETAIL_ROLE_CNT <![CDATA[<]]> 2 
+        BEGIN
+		
+						SELECT A2.MENU_CD
+						FROM
+						(
+						  	SELECT BU_CD
+						         , ROLE_CD
+						  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+						  	WHERE USER_ID = @{GV_USER_ID}
+						      AND BU_CD = @{GV_BU_CD}
+						      AND USE_FLAG = 'Y'
+						) A1
+						INNER JOIN
+						(
+						  	SELECT COMPANY_CD
+						         , BU_CD
+						         , ROLE_CD
+						         , MENU_CD
+						  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+						  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+						      AND BU_CD = @{GV_BU_CD}
+						      AND MENU_CD IN ('APS10102', 'APS10103', 'APS10104')
+						      AND ACTION_CD = 'SAVE'
+						      AND USE_FLAG = 'Y'
+						) A2
+						ON A1.BU_CD = A2.BU_CD
+						AND A1.ROLE_CD = A2.ROLE_CD
+						GROUP BY A2.MENU_CD
+
+        END
+        
+        IF @{GV_USER_ID} = '00602'
+        BEGIN
+        
+            
+                        SELECT A2.MENU_CD
+                        FROM
+                        (
+                            SELECT BU_CD
+                                 , ROLE_CD
+                            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                            WHERE USER_ID = @{GV_USER_ID}
+                              AND BU_CD = @{GV_BU_CD}
+                              AND USE_FLAG = 'Y'
+                        ) A1
+                        INNER JOIN
+                        (
+                            SELECT COMPANY_CD
+                                 , BU_CD
+                                 , ROLE_CD
+                                 , MENU_CD
+                            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                              AND BU_CD = @{GV_BU_CD}
+                              AND MENU_CD IN ('APS10102', 'APS10103', 'APS10104')
+                              AND ACTION_CD = 'SAVE'
+                              AND USE_FLAG = 'Y'
+                        ) A2
+                        ON A1.BU_CD = A2.BU_CD
+                        AND A1.ROLE_CD = A2.ROLE_CD
+                        GROUP BY A2.MENU_CD
+        
+        END 
+
+
+	</select>
+	
+	<select id="workCalendarWeekSelect"  parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarWeekSelect ] ******/
+		SELECT SUBSTRING(YYYYMMDD, 5, 2) + '/' + SUBSTRING(YYYYMMDD, 7, 2) +' (' + B.CODE_NM_KR + ')' AS CD
+             , 'W' + YEARWEEK AS NM
+		FROM TB_MST_CALENDAR A WITH(NOLOCK)
+        LEFT OUTER JOIN TB_MST_CODE B WITH(NOLOCK)
+          ON A.DAY_NM = B.CODE_CD
+         AND B.BU_CD = @{GV_BU_CD}
+         AND B.GROUP_CD = 'DAY_INDEX'
+         AND B.USE_FLAG ='Y'
+       	WHERE A.YYYYMMDD BETWEEN @{fromCal} AND @{toCal}
+	
+	</select>
+	
+	<select id="workCalendarPopupSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarPopupSelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		       AND MENU_CD IN ('APS10101')
+		      AND ACTION_CD in ('SEARCH', 'SAVE')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<update id="workCalendarUpdate" parameterType="map">
+	    /****** [ aps.static.sworkCalendarUpdate ] ******/
+		MERGE TB_MST_WORK_CALENDAR WITH (HOLDLOCK) AS T 
+	    USING 
+	    (
+			SELECT '$_parameter.GV_COMPANY_CD' AS COMPANY_CD
+                 , '$_parameter.GV_BU_CD' AS BU_CD
+                 , '$_parameter.PROD_PART' AS PROD_PART
+                 , '$_parameter.POQ_CD' AS PROD_OR_QC
+                 , '$_parameter.RESOURCE_TYPE_CD' AS RESOURCE_TYPE
+				 , '$_parameter.WC_TIME_CD' AS WC_TIME_CD
+				 , '$_parameter.TIME_TYPE_CD' AS WC_TIME_TYPE
+				 , '$_parameter.WC_SHIFT' AS WC_SHIFT
+				 , '$_parameter.YYYYMMDD' AS YYYYMMDD
+				 , '$_parameter.START_TIME' AS START_TIME
+				 , '$_parameter.END_TIME' AS END_TIME
+				 , '$_parameter.GV_USER_ID' AS CREATE_ID
+				 , DBO.UFN_GETDATE() AS CREATE_DTTM
+				 , '$_parameter.GV_USER_ID' AS UPDATE_ID
+				 , DBO.UFN_GETDATE() AS UPDATE_DTTM
+		) AS S
+	    ON 
+	    (
+	    	T.COMPANY_CD = S.COMPANY_CD 
+	        AND T.BU_CD = S.BU_CD
+	        AND T.PROD_PART = S.PROD_PART
+	        AND T.PROD_OR_QC = S.PROD_OR_QC
+	        AND T.RESOURCE_TYPE = S.RESOURCE_TYPE
+	        AND T.WC_TIME_CD = S.WC_TIME_CD
+	        AND T.WC_TIME_TYPE = S.WC_TIME_TYPE
+	        AND T.WC_SHIFT = S.WC_SHIFT
+	        AND T.YYYYMMDD = S.YYYYMMDD
+		)
+	    WHEN MATCHED THEN 
+	    UPDATE SET
+	    	UPDATE_ID = S.UPDATE_ID
+		  , UPDATE_DTTM = S.UPDATE_DTTM 
+		#if($_parameter.START_TIME != "undefined")
+	      , START_TIME = S.START_TIME
+		#end
+	    #if($_parameter.END_TIME != "undefined")
+	      , END_TIME = S.END_TIME
+		#end
+		WHEN NOT MATCHED THEN
+	    INSERT 
+	    (
+			COMPANY_CD
+          , BU_CD
+          , PROD_PART
+          , PROD_OR_QC
+          , RESOURCE_TYPE
+          , WC_TIME_CD
+          , WC_TIME_TYPE
+          , WC_SHIFT
+          , YYYYMMDD
+		#if($_parameter.START_TIME != "undefined")
+          , START_TIME
+        #end
+        #if($_parameter.END_TIME != "undefined")
+          , END_TIME
+        #end
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+		)VALUES( 
+			S.COMPANY_CD
+          , S.BU_CD
+          , S.PROD_PART
+          , S.PROD_OR_QC
+          , S.RESOURCE_TYPE
+          , S.WC_TIME_CD
+          , S.WC_TIME_TYPE
+          , S.WC_SHIFT
+          , S.YYYYMMDD
+		#if($_parameter.START_TIME != "undefined")
+          , S.START_TIME
+        #end
+        #if($_parameter.END_TIME != "undefined")
+          , S.END_TIME
+        #end
+          , S.CREATE_ID
+          , S.CREATE_DTTM
+          , S.UPDATE_ID
+          , S.UPDATE_DTTM
+		);
+      </update>
+      	
+</mapper>

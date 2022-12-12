@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+
+	<select id="dimMapSelect" parameterType="map" resultType="map">
+		/****** [ common.dimMapSelect ] ******/
+		SELECT @{SEARCH_COMPANY_CD} AS COMPANY_CD
+		     , @{SEARCH_BU_CD}      AS BU_CD
+		     , @{SEARCH_MENU_CD}    AS MENU_CD
+		     , DIM_CD
+	         , CASE WHEN 'ko' = @{GV_LANG} THEN DIM_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN DIM_NM_CN
+	                ELSE DIM_NM
+	           END AS DIM_NM
+	         , DIM_DESC
+		FROM TB_MST_DIM A WITH(NOLOCK)
+		WHERE USE_FLAG = 'Y'
+		#if($_parameter.SEARCH_DIM_CD and $_parameter.SEARCH_DIM_CD != "")
+		  AND DIM_CD LIKE '%' + REPLACE(@{SEARCH_DIM_CD},'_','[_]') + '%'
+		#end
+		#if($_parameter.SEARCH_DIM_NM and $_parameter.SEARCH_DIM_NM != "")
+		  AND DIM_NM_KR LIKE '%' + REPLACE(@{SEARCH_DIM_NM},'_','[_]') + '%'
+		#end
+		  AND NOT EXISTS (SELECT 1 
+		                  FROM TB_MAP_MENU_DIM WITH(NOLOCK)
+		                  WHERE DIM_CD     = A.DIM_CD
+		                    AND USE_FLAG   = 'Y' 
+		                    AND COMPANY_CD = @{SEARCH_COMPANY_CD}
+		                    AND BU_CD      = @{SEARCH_BU_CD}
+		                    AND MENU_CD    = @{SEARCH_MENU_CD})
+		ORDER BY DIM_CD, DIM_NM
+	</select>
+
+	<!-- Measure Mapping 조회  -->
+	<select id="meaMapSelect" parameterType="map" resultType="map">
+		/****** [ common.meaMapSelect ] ******/
+		SELECT @{SEARCH_COMPANY_CD} AS COMPANY_CD
+		     , @{SEARCH_BU_CD}      AS BU_CD
+		     , @{SEARCH_MENU_CD}    AS MENU_CD
+		     , MEAS_CD
+	         , CASE WHEN 'ko' = @{GV_LANG} THEN MEAS_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MEAS_NM_CN
+	                ELSE MEAS_NM
+	           END AS MEAS_NM
+	         , MEAS_DESC
+		FROM TB_MST_MEAS A WITH(NOLOCK)
+		WHERE USE_FLAG = 'Y'
+		#if($_parameter.SEARCH_MEA_CD and $_parameter.SEARCH_MEA_CD != "")
+		  AND MEAS_CD LIKE '%' + REPLACE(@{SEARCH_MEA_CD},'_','[_]') + '%'
+		#end
+		#if($_parameter.SEARCH_MEA_NM and $_parameter.SEARCH_MEA_NM != "")
+		  AND MEAS_NM_KR LIKE '%' + REPLACE(@{SEARCH_MEA_NM},'_','[_]') + '%'
+		#end
+		  AND NOT EXISTS (SELECT 1 
+		                  FROM TB_MAP_MENU_MEAS WITH(NOLOCK)
+		                  WHERE MEAS_CD     = A.MEAS_CD
+		                    AND USE_FLAG   = 'Y' 
+		                    AND COMPANY_CD = @{SEARCH_COMPANY_CD}
+		                    AND BU_CD      = @{SEARCH_BU_CD}
+		                    AND MENU_CD    = @{SEARCH_MENU_CD})
+		ORDER BY MEAS_CD, MEAS_NM
+	</select>
+
+	<!-- 디멘전 조회  -->
+	<select id="dimensionSelect" parameterType="map" resultType="map">
+		/****** [ common.dimensionSelect ] ******/
+		WITH W_DIM_ALL AS 
+		(
+		    SELECT B.COMPANY_CD
+		         , B.BU_CD
+		         , C.USER_ID
+		         , B.MENU_CD
+		         , B.DIM_CD
+		         , CASE WHEN 'ko' = @{GV_LANG} THEN A.DIM_NM_KR
+	                    WHEN 'cn' = @{GV_LANG} THEN A.DIM_NM_CN
+	                    ELSE A.DIM_NM
+	               END AS DIM_NM
+		         , A.DIM_ALIGN_CD
+		         , B.SORT AS SORT_ORG
+		         , ISNULL(C.SORT, B.SORT) AS SORT
+		         , ISNULL(ISNULL(C.WIDTH, B.WIDTH),80) AS WIDTH
+		         , B.LVL
+		         , B.MAND_FLAG
+		         , B.DEFAULT_FLAG
+		         , B.TOTAL_FLAG AS TOTAL_FLAG_YN
+		         , CASE WHEN B.TOTAL_FLAG = 'Y' THEN ISNULL(IIF(C.TOTAL_FLAG='Y','Y',''), '') 
+	                    ELSE ''
+	               END AS TOTAL_FLAG
+		         , CASE WHEN C.DIM_CD IS NOT NULL THEN 'Y' 
+		                ELSE 'N'
+		           END AS MAPPING_FLAG
+		         , MAX(C.DIM_CD) OVER() AS USER_FLAG
+			FROM TB_MST_DIM A WITH(NOLOCK)
+		    INNER JOIN TB_MAP_MENU_DIM B WITH(NOLOCK)
+		       ON B.DIM_CD     = A.DIM_CD
+		      AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND B.BU_CD      = @{GV_BU_CD}
+		      AND B.MENU_CD    = @{menuCd}
+		      AND B.USE_FLAG   = 'Y'
+		    LEFT JOIN TB_MAP_USER_MENU_DIM C WITH(NOLOCK)
+		      ON C.COMPANY_CD = B.COMPANY_CD
+		     AND C.BU_CD      = B.BU_CD
+		     AND C.MENU_CD    = B.MENU_CD
+		     AND C.DIM_CD     = B.DIM_CD
+		     AND C.USER_ID    = @{GV_USER_ID}
+		     AND C.USE_FLAG   = 'Y'
+		    WHERE A.USE_FLAG  = 'Y'
+		)
+		SELECT A.*
+		     , CASE WHEN ROW_NUMBER() OVER(PARTITION BY LVL ORDER BY LVL,SORT,DIM_CD) = 1 THEN MAX(TOTAL_FLAG) OVER(PARTITION BY LVL)
+	                ELSE 'N'
+	           END AS SQL_TOTAL_FLAG
+		FROM W_DIM_ALL A
+		WHERE MAND_FLAG    = 'Y'
+		   OR MAPPING_FLAG = 'Y'
+		   OR (USER_FLAG IS NULL AND DEFAULT_FLAG = 'Y' AND MAPPING_FLAG = 'N')
+		ORDER BY CASE WHEN USER_FLAG IS NULL THEN LVL
+		              ELSE NULL
+		         END
+		       , SORT, DIM_CD
+	</select>
+	
+	<insert id="dimConfMenuMerge" parameterType="map">
+		/****** [ common.dimConfMenuMerge ] ******/
+		MERGE TB_MAP_USER_MENU_DIM AS A
+		USING (
+			SELECT @{GV_COMPANY_CD} AS COMPANY_CD
+		     	 , @{GV_BU_CD}      AS BU_CD
+		     	 , @{GV_USER_ID}    AS USER_ID
+		     	 , @{MENU_CD}       AS MENU_CD
+		     	 , @{DIM_CD}        AS DIM_CD
+		     	 , @{SORT}          AS SORT
+		     	 , @{WIDTH}         AS WIDTH
+		     	 , ISNULL(@{TOTAL_FLAG}	 , 'N') AS TOTAL_FLAG
+		     	 , 'Y' AS USE_FLAG
+		) B
+		ON (
+			    A.COMPANY_CD = B.COMPANY_CD   
+		   	AND A.BU_CD      = B.BU_CD   
+			AND A.USER_ID    = B.USER_ID   
+			AND A.MENU_CD    = B.MENU_CD   
+			AND A.DIM_CD     = B.DIM_CD
+		)   
+		WHEN MATCHED THEN
+			UPDATE SET 
+			    A.SORT         = B.SORT
+			  , A.WIDTH        = B.WIDTH
+			  , A.TOTAL_FLAG   = B.TOTAL_FLAG
+			  , A.UPDATE_DTTM  = DBO.UFN_GETDATE()
+			  , A.UPDATE_ID    = @{GV_USER_ID}
+		WHEN NOT MATCHED THEN
+			INSERT (
+			    COMPANY_CD
+			  , BU_CD
+			  , USER_ID
+			  , MENU_CD
+			  , DIM_CD
+			  , SORT         
+			  , WIDTH        
+			  , TOTAL_FLAG   
+			  , USE_FLAG   
+	 		  , UPDATE_DTTM
+		      , UPDATE_ID  
+			  , CREATE_DTTM
+			  , CREATE_ID
+			) VALUES (
+			    B.COMPANY_CD
+			  , B.BU_CD
+			  , B.USER_ID
+			  , B.MENU_CD
+			  , B.DIM_CD
+			  , B.SORT         
+			  , B.WIDTH        
+			  , B.TOTAL_FLAG
+			  , B.USE_FLAG
+			  , DBO.UFN_GETDATE()
+			  , @{GV_USER_ID}
+			  , DBO.UFN_GETDATE()
+			  , @{GV_USER_ID}
+			);
+	</insert>
+	
+	<delete id="dimConfMenuDelete" parameterType="map">
+		/****** [ common.dimConfMenuDelete ] ******/
+		DELETE FROM TB_MAP_USER_MENU_DIM 
+		WHERE COMPANY_CD = @{COMPANY_CD}   
+		  AND BU_CD      = @{BU_CD}
+		  AND USER_ID    = @{GV_USER_ID}
+		  AND MENU_CD    = @{MENU_CD}   
+		  AND DIM_CD     = @{DIM_CD}
+	</delete>
+	
+	<!-- user measure 조회  -->
+	<select id="meaConfSelect" parameterType="map" resultType="map">
+		/****** [ common.meaConfSelect ] ******/
+		BEGIN
+  
+			DECLARE @P_USER_CNT INT;
+		  
+		  	SELECT @P_USER_CNT = COUNT(*)
+		  	FROM TB_MAP_USER_MENU_MEAS WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD      = @{GV_BU_CD}
+			  AND MENU_CD    = @{SEARCH_MENU_CD}
+			  AND USER_ID    = @{GV_USER_ID}
+			;
+			
+			SELECT B.COMPANY_CD
+			     , B.BU_CD
+			     , B.MENU_CD
+			     , B.MEAS_CD
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN A.MEAS_NM_KR
+		                WHEN 'cn' = @{GV_LANG} THEN A.MEAS_NM_CN
+		                ELSE A.MEAS_NM
+		           END AS MEAS_NM
+			     , ISNULL(C.SORT, B.SORT) AS SORT
+			     , B.MAND_FLAG
+			     , B.DEFAULT_FLAG
+			     , CASE WHEN @P_USER_CNT = 0 THEN CASE WHEN B.MAND_FLAG = 'Y' THEN 'Y'
+              										   WHEN B.DEFAULT_FLAG = 'Y' THEN 'Y'
+         										   END	
+          				ELSE ISNULL(C.USE_FLAG, 'N')
+            		END USER_USE_FLAG
+			     <!-- , CASE WHEN B.MAND_FLAG = 'Y' THEN 'Y'
+			            WHEN C.MEAS_CD IS NULL AND DEFAULT_FLAG = 'Y' THEN 'Y'
+			            ELSE C.USE_FLAG 
+			       END AS USER_USE_FLAG -->
+			FROM TB_MST_MEAS A WITH(NOLOCK)
+			INNER JOIN TB_MAP_MENU_MEAS B WITH(NOLOCK)
+			    ON B.MEAS_CD    = A.MEAS_CD
+			   AND B.COMPANY_CD = @{GV_COMPANY_CD}
+			   AND B.BU_CD      = @{GV_BU_CD}
+			   AND B.MENU_CD    = @{SEARCH_MENU_CD}
+			   AND B.USE_FLAG   = 'Y'
+			LEFT JOIN TB_MAP_USER_MENU_MEAS C WITH(NOLOCK)
+			    ON C.COMPANY_CD = B.COMPANY_CD
+			   AND C.BU_CD      = B.BU_CD
+			   AND C.MENU_CD    = B.MENU_CD
+			   AND C.USER_ID    = @{GV_USER_ID}
+			   AND C.MEAS_CD    = B.MEAS_CD
+			WHERE A.USE_FLAG = 'Y'
+			ORDER BY ISNULL(C.SORT, B.SORT), B.MEAS_CD
+		
+		END;
+	</select>
+	
+	<insert id="meaConfMerge" parameterType="map">
+		/****** [ common.meaConfMerge ] ******/
+		MERGE TB_MAP_USER_MENU_MEAS AS A
+		USING (
+			SELECT @{GV_COMPANY_CD} AS COMPANY_CD
+		     	 , @{GV_BU_CD}      AS BU_CD
+		     	 , @{GV_USER_ID}    AS USER_ID
+		     	 , @{MENU_CD}       AS MENU_CD
+		     	 , @{MEAS_CD}       AS MEAS_CD
+		     	 , @{SORT}          AS SORT
+		     	 , @{USER_USE_FLAG} AS USE_FLAG
+		) B
+		ON (
+			    A.COMPANY_CD = B.COMPANY_CD   
+		   	AND A.BU_CD      = B.BU_CD   
+			AND A.USER_ID    = B.USER_ID   
+			AND A.MENU_CD    = B.MENU_CD   
+			AND A.MEAS_CD    = B.MEAS_CD
+		)   
+		WHEN MATCHED THEN
+			UPDATE SET 
+			    A.SORT         = B.SORT
+			  , A.USE_FLAG     = B.USE_FLAG
+			  , A.UPDATE_DTTM  = DBO.UFN_GETDATE()
+			  , A.UPDATE_ID    = @{GV_USER_ID}
+		WHEN NOT MATCHED THEN
+			INSERT (
+			    COMPANY_CD
+			  , BU_CD
+			  , USER_ID
+			  , MENU_CD
+			  , MEAS_CD
+			  , SORT         
+			  , USE_FLAG   
+	 		  , UPDATE_DTTM
+		      , UPDATE_ID  
+			  , CREATE_DTTM
+			  , CREATE_ID
+			) VALUES (
+			    B.COMPANY_CD
+			  , B.BU_CD
+			  , B.USER_ID
+			  , B.MENU_CD
+			  , B.MEAS_CD
+			  , B.SORT         
+			  , B.USE_FLAG
+			  , DBO.UFN_GETDATE()
+			  , @{GV_USER_ID}
+			  , DBO.UFN_GETDATE()
+			  , @{GV_USER_ID}
+			);
+	</insert>
+	
+	<delete id="meaConfDelete" parameterType="map">
+		/****** [ common.meaConfDelete ] ******/
+		DELETE FROM TB_MAP_USER_MENU_MEAS 
+		WHERE COMPANY_CD = @{COMPANY_CD}   
+		  AND BU_CD      = @{BU_CD}
+		  AND USER_ID    = @{USER_ID}
+		  AND MENU_CD    = @{MENU_CD}   
+		  AND MEAS_CD    = @{MEAS_CD}
+	</delete>
+
+	<!-- 메저 조회  -->
+	<select id="measureSelect" parameterType="map" resultType="map">
+		/****** [ common.measureSelect ] ******/
+		WITH W_MEA_ALL AS 
+		(
+		    SELECT B.MEAS_CD AS CD
+		         , CASE WHEN 'ko' = @{GV_LANG} THEN A.MEAS_NM_KR
+		                WHEN 'cn' = @{GV_LANG} THEN A.MEAS_NM_CN
+		                ELSE A.MEAS_NM
+		           END AS NM
+		         , ISNULL(C.SORT, B.SORT) AS SORT
+		         , B.MAND_FLAG
+		         , B.DEFAULT_FLAG
+		         , CASE WHEN C.MEAS_CD IS NOT NULL THEN 'Y' 
+		                ELSE 'N'
+		           END AS MAPPING_FLAG
+		         , MAX(C.MEAS_CD) OVER() AS USER_FLAG
+		    FROM TB_MST_MEAS A WITH(NOLOCK)
+		    INNER JOIN TB_MAP_MENU_MEAS B WITH(NOLOCK)
+		        ON B.MEAS_CD    = A.MEAS_CD
+		       AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		       AND B.BU_CD      = @{GV_BU_CD}
+		       AND B.MENU_CD    = @{menuCd}
+		       AND B.USE_FLAG   = 'Y'
+		    LEFT JOIN TB_MAP_USER_MENU_MEAS C WITH(NOLOCK)
+		        ON C.COMPANY_CD = B.COMPANY_CD
+		       AND C.BU_CD      = B.BU_CD
+		       AND C.MENU_CD    = B.MENU_CD
+		       AND C.USER_ID    = @{GV_USER_ID}
+		       AND C.MEAS_CD    = B.MEAS_CD
+		       AND C.USE_FLAG   = 'Y'
+		    WHERE A.USE_FLAG = 'Y'
+		)
+		SELECT A.*
+		FROM W_MEA_ALL A
+		WHERE MAND_FLAG    = 'Y'
+		   OR MAPPING_FLAG = 'Y'
+		   OR (USER_FLAG IS NULL AND DEFAULT_FLAG = 'Y' AND MAPPING_FLAG = 'N')
+		ORDER BY SORT, CD
+	</select>
+	
+</mapper>

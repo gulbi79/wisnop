@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+
+    <select id="injectPlanSelect" parameterType="map" resultType="map">
+	    /****** [ supply.product.injectPlanSelect ] ******/
+	    <include refid="snop.common.w_cust" />
+	    SELECT TMP_COL
+		      #foreach($dimMap in $_parameter.dimList)
+				, ${dimMap.DIM_CD}_NM, $dimMap.DIM_CD 
+			  #end
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE SP_WEEK END SP_WEEK
+			 , SP_QTY
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PI_WEEK END PI_WEEK
+			 , INV_QTY
+			 , PI_QTY
+			 , SP_AMT
+	    	 , AVAIL_PI_QTY
+	    	 , ADJ_PI_QTY
+	    	 , ADJ_SP_QTY
+	    	 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PROD_IN_DATE END PROD_IN_DATE
+	    	 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PROD_OUT_DATE END PROD_OUT_DATE
+	    	 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PROD_MEMO END PROD_MEMO
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE SALES_MEMO END SALES_MEMO
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PI_FLAG END PI_FLAG
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE REMARK END REMARK
+	    FROM
+	    (
+		    SELECT NULL AS TMP_COL
+		    	   <include refid="include.getCdDimTotal"/>
+		    	   <include refid="include.getGrpLvlId"/>
+		    	 , SP_WEEK
+				 , SUM(SP_QTY) AS SP_QTY
+				 , PI_WEEK
+				 , SUM(INV_QTY) AS INV_QTY
+				 , SUM(PI_QTY) AS PI_QTY
+				 , SUM(SP_AMT) AS SP_AMT
+		    	 , SUM(AVAIL_PI_QTY) AS AVAIL_PI_QTY
+		    	 , SUM(ADJ_PI_QTY) AS ADJ_PI_QTY
+		    	 , SUM(ADJ_SP_QTY) AS ADJ_SP_QTY
+		    	 , PROD_IN_DATE
+		    	 , PROD_OUT_DATE
+		    	 , PROD_MEMO
+			     , SALES_MEMO
+			     , PI_FLAG
+			     , REMARK
+		    FROM
+		    (
+			    SELECT CT.COMPANY_CD
+			         , CT.BU_CD
+			         , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+			         , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+			         , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+			         , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+			         , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID
+			         , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+			         , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+			         , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+			         , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+			         , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+			         , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+			         , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+			         , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+			         , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+			         , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+			         , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+			         , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+			         , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+			         , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD
+			         , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD_NM
+			         , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM
+			         , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM_NM
+			         , ISNULL (CT.SPEC, ' ')              AS SPEC
+			         , ISNULL (CT.SPEC, ' ')              AS SPEC_NM
+			         , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO
+			         , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO_NM
+			         , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+			         , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+			         , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+			         , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+			         , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+			         , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+			         , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+			         , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+			         , ISNULL (CAST(CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+		             , ISNULL (CAST(CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+			         , ISNULL (CAST(IP.MFG_LT AS NVARCHAR(20)), ' ') AS MFG_LT
+			         , ISNULL (CAST(IP.MFG_LT AS NVARCHAR(20)), ' ') AS MFG_LT_NM
+			         , IP.SP_WEEK
+			         , IP.SP_QTY
+			         , IP.PI_WEEK
+			         , IP.INV_QTY
+			         , (IP.PI_QTY * IP.PRICE) SP_AMT
+			         , IP.ADJ_SP_QTY
+			         , IP.AVAIL_PI_QTY
+			         , IP.ADJ_PI_QTY
+			         , CONVERT(NVARCHAR(30), CAST(IP.PROD_IN_DATE AS DATE), 120)  PROD_IN_DATE
+			         , CONVERT(NVARCHAR(30), CAST(IP.PROD_OUT_DATE AS DATE), 120) PROD_OUT_DATE
+			         , IP.PROD_MEMO
+			         , IP.SALES_MEMO
+			         , IP.PI_FLAG
+			         , IP.REMARK
+			         , IP.PI_QTY
+				FROM W_CUST CT 
+			    INNER JOIN TB_DYN_PROD_IN_PLAN IP WITH (NOLOCK)
+			       ON CT.COMPANY_CD = IP.COMPANY_CD
+			      AND CT.BU_CD      = IP.BU_CD
+			      AND CT.ITEM_CD    = IP.ITEM_CD
+			      AND IP.PI_WEEK BETWEEN @{fromPWeek} AND @{toPWeek}
+			  	#if($_parameter.inputYn and $_parameter.inputYn != "")
+			      AND IP.PI_FLAG = @{inputYn}
+			  	#end
+			  	#if($_parameter.planWeek and $_parameter.planWeek != "")
+			      AND IP.PLAN_WEEK = @{planWeek}
+			  	#end
+				WHERE CT.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND CT.BU_CD      = @{GV_BU_CD}
+				  AND IP.PLANT_CD = 'WF01'
+			  	#if($_parameter.item_cd and $_parameter.item_cd != "")
+			      AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+			  	#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+			      AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+			  	#end
+			  	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+			      AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			  	#end
+			  	#if($_parameter.route and $_parameter.route != "")
+			      AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+			  	#end
+			  	#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+			      AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+			  	#end
+			  	#if($_parameter.custGroup and $_parameter.custGroup != "")
+			      AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+			  	#end
+			) A
+			#if($_parameter.injectionNeed == "Y")
+			WHERE PI_QTY <![CDATA[>]]> 0
+			#elseif($_parameter.injectionNeed == "N")
+			WHERE PI_QTY = 0	
+			#end
+			GROUP BY ROLLUP
+			(
+				(
+					#foreach( $dimMap in $_parameter.dimList )
+						#if($velocityCount == 1)
+							${dimMap.DIM_CD}
+						#else
+				        	, ${dimMap.DIM_CD}
+						#end
+					#end
+					, SP_WEEK, PI_WEEK, PROD_IN_DATE, PROD_OUT_DATE, PROD_MEMO, SALES_MEMO, PI_FLAG, REMARK
+				)
+			)
+		) B
+		ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    	, B.$dimMap.DIM_CD
+		#end
+	  	
+    </select>
+    
+    
+    <select id="planWeekComboSelect" parameterType="map" resultType="map">
+    	/****** [ supply.product.planWeekComboSelect ] ******/
+    	SELECT B1.CODE_CD
+    	     , B1.CODE_NM
+    	     , B2.FROM_MAX_YYYYMMDD
+    	     , B2.TO_MAX_YYYYMMDD
+    	FROM
+    	(
+	        SELECT PLAN_WEEK CODE_CD
+	             , PLAN_WEEK CODE_NM
+	        FROM TB_DYN_PROD_IN_PLAN WITH(NOLOCK)
+	        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+	          AND PLANT_CD = 'WF01'
+	        GROUP BY PLAN_WEEK
+		) B1 
+		INNER JOIN
+		(
+			SELECT A1.YEARWEEK
+		    	 , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR(8), DATEADD(D, -140, MAX(A1.YYYYMMDD)), 112)) AS FROM_MAX_YYYYMMDD
+		    	 , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR(8), DATEADD(D, 7, MAX(A1.YYYYMMDD)), 112)) AS TO_MAX_YYYYMMDD
+			FROM TB_MST_CALENDAR A1
+			GROUP BY A1.YEARWEEK
+		) B2
+		ON B1.CODE_CD = B2.YEARWEEK
+		#if($_parameter.planWeek and $_parameter.planWeek != "")
+		WHERE B1.CODE_CD = @{planWeek}
+		#end
+        ORDER BY B1.CODE_CD DESC
+    </select>
+    
+    
+</mapper>

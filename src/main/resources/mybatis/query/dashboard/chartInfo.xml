@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dashboard.chartInfo">
+
+
+    <!-- 메인화면 차트의 QUILL JS에 보여줄 차트정보 쿼리-->
+    <select id="homeSelect" parameterType="map" resultType="map">
+    
+        SELECT DCI.CHART_INFO_ID             AS ID
+		, DCI.CONTENT                        AS CONTENT
+		, DCI.URL                            AS URL
+		, DCI.CHART_NM_ID                    AS NM_ID 
+		, CASE WHEN DCI.CHART_INFO_ID = 'bscGeneral'              THEN 1
+		       WHEN DCI.CHART_INFO_ID = 'businessPerformance'     THEN 2
+		       WHEN DCI.CHART_INFO_ID = 'productInventoryStatus'  THEN 3
+		       WHEN DCI.CHART_INFO_ID = 'defectiveRate'           THEN 4
+		       WHEN DCI.CHART_INFO_ID = 'expectedToShip'          THEN 5
+		       WHEN DCI.CHART_INFO_ID = 'materialStock'           THEN 6
+		       WHEN DCI.CHART_INFO_ID = 'weeklyProductionPlanComplianceRate' THEN 7
+		       WHEN DCI.CHART_INFO_ID = 'weeklyShippingPlanComplianceRate'   THEN 8
+		       WHEN DCI.CHART_INFO_ID = 'weeklyMaterialAvailabilityRate'     THEN 9
+		       END AS 'RN'
+		FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+		WHERE DCI.URL LIKE '%HOME%'
+		ORDER BY RN
+
+    </select>
+
+    
+    <!--  수요  > 대시보드 >  수요 대시보드 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="demandDashboardSelect" parameterType="map" resultType="map">
+    
+        SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'shipmentProgressThisWeek'                                        THEN 1
+               WHEN DCI.CHART_INFO_ID = 'shipmentProgressRateThisWeekByRepresentativeCustomerGroup'       THEN 2
+               WHEN DCI.CHART_INFO_ID = 'expectedMonthlyShipmentsByRepresentativeCustomerGroup1'          THEN 3
+               WHEN DCI.CHART_INFO_ID = 'expectedMonthlyShipmentsByRepresentativeCustomerGroup2'          THEN 4
+               WHEN DCI.CHART_INFO_ID = 'estimatedAnnualShipments'                                        THEN 5
+               WHEN DCI.CHART_INFO_ID = 'annualShipmentForecastByRepresentativeCustomerGroup'             THEN 6
+              END AS 'RN'
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE DCI.URL LIKE '%수요 > 대시보드 > 수요 대시보드%'
+        ORDER BY RN
+
+    </select>
+
+    
+        <!--  수요  > 대시보드 >  수요 Trend 1 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="demandTrend1Select" parameterType="map" resultType="map">
+        SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'shipmentComplianceRate'        THEN 1
+               WHEN DCI.CHART_INFO_ID = 'shipmentHitRate'               THEN 2
+               WHEN DCI.CHART_INFO_ID = 'shipmentAchievementRate'       THEN 3
+               WHEN DCI.CHART_INFO_ID = 'cpfrShipmentPlanTrend'         THEN 4
+               WHEN DCI.CHART_INFO_ID = 'cpfrShipmentPlanNPerformance'  THEN 5
+               WHEN DCI.CHART_INFO_ID = 'remainingOrderAmountSO'        THEN 6
+               WHEN DCI.CHART_INFO_ID = 'shipmentTrend'                 THEN 7
+                             WHEN DCI.CHART_INFO_ID = 'salesTrend'      THEN 8
+                             WHEN DCI.CHART_INFO_ID = 'operatingProfit' THEN 9
+                            END AS 'RN'
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE DCI.URL LIKE '%수요 > 대시보드 > 수요 Trend 1%'
+        ORDER BY RN
+
+    </select>
+    
+    
+        <!--  수요  > 대시보드 >  수요 Trend 2 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="demandTrend2Select" parameterType="map" resultType="map">
+    
+        SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'inventoryRatioStatus'        THEN 1
+               WHEN DCI.CHART_INFO_ID = 'onTimeDeliveryRate'          THEN 2
+               WHEN DCI.CHART_INFO_ID = 'lamConsignmentTREND'         THEN 3
+               WHEN DCI.CHART_INFO_ID = 'productInventory'            THEN 4
+               WHEN DCI.CHART_INFO_ID = 'ap2ShipmentPlanTREND'        THEN 5
+               
+                            END AS 'RN'
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE DCI.URL LIKE '%수요 > 대시보드 > 수요 Trend 2%'
+        ORDER BY RN
+    
+    </select>
+   
+        <!--  수요  > 대시보드 >  공급 대시보드 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="prodSelect" parameterType="map" resultType="map">
+   
+   
+        SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'monthlyWeeklyProgressRate'                 THEN 1
+                             WHEN DCI.CHART_INFO_ID = 'weeklyStatus'                THEN 2
+                             WHEN DCI.CHART_INFO_ID = 'productionStatusByItemGroup' THEN 3
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1 = 1
+		AND DCI.URL LIKE '%공급 > 대시보드 > 공급 대시보드%' 
+		AND DCI.URL NOT LIKE '%공급 > 대시보드 > 공급 대시보드 2%'
+        ORDER BY RN
+        
+    </select>
+
+        <!--  수요  > 대시보드 >  공급 대시보드 2 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="supplySelect" parameterType="map" resultType="map">
+        
+        SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'weeklySupplyPlan'                                            THEN 1
+                             WHEN DCI.CHART_INFO_ID = 'expectedLoadRateAtMajorWorkplaces'             THEN 2
+                             WHEN DCI.CHART_INFO_ID = 'leadTimeForManufacturingMajorProductGroups'    THEN 3
+                             WHEN DCI.CHART_INFO_ID = 'progressRateOfTheCurrentWeek'                  THEN 4
+                             WHEN DCI.CHART_INFO_ID = 'samsungElectronicsCPFRItemPSI'                 THEN 5
+                             WHEN DCI.CHART_INFO_ID = 'majorWorkplacePlanComplianceRate'              THEN 6
+                             WHEN DCI.CHART_INFO_ID = 'majorItemGroupFQCDefectiveQuantity'            THEN 7
+                             WHEN DCI.CHART_INFO_ID = 'majorProductGroupProductionPerformancePlan'    THEN 8
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE DCI.URL LIKE '%공급 > 대시보드 > 공급 대시보드 2%'
+        ORDER BY RN
+
+    </select>    
+    
+       <!--  공급 > 대시보드 > 공급 Trend 1 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="supplyTrend1Select" parameterType="map" resultType="map">
+    
+      SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'claimRate'                                           THEN 1
+                             WHEN DCI.CHART_INFO_ID = 'defectiveRateSupply'                   THEN 2
+                             WHEN DCI.CHART_INFO_ID = 'scrap'                                 THEN 3
+                             WHEN DCI.CHART_INFO_ID = 'productionTrend'                       THEN 4
+                             WHEN DCI.CHART_INFO_ID = 'productionPerformanceByMajorItemGroup' THEN 5
+                             WHEN DCI.CHART_INFO_ID = 'productionComplianceRate'              THEN 6
+                             WHEN DCI.CHART_INFO_ID = 'supplyCapacityIndex'                   THEN 7
+                             WHEN DCI.CHART_INFO_ID = 'stockInWork'                           THEN 8
+                             WHEN DCI.CHART_INFO_ID = 'stockInWorkAging'                      THEN 9
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE DCI.URL LIKE '%공급 > 대시보드 > 공급 Trend 1%'
+        ORDER BY RN
+    
+    </select>
+    
+       <!--  공급 > 대시보드 > 공급 Trend 2 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="supplyTrend2Select" parameterType="map" resultType="map">
+        
+      SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'productivity'                                        THEN 1
+                             WHEN DCI.CHART_INFO_ID = 'overworkedAmountStatus'                THEN 2
+                             WHEN DCI.CHART_INFO_ID = 'mainItemGroupLT'                       THEN 3
+                             WHEN DCI.CHART_INFO_ID = 'equipmentUtilizationRate'              THEN 4
+                             WHEN DCI.CHART_INFO_ID = 'semiFinishedProductStockingRate'       THEN 5
+                             WHEN DCI.CHART_INFO_ID = 'emergencyRegistrationStatus'           THEN 6
+                             WHEN DCI.CHART_INFO_ID = 'urgentDemandCompRate'                  THEN 7
+                             WHEN DCI.CHART_INFO_ID = 'salesResultAgainstProdPlan'   		  THEN 8
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1=1 
+        AND DCI.URL LIKE '%공급 > 대시보드 > 공급 Trend 2%'
+        AND DCI.URL NOT LIKE '%공급 > 대시보드 > 공급 Trend 1%'
+        ORDER BY RN
+    
+    </select>
+    
+       <!--  구매 > 대시보드 > 구매 대시보드 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="purchaseSelect" parameterType="map" resultType="map">
+    
+    
+          SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE WHEN DCI.CHART_INFO_ID = 'inventoryStatus'                                 THEN 1
+                             WHEN DCI.CHART_INFO_ID = 'deliveryBasedYield'                THEN 2
+                             WHEN DCI.CHART_INFO_ID = 'stockAging'                        THEN 3
+                             WHEN DCI.CHART_INFO_ID = 'goodsReceiptComplianceRate'        THEN 4
+                             WHEN DCI.CHART_INFO_ID = 'materialPSI'                                           THEN 5
+                             WHEN DCI.CHART_INFO_ID = 'materialAvailability'                            THEN 6
+
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1=1 
+        AND DCI.URL LIKE '%구매 > 대시보드 > 구매 대시보드%'
+        
+        ORDER BY RN
+    
+    </select>
+    
+       <!--  구매 > 대시보드 > 구매 Trend 1 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="purchaseTrend1Select" parameterType="map" resultType="map">
+         SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE  WHEN DCI.CHART_INFO_ID = 'materialCostTREND'                                   THEN 1
+                                WHEN DCI.CHART_INFO_ID = 'outsourcingExpensesTREND'            THEN 2
+                                WHEN DCI.CHART_INFO_ID = 'majorRawMaterialManufacturingLT'     THEN 3
+                                WHEN DCI.CHART_INFO_ID = 'stockTrend'                          THEN 4
+                                WHEN DCI.CHART_INFO_ID = 'agingTrend'                          THEN 5
+                                WHEN DCI.CHART_INFO_ID = 'materialAvailability2'               THEN 6
+                                WHEN DCI.CHART_INFO_ID = 'properMovementRate'                  THEN 7
+
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1=1 
+        AND DCI.URL LIKE '%구매 > 대시보드 > 구매 Trend 1%'
+        
+        ORDER BY RN
+    </select>
+    
+    
+       <!--  구매 > 대시보드 > 구매 Trend 2 차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="purchaseTrend2Select" parameterType="map" resultType="map">
+        
+                      SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE  WHEN DCI.CHART_INFO_ID = 'weeklyGoodsReceiptComplianceRate'                            THEN 1
+                                WHEN DCI.CHART_INFO_ID = 'dailyCumulativeWarehousingComplianceRate'    THEN 2
+                                WHEN DCI.CHART_INFO_ID = 'dailyWarehousingComplianceRate'              THEN 3
+                                WHEN DCI.CHART_INFO_ID = 'weeklyDeliveryComplianceRate'                THEN 4
+                                
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1=1 
+        AND DCI.URL     LIKE '%구매 > 대시보드 > 구매 Trend 2%'
+        AND DCI.URL NOT LIKE '%구매 > 대시보드 > 구매 Trend 1%'
+        ORDER BY RN
+    </select>
+    
+       <!--  구매 > 대시보드 > SCM 대시보드  차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="scmDashSelect" parameterType="map" resultType="map">
+    
+            
+        SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE  WHEN DCI.CHART_INFO_ID = 'claimRateScm'                                     THEN 1
+                                WHEN DCI.CHART_INFO_ID = 'defectiveRateScm'                 THEN 2
+                                WHEN DCI.CHART_INFO_ID = 'supplyCapacityIndexScm'           THEN 3
+                                WHEN DCI.CHART_INFO_ID = 'productionAmount'                 THEN 4
+                                WHEN DCI.CHART_INFO_ID = 'productionComplianceRateScm'      THEN 5
+                                WHEN DCI.CHART_INFO_ID = 'stockInWorkAgingScm'              THEN 6
+                                WHEN DCI.CHART_INFO_ID = 'shipmentAmount'                   THEN 7
+                                WHEN DCI.CHART_INFO_ID = 'productInventoryScm'              THEN 8
+                                WHEN DCI.CHART_INFO_ID = 'stockInWorkAmount'                THEN 9
+                                
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1=1 
+        AND DCI.URL     LIKE '%SCM > 대시보드 > SCM 대시보드%'
+        AND DCI.URL NOT LIKE '%SCM > 대시보드 > SCM 대시보드2%'
+        
+        ORDER BY RN
+    
+    </select>
+    
+     <!--  구매 > 대시보드 > SCM 대시보드2  차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="scmDash2Select" parameterType="map" resultType="map">
+    
+         
+        SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE  WHEN DCI.CHART_INFO_ID = 'materialAvailabilityScm'                               THEN 1
+                                WHEN DCI.CHART_INFO_ID = 'materialReceiptComplianceRate'         THEN 2
+                                WHEN DCI.CHART_INFO_ID = 'materialStockScm'                      THEN 3
+                                WHEN DCI.CHART_INFO_ID = 'shipmentComplianceRateScm'             THEN 4
+                                WHEN DCI.CHART_INFO_ID = 'shipmentHitRateScm'                    THEN 5
+                                WHEN DCI.CHART_INFO_ID = 'shipmentAchievementRateScm'            THEN 6
+                                WHEN DCI.CHART_INFO_ID = 'standardInformationRegistrationRate'   THEN 7
+                                WHEN DCI.CHART_INFO_ID = 'CPFRshipmentStatus'                    THEN 8
+                                WHEN DCI.CHART_INFO_ID = 'averageShippingUnitASPTREND'           THEN 9
+                                
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1=1 
+        AND DCI.URL     LIKE '%SCM > 대시보드 > SCM 대시보드2%'
+        AND DCI.URL     LIKE '%SCM > 대시보드 > SCM 대시보드%'
+        ORDER BY RN
+    
+    </select>
+    
+    <!--  SCM > 대시보드 > S&OP회의  차트의 QUILL JS에 보여줄 차트정보 쿼리 -->
+    <select id="snopMeetingSelect" parameterType="map" resultType="map">
+       SELECT DCI.CHART_INFO_ID             AS ID
+        , DCI.CONTENT                        AS CONTENT
+        , DCI.URL                            AS URL
+        , DCI.CHART_NM_ID                    AS NM_ID 
+        , CASE  WHEN DCI.CHART_INFO_ID = 'salesTrend'                     THEN 1
+                                WHEN DCI.CHART_INFO_ID = 'shipmentTrend'                  THEN 2
+                                WHEN DCI.CHART_INFO_ID = 'operatingProfit'                THEN 3
+                                WHEN DCI.CHART_INFO_ID = 'productInventory'               THEN 4
+                                WHEN DCI.CHART_INFO_ID = 'shipmentComplianceRate'         THEN 5
+                                WHEN DCI.CHART_INFO_ID = 'defectiveRateSupply'            THEN 6
+                                WHEN DCI.CHART_INFO_ID = 'claimRate'                      THEN 7
+                                WHEN DCI.CHART_INFO_ID = 'productionTrend'                THEN 8
+                                WHEN DCI.CHART_INFO_ID = 'productionPerformanceByMajorItemGroup'  THEN 9
+                                WHEN DCI.CHART_INFO_ID = 'stockInWork'                                                      THEN 10
+                                WHEN DCI.CHART_INFO_ID = 'productionComplianceRate'               THEN 11
+                                WHEN DCI.CHART_INFO_ID = 'supplyCapacityIndex'                    THEN 12
+                                WHEN DCI.CHART_INFO_ID = 'stockTrend'                                                         THEN 13
+                                WHEN DCI.CHART_INFO_ID = 'materialAvailability2'                  THEN 14
+                                WHEN DCI.CHART_INFO_ID = 'weeklyGoodsReceiptComplianceRate'       THEN 15
+
+                                
+        END AS 'RN'
+        
+        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+        WHERE 1=1 
+        AND DCI.CHART_INFO_ID IN ('salesTrend','shipmentTrend','operatingProfit','productInventory','shipmentComplianceRate','defectiveRateSupply','claimRate','productionTrend','productionPerformanceByMajorItemGroup','stockInWork','productionComplianceRate','supplyCapacityIndex','stockTrend','materialAvailability2','weeklyGoodsReceiptComplianceRate')
+                ORDER BY RN
+    </select>
+    
+    <select id="dashboardChartSelect" parameterType="map" resultType="map">
+
+			DECLARE @CHART_ID NVARCHAR(50);
+			
+			
+			
+			SELECT @CHART_ID = A.CHART_NM_ID  
+			FROM TB_SNOP_DASHBOARD_CHART_INFO A WITH(NOLOCK)
+			WHERE COMPANY_CD  = @{GV_COMPANY_CD}
+			AND BU_CD         = @{GV_BU_CD}
+			AND CHART_INFO_ID = @{CHART_ID}
+			       
+			
+			SELECT DCI.CHART_INFO_ID             AS ID
+	        , DCI.CONTENT                        AS CONTENT
+	        , DCI.URL                            AS URL
+	        , dbo.UFN_GET_TRANSLATE('lbl',@CHART_ID, @{GV_LANG}) AS NM_ID 
+	        FROM TB_SNOP_DASHBOARD_CHART_INFO DCI WITH(NOLOCK)
+	        WHERE COMPANY_CD  = @{GV_COMPANY_CD}
+	        AND BU_CD         = @{GV_BU_CD}
+	        AND CHART_INFO_ID = @{CHART_ID}
+			        
+
+        
+    </select>
+
+    <update id="contentUpdate" parameterType="map">
+    
+            /****** [ dashboard.chartInfo.contentUpdate ] ******/
+            UPDATE TB_SNOP_DASHBOARD_CHART_INFO
+            SET 
+                            
+                CONTENT  = @{CONTENT}
+                , UPDATE_ID = @{USER_ID}
+                , UPDATE_DTTM = dbo.UFN_GETDATE()
+                
+            
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+            AND BU_CD        = @{GV_BU_CD}
+            AND CHART_INFO_ID= @{CHART_ID}
+    
+    </update>
+
+
+    <select id="isSCMTeamSelect" parameterType="map" resultType="map">
+    /*** dashboard.chartInfo.isSCMTeamSelect ***/
+    /* 사용자가 SCM팀 권한을 가지고 있는지 여부를 확인하기 위함  */
+    
+    BEGIN
+    
+    with USER_ROLE AS(
+        select *
+        from TB_MAP_USER_ROLE
+    where USER_ID = @{USER_ID})
+
+    /* GOCQT0001: SCM팀 ROLE CODE */
+    
+    
+    SELECT COUNT(*) AS isSCMTeam
+    FROM USER_ROLE
+    WHERE ROLE_CD = 'GOCQT0001'
+    
+    END;
+    
+    </select>
+
+
+</mapper>

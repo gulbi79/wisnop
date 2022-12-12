@@ -1,0 +1,523 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+
+    <select id="itemSelect" parameterType="map" resultType="map">
+        /****** [ master.master.itemSelect ] ******/
+        BEGIN
+        
+            DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+            
+            <include refid="include.macros"/>
+            #getProductTree()
+            
+            WITH W_ITEM_P AS 
+            (
+                SELECT T.COMPANY_CD 
+                     , T.BU_CD 
+                     , T.ITEM_CD 
+                     , MAX (T.ROUTING_ID)      AS ROUTING_ID 
+                     , MAX (T.SUB_ROUTING_ID)  AS SUB_ROUTING_ID
+                     , MAX (T.PUR_LT)      AS PUR_LT
+                     , MAX (T.MFG_LT)      AS MFG_LT
+                     , SUM (T.SS_QTY)      AS SS_QTY
+                     , SUM (T.SS_QTY_DISP) AS SS_QTY_DISP
+                     , MAX (T.PROCUR_TYPE) AS PROCUR_TYPE
+                     , MAX (T.PROCUR_TYPE_NM) AS PROCUR_TYPE_NM
+                     , MAX (T.RCPT_SL_CD) AS RCPT_SL_CD
+                FROM 
+                (
+                    SELECT A.COMPANY_CD
+                         , A.BU_CD
+                         , A.ITEM_CD
+                         , A.ROUTING_ID
+                         , A.SUB_ROUTING_ID
+                         , A.PUR_LT
+                         , A.MFG_LT
+                         , A.SS_QTY
+                         , A.SS_QTY_DISP
+                         , A.PROCUR_TYPE
+                         , (
+                              SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                          WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                          ELSE CODE_NM
+                                     END AS CODE_NM
+                                FROM TB_MST_CODE WITH(NOLOCK)
+                               WHERE GROUP_CD = 'PROCUR_TYPE'
+                                 AND USE_FLAG = 'Y'
+                                 AND CODE_CD = A.PROCUR_TYPE
+                             ) AS PROCUR_TYPE_NM
+                           , A.RCPT_SL_CD
+                    FROM TB_MST_ITEM_PLANT A WITH(NOLOCK)
+                    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND A.BU_CD = @{GV_BU_CD}
+                      AND A.PLANT_CD = 'WF01'
+                      AND A.VALID_FLAG = 'Y'
+                ) T
+                GROUP BY T.COMPANY_CD, T.BU_CD, T.ITEM_CD 
+            )
+            SELECT A.COMPANY_CD
+                 , A.BU_CD
+                 , A.ITEM_CD
+                 , A.ITEM_CD AS ITEM_CD_NM
+                 , A.ITEM_NM
+                 , A.ITEM_NM AS ITEM_NM_NM
+                 , A.SPEC
+                 , A.SPEC AS SPEC_NM
+                 , A.ITEM_TYPE
+                 , (
+                    SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                      FROM TB_MST_CODE MC WITH(NOLOCK)
+                     WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+                       AND MC.GROUP_CD = 'ITEM_TYPE'
+                       AND MC.CODE_CD  = A.ITEM_TYPE
+                       AND MC.USE_FLAG = 'Y'
+                   ) AS ITEM_TYPE_NM
+                 , (
+                    SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                      FROM TB_MST_CODE MC WITH(NOLOCK)
+                     WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+                       AND MC.GROUP_CD = 'ITEM_TYPE'
+                       AND MC.CODE_CD  = A.ITEM_TYPE
+                       AND MC.USE_FLAG = 'Y'
+                   ) AS ITEM_TYPE_NM_NM
+                 , A.UOM_CD
+                 , A.UOM_CD AS UOM_CD_NM
+                 , A.DRAW_NO
+                 , A.DRAW_NO AS DRAW_NO_NM
+                 , A.FIREWORK_YN
+                 , A.FIREWORK_YN AS FIREWORK_YN_NM
+                 , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN_NM
+                 , A.BOM_CNT
+                 , A.BOM_CNT AS BOM_CNT_NM
+                 , E.PUR_LT
+                 , E.PUR_LT AS PUR_LT_NM
+                 , A.FQC_ROUTING_TYPE
+                 , A.FQC_ROUTING_TYPE AS FQC_ROUTING_TYPE_NM
+                 , A.ITEM_GROUP_CD
+                 , A.ITEM_GROUP_CD AS ITEM_GROUP_CD_NM
+                 , B.ITEM_GROUP_NM
+                 , B.ITEM_GROUP_NM AS ITEM_GROUP_NM_NM
+                 , ISNULL(E.SS_QTY, 0) AS SS_QTY
+                 , ISNULL(E.SS_QTY, 0) AS SS_QTY_NM
+                 , ISNULL(E.SS_QTY_DISP, 0) AS SS_QTY_DISP2
+                 , ISNULL(E.SS_QTY_DISP, 0) AS SS_QTY_DISP2_NM
+                 , B.REP_ITEM_GROUP_CD
+                 , B.REP_ITEM_GROUP_CD AS REP_ITEM_GROUP_CD_NM
+                 , I.REP_ITEM_GROUP_NM
+                 , I.REP_ITEM_GROUP_NM AS REP_ITEM_GROUP_NM_NM
+                 , A.MAT_ISSUE_FLAG
+                 , A.MAT_ISSUE_FLAG AS MAT_ISSUE_FLAG_NM
+                 , A.USE_FLAG
+                 , A.USE_FLAG AS USE_FLAG_NM
+                 , A.VALID_FLAG
+                 , A.VALID_FLAG AS VALID_FLAG_NM
+                 , CONVERT(VARCHAR(10), CONVERT(DATE, A.VALID_FROM_DATE), 120) AS VALID_FROM_DATE
+                 , CONVERT(VARCHAR(10), CONVERT(DATE, A.VALID_FROM_DATE), 120) AS VALID_FROM_DATE_NM
+                 , CONVERT(VARCHAR(10), CONVERT(DATE, A.VALID_TO_DATE), 120) AS VALID_TO_DATE
+                 , CONVERT(VARCHAR(10), CONVERT(DATE, A.VALID_TO_DATE), 120) AS VALID_TO_DATE_NM
+                 , A.PROD_LVL1_NM AS PROD_L1_NM
+                 , A.PROD_LVL1_NM AS PROD_L1_NM_NM
+                 , A.PROD_LVL2_NM AS PROD_L2_NM
+                 , A.PROD_LVL2_NM AS PROD_L2_NM_NM
+                 , A.PROD_LVL3_NM AS PROD_L3_NM
+                 , A.PROD_LVL3_NM AS PROD_L3_NM_NM
+                 , A.PROD_LVL4_NM AS PROD_L4_NM
+                 , A.PROD_LVL4_NM AS PROD_L4_NM_NM
+                 , A.ITEM_GRADE
+                 , A.ITEM_GRADE AS ITEM_GRADE_NM
+                 , CONVERT(VARCHAR(19), A.CREATE_DTTM, 120) AS CREATE_DTTM
+                 , A.CREATE_ID
+                 , CONVERT(VARCHAR(19), A.UPDATE_DTTM, 120) AS UPDATE_DTTM
+                 , A.UPDATE_ID
+                 , ISNULL(D.SALES_PRICE_KRW, A.ITEM_COST_KRW) AS SALES_PRICE_KRW
+                 , ISNULL(D.SALES_PRICE_KRW, A.ITEM_COST_KRW) AS SALES_PRICE_KRW_NM
+                 , E.ROUTING_ID
+                 , E.ROUTING_ID AS ROUTING_ID_NM
+                 , E.SUB_ROUTING_ID
+                 , E.SUB_ROUTING_ID AS SUB_ROUTING_ID_NM
+                 , C.REP_CUST_CD
+                 , C.REP_CUST_CD AS REP_CUST_CD_NM
+                 , F.CUST_NM AS REP_CUST_NM
+                 , F.CUST_NM AS REP_CUST_NM_NM
+                 , H.REP_CUST_GROUP_CD
+                 , H.REP_CUST_GROUP_CD AS REP_CUST_GROUP_CD_NM
+                 , H.REP_CUST_GROUP_NM
+                 , H.REP_CUST_GROUP_NM AS REP_CUST_GROUP_NM_NM
+                 , E.MFG_LT
+                 , E.MFG_LT AS MFG_LT_NM
+                 , A.CAMPUS_PRIORITY
+                 , A.ANNEALING_ITEM_GROUP
+                 , (
+                    SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                      FROM TB_MST_CODE
+                     WHERE BU_CD = @{GV_BU_CD}
+                       AND GROUP_CD = 'ANNEALING_ITEM_GROUP_CD'
+                       AND CODE_CD  = A.ANNEALING_ITEM_GROUP
+                       AND USE_FLAG = 'Y'
+                   ) AS ANNEALING_ITEM_GROUP_NM_NM
+                 , A.AREA 
+                 , A.KEY_MAT_YN 
+                 , A.KEY_MAT_LT 
+                 , A.MIN_PUR_LT 
+                 , A.REC_INSP_YN AS REC_INSP_YN_NM
+                 , A.REC_INSP_LT AS REC_INSP_LT_NM
+                 , A.REC_INSP_YN
+                 , A.REC_INSP_LT
+                 , A.LOAD_YN 
+                 , A.LOAD_QTY 
+                 , E.PROCUR_TYPE_NM
+                 , E.PROCUR_TYPE
+                 , A.LP_YN AS LP_YN_NM
+                 , A.OS_YN AS OS_YN_NM
+                 , G.CUST_GROUP_NM AS CUST_GROUP_NM_NM
+                 , MBP.BP_NM AS BP_NM_NM
+                 , MR.OS_PRICE_KRW AS OS_PRICE_KRW_NM
+                 , MR.OUT_LOT_SIZE AS OUT_LOT_SIZE_NM
+                 , ROUND(MR.PROCESS_TIME / 3600, 1) AS PROCESS_TIME_NM
+                 , A.CAMPUS_MOVE_FLAG AS CAMPUS_MOVE_FLAG_NM
+                 , A.ANNEALING_YN
+                 , A.APS_BAL_LT
+                 , A.APS_BAL_LT AS APS_BAL_LT_NM 
+                 , A.APPLY_APS_BAL_LT
+                 , A.APPLY_APS_BAL_LT AS APPLY_APS_BAL_LT_NM
+                 , A.BUFFER_PUR_LT
+                 , A.BUFFER_PUR_LT AS BUFFER_PUR_LT_NM
+                 , MIA.ALT_ITEM_CD AS ALT_ITEM_CD_NM
+                 , MIA.SPEC AS ALT_SPEC_NM
+                 , CASE WHEN MIA.ALT_ITEM_CD IS NOT NULL AND ISNULL(A.KEY_MAT_YN, 'N') = ISNULL(MIA.KEY_MAT_YN, 'N') THEN 'Y'
+                        WHEN MIA.ALT_ITEM_CD IS NOT NULL AND ISNULL(A.KEY_MAT_YN, 'N') != ISNULL(MIA.KEY_MAT_YN, 'N') THEN 'N'                  
+                    END AS KEY_MAT_YN_CON_NM
+                 , MIA.TWO_WAY_YN AS TWO_WAY_YN_NM
+                 , A.SBS_QTY
+                 , A.SBS_QTY AS SBS_QTY_NM
+                 , A.GR_MNG_YN 
+                 , A.GR_MNG_YN AS  GR_MNG_YN_NM
+                 , A.WEEKLY_GR_QTY
+                 , A.WEEKLY_GR_QTY AS WEEKLY_GR_QTY_NM
+                 , A.FIRST_CLASS 
+                 , A.FIRST_CLASS AS FIRST_CLASS_NM
+                 , A.SECOND_CLASS 
+                 , A.SECOND_CLASS AS SECOND_CLASS_NM
+                 , A.THIRD_CLASS
+                 , A.THIRD_CLASS  AS THIRD_CLASS_NM
+                 
+            FROM TB_MST_ITEM A WITH (NOLOCK)
+            LEFT JOIN TB_MST_ITEM_GROUP B WITH (NOLOCK)
+              ON A.COMPANY_CD    = B.COMPANY_CD
+             AND A.BU_CD         = B.BU_CD
+             AND A.ITEM_GROUP_CD = B.ITEM_GROUP_CD
+             AND B.DEL_FLAG      = 'N'
+            LEFT JOIN TB_MST_REP_CUST C WITH (NOLOCK)     
+              ON A.COMPANY_CD  = C.COMPANY_CD
+             AND A.BU_CD       = C.BU_CD
+             AND A.REP_CUST_CD = C.REP_CUST_CD
+            LEFT JOIN TB_MAP_ITEM_CUST_GROUP D WITH(NOLOCK)
+              ON A.COMPANY_CD = D.COMPANY_CD
+             AND A.BU_CD      = D.BU_CD
+             AND A.ITEM_CD    = D.ITEM_CD
+             AND C.CUST_GROUP_CD = D.CUST_GROUP_CD
+            LEFT JOIN W_ITEM_P E
+              ON A.COMPANY_CD = E.COMPANY_CD
+             AND A.BU_CD      = E.BU_CD
+             AND A.ITEM_CD    = E.ITEM_CD
+            LEFT JOIN TB_MST_CUSTOMER F WITH (NOLOCK)
+              ON C.COMPANY_CD  = F.COMPANY_CD
+             AND C.BU_CD       = F.BU_CD
+             AND C.REP_CUST_CD = F.CUST_CD
+             AND F.VALID_FLAG  = 'Y'
+            LEFT JOIN TB_MST_CUST_GROUP G WITH(NOLOCK)
+              ON G.COMPANY_CD    = C.COMPANY_CD
+             AND G.BU_CD         = C.BU_CD
+             AND G.CUST_GROUP_CD = C.CUST_GROUP_CD
+             AND G.USE_FLAG  = 'Y'
+            LEFT JOIN TB_MST_REP_CUST_GROUP H WITH(NOLOCK)
+              ON H.COMPANY_CD        = G.COMPANY_CD
+             AND H.BU_CD             = G.BU_CD
+             AND H.REP_CUST_GROUP_CD = G.REP_CUST_GROUP_CD
+            LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+              ON MC1.BU_CD = E.BU_CD
+             AND MC1.GROUP_CD = 'CL_SL_CD'
+             AND MC1.CODE_CD = E.RCPT_SL_CD
+             AND MC1.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_REP_ITEM_GROUP I WITH(NOLOCK)
+              ON I.COMPANY_CD        = B.COMPANY_CD
+             AND I.BU_CD             = B.BU_CD
+             AND I.REP_ITEM_GROUP_CD = B.REP_ITEM_GROUP_CD
+            OUTER APPLY 
+            (
+                SELECT TOP 1 MR.COMPANY_CD
+                     , MR.BU_CD
+                     , MR.BP_CD
+                     , MR.OS_PRICE_KRW
+                     , MR.OUT_LOT_SIZE
+                     , ISNULL(MR.FIRST_TIME, 0) + ISNULL(MR.RUN_TIME, 0) + ISNULL(MR.AFTER_TIME, 0) AS PROCESS_TIME
+                FROM TB_MST_ROUTING MR WITH(NOLOCK)
+                INNER JOIN TB_MST_ROUTING_PRIORITY MRP WITH(NOLOCK)
+                   ON MRP.COMPANY_CD = MR.COMPANY_CD
+                  AND MRP.BU_CD = MR.BU_CD
+                  AND MRP.ITEM_CD = MR.ITEM_CD
+                  AND MRP.ROUTING_NO = MR.ROUTING_NO
+                  AND MRP.PRIORITY = 1
+                INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                   ON MC.BU_CD = MR.BU_CD
+                  AND MC.GROUP_CD = 'ROUTE_CD'
+                  AND MC.CODE_CD = MR.JOB_CD
+                  AND MC.ATTB_3_CD = 'OS'
+                  AND MC.USE_FLAG = 'Y'
+                WHERE MR.COMPANY_CD = A.COMPANY_CD
+                  AND MR.BU_CD = A.BU_CD
+                  AND MR.PLANT_CD = 'WF01'
+                  AND MR.ITEM_CD = A.ITEM_CD
+                ORDER BY MR.OPERATION_NO
+            ) MR
+            LEFT OUTER JOIN TB_MST_BIZ_PARTNER MBP WITH(NOLOCK)
+              ON MBP.COMPANY_CD = MR.COMPANY_CD
+             AND MBP.BU_CD = MR.BU_CD
+             AND MBP.BP_CD = MR.BP_CD
+            OUTER APPLY 
+            (
+                SELECT TOP 1 MIA.ALT_ITEM_CD
+                     , MI.SPEC
+                     , MI.KEY_MAT_YN
+                     , CASE WHEN MAX(MIA2.ITEM_CD) OVER(PARTITION BY MIA.COMPANY_CD, MIA.BU_CD, MIA.PLANT_CD, MIA.ITEM_CD) IS NOT NULL THEN 'Y'
+                            ELSE 'N'
+                        END TWO_WAY_YN
+                FROM TB_MST_ITEM_ALT MIA WITH(NOLOCK)
+                INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                   ON MI.COMPANY_CD = MIA.COMPANY_CD
+                  AND MI.BU_CD = MIA.BU_CD
+                  AND MI.ITEM_CD = MIA.ALT_ITEM_CD
+                LEFT OUTER JOIN TB_MST_ITEM_ALT MIA2 WITH(NOLOCK)
+                  ON MIA2.COMPANY_CD = MIA.COMPANY_CD
+                 AND MIA2.BU_CD = MIA.BU_CD
+                 AND MIA2.ITEM_CD = MIA.ALT_ITEM_CD
+                 AND MIA2.ALT_ITEM_CD = MIA.ITEM_CD
+                 AND MIA2.DEL_FLAG = 'N'
+                 AND MIA2.VALID_FROM_DATE <![CDATA[<=]]> @V_CUR_DATE
+                 AND MIA2.VALID_TO_DATE <![CDATA[>=]]> @V_CUR_DATE
+                WHERE MIA.COMPANY_CD = A.COMPANY_CD
+                  AND MIA.BU_CD = A.BU_CD
+                  AND MIA.PLANT_CD = 'WF01'
+                  AND MIA.ITEM_CD = A.ITEM_CD
+                  AND MIA.DEL_FLAG = 'N'
+                  AND MIA.VALID_FROM_DATE <![CDATA[<=]]> @V_CUR_DATE
+                  AND MIA.VALID_TO_DATE <![CDATA[>=]]> @V_CUR_DATE
+                ORDER BY MIA.ALT_ITEM_CD
+            ) MIA
+            WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+              AND A.BU_CD      = @{GV_BU_CD}
+            #if($_parameter.itemType and $_parameter.itemType != "")
+              AND A.ITEM_TYPE  IN ('$_parameter.itemType.replace(",","','")')
+            #end
+            #if($_parameter.validYn and $_parameter.validYn != "")
+              AND A.USE_FLAG   = @{validYn}
+            #end
+            #if($_parameter.fireworkYn and $_parameter.fireworkYn != "")
+              AND A.FIREWORK_YN   = @{fireworkYn}
+            #end
+            #if($_parameter.validYnERP and $_parameter.validYnERP != "")
+              AND A.VALID_FLAG = @{validYnERP}
+            #end
+            #if($_parameter.validDateFrom and $_parameter.validDateFrom != "")
+              AND A.VALID_TO_DATE <![CDATA[>=]]> @{validDateFrom}
+            #end
+            #if($_parameter.validDateTo and $_parameter.validDateTo != "")
+              AND A.VALID_FROM_DATE <![CDATA[<=]]> @{validDateTo}
+            #end
+            #if($_parameter.item_cd and $_parameter.item_cd != "")
+              AND A.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+            #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+              AND (A.ITEM_CD LIKE '%' + @{item_nm} + '%' OR A.ITEM_NM LIKE '%' + @{item_nm} + '%')
+            #end
+            #if($_parameter.lpYn and $_parameter.lpYn != "")
+              AND A.LP_YN = @{lpYn}
+            #end
+            #if($_parameter.osYn and $_parameter.osYn != "")
+              AND A.OS_YN = @{osYn} 
+            #end
+            #if($_parameter.cleaningYn and $_parameter.cleaningYn != "")
+              AND CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END = @{cleaningYn}
+            #end
+            #if($_parameter.reptItemGroup and $_parameter.reptItemGroup != "")
+              AND B.REP_ITEM_GROUP_CD IN ('$_parameter.reptItemGroup.replace(",","','")')
+            #end
+            #if($_parameter.route and $_parameter.route != "")
+              AND E.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+            #end
+            #if($_parameter.reptCust and $_parameter.reptCust != "")
+              AND (C.REP_CUST_CD LIKE '%' + @{reptCust} + '%' OR F.CUST_NM LIKE '%' + @{reptCust} + '%')
+            #end
+            #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+              AND H.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+            #end
+            #if(($_parameter.fromAmt and $_parameter.fromAmt != "") or ($_parameter.toAmt and $_parameter.toAmt != ""))
+              AND D.SALES_PRICE_KRW BETWEEN @{fromAmt} AND @{toAmt}
+            #end
+            #if(($_parameter.fromLt and $_parameter.fromLt != "") or ($_parameter.toLt and $_parameter.toLt != ""))
+              AND E.MFG_LT BETWEEN @{fromLt} AND @{toLt}
+            #end
+            #if($_parameter.procurType and $_parameter.procurType != "")
+              AND E.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+            #end
+            #set($treeAlias = "A")
+            <include refid="include.productTree"/>
+            ORDER BY A.ITEM_CD ASC
+        END;
+    </select>
+
+	<select id="groupCodeSelect" parameterType="map" resultType="map">
+	/****** [ master.master.groupCodeSelect ] ******/
+	#if($_parameter.class_group and $_parameter.class_group=="FirstClass")
+		SELECT CODE_NM_KR
+		, CODE_CD
+		FROM TB_MST_CODE
+		WHERE GROUP_CD = 'FIRST_CLASS_GROUP'
+		AND BU_CD			 = @{GV_BU_CD}
+		AND ATTB_1_CD		 = @{routing}			
+	#elseif($_parameter.class_group and $_parameter.class_group=="SecondClass")
+		SELECT CODE_NM_KR
+		, CODE_CD
+		FROM TB_MST_CODE
+		WHERE GROUP_CD = 'SECOND_CLASS_GROUP'
+		AND BU_CD			 = @{GV_BU_CD}
+		AND ATTB_1_CD		 = @{routing}	
+	#elseif($_parameter.class_group and $_parameter.class_group=="ThirdClass")
+		SELECT CODE_NM_KR
+		, CODE_CD
+		FROM TB_MST_CODE
+		WHERE GROUP_CD = 'THIRD_CLASS_GROUP'
+		AND BU_CD			 = @{GV_BU_CD}
+		AND ATTB_1_CD		 = @{routing}	
+	#end	
+	</select>
+
+    <select id="authoritySelect" parameterType="map" resultType="map">
+        /****** [ master.master.authoritySelect ] ******/
+        SELECT A2.MENU_CD
+        FROM 
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID  = @{GV_USER_ID}
+              AND BU_CD    = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN 
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD      = @{GV_BU_CD}
+              AND MENU_CD IN ('MNG10101', 'MNG10102', 'MNG10103','MNG10104')
+              AND ACTION_CD  = 'SAVE'
+              AND USE_FLAG   = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+    </select>
+    
+    <update id="itemUpdate" parameterType="map">
+        /****** [ master.master.itemUpdate ] ******/
+        UPDATE TB_MST_ITEM
+           SET UPDATE_ID = @{GV_USER_ID}
+             , UPDATE_DTTM = dbo.UFN_GETDATE()
+             #if($_parameter.CAMPUS_PRIORITY and $_parameter.CAMPUS_PRIORITY != "")
+             , CAMPUS_PRIORITY = @{CAMPUS_PRIORITY}
+             #elseif($_parameter.CAMPUS_PRIORITY and $_parameter.CAMPUS_PRIORITY == "")
+             , CAMPUS_PRIORITY = NULL
+             #end
+             #if($_parameter.ANNEALING_ITEM_GROUP and $_parameter.ANNEALING_ITEM_GROUP != "")
+             , ANNEALING_ITEM_GROUP = @{ANNEALING_ITEM_GROUP}
+             #elseif($_parameter.ANNEALING_ITEM_GROUP and $_parameter.ANNEALING_ITEM_GROUP == "")
+             , ANNEALING_ITEM_GROUP = NULL
+             #end
+             #if($_parameter.AREA and $_parameter.AREA != "")
+             , AREA = @{AREA}
+             #elseif($_parameter.AREA and $_parameter.AREA == "")
+             , AREA = NULL
+             #end
+             #if($_parameter.KEY_MAT_YN and $_parameter.KEY_MAT_YN != "")
+             , KEY_MAT_YN = @{KEY_MAT_YN}
+             #elseif($_parameter.KEY_MAT_YN and $_parameter.KEY_MAT_YN == "")
+             , KEY_MAT_YN = NULL
+             #end
+             #if($_parameter.KEY_MAT_LT and $_parameter.KEY_MAT_LT != "")
+             , KEY_MAT_LT = @{KEY_MAT_LT}
+             #elseif($_parameter.KEY_MAT_LT and $_parameter.KEY_MAT_LT == "")
+             , KEY_MAT_LT = NULL
+             #end
+             #if($_parameter.MIN_PUR_LT and $_parameter.MIN_PUR_LT != "")
+             , MIN_PUR_LT = @{MIN_PUR_LT}
+             #elseif($_parameter.MIN_PUR_LT and $_parameter.MIN_PUR_LT == "")
+             , MIN_PUR_LT = NULL
+             #end
+             #if($_parameter.LOAD_YN and $_parameter.LOAD_YN != "")
+             , LOAD_YN = @{LOAD_YN}
+             #elseif($_parameter.LOAD_YN and $_parameter.LOAD_YN == "")
+             , LOAD_YN = NULL
+             #end
+             #if($_parameter.LOAD_QTY and $_parameter.LOAD_QTY != "")
+             , LOAD_QTY = @{LOAD_QTY}
+             #elseif($_parameter.LOAD_QTY and $_parameter.LOAD_QTY == "")
+             , LOAD_QTY = NULL
+             #end
+             #if($_parameter.BUFFER_PUR_LT and $_parameter.BUFFER_PUR_LT != "")
+             , BUFFER_PUR_LT = @{BUFFER_PUR_LT}
+             #elseif($_parameter.BUFFER_PUR_LT and $_parameter.BUFFER_PUR_LT == "")
+             , BUFFER_PUR_LT = NULL
+             #end
+             #if($_parameter.SBS_QTY and $_parameter.SBS_QTY != "")
+             , SBS_QTY = @{SBS_QTY}
+             #elseif($_parameter.SBS_QTY and $_parameter.SBS_QTY == "")
+             , SBS_QTY = NULL
+             #end
+             #if($_parameter.GR_MNG_YN and $_parameter.GR_MNG_YN != "")
+             , GR_MNG_YN = @{GR_MNG_YN}
+             #elseif($_parameter.GR_MNG_YN and $_parameter.GR_MNG_YN == "")
+             , GR_MNG_YN = NULL
+             #end
+             #if($_parameter.WEEKLY_GR_QTY and $_parameter.WEEKLY_GR_QTY != "")
+             , WEEKLY_GR_QTY = @{WEEKLY_GR_QTY}
+             #elseif($_parameter.WEEKLY_GR_QTY and $_parameter.WEEKLY_GR_QTY == "")
+             , WEEKLY_GR_QTY = NULL
+             #end
+
+             #if($_parameter.FIRST_CLASS and $_parameter.FIRST_CLASS != " ")
+             , FIRST_CLASS = @{FIRST_CLASS}
+             #elseif($_parameter.FIRST_CLASS and $_parameter.FIRST_CLASS == " ")
+             , FIRST_CLASS = NULL
+             #end
+
+			 #if($_parameter.SECOND_CLASS and $_parameter.SECOND_CLASS != " ")
+             , SECOND_CLASS = @{SECOND_CLASS}
+             #elseif($_parameter.SECOND_CLASS and $_parameter.SECOND_CLASS == " ")
+             , SECOND_CLASS = NULL
+             #end             
+
+             #if($_parameter.THIRD_CLASS and $_parameter.THIRD_CLASS != " ")
+             , THIRD_CLASS = @{THIRD_CLASS}
+             #elseif($_parameter.THIRD_CLASS and $_parameter.THIRD_CLASS == " ")
+             , THIRD_CLASS = NULL
+             #end
+         WHERE COMPANY_CD = @{COMPANY_CD}
+           AND BU_CD      = @{BU_CD}
+           AND ITEM_CD    = @{ITEM_CD}
+    </update>
+
+</mapper>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+    <select id="userLogSelect"  parameterType="map" resultType="map">
+		/****** [ admin.userLogSelect ] ******/
+		SELECT A.USER_ID
+		     , C.USER_NM
+		     , D.DEPT_CD
+		     , D.DEPT_NM
+	         , A.COMPANY_CD
+	         , A.BU_CD
+	         , CASE WHEN A.ACCESS_TYPE_CD = 'PORTAL' THEN 'PORTAL' 
+	                ELSE B.MENU_CD    
+	            END MENU_CD
+	         , CASE WHEN A.ACCESS_TYPE_CD = 'PORTAL' THEN 'PORTAL' 
+	                ELSE CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN B.MENU_NM_KR
+	                          WHEN UPPER(@{GV_LANG}) = 'CN' THEN B.MENU_NM_CN
+	                          ELSE B.MENU_NM
+	                     END    
+	            END MENU_NM
+	         , A.URL
+	         , CONVERT(VARCHAR(30), A.ACCESS_DTTM, 120) AS ACCESS_DTTM
+	         , A.ACCESS_TYPE_CD
+	         , A.ACCESS_ETC
+		FROM TB_COMM_ACCESS_LOG A WITH(NOLOCK)
+		LEFT JOIN TB_MST_MENU B WITH(NOLOCK)
+		  ON B.COMPANY_CD = A.COMPANY_CD
+		 AND B.BU_CD      = A.BU_CD
+		 AND B.MENU_CD    = A.MENU_CD
+		LEFT JOIN TB_MST_USER C WITH(NOLOCK)
+		  ON C.USER_ID = A.USER_ID
+		LEFT JOIN TB_MST_DEPT D WITH(NOLOCK)
+		  ON D.COMPANY_CD = A.COMPANY_CD
+		 AND D.DEPT_CD    = C.DEPT_CD
+		WHERE 1 = 1
+		#if($_parameter.SEARCH_FROM_CAL and $_parameter.SEARCH_FROM_CAL != "" and $_parameter.SEARCH_TO_CAL and $_parameter.SEARCH_TO_CAL != "")
+		  AND CONVERT(VARCHAR, A.ACCESS_DTTM, 112) BETWEEN @{SEARCH_FROM_CAL} AND @{SEARCH_TO_CAL}
+		#end
+		#if($_parameter.SEARCH_USER_ID and $_parameter.SEARCH_USER_ID != "")
+		  AND (A.USER_ID LIKE '%' + REPLACE(@{SEARCH_USER_ID},'_','[_]') + '%'
+		    OR C.USER_NM LIKE '%' + REPLACE(@{SEARCH_USER_ID},'_','[_]') + '%')
+		#end
+		#if($_parameter.SEARCH_BU and $_parameter.SEARCH_BU != "")
+		  AND A.BU_CD = @{SEARCH_BU}
+		#end
+		#if($_parameter.SEARCH_MENU_ID and $_parameter.SEARCH_MENU_ID != "")
+		  AND (CASE WHEN A.ACCESS_TYPE_CD = 'PORTAL' THEN 'PORTAL' 
+		            ELSE B.MENU_CD    
+		       END LIKE '%' + REPLACE(@{SEARCH_MENU_ID},'_','[_]') + '%'
+		    OR CASE WHEN A.ACCESS_TYPE_CD = 'PORTAL' THEN 'PORTAL' 
+		            ELSE CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN B.MENU_NM_KR
+	                          WHEN UPPER(@{GV_LANG}) = 'CN' THEN B.MENU_NM_CN
+	                          ELSE B.MENU_NM
+	                     END    
+		       END LIKE '%' + REPLACE(@{SEARCH_MENU_ID},'_','[_]') + '%')
+		#end
+		ORDER BY A.ACCESS_DTTM DESC
+	</select>
+</mapper>

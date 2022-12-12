@@ -1,0 +1,1231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerformNew">
+    <select id="salesPlanVsActualDateSelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.salesPlanVsActualDateSelect ] ******/
+		WITH W_SYSDATE AS 
+		(
+		  	SELECT DBO.UFN_GETDATE() AS TODAY
+		)
+		SELECT CONVERT(VARCHAR(8),  DATEADD(WK, -1, TODAY), 112) AS FROM_DATE
+		     , CONVERT(VARCHAR(8),  DATEADD(WK, -1, TODAY), 112) AS TO_DATE
+		     , CONVERT(VARCHAR(10), CONVERT(DATETIME, (
+		     											SELECT MAX(YYYYMMDD) 
+														FROM TB_MST_CALENDAR
+														WHERE YEARWEEK = (
+																			SELECT YEARWEEK
+																			FROM TB_MST_CALENDAR
+																			WHERE YYYYMMDD = CONVERT(VARCHAR(10), DATEADD(WK, -1, TODAY), 112))
+																		 )
+													  ), 23) AS MAX_DATE
+		FROM W_SYSDATE
+    </select>
+    
+    <select id="commonCodeSelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerformNew.commonCodeSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                    WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                    ELSE CODE_NM
+               END AS CODE_NM
+             , ATTB_1_CD
+		FROM TB_MST_CODE WITH (NOLOCK)
+		WHERE BU_CD IN('ALL', @{GV_BU_CD})
+		  AND USE_FLAG != 'N'
+		  AND GROUP_CD = 'PTSP_REASON_ID'
+    </select>
+	
+	<select id="salesPlanVsActualSelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.salesPlanVsActualSelect ] ******/
+		
+		<include refid="include.macros"/>
+		#getCustomerTree()
+		
+		WITH W_ITEM_CUST_GROUP AS 
+		(
+		    SELECT CG.COMPANY_CD
+		         , CG.BU_CD
+		         , ISNULL(CM.CUST_LVL2_CD     , ' ') AS CUST_LVL2_CD
+		         , ISNULL(CM.CUST_LVL2_NM     , ' ') AS CUST_LVL2_NM
+		         , CG.CUST_GROUP_CD
+		         , ISNULL(CM.CUST_GROUP_NM    , ' ') AS CUST_GROUP_NM
+		         , ISNULL(IT.PROD_LVL3_CD     , ' ') AS PROD_LVL3_CD
+		         , ISNULL(IT.PROD_LVL3_NM     , ' ') AS PROD_LVL3_NM
+		         , CG.ITEM_CD
+		         , ISNULL(IT.ITEM_NM          , ' ') AS ITEM_NM
+		         , ISNULL(IT.SPEC             , ' ') AS SPEC
+		         , ISNULL(IT.DRAW_NO          , ' ') AS DRAW_NO
+		         , ISNULL(IP.ROUTING_ID		  , ' ') AS ROUTING_ID
+		         , CG.SALES_PRICE_KRW
+		         , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+			FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+		    INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+		       ON CG.COMPANY_CD = IT.COMPANY_CD
+		      AND CG.BU_CD      = IT.BU_CD
+		      AND CG.ITEM_CD    = IT.ITEM_CD
+			INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+		       ON CG.COMPANY_CD    = CM.COMPANY_CD
+		      AND CG.BU_CD         = CM.BU_CD
+		      AND CG.CUST_GROUP_CD = CM.CUST_CD
+		    LEFT OUTER JOIN 
+			(
+				SELECT COMPANY_CD 
+			         , BU_CD 
+			         , ITEM_CD 
+			         , MAX(ROUTING_ID) AS ROUTING_ID 
+			         , MAX(PUR_LT) AS PUR_LT
+			         , MAX(MFG_LT) AS MFG_LT
+			         , SUM(SS_QTY) AS SS_QTY
+			         , MAX(PROCUR_TYPE) AS PROCUR_TYPE
+			         , MAX(RCPT_SL_CD) AS RCPT_SL_CD
+			    FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+			    WHERE PLANT_CD = 'WF01'
+			    GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+			) IP
+			ON CG.COMPANY_CD = IP.COMPANY_CD
+			AND CG.BU_CD = IP.BU_CD
+			AND CG.ITEM_CD = IP.ITEM_CD   
+		    LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+  			  ON MC1.BU_CD = IP.BU_CD
+			 AND MC1.GROUP_CD = 'CL_SL_CD'
+			 AND MC1.CODE_CD = IP.RCPT_SL_CD
+			 AND MC1.USE_FLAG = 'Y'  
+			WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND CG.BU_CD         = @{GV_BU_CD}
+			#if($_parameter.customerList and $_parameter.customerList.size() > 0)
+		      AND EXISTS (
+							SELECT 1
+					  		FROM TB_MST_CUSTOMER TT
+					 		WHERE TT.COMPANY_CD    = CG.COMPANY_CD
+					   		  AND TT.BU_CD         = CG.BU_CD
+					   		  AND TT.CUST_GROUP_CD = CG.CUST_GROUP_CD
+					   		#set($treeAlias = "TT")
+					   		<include refid="include.customerTree"/>
+		       			  )
+			#end
+			#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+		      AND CM.CUST_LVL2_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+			#end
+			#if($_parameter.custGroup and $_parameter.custGroup != "")
+		      AND CG.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+		    #end
+		    #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		      AND IT.PROD_LVL3_CD IN ('$_parameter.itemGroup.replace(",","','")')
+		    #end
+		    #if($_parameter.item_cd and $_parameter.item_cd != "")
+		      AND CG.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		    #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		      AND (IT.ITEM_CD LIKE '%' + @{item_nm} + '%' OR IT.ITEM_NM LIKE '%' + @{item_nm} + '%')
+		    #end
+		),
+		W_MAIN AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.ITEM_CD
+		         , A.CUST_GROUP_CD
+		         , A.YEARWEEK
+		         , ISNULL(A.SALES_PLAN_QTY,0) AS SALES_PLAN_QTY
+		         , ISNULL(A.SALES_QTY,0) AS SALES_QTY
+		         , CASE WHEN ISNULL(A.SALES_PLAN_QTY,0) <![CDATA[>]]> ISNULL(A.SALES_QTY,0) THEN ISNULL(A.SALES_PLAN_QTY,0)
+		                WHEN ISNULL(A.SALES_PLAN_QTY,0) <![CDATA[<]]> ISNULL(A.SALES_QTY,0) THEN ISNULL(A.SALES_QTY,0)
+		                ELSE ISNULL(A.SALES_QTY,0)
+		           END AS SALES_PLAN_QTY_MAX
+		         , CASE WHEN ISNULL(A.SALES_PLAN_QTY,0) <![CDATA[>]]> ISNULL(A.SALES_QTY,0) THEN ISNULL(A.SALES_QTY,0)
+		                WHEN ISNULL(A.SALES_PLAN_QTY,0) <![CDATA[<]]> ISNULL(A.SALES_QTY,0) THEN ISNULL(A.SALES_PLAN_QTY,0)
+		                ELSE ISNULL(A.SALES_QTY,0)
+		           END AS SALES_PLAN_QTY_MIN
+		         , ISNULL(A.SALES_PLAN_AMT, 0) AS SALES_PLAN_AMT
+		         , ISNULL(A.SALES_AMT, 0) AS SALES_AMT
+		         , CASE WHEN ISNULL(A.SALES_PLAN_AMT,0) <![CDATA[>]]> ISNULL(A.SALES_AMT,0) THEN ISNULL(A.SALES_PLAN_AMT,0)
+		                WHEN ISNULL(A.SALES_PLAN_AMT,0) <![CDATA[<]]> ISNULL(A.SALES_AMT,0) THEN ISNULL(A.SALES_AMT,0)
+		                ELSE ISNULL(A.SALES_AMT,0)
+		           END AS SALES_PLAN_AMT_MAX
+		         , CASE WHEN ISNULL(A.SALES_PLAN_AMT,0) <![CDATA[>]]> ISNULL(A.SALES_AMT,0) THEN ISNULL(A.SALES_AMT,0)
+		                WHEN ISNULL(A.SALES_PLAN_AMT,0) <![CDATA[<]]> ISNULL(A.SALES_AMT,0) THEN ISNULL(A.SALES_PLAN_AMT,0)
+		                ELSE ISNULL(A.SALES_AMT,0)
+		           END AS SALES_PLAN_AMT_MIN
+		         , A.PROD_PLAN_QTY
+		         , A.PROD_PLAN_AMT
+		         , A.PROD_QTY
+		         , A.PROD_AMT
+		         , A.INV_QTY
+		         , A.INV_AMT
+		         , B.PTSP_TYPE
+		         , B.QTY
+		         , B.PTSP_REASON_ID
+		         , B.PTSP_DEPT
+		         , B.REMARK
+		         , A.AVAIL_QTY
+		         , A.AVAIL_AMT
+		         , A.EXP_INV_QTY 
+		         , A.EXP_INV_AMT 
+			FROM TB_DYN_PTSP A WITH(NOLOCK)
+		    INNER JOIN TB_DYN_PTSP_REASON B WITH(NOLOCK)
+		       ON A.COMPANY_CD = B.COMPANY_CD
+		      AND A.BU_CD = B.BU_CD
+		      AND A.ITEM_CD = B.ITEM_CD
+		      AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+		      AND A.YEARWEEK = B.YEARWEEK
+		    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD      = @{GV_BU_CD}
+		),
+		W_GIGAN AS 
+		(
+			SELECT T.COMPANY_CD
+			     , T.BU_CD
+			     , T.ITEM_CD
+			     , T.CUST_GROUP_CD
+			     , T.PTSP_TYPE
+			     , T.YEARWEEK
+			FROM 
+			(
+				SELECT COMPANY_CD
+		             , BU_CD
+		             , ITEM_CD
+		             , CUST_GROUP_CD
+		             , PTSP_TYPE
+		             , YEARWEEK
+		             , COUNT(*) OVER(PARTITION BY COMPANY_CD, BU_CD, ITEM_CD, CUST_GROUP_CD, PTSP_TYPE) AS CNT
+				FROM W_MAIN
+		        WHERE YEARWEEK BETWEEN @{fromWeek} AND @{toWeek}
+			) T
+			WHERE T.CNT <![CDATA[>=]]> @{gigan}
+		)
+		SELECT TT.*
+		     , (
+				SELECT YEARWEEK
+				  FROM TB_MST_CALENDAR
+				 WHERE YYYYMMDD = CONVERT(VARCHAR(10), DATEADD(WK, -1, DBO.UFN_GETDATE()), 112)
+		       ) AS PRE_YEARWEEK
+		     , (
+				SELECT YEARWEEK
+				  FROM TB_MST_CALENDAR
+				 WHERE YYYYMMDD = CONVERT(VARCHAR(10), DATEADD(WK, -3, DBO.UFN_GETDATE()), 112)
+		       ) AS EDIT_YEARWEEK 
+		     , #foreach( $meaMap in $_parameter.meaList )
+			   ISNULL (ABS ($meaMap.CD), 0) +
+			   #end + 0 AS OMIT_FLAG
+		FROM 
+		(
+			SELECT NULL AS TMP_COL
+			     <include refid="include.getCdDimTotal"/>
+			     <include refid="include.getGrpLvlId"/>
+			     , SUM(X.QTY_INV) AS QTY_INV
+			     , SUM(X.QTY_SALES_PLAN) AS QTY_SALES_PLAN
+			     , SUM(X.QTY_SALES) AS QTY_SALES
+			     , SUM(X.AVAIL_QTY) AS QTY_AVAIL_SALES
+			     , SUM(X.AVAIL_AMT) AS AMT_AVAIL_SALES
+			     , SUM(X.SALES_PLAN_QTY_MAX) AS SALES_PLAN_QTY_MAX
+			     , SUM(X.SALES_PLAN_QTY_MIN) AS SALES_PLAN_QTY_MIN
+			     , SUM(X.QTY_PROD) AS QTY_PROD
+			     , SUM(X.QTY_PROD_PLAN) AS QTY_PROD_PLAN
+			     , SUM(X.QTY_EXP_INV) AS QTY_EXP_INV
+			     , SUM(X.AMT_EXP_INV) AS AMT_EXP_INV
+			     , SUM(X.QTY_SALES) - SUM(X.QTY_SALES_PLAN) AS QTY_SALES_DELTA
+			     , SUM(X.AVAIL_QTY) - SUM(X.QTY_SALES) AS  QTY_AVAIL_ADD_SALES
+			     , SUM(X.AVAIL_AMT) - SUM(X.AMT_SALES) AS  AMT_AVAIL_ADD_SALES
+			     , CASE WHEN SUM(X.SALES_PLAN_QTY_MAX) <![CDATA[>]]> 0 
+			     		THEN SUM(X.SALES_PLAN_QTY_MIN) / SUM(X.SALES_PLAN_QTY_MAX) * 100
+			            ELSE 0
+			       END AS QTY_COMP_RATE
+			     , SUM(X.AMT_INV) AS AMT_INV
+			     , SUM(X.AMT_SALES_PLAN) AS AMT_SALES_PLAN
+			     , SUM(X.AMT_SALES) AS AMT_SALES
+			     , SUM(X.SALES_PLAN_AMT_MAX) AS SALES_PLAN_AMT_MAX
+			     , SUM(X.SALES_PLAN_AMT_MIN) AS SALES_PLAN_AMT_MIN
+			     , SUM(X.AMT_PROD_PLAN) AS AMT_PROD_PLAN
+			     , SUM(X.AMT_PROD) AS AMT_PROD
+			     , SUM(X.AMT_SALES_PLAN) - SUM(AMT_SALES) AS AMT_SALES_DELTA
+			     <!-- , SUM(X.AMT_PROD_PLAN) - SUM(AMT_PROD) AS AMT_PROD_DELTA -->
+			     , CASE WHEN SUM(X.SALES_PLAN_AMT_MAX) <![CDATA[>]]> 0 
+			     		THEN SUM(X.SALES_PLAN_AMT_MIN) / SUM(X.SALES_PLAN_AMT_MAX) * 100
+			            ELSE 0
+			       END AS AMT_COMP_RATE
+			     , MAX(X.PTSP_TYPE) AS PTSP_TYPE
+			     , MAX(X.PTSP_TYPE_NM) AS PTSP_TYPE_NM
+			     , MAX(X.PTSP_REASON_ID) AS PTSP_REASON_ID
+			     , MAX(X.PTSP_DEPT) AS PTSP_DEPT
+			     , MAX(X.REMARK) AS REMARK
+			FROM 
+			(
+				SELECT T1.COMPANY_CD
+		             , T1.BU_CD
+		             , ISNULL(T1.YEARWEEK        , ' ') AS YEARWEEK
+		             , ISNULL(T1.YEARWEEK        , ' ') AS YEARWEEK_NM
+		             , ISNULL(T2.CUST_LVL2_CD    , ' ') AS CUST_LVL2_CD
+		             , ISNULL(T2.CUST_LVL2_CD    , ' ') AS CUST_LVL2_CD_NM
+		             , ISNULL(T2.CUST_LVL2_NM    , ' ') AS CUST_LVL2_NM
+		             , ISNULL(T2.CUST_LVL2_NM    , ' ') AS CUST_LVL2_NM_NM
+		             , ISNULL(T2.CUST_GROUP_CD   , ' ') AS CUST_GROUP_CD
+		             , ISNULL(T2.CUST_GROUP_CD   , ' ') AS CUST_GROUP_CD_NM
+		             , ISNULL(T2.CUST_GROUP_NM   , ' ') AS CUST_GROUP_NM
+		             , ISNULL(T2.CUST_GROUP_NM   , ' ') AS CUST_GROUP_NM_NM
+		             , ISNULL(T2.PROD_LVL3_CD    , ' ') AS PROD_LVL3_CD
+		             , ISNULL(T2.PROD_LVL3_CD    , ' ') AS PROD_LVL3_CD_NM
+		             , ISNULL(T2.PROD_LVL3_NM    , ' ') AS PROD_LVL3_NM
+		             , ISNULL(T2.PROD_LVL3_NM    , ' ') AS PROD_LVL3_NM_NM
+		             , ISNULL(T2.ITEM_CD         , ' ') AS ITEM_CD
+		             , ISNULL(T2.ITEM_CD         , ' ') AS ITEM_CD_NM
+		             , ISNULL(T2.ITEM_NM         , ' ') AS ITEM_NM
+		             , ISNULL(T2.ITEM_NM         , ' ') AS ITEM_NM_NM
+		             , ISNULL(T2.SPEC            , ' ') AS SPEC
+		             , ISNULL(T2.SPEC            , ' ') AS SPEC_NM
+		             , ISNULL(T2.DRAW_NO         , ' ') AS DRAW_NO
+		             , ISNULL(T2.DRAW_NO         , ' ') AS DRAW_NO_NM
+		             , ISNULL(T2.CLEANING_YN     , ' ') AS CLEANING_YN
+		             , ISNULL(T2.CLEANING_YN     , ' ') AS CLEANING_YN_NM
+		             , ISNULL (CAST (T2.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+		             , ISNULL (CAST (T2.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+		             , ISNULL(T2.ROUTING_ID, ' ') AS  ROUTING_ID
+		             , ISNULL(T2.ROUTING_ID, ' ') AS  ROUTING_ID_NM
+		             , T1.INV_QTY                       AS QTY_INV
+		             , T1.SALES_PLAN_QTY                AS QTY_SALES_PLAN
+		             , T1.SALES_QTY                     AS QTY_SALES
+		             , T1.SALES_PLAN_QTY_MAX
+		             , T1.SALES_PLAN_QTY_MIN
+		             , T1.PROD_PLAN_QTY                 AS QTY_PROD_PLAN
+		             , T1.PROD_QTY                      AS QTY_PROD
+		             , T1.INV_AMT                       AS AMT_INV
+		             , T1.SALES_PLAN_AMT                AS AMT_SALES_PLAN
+		             , T1.SALES_AMT                     AS AMT_SALES
+		             , T1.SALES_PLAN_AMT_MAX
+		             , T1.SALES_PLAN_AMT_MIN
+		             , T1.PROD_PLAN_AMT                 AS AMT_PROD_PLAN
+		             , T1.PROD_AMT                      AS AMT_PROD
+		             , T1.EXP_INV_QTY                   AS QTY_EXP_INV
+		             , T1.EXP_INV_AMT                   AS AMT_EXP_INV
+		             , T1.PTSP_TYPE
+	                 , (
+			            SELECT CASE WHEN 'ko' = @{GV_LANG} THEN A.CODE_NM_KR
+			                        WHEN 'cn' = @{GV_LANG} THEN A.CODE_NM_CN
+			                        ELSE A.CODE_NM
+			                   END 
+	                      FROM TB_MST_CODE A WITH (NOLOCK) 
+	                     WHERE A.BU_CD IN('ALL', @{GV_BU_CD})
+	                       AND A.USE_FLAG != 'N'
+	                       AND A.GROUP_CD = 'PTSP_TYPE'
+	                       AND A.CODE_CD = T1.PTSP_TYPE
+	                   ) AS PTSP_TYPE_NM
+		             , T1.PTSP_REASON_ID
+		             , T1.PTSP_DEPT
+		             , T1.REMARK
+		             , ISNULL(T1.AVAIL_QTY, 0) AS AVAIL_QTY
+		             , ISNULL(T1.AVAIL_AMT, 0) AS AVAIL_AMT
+				FROM W_MAIN T1
+				INNER JOIN W_ITEM_CUST_GROUP T2
+				   ON T1.COMPANY_CD = T2.COMPANY_CD
+				  AND T1.BU_CD = T2.BU_CD
+				  AND T1.CUST_GROUP_CD = T2.CUST_GROUP_CD
+				  AND T1.ITEM_CD = T2.ITEM_CD
+				INNER JOIN W_GIGAN T3
+				   ON T1.COMPANY_CD = T3.COMPANY_CD
+				  AND T1.BU_CD = T3.BU_CD
+				  AND T1.ITEM_CD = T3.ITEM_CD
+				  AND T1.CUST_GROUP_CD = T3.CUST_GROUP_CD
+				  AND T1.YEARWEEK = T3.YEARWEEK
+				  AND T1.PTSP_TYPE = T3.PTSP_TYPE
+				WHERE T1.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND T1.BU_CD = @{GV_BU_CD}
+				  AND T1.YEARWEEK BETWEEN @{fromWeek} AND @{toWeek} 
+				#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+				  AND T2.CUST_LVL2_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+				#end
+				#if($_parameter.custGroup and $_parameter.custGroup != "")
+				  AND T2.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+				#end
+				#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+				  AND T2.PROD_LVL3_CD IN ('$_parameter.itemGroup.replace(",","','")')
+				#end
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+				  AND T2.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+				#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+				  AND (T2.ITEM_CD   LIKE '%' + @{item_nm} + '%' OR T2.ITEM_NM   LIKE '%' + @{item_nm} + '%')
+				#end
+				#if($_parameter.type and $_parameter.type != "")
+				  AND T1.PTSP_TYPE = @{type}
+				#end
+				#if($_parameter.reason and $_parameter.reason != "")
+				  AND T1.PTSP_REASON_ID = @{reason}
+				#end
+				#if($_parameter.dept and $_parameter.dept != "")
+				  AND T1.PTSP_DEPT = @{dept}
+				#end
+			) X
+			GROUP BY ROLLUP(<include refid="include.getCdRollup"/>)
+		) TT
+		WHERE 1 = 1
+		#if($_parameter.sAmt and $_parameter.sAmt == "on" and $_parameter.sQty and $_parameter.sQty == "on")
+			#if($_parameter.saleRateFrom and $_parameter.saleRateFrom != "" and $_parameter.saleRateTo and $_parameter.saleRateTo != "")
+			  AND QTY_SALES_DELTA BETWEEN @{saleRateFrom} AND @{saleRateTo}
+		    #end
+		#elseif($_parameter.sAmt and $_parameter.sAmt == "on" and $_parameter.sQty and $_parameter.sQty != "on")
+		    #if($_parameter.saleRateFrom and $_parameter.saleRateFrom != "" and $_parameter.saleRateTo and $_parameter.saleRateTo != "")
+			  AND AMT_SALES_DELTA BETWEEN @{saleRateFrom} AND @{saleRateTo}
+		    #end
+		#elseif($_parameter.sAmt and $_parameter.sAmt != "on" and $_parameter.sQty and $_parameter.sQty == "on")
+		    #if($_parameter.saleRateFrom and $_parameter.saleRateFrom != "" and $_parameter.saleRateTo and $_parameter.saleRateTo != "")
+			  AND QTY_SALES_DELTA BETWEEN @{saleRateFrom} AND @{saleRateTo}
+		    #end
+		#end
+		#if($_parameter.addSalesAvail and $_parameter.addSalesAvail == "Y")
+			AND  TT.QTY_AVAIL_ADD_SALES <![CDATA[>]]>0	
+		#elseif($_parameter.addSalesAvail and $_parameter.addSalesAvail == "N")
+			AND  TT.QTY_AVAIL_ADD_SALES <![CDATA[<=]]>0
+		#end
+		ORDER BY TMP_COL, case when TT.YEARWEEK is null then 1 else 0 end DESC
+		#foreach($dimMap in $_parameter.dimList)
+		#if($dimMap.DIM_CD == "YEARWEEK")
+		  , TT.$dimMap.DIM_CD DESC
+		#else
+		  , TT.$dimMap.DIM_CD
+		#end
+		#end	
+	</select>
+	
+	<update id="salesPlanVsActualUpdate" parameterType="map">
+		/****** [ dp.salesPerformNew.salesPlanVsActualUpdate ] ******/
+		UPDATE TB_DYN_PTSP_REASON
+		   SET UPDATE_ID      = @{GV_USER_ID}
+		     , UPDATE_DTTM    = DBO.UFN_GETDATE()
+		     , PTSP_REASON_ID = @{PTSP_REASON_ID}
+		     , PTSP_DEPT      = @{PTSP_DEPT}
+		     , REMARK         = @{REMARK}
+		 WHERE COMPANY_CD     = @{GV_COMPANY_CD}
+		   AND BU_CD          = @{GV_BU_CD}
+		   AND ITEM_CD        = @{ITEM_CD}
+		   AND CUST_GROUP_CD  = @{CUST_GROUP_CD}
+		   AND YEARWEEK       = @{YEARWEEK}
+		   AND PTSP_TYPE      = @{PTSP_TYPE}
+	</update>
+	
+	<select id="chartBucketSelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.chartBucketSelect ] ******/
+		SELECT 'PW' + YEARWEEK AS CD
+		      , YEARWEEK AS NM
+		      , 'W' + RIGHT(YEARWEEK, 2) AS DISWEEK
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARWEEK BETWEEN @{fromWeek} AND @{toWeek}
+		GROUP BY YEARWEEK
+	</select>
+	
+	<select id="chartRepCustGroupSelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPerform.planSalesRepCustGroupSelect ] ******/
+		SELECT REP_CUST_GROUP_CD AS CD
+		     , REP_CUST_GROUP_NM AS NM
+		FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	      AND BU_CD = @{GV_BU_CD}
+		  AND USE_FLAG = 'Y'
+	</select>
+	
+	<select id="chart1Select" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.chart1Select ] ******/
+		WITH W_ITEM_CUST_GROUP AS 
+		(
+		    SELECT CG.COMPANY_CD
+		         , CG.BU_CD
+		         , ISNULL(CM.CUST_LVL2_CD     , ' ') AS CUST_LVL2_CD
+		         , ISNULL(CM.CUST_LVL2_NM     , ' ') AS CUST_LVL2_NM
+		         , CG.CUST_GROUP_CD
+		         , ISNULL(CM.CUST_GROUP_NM    , ' ') AS CUST_GROUP_NM
+		         , ISNULL(IT.PROD_LVL3_CD     , ' ') AS PROD_LVL3_CD
+		         , ISNULL(IT.PROD_LVL3_NM     , ' ') AS PROD_LVL3_NM
+		         , CG.ITEM_CD
+		         , ISNULL(IT.ITEM_NM          , ' ') AS ITEM_NM
+		         , ISNULL(IT.SPEC             , ' ') AS SPEC
+		         , ISNULL(IT.DRAW_NO          , ' ') AS DRAW_NO
+		         , CG.SALES_PRICE_KRW
+			FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+		    INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+		       ON CG.COMPANY_CD = IT.COMPANY_CD
+			  AND CG.BU_CD      = IT.BU_CD
+		      AND CG.ITEM_CD    = IT.ITEM_CD
+			INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+		       ON CG.COMPANY_CD    = CM.COMPANY_CD
+		      AND CG.BU_CD         = CM.BU_CD
+		      AND CG.CUST_GROUP_CD = CM.CUST_CD
+			WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND CG.BU_CD         = @{GV_BU_CD}
+		      AND CG.VALID_FLAG    = 'Y'
+		),
+		W_MAIN AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.ITEM_CD
+		         , A.CUST_GROUP_CD
+		         , A.YEARWEEK
+		         , B.PTSP_TYPE
+		         , B.QTY
+			FROM TB_DYN_PTSP A WITH(NOLOCK)
+		    INNER JOIN TB_DYN_PTSP_REASON B WITH(NOLOCK)
+		       ON A.COMPANY_CD    = B.COMPANY_CD
+		      AND A.BU_CD         = B.BU_CD
+		      AND A.ITEM_CD       = B.ITEM_CD
+		      AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+		      AND A.YEARWEEK      = B.YEARWEEK
+			WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD = @{GV_BU_CD}
+		      AND A.YEARWEEK BETWEEN @{fromWeek} AND @{toWeek}
+			#if($_parameter.ptspType != "")
+		      AND B.PTSP_TYPE = @{ptspType}
+		    #end
+		      AND B.QTY <![CDATA[>]]> 0
+		),
+		W_DATA AS 
+		(
+			SELECT T.CUST_LVL2_CD
+		         , T.CUST_LVL2_NM
+				#foreach( $bucketMap in $_parameter.bucketList )
+		         , SUM(CASE WHEN T.YEARWEEK = '$bucketMap.NM' THEN T.CNT ELSE 0 END) AS ${bucketMap.CD}
+		        #end
+		         , ROW_NUMBER() OVER(ORDER BY T.CUST_LVL2_CD) RN
+			FROM 
+			(
+		    	SELECT A.CUST_LVL2_CD
+	                 , A.CUST_LVL2_NM
+	                 , B.YEARWEEK
+	                 , B.PTSP_TYPE
+	                 , CASE WHEN B.QTY IS NOT NULL THEN 1 ELSE 0 END AS CNT
+				FROM W_ITEM_CUST_GROUP A
+	            LEFT OUTER JOIN W_MAIN B
+	              ON A.COMPANY_CD = B.COMPANY_CD
+	             AND A.BU_CD = B.BU_CD
+	             AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+	             AND A.ITEM_CD = B.ITEM_CD       
+			) T
+		    GROUP BY T.CUST_LVL2_CD, T.CUST_LVL2_NM
+		),
+		W_DATA_RT AS 
+		(
+			SELECT B.CUST_LVL2_CD
+			     , B.CUST_LVL2_NM
+				#foreach( $bucketMap in $_parameter.bucketList )
+			     , CASE WHEN A.${bucketMap.CD}_TOT <![CDATA[>]]> 0 THEN CAST(ROUND(CAST(${bucketMap.CD} AS FLOAT) / CAST(${bucketMap.CD}_TOT AS FLOAT) * 100 ,1) AS NUMERIC(4,1)) ELSE 0 END AS ${bucketMap.CD}
+			    #end
+			     , ROW_NUMBER() OVER(ORDER BY B.CUST_LVL2_CD) RN
+			FROM 
+			(
+				SELECT NULL AS TMP
+					#foreach( $bucketMap in $_parameter.bucketList )
+			         , SUM(${bucketMap.CD}) AS ${bucketMap.CD}_TOT
+					#end
+				FROM W_DATA
+			) A, W_DATA B
+		)
+		SELECT 
+		(
+			SELECT CUST_LVL2_CD "code"
+		         , CUST_LVL2_NM "name"
+		         , JSON_QUERY( '['
+				#foreach( $bucketMap in $_parameter.bucketList )
+		         + CAST ($bucketMap.CD AS NVARCHAR(30)) 
+				#if($foreach.hasNext) 
+				 + ','
+				#end
+		       	#end
+		       	 + ']') "data"
+		       	 , RN
+			#if($_parameter.type1 == "cnt")
+			FROM W_DATA
+		    #else
+		    FROM W_DATA_RT
+		    #end
+		   	WHERE CUST_LVL2_CD IS NOT NULL
+		      FOR JSON AUTO
+		) STATUS_CHART
+	</select>
+	
+	<select id="chart2Select" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.chart2Select ] ******/
+		WITH W_ITEM_CUST_GROUP AS 
+		(
+		    SELECT CG.COMPANY_CD
+		         , CG.BU_CD
+		         , ISNULL(CM.CUST_LVL2_CD     , ' ') AS CUST_LVL2_CD
+		         , ISNULL(CM.CUST_LVL2_NM     , ' ') AS CUST_LVL2_NM
+		         , CG.CUST_GROUP_CD
+		         , ISNULL(CM.CUST_GROUP_NM    , ' ') AS CUST_GROUP_NM
+		         , ISNULL(IT.PROD_LVL3_CD     , ' ') AS PROD_LVL3_CD
+		         , ISNULL(IT.PROD_LVL3_NM     , ' ') AS PROD_LVL3_NM
+		         , CG.ITEM_CD
+		         , ISNULL(IT.ITEM_NM          , ' ') AS ITEM_NM
+		         , ISNULL(IT.SPEC             , ' ') AS SPEC
+		         , ISNULL(IT.DRAW_NO          , ' ') AS DRAW_NO
+		         , CG.SALES_PRICE_KRW
+			FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+		    INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+		       ON CG.COMPANY_CD = IT.COMPANY_CD
+		      AND CG.BU_CD      = IT.BU_CD
+		      AND CG.ITEM_CD    = IT.ITEM_CD
+			INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+		       ON CG.COMPANY_CD    = CM.COMPANY_CD
+		      AND CG.BU_CD         = CM.BU_CD
+		      AND CG.CUST_GROUP_CD = CM.CUST_CD
+			WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND CG.BU_CD         = @{GV_BU_CD}
+		      AND CG.VALID_FLAG    = 'Y'
+		),
+		W_ROW AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.ITEM_CD
+		         , A.CUST_GROUP_CD
+		         , A.YEARWEEK
+		         , B.PTSP_TYPE
+		         , B.QTY
+			FROM TB_DYN_PTSP A WITH(NOLOCK)
+		    INNER JOIN TB_DYN_PTSP_REASON B WITH(NOLOCK)
+		       ON A.COMPANY_CD    = B.COMPANY_CD
+		      AND A.BU_CD         = B.BU_CD
+		      AND A.ITEM_CD       = B.ITEM_CD
+		      AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+		      AND A.YEARWEEK      = B.YEARWEEK
+		    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD = @{GV_BU_CD}
+		      AND A.YEARWEEK BETWEEN @{fromWeek} AND @{toWeek}
+		      AND B.QTY <![CDATA[>]]> 0
+		),
+		W_MAIN AS 
+		(
+		    SELECT TT.CUST_LVL2_CD
+		         , TT.CUST_LVL2_NM
+		         , ISNULL(SUM(TT.PTSP_TYPE_1_CNT),0) AS PTSP_TYPE_1_CNT
+		         , ISNULL(SUM(TT.PTSP_TYPE_2_CNT),0) AS PTSP_TYPE_2_CNT
+		         , ISNULL(SUM(TT.PTSP_TYPE_3_CNT),0) AS PTSP_TYPE_3_CNT
+			FROM 
+			(
+		    	SELECT T.CUST_LVL2_CD
+		        	 , T.CUST_LVL2_NM
+		             , CASE WHEN T.PTSP_TYPE = 'PTSP_TYPE_1' THEN SUM(CNT) END AS PTSP_TYPE_1_CNT
+		             , CASE WHEN T.PTSP_TYPE = 'PTSP_TYPE_2' THEN SUM(CNT) END AS PTSP_TYPE_2_CNT
+		             , CASE WHEN T.PTSP_TYPE = 'PTSP_TYPE_3' THEN SUM(CNT) END AS PTSP_TYPE_3_CNT
+				FROM 
+				(
+		        	SELECT A.CUST_LVL2_CD
+                         , A.CUST_LVL2_NM
+                         , B.YEARWEEK
+                         , B.PTSP_TYPE
+                         , CASE WHEN B.QTY IS NOT NULL THEN 1 ELSE 0 END AS CNT
+					FROM W_ITEM_CUST_GROUP A
+                    LEFT OUTER JOIN W_ROW B
+                      ON A.COMPANY_CD = B.COMPANY_CD
+                     AND A.BU_CD = B.BU_CD
+                     AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+                     AND A.ITEM_CD = B.ITEM_CD 
+				) T
+		        WHERE T.PTSP_TYPE IS NOT NULL
+		        GROUP BY T.CUST_LVL2_CD, T.CUST_LVL2_NM, T.PTSP_TYPE
+			) TT
+		    GROUP BY TT.CUST_LVL2_CD, TT.CUST_LVL2_NM
+		)
+		SELECT T.CUST_LVL2_CD
+		     , T.CUST_LVL2_NM
+		     , T.PTSP_TYPE_1_CNT
+		     , CASE WHEN T.TOTAL <![CDATA[>]]> 0 THEN CAST(ROUND(CAST(T.PTSP_TYPE_1_CNT AS FLOAT) / CAST(T.TOTAL AS FLOAT) * 100 ,1) AS NUMERIC(4,1)) ELSE 0 END PTSP_TYPE_1_RT
+		     , T.PTSP_TYPE_2_CNT
+		     , CASE WHEN T.TOTAL <![CDATA[>]]> 0 THEN CAST(ROUND(CAST(T.PTSP_TYPE_2_CNT AS FLOAT) / CAST(T.TOTAL AS FLOAT) * 100, 1) AS NUMERIC(4,1)) ELSE 0 END PTSP_TYPE_2_RT
+		     , T.PTSP_TYPE_3_CNT
+		     , CASE WHEN T.TOTAL <![CDATA[>]]> 0 THEN CAST(ROUND(CAST(T.PTSP_TYPE_3_CNT AS FLOAT) / CAST(T.TOTAL AS FLOAT) * 100, 1) AS NUMERIC(4,1)) ELSE 0 END PTSP_TYPE_3_RT
+		     , T.TOTAL
+		FROM 
+		(
+			SELECT CUST_LVL2_CD
+	             , CUST_LVL2_NM
+	             , PTSP_TYPE_1_CNT
+	             , PTSP_TYPE_2_CNT
+	             , PTSP_TYPE_3_CNT
+	             , PTSP_TYPE_1_CNT + PTSP_TYPE_2_CNT + PTSP_TYPE_3_CNT AS TOTAL
+			FROM W_MAIN
+		) T
+		ORDER BY T.CUST_LVL2_CD
+	</select>
+	
+	<select id="chart3Select" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.chart3Select ] ******/
+		WITH W_DATA AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.ITEM_CD
+		         , A.CUST_GROUP_CD
+		         , A.YEARWEEK
+		         , B.PTSP_REASON_ID
+		         , B.QTY
+		         , COUNT(*) OVER(PARTITION BY A.COMPANY_CD, A.BU_CD) AS TOTAL_CNT
+			FROM TB_DYN_PTSP A WITH(NOLOCK)
+		    INNER JOIN TB_DYN_PTSP_REASON B WITH(NOLOCK)
+		       ON A.COMPANY_CD    = B.COMPANY_CD
+		      AND A.BU_CD         = B.BU_CD
+		      AND A.ITEM_CD       = B.ITEM_CD
+		      AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+		      AND A.YEARWEEK      = B.YEARWEEK
+		    WHERE A.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND A.BU_CD         = @{GV_BU_CD}
+		      AND A.YEARWEEK      = @{toWeek}
+		      AND B.QTY <![CDATA[>]]> 0
+			#if($_parameter.reason and $_parameter.reason != "")
+		      AND B.PTSP_REASON_ID IN ('$_parameter.reason.replace(",","','")')
+			#end
+		),
+		W_CODE AS 
+		(
+			SELECT BU_CD
+	            , GROUP_CD
+	            , CODE_CD
+	            , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                   WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                   ELSE CODE_NM
+	               END AS CODE_NM
+			FROM TB_MST_CODE WITH (NOLOCK)
+	       	WHERE BU_CD IN('ALL', @{GV_BU_CD})
+	          AND USE_FLAG != 'N'
+	          AND GROUP_CD  = 'PTSP_REASON_ID'
+			#if($_parameter.reason and $_parameter.reason != "")
+	          AND CODE_CD IN ('$_parameter.reason.replace(",","','")')
+			#end
+		)
+		SELECT 
+		(
+			SELECT TT.CODE_CD "code"
+	             , TT.CODE_NM "name"
+	             , CASE WHEN TT.TOTAL_CNT <![CDATA[>]]> 0
+	                    THEN CAST(ROUND(CAST(TT.REASON_CNT AS FLOAT) / CAST(TT.TOTAL_CNT AS FLOAT) * 100 ,1) AS NUMERIC(4,1))
+	                    ELSE 0
+	               END "y"
+			FROM 
+			(
+	        	SELECT T.CODE_CD
+                     , T.CODE_NM
+                     , SUM(T.REASON_CNT) AS REASON_CNT
+                     , MAX(T.TOTAL_CNT) AS TOTAL_CNT
+				FROM 
+				(
+                	SELECT A.CODE_CD 
+                         , A.CODE_NM
+                         , CASE WHEN ISNULL(B.QTY,0) <![CDATA[>]]> 0 THEN 1 ELSE 0 END AS REASON_CNT
+                         , ISNULL(B.TOTAL_CNT, 0) AS TOTAL_CNT
+					FROM W_CODE A
+                    LEFT OUTER JOIN W_DATA B
+                      ON A.BU_CD = B.BU_CD
+                     AND A.CODE_CD = B.PTSP_REASON_ID
+				) T
+                GROUP BY T.CODE_CD, T.CODE_NM
+			) TT
+           	FOR JSON AUTO
+		) STATUS_CHART
+	</select>
+	
+	<select id="chart4Select" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.chart4Select ] ******/
+		WITH W_CODE AS 
+		(
+			SELECT BU_CD
+	           , GROUP_CD
+	           , CODE_CD
+	           , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                  WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                  ELSE CODE_NM
+	             END AS CODE_NM
+			FROM TB_MST_CODE WITH (NOLOCK)
+	       	WHERE BU_CD IN('ALL', @{GV_BU_CD})
+	          AND USE_FLAG != 'N'
+	          AND GROUP_CD  = 'PTSP_REASON_ID'
+	        #if($_parameter.reason and $_parameter.reason != "")
+	          AND CODE_CD IN ('$_parameter.reason.replace(",","','")')
+	        #end
+		),
+		W_DATA AS 
+		(
+			SELECT T.COMPANY_CD
+	             , T.BU_CD
+	             , T.YEARWEEK
+	             , ISNULL(T.PTSP_REASON_ID, 'PTSPR999999') AS PTSP_REASON_ID
+	           	#foreach( $bucketMap in $_parameter.bucketList )
+	             , SUM(CASE WHEN T.YEARWEEK = '$bucketMap.NM' THEN T.REASON_CNT ELSE 0 END) AS ${bucketMap.CD}
+	           	#end
+	        FROM 
+	        (
+		    	SELECT A.COMPANY_CD
+                     , A.BU_CD
+                     , A.ITEM_CD
+                     , A.CUST_GROUP_CD
+                     , A.YEARWEEK
+                     , B.PTSP_REASON_ID
+                     , CASE WHEN ISNULL(B.QTY, 0) <![CDATA[>]]> 0 THEN 1 ELSE 0 END REASON_CNT
+				FROM TB_DYN_PTSP A WITH(NOLOCK)
+				INNER JOIN TB_DYN_PTSP_REASON B WITH(NOLOCK)
+                   ON A.COMPANY_CD    = B.COMPANY_CD
+                  AND A.BU_CD         = B.BU_CD
+                  AND A.ITEM_CD       = B.ITEM_CD
+                  AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+                  AND A.YEARWEEK      = B.YEARWEEK
+                WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND A.BU_CD = @{GV_BU_CD}
+                  AND A.YEARWEEK BETWEEN @{fromWeek} AND @{toWeek}
+			) T
+		    GROUP BY T.COMPANY_CD, T.BU_CD, T.YEARWEEK, T.PTSP_REASON_ID
+		),
+		W_DATA_M AS 
+		(
+        	SELECT T.CODE_CD 
+                 , T.CODE_NM 
+				#foreach( $bucketMap in $_parameter.bucketList )
+                 , SUM(T.${bucketMap.CD}) AS ${bucketMap.CD}
+                #end
+			FROM 
+			(
+            	SELECT A.CODE_CD
+                     , A.CODE_NM
+					#foreach( $bucketMap in $_parameter.bucketList )
+                     , ISNULL(B.${bucketMap.CD},0) AS ${bucketMap.CD}
+                    #end
+				FROM W_CODE A
+                LEFT OUTER JOIN W_DATA B
+                  ON A.BU_CD = B.BU_CD
+                 AND A.CODE_CD = B.PTSP_REASON_ID 
+			) T
+            GROUP BY T.CODE_CD, T.CODE_NM		
+		),
+		W_DATA_M_RT AS 
+		(
+			SELECT B.CODE_CD
+			     , B.CODE_NM
+				#foreach( $bucketMap in $_parameter.bucketList )
+			     , CASE WHEN A.${bucketMap.CD}_TOT <![CDATA[>]]> 0 THEN CAST(ROUND(CAST(B.${bucketMap.CD} AS FLOAT) / CAST(A.${bucketMap.CD}_TOT AS FLOAT) * 100 ,1) AS NUMERIC(4,1)) ELSE 0 END AS ${bucketMap.CD}
+			    #end
+			FROM 
+			(
+				SELECT NULL AS TMP
+					#foreach( $bucketMap in $_parameter.bucketList )
+			         , SUM(${bucketMap.CD}) AS ${bucketMap.CD}_TOT
+					#end
+				FROM W_DATA_M 
+			) A, W_DATA_M B
+		)
+		SELECT 
+		(
+			SELECT TT.CODE_CD "code"
+		         , TT.CODE_NM "name"
+				 , JSON_QUERY( '['
+				#foreach( $bucketMap in $_parameter.bucketList )
+				 + CAST (TT.$bucketMap.CD AS NVARCHAR(30)) 
+				#if($foreach.hasNext) 
+				 + ','
+				#end
+				#end
+				 + ']') "data"
+			#if($_parameter.type1 == "cnt")
+			FROM W_DATA_M TT
+			#else
+			FROM W_DATA_M_RT TT
+			#end
+			FOR JSON AUTO
+		) STATUS_CHART
+	</select>
+	
+	<select id="chart5Select" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.chart5Select ] ******/
+		WITH W_DATA AS 
+		(
+			SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.ITEM_CD
+		         , A.CUST_GROUP_CD
+		         , A.YEARWEEK
+		         , B.PTSP_DEPT
+		         , B.QTY
+		         , COUNT(*) OVER(PARTITION BY A.COMPANY_CD, A.BU_CD) AS TOTAL_CNT
+			FROM TB_DYN_PTSP A WITH(NOLOCK)
+		    INNER JOIN TB_DYN_PTSP_REASON B WITH(NOLOCK)
+		       ON A.COMPANY_CD    = B.COMPANY_CD
+		      AND A.BU_CD         = B.BU_CD
+		      AND A.ITEM_CD       = B.ITEM_CD
+		      AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+		      AND A.YEARWEEK      = B.YEARWEEK
+		    WHERE A.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND A.BU_CD         = @{GV_BU_CD}
+		      AND A.YEARWEEK      = @{toWeek}
+		      AND B.QTY <![CDATA[>]]> 0
+			#if($_parameter.dept and $_parameter.dept != "")
+		      AND B.PTSP_DEPT IN ('$_parameter.dept.replace(",","','")')
+		    #end
+		),
+		W_CODE AS 
+		(
+			SELECT BU_CD
+	             , GROUP_CD
+	             , CODE_CD
+	             , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                    WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                    ELSE CODE_NM
+	             	END AS CODE_NM
+			FROM TB_MST_CODE WITH (NOLOCK)
+	       	WHERE BU_CD IN('ALL', @{GV_BU_CD})
+	          AND USE_FLAG != 'N'
+	          AND GROUP_CD  = 'PTSP_DEPT'
+	        #if($_parameter.dept and $_parameter.dept != "")
+	          AND CODE_CD IN ('$_parameter.dept.replace(",","','")')
+	        #end
+		)
+		SELECT 
+		(
+			SELECT TT.CODE_CD "code"
+				 , TT.CODE_NM "name"
+		         , CASE WHEN TT.TOTAL_CNT <![CDATA[>]]> 0
+		                THEN CAST(ROUND(CAST(TT.DEPT_CNT AS FLOAT) / CAST(TT.TOTAL_CNT AS FLOAT) * 100 ,1) AS NUMERIC(4,1))
+		                ELSE 0
+					END "y"
+			FROM 
+			(
+		    	SELECT T.CODE_CD
+                     , T.CODE_NM
+                     , SUM(T.DEPT_CNT) AS DEPT_CNT
+                     , MAX(T.TOTAL_CNT) AS TOTAL_CNT
+				FROM 
+				(
+                	SELECT A.CODE_CD 
+                         , A.CODE_NM
+                         , CASE WHEN ISNULL(B.QTY,0) <![CDATA[>]]> 0 THEN 1 ELSE 0 END AS DEPT_CNT
+                         , ISNULL(B.TOTAL_CNT, 0) AS TOTAL_CNT
+					FROM W_CODE A
+                    LEFT OUTER JOIN W_DATA B
+                      ON A.BU_CD = B.BU_CD
+					 AND A.CODE_CD = B.PTSP_DEPT
+				) T
+              	GROUP BY T.CODE_CD, T.CODE_NM
+			) TT
+		    FOR JSON AUTO
+		) STATUS_CHART
+	</select>
+	
+	<select id="chart6Select" parameterType="map" resultType="map">
+		/****** [ dp.salesPerformNew.chart6Select ] ******/
+		WITH W_CODE AS 
+		(
+			SELECT BU_CD
+	             , GROUP_CD
+	             , CODE_CD
+	             , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                    WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                    ELSE CODE_NM
+	             	END AS CODE_NM
+	        FROM TB_MST_CODE WITH (NOLOCK)
+			WHERE BU_CD IN('ALL', @{GV_BU_CD})
+	          AND USE_FLAG != 'N'
+	          AND GROUP_CD  = 'PTSP_DEPT'
+			#if($_parameter.dept and $_parameter.dept != "")
+	          AND CODE_CD IN ('$_parameter.dept.replace(",","','")')
+			#end
+		),
+		W_DATA AS 
+		(
+			SELECT T.COMPANY_CD
+	             , T.BU_CD
+	             , T.YEARWEEK
+	             , ISNULL(T.PTSP_DEPT, 'PTSPR999999') AS PTSP_DEPT
+	           	#foreach( $bucketMap in $_parameter.bucketList )
+	             , SUM(CASE WHEN T.YEARWEEK = '$bucketMap.NM' THEN T.DEPT_CNT ELSE 0 END) AS ${bucketMap.CD}
+	           	#end
+			FROM 
+			(
+	        	SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.ITEM_CD
+	                 , A.CUST_GROUP_CD
+	                 , A.YEARWEEK
+	                 , B.PTSP_DEPT
+	                 , CASE WHEN ISNULL(B.QTY, 0) <![CDATA[>]]> 0 THEN 1 ELSE 0 END DEPT_CNT
+				FROM TB_DYN_PTSP A WITH(NOLOCK)
+	            INNER JOIN TB_DYN_PTSP_REASON B WITH(NOLOCK)
+	               ON A.COMPANY_CD    = B.COMPANY_CD
+	              AND A.BU_CD         = B.BU_CD
+	              AND A.ITEM_CD       = B.ITEM_CD
+	              AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+	              AND A.YEARWEEK      = B.YEARWEEK
+				WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	              AND A.BU_CD = @{GV_BU_CD}
+				  AND A.YEARWEEK BETWEEN @{fromWeek} AND @{toWeek}
+			) T
+		    GROUP BY T.COMPANY_CD, T.BU_CD, T.YEARWEEK, T.PTSP_DEPT
+		),
+		W_DATA_M AS 
+		(
+        	SELECT T.CODE_CD 
+                 , T.CODE_NM 
+				#foreach( $bucketMap in $_parameter.bucketList )
+                 , SUM(T.${bucketMap.CD}) AS ${bucketMap.CD}
+                #end
+			FROM 
+			(
+            	SELECT A.CODE_CD
+                     , A.CODE_NM
+					#foreach( $bucketMap in $_parameter.bucketList )
+                     , ISNULL(B.${bucketMap.CD},0) AS ${bucketMap.CD}
+					#end
+				FROM W_CODE A
+                LEFT OUTER JOIN W_DATA B
+                  ON A.BU_CD = B.BU_CD
+				 AND A.CODE_CD = B.PTSP_DEPT 
+			) T
+            GROUP BY T.CODE_CD, T.CODE_NM
+		),
+		W_DATA_M_RT AS 
+		(
+			SELECT B.CODE_CD
+			     , B.CODE_NM
+				#foreach( $bucketMap in $_parameter.bucketList )
+			     , CASE WHEN A.${bucketMap.CD}_TOT <![CDATA[>]]> 0 THEN CAST(ROUND(CAST(B.${bucketMap.CD} AS FLOAT) / CAST(A.${bucketMap.CD}_TOT AS FLOAT) * 100 ,1) AS NUMERIC(4,1)) ELSE 0 END AS ${bucketMap.CD}
+			    #end
+			FROM
+			(
+				SELECT NULL AS TMP
+			    	#foreach( $bucketMap in $_parameter.bucketList )
+			         , SUM(${bucketMap.CD}) AS ${bucketMap.CD}_TOT
+					#end
+				FROM W_DATA_M
+			) A, W_DATA_M B
+		)
+		SELECT 
+		(
+			SELECT TT.CODE_CD "code"
+	             , TT.CODE_NM "name"
+	             , JSON_QUERY( '['
+				#foreach( $bucketMap in $_parameter.bucketList )
+			     + CAST (TT.$bucketMap.CD AS NVARCHAR(30)) 
+				#if($foreach.hasNext) 
+				 + ','
+				#end
+				#end
+	             + ']') "data"
+			#if($_parameter.type1 == "cnt")
+		    FROM W_DATA_M TT
+		    #else
+		    FROM W_DATA_M_RT TT
+		    #end
+	        FOR JSON AUTO
+		) STATUS_CHART
+	</select>
+	
+	<select id="chart7Select" parameterType="map" resultType="map">
+		 /****** [ dp.salesPerformNew.chart7Select ] ******/
+		 WITH W_DIM_ROW AS
+	    (
+	    	SELECT ISNULL(CM.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+	             , ISNULL(CM.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+	             , ISNULL(CM.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+	             , ISNULL(CM.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+	             , ISNULL(IT.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+	             , ISNULL(IG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+	             , ISNULL(SO.SALES_ORG_LVL3_CD, ' ') AS SALES_ORG_LVL3_CD
+	             , ISNULL(SO.SALES_ORG_LVL3_NM, ' ') AS SALES_ORG_LVL3_NM
+	             , ISNULL(SO.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+	             , ISNULL(SO.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+	             , CASE WHEN CG.SALES_ORG_LVL5_CD IS NULL THEN ' ' ELSE ISNULL(SO.SALES_ORG_LVL5_CD, ' ') END AS SALES_ORG_LVL5_CD
+	             , CASE WHEN CG.SALES_ORG_LVL5_CD IS NULL THEN ' ' ELSE ISNULL(SO.SALES_ORG_LVL5_NM, ' ') END AS SALES_ORG_LVL5_NM
+	             , IT.ITEM_CD
+	             , IT.ITEM_NM
+	             , IT.SPEC
+	             , IT.DRAW_NO
+	             , PP.YEARWEEK
+	             , CASE WHEN SALES_PLAN_QTY <![CDATA[>]]> 0 THEN 1 ELSE 0 END PLAN_SET_ITEM_COUNT
+	             , PR.PTSP_TYPE
+	             , CASE WHEN PR.QTY <![CDATA[>]]> 0 THEN 1 ELSE 0 END PLAN_ITEM_COUNT
+	    	FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+	        INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+	        ON CG.COMPANY_CD = IT.COMPANY_CD
+	        AND CG.BU_CD = IT.BU_CD
+	        AND CG.ITEM_CD = IT.ITEM_CD
+	        INNER JOIN TB_MST_ITEM_PLANT IP WITH(NOLOCK)
+	           ON IT.COMPANY_CD = IP.COMPANY_CD
+	          AND IT.BU_CD = IP.BU_CD
+	          AND IT.ITEM_CD = IP.ITEM_CD
+	        INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+	           ON CG.COMPANY_CD = CM.COMPANY_CD
+	          AND CG.BU_CD = CM.BU_CD
+	          AND CG.CUST_GROUP_CD = CM.CUST_CD
+	        LEFT OUTER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+	          ON IG.COMPANY_CD = IT.COMPANY_CD
+	         AND IG.BU_CD = IT.BU_CD
+	         AND IG.ITEM_GROUP_CD = IT.ITEM_GROUP_CD
+	        LEFT OUTER JOIN UV_MAP_SALES_ORG SO WITH(NOLOCK)
+	          ON CG.COMPANY_CD = SO.COMPANY_CD
+	         AND CG.BU_CD = SO.BU_CD
+	         AND CG.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+	         AND (
+	         		CG.SALES_ORG_LVL5_CD IS NULL
+	                OR (CG.SALES_ORG_LVL5_CD IS NOT NULL AND CG.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD)
+	             )
+	        INNER JOIN TB_DYN_PTSP PP WITH(NOLOCK)
+	           ON CG.COMPANY_CD = PP.COMPANY_CD
+	          AND CG.BU_CD = PP.BU_CD
+	          AND CG.ITEM_CD = PP.ITEM_CD
+	          AND CG.CUST_GROUP_CD = PP.CUST_GROUP_CD
+	          AND PP.YEARWEEK BETWEEN @{fromWeek} AND @{toWeek}
+	        INNER JOIN TB_DYN_PTSP_REASON PR WITH(NOLOCK)
+	           ON PP.COMPANY_CD = PR.COMPANY_CD
+	          AND PP.BU_CD = PR.BU_CD
+	          AND PP.ITEM_CD = PR.ITEM_CD
+	          AND PP.CUST_GROUP_CD = PR.CUST_GROUP_CD
+	          AND PP.YEARWEEK = PR.YEARWEEK
+	        WHERE CG.COMPANY_CD = @{GV_COMPANY_CD}
+	          AND CG.BU_CD = @{GV_BU_CD}
+	          AND CM.REP_CUST_GROUP_CD = @{repCustGroup}
+	          AND IP.PLANT_CD = 'WF01'
+	        #if($_parameter.ptspType and $_parameter.ptspType != "")
+	          AND EXISTS (
+	             SELECT 1
+	               FROM TB_DYN_PTSP_REASON PT
+	              WHERE PT.COMPANY_CD    = CG.COMPANY_CD
+	                AND PT.BU_CD         = CG.BU_CD
+	                AND PT.ITEM_CD       = CG.ITEM_CD
+	                AND PT.CUST_GROUP_CD = CG.CUST_GROUP_CD
+	                AND PT.YEARWEEK     = PP.YEARWEEK
+	                AND PT.PTSP_TYPE     IN ('$_parameter.ptspType.replace(",","','")')
+	                AND PT.QTY           <![CDATA[>]]> 0
+	          )
+			#end
+	    ),
+	    W_ROW AS 
+	    (
+	        SELECT R.REP_CUST_GROUP_CD
+	             , R.REP_CUST_GROUP_NM
+	             , R.CUST_GROUP_CD
+	             , R.CUST_GROUP_NM
+	             , R.ITEM_GROUP_CD
+	             , R.ITEM_GROUP_NM
+	             , R.SALES_ORG_LVL3_CD
+	             , R.SALES_ORG_LVL3_NM
+	             , R.SALES_ORG_LVL4_CD
+	             , R.SALES_ORG_LVL4_NM
+	             , R.SALES_ORG_LVL5_CD
+	             , R.SALES_ORG_LVL5_NM
+	             , R.ITEM_CD
+	             , R.ITEM_NM
+	             , R.SPEC
+	             , R.DRAW_NO
+	             , R.YEARWEEK
+	             , R.PLAN_SET_ITEM_COUNT
+	             , SUM(CASE WHEN R.PTSP_TYPE = 'PTSP_TYPE_1' THEN R.PLAN_ITEM_COUNT ELSE 0 END) AS PTSP_TYPE_1
+	             , SUM(CASE WHEN R.PTSP_TYPE = 'PTSP_TYPE_2' THEN R.PLAN_ITEM_COUNT ELSE 0 END) AS PTSP_TYPE_2
+	             , SUM(CASE WHEN R.PTSP_TYPE = 'PTSP_TYPE_3' THEN R.PLAN_ITEM_COUNT ELSE 0 END) AS PTSP_TYPE_3
+			FROM W_DIM_ROW R
+	        GROUP BY R.REP_CUST_GROUP_CD
+	            , R.REP_CUST_GROUP_NM
+	            , R.CUST_GROUP_CD
+	            , R.CUST_GROUP_NM
+	            , R.ITEM_GROUP_CD
+	            , R.ITEM_GROUP_NM
+	            , R.SALES_ORG_LVL3_CD
+	            , R.SALES_ORG_LVL3_NM
+	            , R.SALES_ORG_LVL4_CD
+	            , R.SALES_ORG_LVL4_NM
+	            , R.SALES_ORG_LVL5_CD
+	            , R.SALES_ORG_LVL5_NM
+	            , R.ITEM_CD
+	            , R.ITEM_NM
+	            , R.SPEC
+	            , R.DRAW_NO
+	            , R.YEARWEEK
+	            , R.PLAN_SET_ITEM_COUNT
+	    ),
+	    W_ROW_GROUP AS 
+	    (
+	    	SELECT REP_CUST_GROUP_CD 
+			     , REP_CUST_GROUP_NM
+				#foreach( $bucketMap in $_parameter.bucketList )
+	             , SUM(CASE WHEN YEARWEEK = '$bucketMap.NM' THEN PLAN_SET_ITEM_COUNT ELSE 0 END) AS ${bucketMap.CD}_PLAN_SET_ITEM_COUNT
+	             , SUM(CASE WHEN YEARWEEK = '$bucketMap.NM' THEN PTSP_TYPE_1 ELSE 0 END) AS ${bucketMap.CD}_PLAN_ACHIEVE_ITEM_COUNT
+	             , SUM(CASE WHEN YEARWEEK = '$bucketMap.NM' THEN PTSP_TYPE_2 ELSE 0 END) AS ${bucketMap.CD}_PLAN_OVER_ITEM_COUNT
+	             , SUM(CASE WHEN YEARWEEK = '$bucketMap.NM' THEN PTSP_TYPE_3 ELSE 0 END) AS ${bucketMap.CD}_PLAN_SHORT_ITEM_COUNT
+				#end
+	        FROM W_ROW
+	        GROUP BY REP_CUST_GROUP_CD, REP_CUST_GROUP_NM
+	    ),
+	    W_MEASURE AS 
+	    (
+	    	SELECT B.COMPANY_CD
+			     , B.BU_CD
+			     , B.MENU_CD
+			     , B.MEAS_CD AS CATEGORY_CD
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN A.MEAS_NM_KR
+		                WHEN 'cn' = @{GV_LANG} THEN A.MEAS_NM_CN
+		                ELSE A.MEAS_NM
+		           END CATEGORY_NM
+			     , B.SORT AS CATEGORY_IDX
+			FROM TB_MST_MEAS A WITH(NOLOCK)
+			INNER JOIN TB_MAP_MENU_MEAS B WITH(NOLOCK)
+			   ON B.MEAS_CD    = A.MEAS_CD
+			  AND B.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND B.BU_CD      = @{GV_BU_CD}
+			  AND B.MENU_CD    = 'DP302'
+		      AND A.MEAS_CD IN ('PLAN_ACHIEVE_ITEM_COUNT', 'PLAN_OVER_ITEM_COUNT', 'PLAN_SHORT_ITEM_COUNT')
+	    ),
+	    W_MAIN AS 
+	    (
+	        SELECT REP_CUST_GROUP_CD 
+			     , REP_CUST_GROUP_NM
+	             , M.CATEGORY_CD
+	             , M.CATEGORY_NM
+	             , M.CATEGORY_IDX
+				#foreach( $bucketMap in $_parameter.bucketList )
+		         , SUM(
+		             	CASE
+		                   	WHEN M.CATEGORY_CD = 'PLAN_ACHIEVE_ITEM_COUNT' THEN A.${bucketMap.CD}_PLAN_ACHIEVE_ITEM_COUNT
+		                   	WHEN M.CATEGORY_CD = 'PLAN_OVER_ITEM_COUNT' THEN A.${bucketMap.CD}_PLAN_OVER_ITEM_COUNT
+		                   	WHEN M.CATEGORY_CD = 'PLAN_SHORT_ITEM_COUNT' THEN A.${bucketMap.CD}_PLAN_SHORT_ITEM_COUNT
+		                   	ELSE 0
+		                END
+		             ) AS $bucketMap.CD
+				#end
+			FROM W_ROW_GROUP A
+	        CROSS JOIN W_MEASURE M
+			GROUP BY ROLLUP (REP_CUST_GROUP_CD, REP_CUST_GROUP_NM), M.CATEGORY_CD, M.CATEGORY_NM, M.CATEGORY_IDX
+	    ),
+	    W_MAIN_RT AS 
+	    (
+			SELECT B.REP_CUST_GROUP_CD
+			     , B.REP_CUST_GROUP_NM
+			     , B.CATEGORY_CD
+			     , B.CATEGORY_NM
+			     , B.CATEGORY_IDX
+				#foreach( $bucketMap in $_parameter.bucketList )
+			     , CASE WHEN A.${bucketMap.CD}_TOT <![CDATA[>]]> 0 THEN CAST(ROUND(CAST(B.${bucketMap.CD} AS FLOAT) / CAST(A.${bucketMap.CD}_TOT AS FLOAT) * 100 ,1) AS NUMERIC(4,1)) ELSE 0 END AS ${bucketMap.CD}
+			    #end
+			FROM 
+			(
+				SELECT NULL AS TMP
+			    	#foreach( $bucketMap in $_parameter.bucketList )
+			         , SUM(${bucketMap.CD}) AS ${bucketMap.CD}_TOT
+					#end
+			    FROM W_MAIN
+				WHERE REP_CUST_GROUP_NM IS NOT NULL
+			) A, W_MAIN B
+	    )
+	    SELECT 
+	    (
+		    SELECT CATEGORY_CD "code"
+		         , CATEGORY_NM "name"
+		         , JSON_QUERY( '[' 
+				#foreach( $bucketMap in $_parameter.bucketList )
+				 + CAST ($bucketMap.CD AS NVARCHAR(30)) 
+				#if($foreach.hasNext) 
+				 + ','
+				#end   
+		        #end 
+		         + ']') "data"
+			#if($_parameter.type1 == "cnt")
+	    	FROM W_MAIN A
+	    	#else
+	    	FROM W_MAIN_RT A
+	    	#end
+	    	WHERE REP_CUST_GROUP_NM IS NOT NULL
+	    	FOR JSON AUTO
+       ) STATUS_CHART
+	    
+	</select>
+	
+</mapper>

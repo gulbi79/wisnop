@@ -1,0 +1,647 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.common">
+
+	<sql id="w_item">
+WITH W_ITEM AS (
+    <include refid="snop.common.t_item" />
+)
+	</sql>
+	
+	<sql id="w_cust">
+WITH W_CUST AS (
+    <include refid="snop.common.t_cust" />
+)
+	</sql>
+	
+	<sql id="t_item">
+	SELECT IC.COMPANY_CD
+         , IC.BU_CD
+         , IC.CUST_GROUP_CD
+         , IG.REP_ITEM_GROUP_CD
+         , RG.REP_ITEM_GROUP_NM
+         , IT.ITEM_GROUP_CD
+         , IG.ITEM_GROUP_NM
+         , IC.ITEM_CD
+         , IT.ITEM_NM
+         , IT.ITEM_TYPE
+         , CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                ELSE CD.CODE_NM
+           END ITEM_TYPE_NM
+         , IT.SPEC
+         , IT.DRAW_NO
+         , IP.ROUTING_ID
+         , IP.MFG_LT
+         , IP.PUR_LT
+         , IT.UOM_CD
+         , IG.KEY_GROUP_YN
+         , IP.SS_QTY
+         , IC.SALES_PRICE_KRW
+         , IC.SALES_ORG_LVL4_CD
+         , SO.SALES_ORG_LVL4_NM
+         , IC.SALES_ORG_LVL5_CD
+         , SO.SALES_ORG_LVL5_NM
+         , IP.PROCUR_TYPE
+         , IP.PROCUR_TYPE_CD
+         , IT.CPFR_YN
+         , IG.UPPER_ITEM_GROUP_CD
+         , IG.UPPER_ITEM_GROUP_NM
+         , ISNULL(IT.SS_YN, 'N') AS SS_YN
+         , IT.FIREWORK_YN
+         , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+         , IP.SS_QTY_DISP
+         , IT.ITEM_COST_KRW
+      FROM TB_MAP_ITEM_CUST_GROUP IC WITH(NOLOCK)
+     INNER JOIN TB_MST_ITEM  IT WITH(NOLOCK)
+        ON IC.COMPANY_CD    = IT.COMPANY_CD
+       AND IC.BU_CD         = IT.BU_CD
+       AND IC.ITEM_CD       = IT.ITEM_CD
+      LEFT OUTER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+        ON IG.COMPANY_CD    = IT.COMPANY_CD
+       AND IG.BU_CD         = IT.BU_CD
+       AND IG.ITEM_GROUP_CD = IT.ITEM_GROUP_CD
+      LEFT OUTER JOIN TB_MST_REP_ITEM_GROUP RG WITH(NOLOCK)
+        ON RG.COMPANY_CD    = IG.COMPANY_CD
+       AND RG.BU_CD         = IG.BU_CD
+       AND RG.REP_ITEM_GROUP_CD = IG.REP_ITEM_GROUP_CD
+      LEFT OUTER JOIN (SELECT COMPANY_CD 
+                            , BU_CD 
+                            , ITEM_CD 
+                            , MAX (ROUTING_ID)  AS ROUTING_ID 
+                            , MAX (PUR_LT)      AS PUR_LT
+                            , MAX (MFG_LT)      AS MFG_LT
+                            , SUM (SS_QTY)      AS SS_QTY
+                            , MAX (PROCUR_TYPE) AS PROCUR_TYPE_CD
+                            , (
+							 	SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+							                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+							                ELSE CODE_NM
+							           END AS CODE_NM
+								FROM TB_MST_CODE WITH(NOLOCK)
+								WHERE GROUP_CD = 'PROCUR_TYPE'
+							  	  AND CODE_CD = MAX (PROCUR_TYPE)
+							  	  AND USE_FLAG = 'Y'
+							   ) AS PROCUR_TYPE
+							, MAX(RCPT_SL_CD) AS RCPT_SL_CD
+							, MAX(SS_QTY_DISP) AS SS_QTY_DISP
+                         FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+                         WHERE PLANT_CD = 'WF01'
+  #if($_parameter.procurType and $_parameter.procurType != "")
+                        AND PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+  #end
+                        GROUP BY COMPANY_CD
+                               , BU_CD
+                               , ITEM_CD) IP
+        ON IC.COMPANY_CD    = IP.COMPANY_CD
+       AND IC.BU_CD         = IP.BU_CD
+       AND IC.ITEM_CD       = IP.ITEM_CD
+      LEFT OUTER JOIN UV_MAP_SALES_ORG SO
+        ON IC.COMPANY_CD        = SO.COMPANY_CD
+       AND IC.BU_CD             = SO.BU_CD
+       AND IC.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+       AND IC.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD
+      LEFT OUTER JOIN TB_MST_CODE CD WITH(NOLOCK)
+        ON CD.GROUP_CD = 'ITEM_TYPE'
+       AND CD.CODE_CD  = IT.ITEM_TYPE
+       AND CD.USE_FLAG = 'Y'
+      LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		ON MC1.BU_CD = IP.BU_CD
+ 	   AND MC1.GROUP_CD = 'CL_SL_CD'
+ 	   AND MC1.CODE_CD = IP.RCPT_SL_CD
+ 	   AND MC1.USE_FLAG = 'Y'
+     WHERE IC.COMPANY_CD    = @{GV_COMPANY_CD}
+       AND IC.BU_CD         = @{GV_BU_CD}
+  #if($_parameter.item_cd and $_parameter.item_cd != "")
+       AND IT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+  #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       AND (IT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR IT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+  #end
+  
+  #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+       AND IT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  #end
+  #if($_parameter.route and $_parameter.route != "")
+       AND IP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+  #end
+  #if($_parameter.itemType and $_parameter.itemType != "")
+       AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+  #end
+  #if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+      AND IG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+  #end
+  #if($_parameter.procurType and $_parameter.procurType != "")
+       AND IP.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+  #end
+  
+  #if($_parameter.cpfrYn and $_parameter.cpfrYn != "")
+       AND ISNULL(IT.CPFR_YN, 'N') IN ('$_parameter.cpfrYn.replace(",","','")')
+  #end
+  #if($_parameter.ssYn and $_parameter.ssYn != "")
+       AND ISNULL(IT.SS_YN, 'N') IN ('$_parameter.ssYn.replace(",","','")')
+  #end
+  #if($_parameter.validYn and $_parameter.validYn != "")
+       AND ISNULL(IT.USE_FLAG, 'N') IN ('$_parameter.validYn.replace(",","','")')
+  #end
+  #if($_parameter.drawNo and $_parameter.drawNo != "")
+       AND IT.DRAW_NO LIKE '%' + @{drawNo} + '%'
+  #end
+	</sql>
+	
+	
+	<sql id="t_cust">
+	SELECT IC.COMPANY_CD
+         , IC.BU_CD
+         , CT.REP_CUST_GROUP_CD
+         , CT.REP_CUST_GROUP_NM
+         , IC.CUST_GROUP_CD
+         , CT.CUST_GROUP_NM
+         , IG.REP_ITEM_GROUP_CD
+         , RG.REP_ITEM_GROUP_NM
+         , IT.ITEM_GROUP_CD
+         , IG.ITEM_GROUP_NM
+         , IC.ITEM_CD
+         , IT.ITEM_NM
+         , IT.ITEM_TYPE
+         , CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                ELSE CD.CODE_NM
+           END ITEM_TYPE_NM
+         , IT.SPEC
+         , IT.DRAW_NO
+         , IP.ROUTING_ID
+         , IP.MFG_LT
+         , IP.PUR_LT
+         , IP.SS_QTY
+         , CT.CUST_CD
+         , CT.CUST_NM
+         , CT.COUNTRY_CD
+         , CT.CURRENCY
+         , CT.DEAL_TYPE
+         , CT.PAY_METH
+         , IT.UOM_CD
+         , CT.BIZ_GROUP_CD
+         , CT.BIZ_GROUP_NM
+         , IG.KEY_GROUP_YN
+         , IC.SALES_PRICE_KRW
+         , IC.SALES_ORG_LVL4_CD
+         , SO.SALES_ORG_LVL4_NM
+         , IC.SALES_ORG_LVL5_CD
+         , SO.SALES_ORG_LVL5_NM
+         , IP.PROCUR_TYPE
+         , IP.PROCUR_TYPE_CD
+         , IT.CPFR_YN
+         , IG.UPPER_ITEM_GROUP_CD
+         , IG.UPPER_ITEM_GROUP_NM
+         , ISNULL(IT.SS_YN, 'N') AS SS_YN
+         , IT.FIREWORK_YN
+         , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+         , IP.SS_QTY_DISP
+         , IT.ITEM_COST_KRW
+      FROM TB_MAP_ITEM_CUST_GROUP IC WITH(NOLOCK)
+     INNER JOIN TB_MST_ITEM  IT WITH(NOLOCK)
+        ON IC.COMPANY_CD    = IT.COMPANY_CD
+       AND IC.BU_CD         = IT.BU_CD
+       AND IC.ITEM_CD       = IT.ITEM_CD
+      LEFT OUTER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+        ON IG.COMPANY_CD    = IT.COMPANY_CD
+       AND IG.BU_CD         = IT.BU_CD
+       AND IG.ITEM_GROUP_CD = IT.ITEM_GROUP_CD
+      LEFT OUTER JOIN TB_MST_REP_ITEM_GROUP RG WITH(NOLOCK)
+        ON RG.COMPANY_CD    = IG.COMPANY_CD
+       AND RG.BU_CD         = IG.BU_CD
+       AND RG.REP_ITEM_GROUP_CD = IG.REP_ITEM_GROUP_CD
+      LEFT OUTER JOIN (SELECT COMPANY_CD 
+                            , BU_CD 
+                            , ITEM_CD 
+                            , MAX (ROUTING_ID)  AS ROUTING_ID 
+                            , MAX (PUR_LT)      AS PUR_LT
+                            , MAX (MFG_LT)      AS MFG_LT
+                            , SUM (SS_QTY)      AS SS_QTY
+                            , MAX (PROCUR_TYPE) AS PROCUR_TYPE_CD
+                            , (
+							 	SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+							                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+							                ELSE CODE_NM
+							           END AS CODE_NM
+								FROM TB_MST_CODE WITH(NOLOCK)
+								WHERE GROUP_CD = 'PROCUR_TYPE'
+							  	  AND CODE_CD = MAX (PROCUR_TYPE)
+							  	  AND USE_FLAG = 'Y'
+							   ) AS PROCUR_TYPE
+							, MAX(RCPT_SL_CD) AS RCPT_SL_CD
+							, MAX(SS_QTY_DISP) AS SS_QTY_DISP
+                         FROM TB_MST_ITEM_PLANT WITH(NOLOCK)
+                         WHERE PLANT_CD = 'WF01'
+  #if($_parameter.procurType and $_parameter.procurType != "")
+                        AND PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+  #end
+                        GROUP BY COMPANY_CD
+                               , BU_CD
+                               , ITEM_CD) IP
+        ON IC.COMPANY_CD    = IP.COMPANY_CD
+       AND IC.BU_CD         = IP.BU_CD
+       AND IC.ITEM_CD       = IP.ITEM_CD
+      LEFT OUTER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK) 
+        ON IC.COMPANY_CD    = CT.COMPANY_CD
+       AND IC.BU_CD         = CT.BU_CD
+  	   #if($_parameter.menuId == "salesOrder")      
+       AND IC.CUST_GROUP_CD = CT.CUST_GROUP_CD
+       #else
+       AND IC.CUST_GROUP_CD = CT.CUST_CD
+       #end 
+      LEFT OUTER JOIN UV_MAP_SALES_ORG SO
+        ON IC.COMPANY_CD        = SO.COMPANY_CD
+       AND IC.BU_CD             = SO.BU_CD
+       AND IC.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+       AND IC.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD
+      LEFT OUTER JOIN TB_MST_CODE CD WITH(NOLOCK)
+        ON CD.GROUP_CD = 'ITEM_TYPE'
+       AND CD.CODE_CD  = IT.ITEM_TYPE
+       AND CD.USE_FLAG = 'Y'
+      LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		ON MC1.BU_CD = IP.BU_CD
+ 	   AND MC1.GROUP_CD = 'CL_SL_CD'
+ 	   AND MC1.CODE_CD = IP.RCPT_SL_CD
+ 	   AND MC1.USE_FLAG = 'Y'
+     WHERE IC.COMPANY_CD    = @{GV_COMPANY_CD}
+       AND IC.BU_CD         = @{GV_BU_CD}
+       AND IC.VALID_FLAG    = 'Y'
+  #if($_parameter.item_cd and $_parameter.item_cd != "")
+       AND IT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+  #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       AND (IT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR IT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+  #end
+  
+  #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+       AND IT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  #end
+  #if($_parameter.route and $_parameter.route != "")
+       AND IP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+  #end
+  #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+       AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+  #end
+  #if($_parameter.custGroup and $_parameter.custGroup != "")
+       AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+  #end
+  #if($_parameter.itemType and $_parameter.itemType != "")
+       AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+  #end
+  #if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+      AND IG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+  #end
+  #if($_parameter.procurType and $_parameter.procurType != "")
+       AND IP.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+  #end
+  #if($_parameter.cpfrYn and $_parameter.cpfrYn != "")
+       AND ISNULL(IT.CPFR_YN, 'N') IN ('$_parameter.cpfrYn.replace(",","','")')
+  #end
+  #if($_parameter.ssYn and $_parameter.ssYn != "")
+       AND ISNULL(IT.SS_YN, 'N') IN ('$_parameter.ssYn.replace(",","','")')
+  #end
+  #if($_parameter.validYn and $_parameter.validYn != "")
+       AND ISNULL(IT.USE_FLAG, 'N') IN ('$_parameter.validYn.replace(",","','")')
+  #end
+	</sql>
+	
+	<sql id="t_itemCust">
+	SELECT IT.COMPANY_CD
+         , IT.BU_CD
+         , CT.REP_CUST_GROUP_CD
+         , CT.REP_CUST_GROUP_NM
+         , CT.CUST_GROUP_CD
+         , CT.CUST_GROUP_NM
+         , IG.REP_ITEM_GROUP_CD
+         , RG.REP_ITEM_GROUP_NM
+         , IT.ITEM_GROUP_CD
+         , IG.ITEM_GROUP_NM
+         , IT.ITEM_CD
+         , IT.ITEM_NM
+         , IT.ITEM_TYPE
+         , CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                ELSE CD.CODE_NM
+           END ITEM_TYPE_NM
+         , IT.SPEC
+         , IT.DRAW_NO
+         , IP.ROUTING_ID
+         , IP.MFG_LT
+         , IP.PUR_LT
+         , IP.SS_QTY
+         , CT.CUST_CD
+         , CT.CUST_NM
+         , CT.COUNTRY_CD
+         , CT.CURRENCY
+         , CT.DEAL_TYPE
+         , CT.PAY_METH
+         , IT.UOM_CD
+         , CT.BIZ_GROUP_CD
+         , CT.BIZ_GROUP_NM
+         , IG.KEY_GROUP_YN
+         , IC.SALES_PRICE_KRW
+         , IC.SALES_ORG_LVL4_CD
+         , SO.SALES_ORG_LVL4_NM
+         , IC.SALES_ORG_LVL5_CD
+         , SO.SALES_ORG_LVL5_NM
+         , IP.PROCUR_TYPE
+         , IP.PROCUR_TYPE_CD
+         , IT.CPFR_YN
+         , IG.UPPER_ITEM_GROUP_CD
+         , IG.UPPER_ITEM_GROUP_NM
+         , ISNULL(IT.SS_YN, 'N') AS SS_YN
+         , IT.FIREWORK_YN
+         , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+         , IP.SS_QTY_DISP
+         , IT.ITEM_COST_KRW
+         , IT.BEF_LAST_GR_AVG_QTY
+	     , IT.BEF_LAST_PROD_AVG_QTY
+	     , IT.LAST_GR_AVG_QTY
+	     , IT.LAST_PROD_AVG_QTY
+	     , IT.SBS_QTY
+	     , IT.BOM_CNT
+      FROM TB_MST_ITEM  IT WITH(NOLOCK)
+      LEFT OUTER JOIN TB_MST_REP_CUST RC WITH(NOLOCK)
+        ON RC.COMPANY_CD    = IT.COMPANY_CD
+       AND RC.BU_CD         = IT.BU_CD
+       AND RC.REP_CUST_CD   = IT.REP_CUST_CD
+      LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP IC WITH(NOLOCK)
+        ON IC.COMPANY_CD    = IT.COMPANY_CD
+       AND IC.BU_CD         = IT.BU_CD
+       AND IC.ITEM_CD       = IT.ITEM_CD
+       AND IC.CUST_GROUP_CD = RC.CUST_GROUP_CD
+      LEFT OUTER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+        ON IG.COMPANY_CD    = IT.COMPANY_CD
+       AND IG.BU_CD         = IT.BU_CD
+       AND IG.ITEM_GROUP_CD = IT.ITEM_GROUP_CD
+      LEFT OUTER JOIN TB_MST_REP_ITEM_GROUP RG WITH(NOLOCK)
+        ON RG.COMPANY_CD    = IG.COMPANY_CD
+       AND RG.BU_CD         = IG.BU_CD
+       AND RG.REP_ITEM_GROUP_CD = IG.REP_ITEM_GROUP_CD
+      LEFT OUTER JOIN (SELECT COMPANY_CD 
+                            , BU_CD 
+                            , ITEM_CD 
+                            , MAX (ROUTING_ID)  AS ROUTING_ID 
+                            , MAX (PUR_LT)      AS PUR_LT
+                            , MAX (MFG_LT)      AS MFG_LT
+                            , SUM (SS_QTY)      AS SS_QTY
+                            , MAX (PROCUR_TYPE) AS PROCUR_TYPE_CD
+                            , (
+							 	SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+							                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+							                ELSE CODE_NM
+							           END AS CODE_NM
+								FROM TB_MST_CODE WITH(NOLOCK)
+								WHERE GROUP_CD = 'PROCUR_TYPE'
+							  	  AND CODE_CD = MAX (PROCUR_TYPE)
+							  	  AND USE_FLAG = 'Y'
+							   ) AS PROCUR_TYPE
+							, MAX(RCPT_SL_CD) AS RCPT_SL_CD
+							, MAX(SS_QTY_DISP) AS SS_QTY_DISP
+                         FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+                         WHERE PLANT_CD = 'WF01'
+  #if($_parameter.procurType and $_parameter.procurType != "")
+                        AND PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+  #end
+                        GROUP BY COMPANY_CD
+                               , BU_CD
+                               , ITEM_CD) IP
+        ON IT.COMPANY_CD    = IP.COMPANY_CD
+       AND IT.BU_CD         = IP.BU_CD
+       AND IT.ITEM_CD       = IP.ITEM_CD
+      LEFT OUTER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK) 
+        ON IT.COMPANY_CD    = CT.COMPANY_CD
+       AND IT.BU_CD         = CT.BU_CD 
+       AND IT.REP_CUST_CD   = CT.CUST_CD
+      LEFT OUTER JOIN UV_MAP_SALES_ORG SO
+        ON IT.COMPANY_CD        = SO.COMPANY_CD
+       AND IT.BU_CD             = SO.BU_CD
+       AND IC.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+       AND IC.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD
+      LEFT OUTER JOIN TB_MST_CODE CD WITH(NOLOCK)
+        ON CD.GROUP_CD = 'ITEM_TYPE'
+       AND CD.CODE_CD  = IT.ITEM_TYPE
+       AND CD.USE_FLAG = 'Y'
+      LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		ON MC1.BU_CD = IP.BU_CD
+ 	   AND MC1.GROUP_CD = 'CL_SL_CD'
+ 	   AND MC1.CODE_CD = IP.RCPT_SL_CD
+ 	   AND MC1.USE_FLAG = 'Y'
+     WHERE IT.COMPANY_CD    = @{GV_COMPANY_CD}
+       AND IT.BU_CD         = @{GV_BU_CD}
+  #if($_parameter.item_cd and $_parameter.item_cd != "")
+       AND IT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+  #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       AND (IT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR IT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+  #end
+  
+  #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+       AND IT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  #end
+  #if($_parameter.route and $_parameter.route != "")
+       AND IP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+  #end
+  #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+       AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+  #end
+  #if($_parameter.custGroup and $_parameter.custGroup != "")
+       AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+  #end
+  #if($_parameter.salesOrgLvl5Cd and $_parameter.salesOrgLvl5Cd != "")
+       AND IC.SALES_ORG_LVL5_CD IN ('$_parameter.salesOrgLvl5Cd.replace(",","','")')
+  #end
+  #if($_parameter.itemType and $_parameter.itemType != "")
+       AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+  #end
+  #if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+       AND IG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+  #end
+  #if($_parameter.procurType and $_parameter.procurType != "")
+       AND IP.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+  #end
+  
+  #if($_parameter.cpfrYn and $_parameter.cpfrYn != "")
+       AND ISNULL(IT.CPFR_YN, 'N') IN ('$_parameter.cpfrYn.replace(",","','")')
+  #end
+  #if($_parameter.ssYn and $_parameter.ssYn != "")
+       AND ISNULL(IT.SS_YN, 'N') IN ('$_parameter.ssYn.replace(",","','")')
+  #end
+  #if($_parameter.validYn and $_parameter.validYn != "")
+       AND ISNULL(IT.USE_FLAG, 'N') IN ('$_parameter.validYn.replace(",","','")')
+  #end
+	</sql>
+	
+	<!-- 20210820: Sub Routing 추가요청 from 김영락D -->
+	<sql id="t_itemCust_subRouting">
+    SELECT IT.COMPANY_CD
+         , IT.BU_CD
+         , CT.REP_CUST_GROUP_CD
+         , CT.REP_CUST_GROUP_NM
+         , CT.CUST_GROUP_CD
+         , CT.CUST_GROUP_NM
+         , IG.REP_ITEM_GROUP_CD
+         , RG.REP_ITEM_GROUP_NM
+         , IT.ITEM_GROUP_CD
+         , IG.ITEM_GROUP_NM
+         , IT.ITEM_CD
+         , IT.ITEM_NM
+         , IT.ITEM_TYPE
+         , CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                ELSE CD.CODE_NM
+           END ITEM_TYPE_NM
+         , IT.SPEC
+         , IT.DRAW_NO
+         , IP.ROUTING_ID
+         , IP.MFG_LT
+         , IP.PUR_LT
+         , IP.SS_QTY
+         , CT.CUST_CD
+         , CT.CUST_NM
+         , CT.COUNTRY_CD
+         , CT.CURRENCY
+         , CT.DEAL_TYPE
+         , CT.PAY_METH
+         , IT.UOM_CD
+         , CT.BIZ_GROUP_CD
+         , CT.BIZ_GROUP_NM
+         , IG.KEY_GROUP_YN
+         , IC.SALES_PRICE_KRW
+         , IC.SALES_ORG_LVL4_CD
+         , SO.SALES_ORG_LVL4_NM
+         , IC.SALES_ORG_LVL5_CD
+         , SO.SALES_ORG_LVL5_NM
+         , IP.PROCUR_TYPE
+         , IP.PROCUR_TYPE_CD
+         , IT.CPFR_YN
+         , IG.UPPER_ITEM_GROUP_CD
+         , IG.UPPER_ITEM_GROUP_NM
+         , ISNULL(IT.SS_YN, 'N') AS SS_YN
+         , IT.FIREWORK_YN
+         , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+         , IP.SS_QTY_DISP
+         , IT.ITEM_COST_KRW
+         , IT.BEF_LAST_GR_AVG_QTY
+         , IT.BEF_LAST_PROD_AVG_QTY
+         , IT.LAST_GR_AVG_QTY
+         , IT.LAST_PROD_AVG_QTY
+         , IT.SBS_QTY
+         , IT.BOM_CNT
+      FROM TB_MST_ITEM  IT WITH(NOLOCK)
+      LEFT OUTER JOIN TB_MST_REP_CUST RC WITH(NOLOCK)
+        ON RC.COMPANY_CD    = IT.COMPANY_CD
+       AND RC.BU_CD         = IT.BU_CD
+       AND RC.REP_CUST_CD   = IT.REP_CUST_CD
+      LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP IC WITH(NOLOCK)
+        ON IC.COMPANY_CD    = IT.COMPANY_CD
+       AND IC.BU_CD         = IT.BU_CD
+       AND IC.ITEM_CD       = IT.ITEM_CD
+       AND IC.CUST_GROUP_CD = RC.CUST_GROUP_CD
+      LEFT OUTER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+        ON IG.COMPANY_CD    = IT.COMPANY_CD
+       AND IG.BU_CD         = IT.BU_CD
+       AND IG.ITEM_GROUP_CD = IT.ITEM_GROUP_CD
+      LEFT OUTER JOIN TB_MST_REP_ITEM_GROUP RG WITH(NOLOCK)
+        ON RG.COMPANY_CD    = IG.COMPANY_CD
+       AND RG.BU_CD         = IG.BU_CD
+       AND RG.REP_ITEM_GROUP_CD = IG.REP_ITEM_GROUP_CD
+      LEFT OUTER JOIN (SELECT COMPANY_CD 
+                            , BU_CD 
+                            , ITEM_CD 
+                            
+                            -- 20210820: Sub Routing 추가요청 from 김영락D
+                            -- , MAX (ROUTING_ID)  AS ROUTING_ID
+                            , MAX (CASE WHEN ITEM_TYPE = '20' AND PROCUR_TYPE IN('MG', 'MH') THEN SUB_ROUTING_ID ELSE ROUTING_ID END)  AS ROUTING_ID 
+                            
+                            , MAX (PUR_LT)      AS PUR_LT
+                            , MAX (MFG_LT)      AS MFG_LT
+                            , SUM (SS_QTY)      AS SS_QTY
+                            , MAX (PROCUR_TYPE) AS PROCUR_TYPE_CD
+                            , (
+                                SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                            WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                            ELSE CODE_NM
+                                       END AS CODE_NM
+                                FROM TB_MST_CODE WITH(NOLOCK)
+                                WHERE GROUP_CD = 'PROCUR_TYPE'
+                                  AND CODE_CD = MAX (PROCUR_TYPE)
+                                  AND USE_FLAG = 'Y'
+                               ) AS PROCUR_TYPE
+                            , MAX(RCPT_SL_CD) AS RCPT_SL_CD
+                            , MAX(SS_QTY_DISP) AS SS_QTY_DISP
+                         FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+                         WHERE PLANT_CD = 'WF01'
+  #if($_parameter.procurType and $_parameter.procurType != "")
+                        AND PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+  #end
+                        GROUP BY COMPANY_CD
+                               , BU_CD
+                               , ITEM_CD) IP
+        ON IT.COMPANY_CD    = IP.COMPANY_CD
+       AND IT.BU_CD         = IP.BU_CD
+       AND IT.ITEM_CD       = IP.ITEM_CD
+      LEFT OUTER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK) 
+        ON IT.COMPANY_CD    = CT.COMPANY_CD
+       AND IT.BU_CD         = CT.BU_CD 
+       AND IT.REP_CUST_CD   = CT.CUST_CD
+      LEFT OUTER JOIN UV_MAP_SALES_ORG SO
+        ON IT.COMPANY_CD        = SO.COMPANY_CD
+       AND IT.BU_CD             = SO.BU_CD
+       AND IC.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+       AND IC.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD
+      LEFT OUTER JOIN TB_MST_CODE CD WITH(NOLOCK)
+        ON CD.GROUP_CD = 'ITEM_TYPE'
+       AND CD.CODE_CD  = IT.ITEM_TYPE
+       AND CD.USE_FLAG = 'Y'
+      LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+        ON MC1.BU_CD = IP.BU_CD
+       AND MC1.GROUP_CD = 'CL_SL_CD'
+       AND MC1.CODE_CD = IP.RCPT_SL_CD
+       AND MC1.USE_FLAG = 'Y'
+     WHERE IT.COMPANY_CD    = @{GV_COMPANY_CD}
+       AND IT.BU_CD         = @{GV_BU_CD}
+  #if($_parameter.item_cd and $_parameter.item_cd != "")
+       AND IT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+  #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       AND (IT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR IT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+  #end
+  
+  #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+       AND IT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  #end
+  #if($_parameter.route and $_parameter.route != "")
+       AND IP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+  #end
+  #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+       AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+  #end
+  #if($_parameter.custGroup and $_parameter.custGroup != "")
+       AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+  #end
+  #if($_parameter.salesOrgLvl5Cd and $_parameter.salesOrgLvl5Cd != "")
+       AND IC.SALES_ORG_LVL5_CD IN ('$_parameter.salesOrgLvl5Cd.replace(",","','")')
+  #end
+  #if($_parameter.itemType and $_parameter.itemType != "")
+       AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+  #end
+  #if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+       AND IG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+  #end
+  #if($_parameter.procurType and $_parameter.procurType != "")
+       AND IP.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+  #end
+  
+  #if($_parameter.cpfrYn and $_parameter.cpfrYn != "")
+       AND ISNULL(IT.CPFR_YN, 'N') IN ('$_parameter.cpfrYn.replace(",","','")')
+  #end
+  #if($_parameter.ssYn and $_parameter.ssYn != "")
+       AND ISNULL(IT.SS_YN, 'N') IN ('$_parameter.ssYn.replace(",","','")')
+  #end
+  #if($_parameter.validYn and $_parameter.validYn != "")
+       AND ISNULL(IT.USE_FLAG, 'N') IN ('$_parameter.validYn.replace(",","','")')
+  #end
+    </sql>
+	
+	
+</mapper>

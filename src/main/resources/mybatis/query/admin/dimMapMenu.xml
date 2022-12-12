@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	<select id="dimMapMenuSelect" parameterType="map" resultType="map">
+		/****** [ admin.dimMapMenuSelect ] ******/
+		SELECT B.COMPANY_CD
+		     , B.BU_CD
+		     , B.MENU_CD
+		     , B.DIM_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN A.DIM_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN A.DIM_NM_CN
+	                ELSE A.DIM_NM
+	           END AS DIM_NM
+		     , B.SORT
+		     , B.WIDTH
+		     , B.LVL
+		     , B.MAND_FLAG
+		     , B.DEFAULT_FLAG
+		     , B.TOTAL_FLAG
+		FROM TB_MST_DIM A WITH(NOLOCK)
+		INNER JOIN TB_MAP_MENU_DIM B WITH(NOLOCK)
+		   ON B.DIM_CD     = A.DIM_CD
+		  AND B.COMPANY_CD = ISNULL(@{SEARCH_COMPANY_CD}, @{GV_COMPANY_CD})
+		  AND B.BU_CD      = ISNULL(@{SEARCH_BU_CD}, @{GV_BU_CD})
+		  AND B.MENU_CD    = @{SEARCH_MENU_CD}
+		  AND B.USE_FLAG   = 'Y'
+		WHERE A.USE_FLAG   = 'Y'
+		ORDER BY B.LVL, B.SORT, B.DIM_CD
+	</select>
+	
+	<insert id="dimMapMenuMerge" parameterType="map">
+		/****** [ admin.dimMapMenuMerge ] ******/
+		MERGE TB_MAP_MENU_DIM AS A
+		USING 
+		(
+			SELECT @{COMPANY_CD}    AS COMPANY_CD
+		     	 , @{BU_CD}         AS BU_CD
+		     	 , @{MENU_CD}       AS MENU_CD
+		     	 , @{DIM_CD}        AS DIM_CD
+		     	 , @{SORT}          AS SORT
+		     	 , @{WIDTH}         AS WIDTH
+		     	 , @{LVL}           AS LVL
+		     	 , ISNULL(@{MAND_FLAG}   , 'N') AS MAND_FLAG
+		     	 , ISNULL(@{DEFAULT_FLAG}, 'N') AS DEFAULT_FLAG
+		     	 , ISNULL(@{TOTAL_FLAG}	 , 'N') AS TOTAL_FLAG
+		     	 , 'Y' AS USE_FLAG
+		) B
+		ON 
+		(
+			A.COMPANY_CD  = B.COMPANY_CD   
+		   	AND A.BU_CD   = B.BU_CD   
+			AND A.MENU_CD = B.MENU_CD   
+			AND A.DIM_CD  = B.DIM_CD
+		)   
+		WHEN MATCHED THEN
+		UPDATE 
+		SET A.SORT         = B.SORT
+		  , A.WIDTH        = B.WIDTH
+		  , A.LVL          = B.LVL
+		  , A.MAND_FLAG    = B.MAND_FLAG
+		  , A.DEFAULT_FLAG = B.DEFAULT_FLAG
+		  , A.TOTAL_FLAG   = B.TOTAL_FLAG
+		  , A.UPDATE_DTTM  = DBO.UFN_GETDATE()
+		  , A.UPDATE_ID    = @{GV_USER_ID}
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+			COMPANY_CD
+		  , BU_CD
+		  , MENU_CD
+		  , DIM_CD
+		  , SORT         
+		  , WIDTH        
+		  , LVL          
+		  , MAND_FLAG    
+		  , DEFAULT_FLAG 
+		  , TOTAL_FLAG   
+		  , USE_FLAG   
+ 		  , UPDATE_DTTM
+	      , UPDATE_ID  
+		  , CREATE_DTTM
+		  , CREATE_ID
+		) VALUES (
+		    B.COMPANY_CD
+		  , B.BU_CD
+		  , B.MENU_CD
+		  , B.DIM_CD
+		  , B.SORT         
+		  , B.WIDTH        
+		  , B.LVL          
+		  , B.MAND_FLAG    
+		  , B.DEFAULT_FLAG 
+		  , B.TOTAL_FLAG
+		  , B.USE_FLAG
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		);
+	</insert>
+	
+	<delete id="dimMapMenuDelete" parameterType="map">
+		/****** [ admin.dimMapMenuDelete ] ******/
+		DELETE FROM TB_MAP_MENU_DIM 
+		WHERE COMPANY_CD = @{COMPANY_CD}   
+		  AND BU_CD      = @{BU_CD}
+		  AND MENU_CD    = @{MENU_CD}   
+		  AND DIM_CD     = @{DIM_CD}
+	</delete>
+</mapper>

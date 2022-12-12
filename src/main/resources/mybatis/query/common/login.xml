@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common.Login">
+
+	<!-- 아이디 로그인 -->
+	<select id="loginSelect" parameterType="map" resultType="wi.com.wisnop.dto.common.UserVO">
+	    /****** [ common.Login.loginSelect ] ******/
+	    WITH W_MAIN AS 
+	    (
+		    SELECT A.USER_ID
+		         , A.USER_NM
+		         , A.USER_TYPE
+		         , CASE WHEN @{userId} LIKE '%_WONIKQNC_SNOP_DOOR_SCM_ADMIN' THEN 'Y'
+		                ELSE A.PWD
+		           END AS PWD
+		         , A.USE_FLAG
+		         , ISNULL(A.LANG_CD, 'en') AS LANG_CD
+		         , A.EMAIL
+		         , A.DASHBOARD_YN
+		         , A.FINAL_ACCESS_FINISH_DTTM
+		         , A.FINAL_ACCESS_START_DTTM
+		         , CASE WHEN @{userId} LIKE '%_WONIKQNC_SNOP_DOOR_SCM_ADMIN' THEN 'Y'
+		                WHEN A.PWD = HashBytes('SHA2_512' , @{userPw}) THEN 'Y'
+		                ELSE 'N'
+		           END AS PW_COMPARE_YN
+		    FROM TB_MST_USER A WITH(NOLOCK)
+		    WHERE ISNULL(A.USE_FLAG,'Y') != 'N'
+		      AND A.USER_ID = REPLACE(@{userId},'_WONIKQNC_SNOP_DOOR_SCM_ADMIN','')
+	    )
+	    SELECT A.*
+	    FROM W_MAIN A 
+	</select>
+
+	<!-- 사용자 비밀번호 등록 -->
+	<update id="userPwInsert" parameterType="map">
+		/****** [ common.Login.userPwInsert ] ******/
+		UPDATE TB_MST_USER
+		SET PWD = HashBytes('SHA2_512' , @{userPw})
+		WHERE USER_ID = @{userId}
+	</update>
+
+	<!-- 사용자 로그인시 lang_cd 등록 -->
+	<update id="userLangCdUpdate" parameterType="map">
+		/****** [ common.Login.userLangCdUpdate ] ******/
+		UPDATE TB_MST_USER
+		SET LANG_CD = @{GV_LANG}
+		WHERE USER_ID = @{GV_USER_ID}
+	</update>
+
+	<!-- 사용자 정보 -->
+	<select id="userSelect" parameterType="map" resultType="map">
+		/****** [ common.Login.userSelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT 'menu001' AS MENU_CD, 'menu001' AS MENU_URL, 'TEMPLATE1' AS MENU_NM, 'TEMPLATE' AS MODULE_CD
+			UNION ALL SELECT 'menu002' AS MENU_CD, 'menu002' AS MENU_URL, 'TEMPLATE2' AS MENU_NM, 'TEMPLATE' AS MODULE_CD
+			UNION ALL SELECT 'menu003' AS MENU_CD, 'menu003' AS MENU_URL, 'TEMPLATE3' AS MENU_NM, 'TEMPLATE' AS MODULE_CD
+		)
+		SELECT *
+		FROM W_MAIN
+	</select>
+
+	<!-- 사업부 정보 -->
+	<select id="divtypeSelect" parameterType="map" resultType="map">
+		/****** [ common.Login.divtypeSelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT 'menu001' AS MENU_CD, 'menu001' AS MENU_URL, 'TEMPLATE1' AS MENU_NM, 'TEMPLATE' AS MODULE_CD
+			UNION ALL SELECT 'menu002' AS MENU_CD, 'menu002' AS MENU_URL, 'TEMPLATE2' AS MENU_NM, 'TEMPLATE' AS MODULE_CD
+			UNION ALL SELECT 'menu003' AS MENU_CD, 'menu003' AS MENU_URL, 'TEMPLATE3' AS MENU_NM, 'TEMPLATE' AS MODULE_CD
+		)
+		SELECT *
+		FROM W_MAIN
+	</select>
+
+	<!-- 로그인 후 권한에 따른 메뉴 영역 조회 -->
+	<select id="menuSelect" parameterType="map" resultType="map">
+	    /****** [ common.Login.menuSelect ] ******/
+	    <include refid="include.menuData"/>
+	    , W_ROLE_MENU AS 
+	    (
+			SELECT B.COMPANY_CD
+	             , B.BU_CD
+	             , B.MENU_CD       AS LEVEL3_MENU_CD
+	             , C.UPPER_MENU_CD AS LEVEL2_MENU_CD
+	             , D.UPPER_MENU_CD AS LEVEL1_MENU_CD
+	      	FROM TB_MAP_USER_ROLE A WITH(NOLOCK)
+	      	INNER JOIN TB_MAP_ROLE_MENU_ACTION B WITH(NOLOCK)
+	           ON B.COMPANY_CD           = @{GV_COMPANY_CD}
+	       	  AND B.BU_CD                = @{GV_BU_CD}
+	       	  AND B.BU_CD                = A.BU_CD
+	       	  AND B.ROLE_CD              = A.ROLE_CD
+	       	  AND ISNULL(B.USE_FLAG,'Y') = 'Y'
+	      	INNER JOIN TB_MST_MENU C WITH(NOLOCK)
+	           ON C.COMPANY_CD           = B.COMPANY_CD
+	       	  AND C.BU_CD                = B.BU_CD
+	       	  AND C.MENU_CD              = B.MENU_CD
+	       	  AND ISNULL(C.USE_FLAG,'Y') = 'Y'
+	      	INNER JOIN TB_MST_MENU D WITH(NOLOCK)
+	           ON D.COMPANY_CD           = C.COMPANY_CD
+	       	  AND D.BU_CD                = C.BU_CD
+	       	  AND D.MENU_CD              = C.UPPER_MENU_CD
+	       	  AND D.MENU_LVL             = 2
+	       	  AND ISNULL(D.USE_FLAG,'Y') = 'Y'
+	      	WHERE A.USER_ID = @{GV_USER_ID}
+	      	GROUP BY B.COMPANY_CD, B.BU_CD, B.MENU_CD, C.UPPER_MENU_CD, D.UPPER_MENU_CD
+	    )
+	    SELECT A.MENU_CD
+	         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A.MENU_NM_KR != '' THEN ISNULL(A.MENU_NM_KR,A.MENU_NM)
+	                WHEN UPPER(@{GV_LANG}) = 'CN' AND A.MENU_NM_CN != '' THEN ISNULL(A.MENU_NM_CN,A.MENU_NM)
+	                ELSE A.MENU_NM
+	           END AS MENU_NM
+	         , A.MENU_LVL
+	         , A.UPPER_MENU_CD
+	         , A.URL
+	      	 , A.ROOT_SORT
+	    FROM CTE A
+	    WHERE A.MENU_LVL IN (1,2,3)
+	      AND (
+	                EXISTS (SELECT 'Y'
+	                        FROM W_ROLE_MENU
+	                        WHERE LEVEL1_MENU_CD = A.MENU_CD)
+	             OR EXISTS (SELECT 'Y'
+	                        FROM W_ROLE_MENU
+	                        WHERE LEVEL2_MENU_CD = A.MENU_CD)
+	             OR EXISTS (SELECT 'Y'
+	                        FROM W_ROLE_MENU
+	                        WHERE LEVEL3_MENU_CD = A.MENU_CD)
+		      )
+	    ORDER BY A.ROOT_SORT
+	</select>
+
+</mapper>

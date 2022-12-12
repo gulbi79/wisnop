@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+	<select id="manLtTrendDetaiExcelSqlSelect" parameterType="map" resultType="map">
+		
+		/****** [ supply.product.manLtTrendDetaiExcelSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+
+	</select>
+
+	<select id="manLtTrendBucketSelect" parameterType="map" resultType="map">
+		/****** [ supply.product.manLtTrendBucketSelect ] ******/
+		SELECT 'M' + YEARMONTH AS CD
+		     , 'M' + YEARMONTH AS NM
+		     , NULL AS ROOT_CD
+		     , YEARMONTH AS BUCKET_VAL
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YYYYMMDD BETWEEN @{fromDate} AND @{toDate}
+		GROUP BY YEARMONTH
+		ORDER BY YEARMONTH DESC
+	</select>
+	
+	<select id="manLtTrendListSelect" parameterType="map" resultType="map">
+		/****** [ supply.product.manLtTrendListSelect ] ******/
+		SELECT NULL AS COL_TMP
+			#foreach( $dimMap in $_parameter.dimList )
+				#if($dimMap.DIM_CD == "APPLY_APS_BAL_LT" or $dimMap.DIM_CD == "MFG_LT")
+				 , CASE WHEN GRP_LVL_ID = 0 THEN $dimMap.DIM_CD ELSE NULL END $dimMap.DIM_CD 
+				 , CASE WHEN GRP_LVL_ID = 0 THEN ${dimMap.DIM_CD}_NM ELSE NULL END ${dimMap.DIM_CD}_NM 
+				#else
+				 , $dimMap.DIM_CD
+				 , CASE WHEN ${dimMap.DIM_CD}_NM = 'Total' THEN 'Average' ELSE ${dimMap.DIM_CD}_NM END ${dimMap.DIM_CD}_NM 
+				#end
+			#end
+			#set($minMaxData = "")
+			#foreach($bucketMap in $_parameter.bucketList)
+			 , $bucketMap.CD
+			 #set($minMaxData = $minMaxData + "," + $bucketMap.CD)
+			#end
+			, ROUND(RESULT_LT / NULLIF(RESULT_QTY, 0), 1) AS AVG_VALUE
+			, (SELECT MIN(dt) FROM (VALUES ($minMaxData.substring(1).replace(",","),("))) t(dt)) AS MIN_VALUE			
+			, (SELECT MAX(dt) FROM (VALUES ($minMaxData.substring(1).replace(",","),("))) t(dt)) AS MAX_VALUE			
+		FROM
+		(
+			SELECT NULL AS TMP_COL
+		    	<include refid="include.getCdDimTotal"/>
+		    	<include refid="include.getGrpLvlId"/>
+		    	#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramMon = "$bucketMap.BUCKET_VAL")
+				 , ROUND(AVG(CASE WHEN YEARMONTH = '$paramMon' THEN DATEDIFF(DAY, RELEASE_DATE, COMP_DATE) END + 0.0), 1) AS $bucketMap.CD
+				#end
+				#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramMon = "$bucketMap.BUCKET_VAL")
+				#if($velocityCount == 1)
+				 , ISNULL(AVG(CASE WHEN YEARMONTH = '$paramMon' THEN DATEDIFF(DAY, RELEASE_DATE, COMP_DATE) END + 0.0), 0) 						
+				#else
+				 + ISNULL(AVG(CASE WHEN YEARMONTH = '$paramMon' THEN DATEDIFF(DAY, RELEASE_DATE, COMP_DATE) END + 0.0), 0)
+				#end
+				#end AS TOTAL
+				 , SUM(RESULT_QTY) AS RESULT_QTY
+                 , SUM(RESULT_LT) AS RESULT_LT
+			FROM
+			(
+				SELECT ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+				     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+				     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+				     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+				     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD
+				     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD_NM
+				     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+				     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+				     , ISNULL(MI.SPEC, ' ') AS SPEC
+				     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+				     , ISNULL(MI.APPLY_APS_BAL_LT, ' ') AS APPLY_APS_BAL_LT
+				     , ISNULL(MI.APPLY_APS_BAL_LT, ' ') AS APPLY_APS_BAL_LT_NM
+				     , ISNULL(MIP.MFG_LT, ' ') AS MFG_LT
+				     , ISNULL(MIP.MFG_LT, ' ') AS MFG_LT_NM
+				     , ISNULL(CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+				     , ISNULL(CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+					 , ISNULL(CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM     
+					 , ISNULL(CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM     
+					 , ISNULL(CT.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD		     
+					 , ISNULL(CT.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM		     
+					 , ISNULL(CT.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM 		     
+					 , ISNULL(CT.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM 		     
+         			 , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID
+         			 , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID_NM
+         			 , ISNULL(MI.ITEM_TYPE, ' ') AS ITEM_TYPE_CD 
+         			 , ISNULL(MI.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+         			 , CONVERT(VARCHAR, ISNULL(MR.WORK_LT, 0)) AS WORK_LT
+         			 , CONVERT(VARCHAR, ISNULL(MR.WORK_LT, 0)) AS WORK_LT_NM
+         			 , ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                			WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                			ELSE CD.CODE_NM
+           				END, ' ') AS ITEM_TYPE_NM	
+         			 , ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                			WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                			ELSE CD.CODE_NM
+           				END, ' ') AS ITEM_TYPE_NM_NM
+				     , MCAL.YEARMONTH
+				     , DPOH.RELEASE_DATE
+				     , DI.COMP_DATE
+		             , DI.RESULT_QTY
+		             , DI.RESULT_QTY * DATEDIFF(DAY, DPOH.RELEASE_DATE, DI.COMP_DATE) AS RESULT_LT
+				FROM TB_MST_ITEM MI WITH(NOLOCK)
+				LEFT OUTER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK) 
+				  ON MI.COMPANY_CD    = CT.COMPANY_CD
+			     AND MI.BU_CD         = CT.BU_CD 
+			     AND MI.REP_CUST_CD   = CT.CUST_CD
+				INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				   ON MIP.COMPANY_CD = MI.COMPANY_CD
+				  AND MIP.BU_CD = MI.BU_CD
+				  AND MIP.PLANT_CD = 'WF01'
+				  AND MIP.ITEM_CD = MI.ITEM_CD
+				INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+				   ON MC.BU_CD = MIP.BU_CD
+				  AND MC.GROUP_CD = 'PROD_L2'
+				  AND MC.CODE_CD = MIP.ROUTING_ID
+				INNER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+				   ON MIG.COMPANY_CD = MI.COMPANY_CD
+				  AND MIG.BU_CD = MI.BU_CD
+				  AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+				INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+				   ON DPOH.COMPANY_CD = MI.COMPANY_CD
+				  AND DPOH.BU_CD = MI.BU_CD
+				  AND DPOH.ITEM_CD = MI.ITEM_CD
+				  AND ISNULL(DPOH.REWORK_FLAG, 'N') = 'N'
+				INNER JOIN 
+				(
+                	SELECT MR.COMPANY_CD
+                         , MR.BU_CD
+                         , MR.ITEM_CD
+                         , CEILING(SUM(MR.JC_TIME + MR.WAIT_TIME + MR.FIRST_TIME + MR.RUN_TIME + MR.AFTER_TIME) / 3600.0 / 8.0 + SUM(MR.MOVE_TIME) / 3600.0 / 24.0) AS WORK_LT
+                    FROM TB_MST_ROUTING MR WITH(NOLOCK)
+                    WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND MR.BU_CD = @{GV_BU_CD}
+                      AND MR.PLANT_CD = 'WF01'
+                      AND EXISTS (
+                                   	SELECT 1
+                                    FROM TB_MST_ROUTING_PRIORITY MRP WITH(NOLOCK)
+                                    WHERE MRP.COMPANY_CD = MR.COMPANY_CD
+                                      AND MRP.BU_CD = MR.BU_CD
+                                      AND MRP.ITEM_CD = MR.ITEM_CD
+                                      AND MRP.ROUTING_NO = MR.ROUTING_NO
+                                      AND MRP.MAJOR_FLAG = 'Y'
+                                  )
+					GROUP BY MR.COMPANY_CD, MR.BU_CD, MR.ITEM_CD
+				) MR
+               	ON MR.COMPANY_CD = MI.COMPANY_CD
+              	AND MR.BU_CD = MI.BU_CD
+              	AND MR.ITEM_CD = MI.ITEM_CD
+				INNER JOIN
+				(
+					SELECT DI.COMPANY_CD
+		                  , DI.BU_CD
+		                  , DI.PROD_ORDER_NO
+						#if($_parameter.ltCompPoint == "GR_PROD")
+		                  , DI.INSP_REQ_DATE AS COMP_DATE
+		                  , DI.LOT_SIZE AS RESULT_QTY
+		                #else
+						  , DI.RELEASE_DATE AS COMP_DATE
+						  , DI.GOODS_QTY AS RESULT_QTY                  
+		                #end
+					FROM TB_DYN_INSPECTION DI WITH(NOLOCK)
+		            WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND DI.BU_CD = @{GV_BU_CD}
+		              AND DI.PLANT_CD = 'WF01'
+					#if($_parameter.ltCompPoint == "GR_PROD")
+		              AND DI.INSP_REQ_DATE BETWEEN @{fromMon} + '01' AND @{toMon} + '31'
+		            #else
+		              AND DI.RELEASE_DATE BETWEEN @{fromMon} + '01' AND @{toMon} + '31'
+		            #end
+		              AND DI.DEL_FLAG = 'N'
+					UNION ALL
+		            SELECT DGP.COMPANY_CD
+		                 , DGP.BU_CD
+		                 , DGP.PROD_ORDER_NO
+		                 , DGP.GR_DATE AS COMP_DATE
+		                 , DGP.GR_QTY AS RESULT_QTY
+					FROM TB_DYN_GR_PROD DGP WITH(NOLOCK)
+		            WHERE DGP.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND DGP.BU_CD = @{GV_BU_CD}
+		              AND DGP.PLANT_CD = 'WF01'
+		              AND DGP.GR_DATE BETWEEN @{fromMon} + '01' AND @{toMon} + '31'
+				) DI
+				ON DI.COMPANY_CD = DPOH.COMPANY_CD
+				AND DI.BU_CD = DPOH.BU_CD
+				AND DI.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+				INNER JOIN TB_MST_CALENDAR MCAL WITH(NOLOCK)
+				   ON MCAL.YYYYMMDD = DI.COMP_DATE
+				LEFT OUTER JOIN TB_MST_CODE CD WITH(NOLOCK)
+        		  ON CD.GROUP_CD = 'ITEM_TYPE'
+       			 AND CD.CODE_CD  = MI.ITEM_TYPE
+       			 AND CD.USE_FLAG = 'Y'   
+				WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND MI.BU_CD = @{GV_BU_CD}
+				  AND MI.ITEM_TYPE IN ('10', '20')
+				  AND MC.ATTB_2_CD IN ('$_parameter.prodPart.replace(",","','")')
+				#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+	       		  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+	  			#end
+	  			#if($_parameter.item_cd and $_parameter.item_cd != "")
+	       	  	  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+	  			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+	       	  	  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+	  			#end
+				#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+			      AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+				#end
+				
+				#if($_parameter.custGroup and $_parameter.custGroup != "")
+			      AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+				#end
+				
+				#if($_parameter.route and $_parameter.route != "")
+			      AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+				#end
+				
+				#if($_parameter.itemType and $_parameter.itemType != "")
+			      AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+				#end
+			) A
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+		) B
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+	           , B.$dimMap.DIM_CD 
+		#end 
+	</select>
+	
+	<select id="manLtTrendDetailListSelect" parameterType="map" resultType="map">
+		/****** [ supply.product.manLtTrendDetailListSelect ] ******/
+		SELECT MIP.ROUTING_ID
+		     , MI.ITEM_GROUP_CD
+		     , MIG.ITEM_GROUP_NM
+		     , MI.ITEM_CD
+		     , MI.ITEM_NM
+		     , MI.SPEC
+		     , MI.ITEM_TYPE
+		     , ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                            WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                            ELSE CD.CODE_NM
+                        END, ' ') AS ITEM_TYPE_NM
+		     , DPOH.PROD_ORDER_NO
+		     , DPOH.PROD_ORDER_QTY
+		     , DI.RESULT_QTY
+		     , DPOH.PROD_ORDER_QTY - DI.RESULT_QTY AS REMAIN_QTY
+		     , MI.APPLY_APS_BAL_LT
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, DPOH.RELEASE_DATE), 23) AS RELEASE_DATE
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, DI.COMP_DATE), 23) AS COMP_DATE
+		     , DATEDIFF(DAY, DPOH.RELEASE_DATE, DI.COMP_DATE) AS MFG_LT
+		FROM TB_MST_ITEM MI WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+		   ON MC.BU_CD = MIP.BU_CD
+		  AND MC.GROUP_CD = 'PROD_L2'
+		  AND MC.CODE_CD = MIP.ROUTING_ID
+		INNER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		   ON MIG.COMPANY_CD = MI.COMPANY_CD
+		  AND MIG.BU_CD = MI.BU_CD
+		  AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+		   ON DPOH.COMPANY_CD = MI.COMPANY_CD
+		  AND DPOH.BU_CD = MI.BU_CD
+		  AND DPOH.ITEM_CD = MI.ITEM_CD
+		  AND ISNULL(DPOH.REWORK_FLAG, 'N') = 'N'
+		INNER JOIN 
+		(
+			SELECT DI.COMPANY_CD
+                 , DI.BU_CD
+                 , DI.PROD_ORDER_NO
+				#if($_parameter.ltCompPoint == "GR_PROD")
+                 , DI.INSP_REQ_DATE AS COMP_DATE
+                 , DI.LOT_SIZE AS RESULT_QTY
+                #else
+				 , DI.RELEASE_DATE AS COMP_DATE
+				 , DI.GOODS_QTY AS RESULT_QTY                  
+                #end
+			FROM TB_DYN_INSPECTION DI WITH(NOLOCK)
+			WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND DI.BU_CD = @{GV_BU_CD}
+		      AND DI.PLANT_CD = 'WF01'
+			#if($_parameter.ltCompPoint == "GR_PROD")
+		      AND DI.INSP_REQ_DATE BETWEEN @{fromDate} AND @{toDate}
+			#else
+		      AND DI.RELEASE_DATE BETWEEN @{fromDate} AND @{toDate}
+			#end
+			  AND DI.DEL_FLAG = 'N'
+			UNION ALL
+            SELECT DGP.COMPANY_CD
+                 , DGP.BU_CD
+                 , DGP.PROD_ORDER_NO
+                 , DGP.GR_DATE AS COMP_DATE
+                 , DGP.GR_QTY AS RESULT_QTY
+			FROM TB_DYN_GR_PROD DGP WITH(NOLOCK)
+            WHERE DGP.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DGP.BU_CD = @{GV_BU_CD}
+              AND DGP.PLANT_CD = 'WF01'
+              AND DGP.GR_DATE BETWEEN @{fromDate} AND @{toDate}
+		) DI
+		ON DI.COMPANY_CD = DPOH.COMPANY_CD
+		AND DI.BU_CD = DPOH.BU_CD
+		AND DI.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+		LEFT OUTER JOIN TB_MST_CODE CD WITH (NOLOCK) 
+        ON CD.GROUP_CD = 'ITEM_TYPE'
+        AND CD.CODE_CD = MI.ITEM_TYPE
+        AND CD.USE_FLAG = 'Y'
+		WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND MI.BU_CD = @{GV_BU_CD}
+		  AND MI.ITEM_TYPE IN ('10', '20')
+		  AND MC.ATTB_2_CD IN ('$_parameter.prodPart.replace(",","','")')
+		#if($_parameter.prodOrderNo and $_parameter.prodOrderNo != "")
+	      AND DPOH.PROD_ORDER_NO LIKE '%'+@{prodOrderNo}+'%' OR MI.ITEM_NM LIKE '%'+@{prodOrderNo}+'%'
+		#end
+	  	#if($_parameter.item_cd and $_parameter.item_cd != "")
+	      AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+	  	#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+	      AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+	  	#end
+	  	
+	  	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+          AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+        #end
+        #if($_parameter.itemType and $_parameter.itemType != "")
+          AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+        #end
+	  	ORDER BY MIP.ROUTING_ID, MI.ITEM_GROUP_CD, MI.ITEM_CD, DPOH.PROD_ORDER_NO, DI.COMP_DATE
+	</select>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</mapper>
+

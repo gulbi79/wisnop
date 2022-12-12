@@ -1,0 +1,117 @@
+//그리드를 그린다.
+function fn_initGrid() {
+	//변수처리
+	gridInstance = new GRID();
+	gridInstance.init("realgrid");
+	grdMain = gridInstance.objGrid;
+	dataProvider = gridInstance.objData;
+	
+    fn_setFields(dataProvider); //set fields
+    fn_setColumns(grdMain); // set columns
+    fn_setOptions(grdMain); // set options
+    
+ 	//row 상태에따른 컬럼 속성정의
+    grdMain.onCurrentRowChanged = function (grid, oldRow, newRow) {
+    	
+   		var editable = (newRow < 0 || dataProvider.getRowState(newRow) === "created");
+   		grid.setColumnProperty("BU_CD"     		,"editable",editable);
+   		grid.setColumnProperty("MP_GROUP_CD"  	,"editable",editable);
+   		grid.setColumnProperty("REF_1_CD" 		,"editable",editable);
+   		grid.setColumnProperty("REF_2_CD"      	,"editable",editable);
+   		grid.setColumnProperty("REF_3_CD"      	,"editable",editable);
+   	};
+    
+   	grdMain.onCellButtonClicked = function (grid, itemIndex, column) {
+   		var rowId = grdMain.getCurrent().dataRow;
+   		var buCd  = grdMain.getValue(itemIndex, "BU_CD");
+   		if (gfn_isNull(buCd)) {
+   			var arg1 = '<spring:message code="lbl.buName"/>';
+   			alert('<spring:message code="msg.{1}isnull.Pleasecheck{1}toset{0}." arguments=" ,'+arg1+'"/>');
+   			return false;
+   		}
+   		
+   		if (dataProvider.getRowState(rowId) === "created") {
+       		//var buCd  = dataProvider.getValue(rowId, "BU_CD");
+       		var grpCd = (buCd == "BM" ? "PROD_HIER_LVL" : "ERP_MAT_GROUP");
+       		
+       		var params = {
+       			grpCd: grpCd, 
+       			callback: "fn_erpMatGroupCallback",
+       			singleYn: "Y",
+       			buCd: buCd,
+       			searchCode: grpCd+grdMain.getValue(itemIndex, "REF_1_CD"),
+       			//custYn : "Y",
+       			//columnsInfo : "[{'colId':'BU_CD', 'colNm':'BU', 'tAlign':'near', 'width':60},{'colId':'CODE_CD', 'colNm':'Mat. Group', 'tAlign':'near', 'width':82},{'colId':'CODE_NM', 'colNm':'Mat. Group Name', 'tAlign':'near', 'width':120}]"
+       		};
+       		
+       		gfn_comPopupOpen("CODE",params);
+   		}
+   	}
+   	
+   	grdMain.onEditRowPasted = function(grid, itemIndex, dataRow, fields, oldValues, newValues){
+   	 	grid.setValue(itemIndex, "MP_GROUP_NM", gfn_getFindValueInDs(codeMapAll.MP_GROUP, "CODE_CD", grid.getValue(itemIndex, "MP_GROUP_CD"), "CODE_NM"));
+   	};
+   	
+   	
+    grdMain.onEditChange =  function (grid, index, value) {
+		if (index.fieldName == "BU_CD") {
+			grid.setValue(index.itemIndex, "MP_GROUP_CD"    , "");
+			grid.setValue(index.itemIndex, "MP_GROUP_NM"    , "");
+			grid.setValue(index.itemIndex, "REF_1_CD" 		, "");
+			grid.setValue(index.itemIndex, "REF_1_NM" 		, "");
+			grid.setValue(index.itemIndex, "REF_2_CD"      	, (value != "CM" ? "ALL" : ""));
+			grid.setValue(index.itemIndex, "REF_3_CD"      	, (value != "CM" ? "ALL" : ""));
+			grid.setValue(index.itemIndex, "FCST_UOM_CD"    , "");
+			grid.setValue(index.itemIndex, "REPORT_UOM_CD"  , "");
+		} else if (index.fieldName == "MP_GROUP_CD") {
+			grid.setValue(index.itemIndex, "MP_GROUP_NM", gfn_getFindValueInDs(codeMapAll.MP_GROUP, "CODE_CD", value, "CODE_NM"));
+		}
+   	};
+   	
+   	grdMain.onShowEditor = function (id, index) { 
+   		
+   		if (index.column != "BU_CD") {
+	   		var buCd = grdMain.getValue(index.itemIndex, "BU_CD");
+	   		if (gfn_isNull(buCd)) {
+	   			var arg1 = '<spring:message code="lbl.buName"/>';
+	   			alert('<spring:message code="msg.{1}isnull.Pleasecheck{1}toset{0}." arguments=" ,'+arg1+'"/>');
+	   			return false;
+	   		}
+   		}
+   		
+   		if (index.column == "MP_GROUP_CD") {
+   			fn_setShowEditor(index, "MP_GROUP_CD", codeMapAll.MP_GROUP);
+   		} else if (index.column == "REF_2_CD") {
+   			fn_setShowEditor(index, "REF_2_CD", codeMapAll.UOM_LVL_1);
+   		} else if (index.column == "REF_3_CD") {
+   			fn_setShowEditor(index, "REF_3_CD", codeMapAll.UOM_LVL_2);
+   			
+   		} else if (index.column == "FCST_UOM_CD" || index.column == "REPORT_UOM_CD") {
+   			var erpMatGroup = grdMain.getValue(index.itemIndex, "REF_1_CD");
+	   		if (gfn_isNull(erpMatGroup)) {
+	   			var arg1 = '<spring:message code="lbl.mpGroupName"/>';
+	   			alert('<spring:message code="msg.{1}isnull.Pleasecheck{1}toset{0}." arguments=" ,'+arg1+'"/>');
+	   			grdMain.setCurrent({fieldName: "REF_1_CD"});
+	   			return false;
+	   		}
+   			
+   			fn_setShowEditor(index, index.column, codeMapAll.ERP_UOM);
+   		}
+   	}
+   	
+   	grdMain.onCellEdited =  function (grid, itemIndex, dataRow, field) {
+   		var column = dataProvider.getFieldName(field);
+   		if (column == "FCST_UOM_CD" || column == "REPORT_UOM_CD") {
+   			fn_valid(column);
+   		}
+   	};
+}
+
+function fn_setShowEditor(index, column, ds) {
+	var buCd = grdMain.getValue(index.itemIndex, "BU_CD");
+	var acol = grdMain.columnByName(column);
+    var arrMpGroup = gfn_getFindDataDsInDs(ds, {BU_CD : {VALUE : buCd, CONDI : "="}});
+    acol.values = gfn_getArrayExceptInDs(arrMpGroup, "CODE_CD", "");
+    acol.labels = gfn_getArrayExceptInDs(arrMpGroup, "CODE_NM", "");
+    grdMain.setColumn(acol);
+}

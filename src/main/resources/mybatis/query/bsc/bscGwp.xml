@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="bsc">
+    <select id="bscGwpSelect" parameterType="map" resultType="map">
+        /****** [ bsc.bscGwpSelect ] ******/
+        
+        #set($_parameter.bscList = ['BSC_KPI16', 'BSC_KPI17', 'BSC_KPI18'])
+BEGIN
+    
+    DECLARE @P_YEARMONTH  NVARCHAR(6) = @{fromMon};
+    
+    WITH W_CODE AS (
+      #set($_parameter.groupCd = "BU_CD,DIV_CD,TEAM_CD,PART_CD")
+      #set($_parameter.buAllYn = "Y")
+      <include refid="include.mstCode"/>
+    ), 
+    W_CNT AS (
+        SELECT *
+          FROM ( SELECT KPI_ID
+                      , COMPANY_CD
+                      , BU_CD
+                      , DIV_CD
+                      , TEAM_CD
+                      , COUNT(*) AS CNT
+                   #if($_parameter.rdoAqType == "ACC")   
+                   FROM TB_KPI_BSC_ACC BSC WITH(NOLOCK)
+                   #else
+                   FROM TB_KPI_BSC BSC WITH(NOLOCK)
+                   #end
+                  WHERE KPI_ID IN (
+#foreach( $item in $_parameter.bscList )
+    '$item' #if( $foreach.hasNext ), #end
+#end  )
+                    AND TEAM_CD != 'ALL'
+                    AND YEARMONTH = @P_YEARMONTH
+               GROUP BY KPI_ID
+                      , COMPANY_CD
+                      , BU_CD
+                      , DIV_CD
+                      , TEAM_CD
+              ) A
+         WHERE A.CNT <![CDATA[>]]> 2
+   )
+   SELECT * 
+     FROM ( 
+   SELECT M.COMPANY_CD
+        , M.YEARMONTH
+        , M.BU_CD
+        , M.BU_NM
+        , M.GRP_LVL_ID
+        , M.DIV_CD
+        , M.DIV_NM
+        , M.TEAM_CD
+        , M.TEAM_NM
+        , M.PART_CD
+        , M.PART_NM
+        , M.BU_SORT
+        , M.DIV_SORT
+        , M.TEM_SORT
+        , M.FLAG
+#foreach( $bscMap in $_parameter.bscList )
+    #set( $bscCol = $bscMap.replace("BSC_","") )
+        , M.${bscCol}_WEIGHT_RATE
+        , M.${bscCol}_TARGET_VALUE
+        , M.${bscCol}_TARGET_VALUE_02
+        , M.${bscCol}_BSC_VAL
+        , M.${bscCol}_RESULT_RATE
+        , M.${bscCol}_EDIT_YN
+#end
+        , M.GWP_WEIGHT_RATE
+        , CASE M.GRP_LVL_ID
+            WHEN 7 THEN SUM ( CASE WHEN GRP_LVL_ID = 3 THEN M.GWP_BSC_VAL ELSE 0 END * CASE WHEN GRP_LVL_ID = 3 THEN M.GWP_WEIGHT_RATE  ELSE 0 END ) OVER (PARTITION BY M.COMPANY_CD, M.BU_CD) /
+                        NULLIF ( SUM ( CASE WHEN GRP_LVL_ID = 3 THEN M.GWP_WEIGHT_RATE  ELSE 0 END  ) OVER (PARTITION BY M.COMPANY_CD, M.BU_CD ) , 0)
+            WHEN 3 THEN SUM ( CASE WHEN GRP_LVL_ID = 1 THEN M.GWP_BSC_VAL ELSE 0 END * CASE WHEN GRP_LVL_ID = 1 THEN M.GWP_WEIGHT_RATE  ELSE 0 END ) OVER (PARTITION BY M.COMPANY_CD, M.BU_CD, M.DIV_CD) /
+                        NULLIF ( SUM ( CASE WHEN GRP_LVL_ID = 1 THEN M.GWP_WEIGHT_RATE  ELSE 0 END  ) OVER (PARTITION BY M.COMPANY_CD, M.BU_CD, M.DIV_CD ) , 0)
+            WHEN 1 THEN SUM ( CASE WHEN GRP_LVL_ID = 0 THEN M.GWP_BSC_VAL ELSE 0 END * CASE WHEN GRP_LVL_ID = 0 THEN M.GWP_WEIGHT_RATE  ELSE 0 END ) OVER (PARTITION BY M.COMPANY_CD, M.BU_CD, M.DIV_CD, M.TEAM_CD) /
+                        NULLIF ( SUM ( CASE WHEN GRP_LVL_ID = 0 THEN M.GWP_WEIGHT_RATE  ELSE 0 END  ) OVER (PARTITION BY M.COMPANY_CD, M.BU_CD, M.DIV_CD, M.TEAM_CD ) , 0)
+            WHEN 0 THEN GWP_BSC_VAL
+          END  GWP_BSC_VAL
+   FROM (
+         SELECT X.COMPANY_CD
+              , X.YEARMONTH
+              , X.BU_CD
+              , X.BU_NM
+              , X.LVL AS GRP_LVL_ID
+              , CASE X.LVL WHEN 7 THEN NULL ELSE X.DIV_CD END                                           AS DIV_CD
+              , CASE X.LVL WHEN 7 THEN 'Sub Total' ELSE X.DIV_NM END                                    AS DIV_NM
+              , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN NULL ELSE X.TEAM_CD END                         AS TEAM_CD
+              , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN 'Sub Total' ELSE X.TEAM_NM END                  AS TEAM_NM
+              , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN NULL WHEN 1 THEN NULL ELSE X.PART_CD END        AS PART_CD
+              , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN NULL WHEN 1 THEN 'Sub Total' ELSE X.PART_NM END AS PART_NM
+              , X.BU_SORT
+              , X.DIV_SORT
+              , X.TEM_SORT
+              , MAX (X.FLAG) FLAG
+                 
+#foreach( $bscMap in $_parameter.bscList )
+    #set( $bscCol = $bscMap.replace("BSC_","") )
+               , SUM (X.${bscCol}_WEIGHT_RATE)     AS ${bscCol}_WEIGHT_RATE
+               , SUM (X.${bscCol}_TARGET_VALUE)    AS ${bscCol}_TARGET_VALUE
+               , SUM (X.${bscCol}_TARGET_VALUE_02) AS ${bscCol}_TARGET_VALUE_02
+               , SUM (X.${bscCol}_RESULT_VALUE_01) AS ${bscCol}_RESULT_RATE
+               , SUM (X.${bscCol}_BSC_SCORE)       AS ${bscCol}_BSC_VAL
+               , CASE WHEN X.PART_CD != 'ALL' THEN MAX (CASE X.KPI WHEN '$bscMap' THEN 'Y' ELSE 'N' END) ELSE 'N' END AS ${bscCol}_EDIT_YN
+#end
+               , SUM (X.WEIGHT_RATE) AS GWP_WEIGHT_RATE
+               , (ISNULL (SUM (X.KPI16_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI16_BSC_SCORE), 0) + 
+                  ISNULL (SUM (X.KPI17_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI17_BSC_SCORE), 0) +
+                  ISNULL (SUM (X.KPI18_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI18_BSC_SCORE), 0) ) / NULLIF (SUM (X.WEIGHT_RATE), 0)  AS GWP_BSC_VAL
+            FROM (SELECT BSC.COMPANY_CD
+                       , BSC.BU_CD
+                       , BU.CODE_NM   AS BU_NM
+                       , BSC.DIV_CD
+                       , DIV.CODE_NM  AS DIV_NM
+                       , BSC.TEAM_CD
+                       , TEM.CODE_NM  AS TEAM_NM
+                       , BSC.PART_CD
+                       , PART.CODE_NM AS PART_NM
+                       , BU.SORT      AS BU_SORT
+                       , DIV.SORT     AS DIV_SORT
+                       , TEM.SORT     AS TEM_SORT
+                       , CASE
+                           WHEN BSC.DIV_CD = 'ALL' THEN 7
+                           WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD = 'ALL' THEN 3
+                           WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD = 'ALL' THEN 1
+                           WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD != 'ALL' THEN 0
+                         END LVL
+                       , BSC.KPI_ID
+                       , KPI.KPI_ID KPI
+                       , ISNULL (BSC.YEARMONTH, @P_YEARMONTH) YEARMONTH
+                       , BSC.WEIGHT_RATE    
+                       , BSC.TARGET_VALUE_01   
+                       , BSC.RESULT_VALUE_01
+                       , BSC.RESULT_VALUE_02
+                       , BSC.BSC_SCORE
+#foreach( $bscMap in $_parameter.bscList )
+    #set( $bscCol = $bscMap.replace("BSC_","") )
+                       , (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.WEIGHT_RATE     ELSE NULL END) AS ${bscCol}_WEIGHT_RATE
+                       , (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.TARGET_VALUE_01 ELSE NULL END) AS ${bscCol}_TARGET_VALUE
+                       , (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.TARGET_VALUE_02 ELSE NULL END) AS ${bscCol}_TARGET_VALUE_02
+                       , (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.RESULT_VALUE_01 ELSE NULL END) AS ${bscCol}_RESULT_VALUE_01
+                       , (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.RESULT_VALUE_02 ELSE NULL END) AS ${bscCol}_RESULT_VALUE_02
+                       , (CASE BSC.KPI_ID WHEN '$bscMap' THEN BSC.BSC_SCORE       ELSE NULL END) AS ${bscCol}_BSC_SCORE
+#end
+                       , CASE WHEN CNT.CNT IS NULL AND BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD = 'ALL' THEN 'Y' ELSE 'N' END FLAG
+                   	#if($_parameter.rdoAqType == "ACC")   
+                   	FROM TB_KPI_BSC_ACC BSC WITH(NOLOCK)
+                   	#else
+                   	FROM TB_KPI_BSC BSC WITH(NOLOCK)
+                   	#end
+                    LEFT OUTER JOIN TB_MST_ORG_KPI KPI WITH (NOLOCK)
+                      ON BSC.COMPANY_CD = KPI.COMPANY_CD
+                     AND BSC.BU_CD      = KPI.BU_CD
+                     AND BSC.PART_CD    = KPI.PART_CD
+                     AND BSC.KPI_ID     = KPI.KPI_ID
+                     AND KPI.USE_FLAG   = 'Y'
+                     AND KPI.DEL_FLAG   = 'N'
+                    LEFT OUTER JOIN W_CODE BU
+                      ON BU.CODE_CD  = BSC.BU_CD
+                     AND BU.GROUP_CD = 'BU_CD'
+                    LEFT OUTER JOIN W_CODE DIV
+                    ON DIV.BU_CD      = BSC.BU_CD
+                     AND DIV.CODE_CD    = BSC.DIV_CD
+                     AND DIV.GROUP_CD   = 'DIV_CD'
+                    LEFT OUTER JOIN W_CODE TEM
+                      ON TEM.BU_CD    = BSC.BU_CD
+                     AND TEM.CODE_CD  = BSC.TEAM_CD
+                     AND TEM.GROUP_CD = 'TEAM_CD'
+					LEFT OUTER JOIN W_CODE PART
+                      ON PART.BU_CD    = BSC.BU_CD
+                     AND PART.CODE_CD  = BSC.PART_CD
+                     AND PART.GROUP_CD   = 'PART_CD' 
+                    LEFT OUTER JOIN W_CNT CNT
+                      ON BSC.COMPANY_CD = CNT.COMPANY_CD
+                     AND BSC.BU_CD      = CNT.BU_CD
+                     AND BSC.DIV_CD     = CNT.DIV_CD
+                     AND BSC.TEAM_CD    = CNT.TEAM_CD
+                     AND BSC.KPI_ID     = CNT.KPI_ID
+                   WHERE BSC.KPI_ID     IN  (
+#foreach( $item in $_parameter.bscList )
+    '$item' #if( $foreach.hasNext ), #end
+#end 
+                     )
+                     AND BSC.YEARMONTH  = @P_YEARMONTH ) X
+        GROUP BY X.COMPANY_CD
+               , X.YEARMONTH
+               , X.BU_CD
+               , X.BU_NM
+               , X.LVL
+               , X.DIV_CD
+               , X.DIV_NM
+               , X.TEAM_CD
+               , X.TEAM_NM
+               , X.PART_CD
+               , X.PART_NM
+               , X.BU_SORT
+               , X.DIV_SORT
+               , X.TEM_SORT ) M
+        ) S
+   WHERE S.FLAG = 'N'
+   ORDER BY S.BU_SORT
+          , S.DIV_SORT
+          , S.TEM_SORT
+          , S.GRP_LVL_ID DESC
+       
+END;
+
+    </select>
+    
+    <update id="bscGwpUpdate" parameterType="map" >
+        /****** [ bsc.bscGwpUpdate ] ******/
+        #set($_parameter.bscList = ['BSC_KPI16', 'BSC_KPI17', 'BSC_KPI18'])
+
+#if ($_parameter.rowList.size() > 0)
+BEGIN
+    
+    DECLARE @P_COMPANY_CD NVARCHAR(5) = @{GV_COMPANY_CD};
+    DECLARE @P_BU_CD      NVARCHAR(3) = @{GV_BU_CD};
+    DECLARE @FROM_MON     NVARCHAR(6) = @{fromMon};
+
+    MERGE TB_KPI_BSC AS A
+    USING (
+#foreach( $rowMap in $_parameter.rowList )
+        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+             , '$rowMap.BU_CD'           AS BU_CD
+             , @P_COMPANY_CD             AS COMPANY_CD
+             , '$rowMap.DIV_CD'          AS DIV_CD
+             , '$rowMap.TEAM_CD'         AS TEAM_CD
+             , '$rowMap.PART_CD'         AS PART_CD
+             , 'BSC_KPI16'               AS KPI_ID
+             , #if($rowMap.get("KPI16_WEIGHT_RATE"))  $rowMap.get("KPI16_WEIGHT_RATE") #else NULL #end  AS WEIGHT_RATE
+             , #if($rowMap.get("KPI16_TARGET_VALUE")) $rowMap.get("KPI16_TARGET_VALUE") #else NULL #end AS TARGET_VALUE_01
+             , #if($rowMap.get("KPI16_TARGET_VALUE_02")) $rowMap.get("KPI16_TARGET_VALUE_02") #else NULL #end AS TARGET_VALUE_02
+             , #if($rowMap.get("KPI16_RESULT_RATE"))  $rowMap.get("KPI16_RESULT_RATE") #else NULL #end  AS RESULT_RATE
+             , @{GV_USER_ID}             AS USER_ID
+         UNION ALL
+        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+             , '$rowMap.BU_CD'           AS BU_CD
+             , @P_COMPANY_CD             AS COMPANY_CD
+             , '$rowMap.DIV_CD'          AS DIV_CD
+             , '$rowMap.TEAM_CD'         AS TEAM_CD
+             , '$rowMap.PART_CD'         AS PART_CD
+             , 'BSC_KPI17'               AS KPI_ID
+             , #if($rowMap.get("KPI17_WEIGHT_RATE"))  $rowMap.get("KPI17_WEIGHT_RATE") #else NULL #end  AS WEIGHT_RATE
+             , #if($rowMap.get("KPI17_TARGET_VALUE")) $rowMap.get("KPI17_TARGET_VALUE") #else NULL #end AS TARGET_VALUE_01
+             , NULL
+             , #if($rowMap.get("KPI17_RESULT_RATE"))  $rowMap.get("KPI17_RESULT_RATE") #else NULL #end  AS RESULT_RATE
+             , @{GV_USER_ID}             AS USER_ID
+         UNION ALL
+        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+             , '$rowMap.BU_CD'           AS BU_CD
+             , @P_COMPANY_CD             AS COMPANY_CD
+             , '$rowMap.DIV_CD'          AS DIV_CD
+             , '$rowMap.TEAM_CD'         AS TEAM_CD
+             , '$rowMap.PART_CD'         AS PART_CD
+             , 'BSC_KPI18'               AS KPI_ID
+             , #if($rowMap.get("KPI18_WEIGHT_RATE"))  $rowMap.get("KPI18_WEIGHT_RATE") #else NULL #end  AS WEIGHT_RATE
+             , #if($rowMap.get("KPI18_TARGET_VALUE")) $rowMap.get("KPI18_TARGET_VALUE") #else NULL #end AS TARGET_VALUE_01
+             , NULL
+             , #if($rowMap.get("KPI18_RESULT_RATE"))  $rowMap.get("KPI18_RESULT_RATE") #else NULL #end  AS RESULT_RATE
+             , @{GV_USER_ID}             AS USER_ID
+  #if($_parameter.rowList.size() > $foreach.count) UNION ALL #end
+#end      
+        ) B
+        ON 
+        (
+                A.YEARMONTH  = B.YEARMONTH
+            AND A.COMPANY_CD = B.COMPANY_CD
+            AND A.BU_CD      = B.BU_CD
+            AND A.DIV_CD     = B.DIV_CD
+            AND A.TEAM_CD    = B.TEAM_CD
+            AND A.PART_CD    = B.PART_CD
+            AND A.KPI_ID     = B.KPI_ID
+        )
+        WHEN MATCHED THEN
+            UPDATE SET
+                A.WEIGHT_RATE     = B.WEIGHT_RATE
+              , A.TARGET_VALUE_01 = B.TARGET_VALUE_01
+              , A.TARGET_VALUE_02 = B.TARGET_VALUE_02
+              , A.RESULT_VALUE_01 = B.RESULT_RATE
+              , A.UPDATE_DTTM     = DBO.UFN_GETDATE()
+              , A.UPDATE_ID       = @{GV_USER_ID}
+        WHEN NOT MATCHED THEN
+        INSERT 
+        (
+            YEARMONTH
+          , COMPANY_CD
+          , BU_CD
+          , DIV_CD
+          , TEAM_CD
+          , PART_CD
+          , KPI_ID
+          , WEIGHT_RATE
+          , TARGET_VALUE_01
+          , TARGET_VALUE_02
+          , RESULT_VALUE_01
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM 
+        ) VALUES (
+            B.YEARMONTH
+          , B.COMPANY_CD
+          , B.BU_CD
+          , B.DIV_CD
+          , B.TEAM_CD
+          , B.PART_CD
+          , B.KPI_ID
+          , B.WEIGHT_RATE
+          , B.TARGET_VALUE_01
+          , B.TARGET_VALUE_02
+          , B.RESULT_RATE
+          , B.USER_ID
+          , DBO.UFN_GETDATE()
+          , B.USER_ID
+          , DBO.UFN_GETDATE()
+        );
+        
+   #foreach( $item in $_parameter.bscList )
+       EXECUTE dbo.USP_TB_KPI_BSC @P_COMPANY_CD, @P_BU_CD, '$item', @FROM_MON
+   #end
+   
+END;
+#end
+    </update>
+    
+    <update id="bscGwpFileNoUpdate" parameterType="map">
+        /****** [ bsc.bscGwpFileNoUpdate ] ******/
+        INSERT INTO TB_KPI_BSC_FILE
+        (
+            COMPANY_CD
+          , BU_CD
+          , KPI_ID
+          , FILE_NO
+          , FILE_SEQ
+          , DEL_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+        )VALUES(
+            ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+          , ISNULL(@{BU_CD}, @{GV_BU_CD})
+          , @{KPI_ID}
+          , @{FILE_NO}
+          , (SELECT ISNULL(MAX(FILE_SEQ), 0) AS FILE_NO FROM TB_COMM_FILE WHERE FILE_NO = @{FILE_NO})
+          , 'N'
+          , @{GV_USER_ID}
+          , DBO.UFN_GETDATE()
+        )
+    </update>
+    
+    
+</mapper>

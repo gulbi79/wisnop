@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	<select id="translateMngSelect" parameterType="map" resultType="map">
+		/****** [ admin.translateMngSelect ] ******/
+		SELECT TRANS_TYPE
+		     , TRANS_ID
+		     , EN_TEXT
+		     , KR_TEXT
+		     , CN_TEXT
+		     , USE_FLAG
+		     , CREATE_ID
+		     , CONVERT(NVARCHAR,CREATE_DTTM,120) AS CREATE_DTTM
+		     , UPDATE_ID
+		     , CONVERT(NVARCHAR,UPDATE_DTTM,120) AS UPDATE_DTTM
+		FROM TB_MST_TRANSLATE WITH(NOLOCK)
+		WHERE USE_FLAG = 'Y'
+		#if($_parameter.TRANS_TYPE and $_parameter.TRANS_TYPE != "")
+		  AND TRANS_TYPE = @{TRANS_TYPE}
+		#end
+		#if($_parameter.TRANS_ID and $_parameter.TRANS_ID != "")
+		  AND TRANS_ID LIKE '%' + @{TRANS_ID} + '%'
+		#end
+		#if($_parameter.EN_TEXT and $_parameter.EN_TEXT != "")
+		  AND (EN_TEXT LIKE '%' + @{EN_TEXT} + '%'
+		    OR KR_TEXT LIKE '%' + @{EN_TEXT} + '%'
+		    OR CN_TEXT LIKE '%' + @{EN_TEXT} + '%')
+		#end
+		ORDER BY TRANS_TYPE, TRANS_ID
+	</select>
+	
+	<update id="translateMngInsert" parameterType="map">
+		/****** [ admin.translateMng ] ******/
+	    INSERT INTO TB_MST_TRANSLATE 
+	    (
+			TRANS_TYPE
+          , TRANS_ID
+          , EN_TEXT
+          , KR_TEXT
+          , CN_TEXT
+          , USE_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+	    ) VALUES (
+    	    @{TRANS_TYPE}
+          , @{TRANS_ID}
+          , @{EN_TEXT}
+    	  , @{KR_TEXT}
+    	  , @{CN_TEXT}
+    	  , @{USE_FLAG}
+    	  , @{GV_USER_ID}
+    	  , DBO.UFN_GETDATE()
+    	  , @{GV_USER_ID}
+    	  , DBO.UFN_GETDATE()
+	    )
+	</update>
+	
+	<update id="translateMngUpdate" parameterType="map">
+		/****** [ admin.translateMng ] ******/
+		UPDATE TB_MST_TRANSLATE 
+		   SET EN_TEXT      = @{EN_TEXT}
+		     , KR_TEXT      = @{KR_TEXT}
+		     , CN_TEXT      = @{CN_TEXT}
+		     , UPDATE_ID    = @{GV_USER_ID}
+		     , UPDATE_DTTM  = DBO.UFN_GETDATE()
+		 WHERE TRANS_TYPE = @{TRANS_TYPE}
+		   AND TRANS_ID   = @{TRANS_ID}
+	</update>
+	
+	<delete id="translateMngDelete" parameterType="map">
+		/****** [ admin.translateMngDelete ] ******/
+		DELETE FROM TB_MST_TRANSLATE
+		WHERE TRANS_TYPE = @{TRANS_TYPE}
+		  AND TRANS_ID   = @{TRANS_ID}
+	</delete>
+
+	<select id="translateMngExistPkInsert" parameterType="map" resultType="int">
+		/****** [ admin.translateMngExistPkInsert ] ******/
+		SELECT COUNT(*)
+		FROM TB_MST_TRANSLATE WITH(NOLOCK)
+		WHERE TRANS_TYPE = @{TRANS_TYPE}
+		  AND TRANS_ID   = @{TRANS_ID}
+	</select>
+
+</mapper>

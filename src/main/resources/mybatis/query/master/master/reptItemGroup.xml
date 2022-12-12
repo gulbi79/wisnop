@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+
+	<select id="reptItemGroupUpperItemCodeSelect" parameterType="map" resultType="map">
+		/****** [ master.master.reptItemGroupUpperItemCodeSelect ] ******/
+		<include refid="dp.common.upperItemGroupWith"/>
+		SELECT UPPER_ITEM_GROUP_CD AS CODE_CD
+		     , UPPER_ITEM_GROUP_NM AS CODE_NM
+		FROM W_UPPER_ITEM_GROUP
+	</select>
+
+	<select id="reptItemGroupSelect" parameterType="map" resultType="map">
+		/****** [ master.master.reptItemGroupSelect ] ******/
+		<include refid="dp.common.upperItemGroupWith"/>
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.UPPER_ITEM_GROUP_CD
+		     , B.UPPER_ITEM_GROUP_NM
+		     , A.ITEM_GROUP_CD
+		     , A.ITEM_GROUP_NM
+		     , CASE WHEN A.KEY_GROUP_YN = 'Y' THEN 'Y' ELSE 'N' END AS KEY_GROUP_YN
+		     , A.REP_ITEM_GROUP_CD
+		     , CONVERT(VARCHAR(19), A.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , A.CREATE_ID
+		     , CONVERT(VARCHAR(19), A.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , A.UPDATE_ID
+		     , A.MAJOR_GROUP_YN
+		     , A.MAJOR_GROUP_NM
+		     , A.DEF_RATE_TARGET
+		     , A.MFG_LT_TARGET
+		     , A.OTD_YN
+         	 , A.GR_COMP_YN
+		FROM TB_MST_ITEM_GROUP A WITH (NOLOCK)
+		LEFT OUTER JOIN W_UPPER_ITEM_GROUP B
+		  ON A.COMPANY_CD          = B.COMPANY_CD
+		 AND A.BU_CD               = B.BU_CD
+		 AND A.UPPER_ITEM_GROUP_CD = B.UPPER_ITEM_GROUP_CD
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD      = @{GV_BU_CD}
+		  AND A.LEAF_FLAG  = 'Y'
+		  AND A.DEL_FLAG   = 'N'
+		#if($_parameter.reptItemGroup and $_parameter.reptItemGroup != "")
+		  AND A.REP_ITEM_GROUP_CD IN ('$_parameter.reptItemGroup.replace(",","','")')
+		#end
+		#if($_parameter.upperItemGroup and $_parameter.upperItemGroup != "")
+		  AND A.UPPER_ITEM_GROUP_CD IN ('$_parameter.upperItemGroup.replace(",","','")')
+		#end
+		#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		  AND (A.ITEM_GROUP_CD LIKE '%' + @{itemGroup} + '%'
+		   OR A.ITEM_GROUP_NM LIKE '%' + @{itemGroup} + '%')
+		#end
+		#if($_parameter.newItemGroup and $_parameter.newItemGroup == "Y")
+		  AND A.REP_ITEM_GROUP_CD IS NULL
+		#end
+		#if($_parameter.newItemGroup and $_parameter.newItemGroup == "N")
+		  AND A.REP_ITEM_GROUP_CD IS NOT NULL
+		#end
+		ORDER BY B.UPPER_ITEM_GROUP_NM ASC, A.ITEM_GROUP_CD ASC
+	</select>
+	
+	<update id="reptItemGroupUpdate" parameterType="map">
+		/****** [ master.master.reptItemGroupUpdate ] ******/
+		UPDATE TB_MST_ITEM_GROUP
+		   SET REP_ITEM_GROUP_CD = NULLIF(@{REP_ITEM_GROUP_CD}, '')
+		     , KEY_GROUP_YN      = CASE WHEN @{KEY_GROUP_YN} = 'Y' THEN 'Y' ELSE 'N' END
+		     , MAJOR_GROUP_YN    = CASE WHEN @{MAJOR_GROUP_YN} = 'Y' THEN 'Y' ELSE 'N' END
+		     , MAJOR_GROUP_NM    = @{MAJOR_GROUP_NM}
+		     , DEF_RATE_TARGET   = @{DEF_RATE_TARGET}
+		     , MFG_LT_TARGET     = @{MFG_LT_TARGET}
+		     , OTD_YN            = @{OTD_YN}
+		     , GR_COMP_YN        = @{GR_COMP_YN}
+		     , UPDATE_DTTM       = DBO.UFN_GETDATE()
+		     , UPDATE_ID         = @{GV_USER_ID}
+		 WHERE COMPANY_CD        = @{COMPANY_CD}
+		   AND BU_CD             = @{BU_CD}
+		   AND ITEM_GROUP_CD     = @{ITEM_GROUP_CD}
+	</update>
+
+</mapper>

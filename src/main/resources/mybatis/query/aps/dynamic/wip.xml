@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+
+	<select id="wipDateSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.invDateSelect ] ******/
+		SELECT TOP 1 A.WIP_DATE
+		FROM TB_DYN_WIP_ROUTING_EXPECT A
+		WHERE A.PLAN_ID = @{planId}
+		  AND A.VERSION_TYPE_CD = @{versionType}
+	</select>
+
+   <select id="wipSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.wipList ] ******/
+		DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+		
+		SELECT NULL AS TMP_COL 
+		     , ISNULL(MI.ITEM_CD,'') AS ITEM_CODE
+		     , ISNULL(MI.ITEM_CD,'') AS ITEM_CODE_NM
+		     , ISNULL(MI.ITEM_NM,'') AS ITEM_NM
+	  	 	 , ISNULL(MI.ITEM_NM,'') AS ITEM_NM_NM
+		     , ISNULL(MI.SPEC,'') AS SPEC
+			 , ISNULL(MI.SPEC,'') AS SPEC_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+		  	   		ELSE MC3.CODE_NM
+		       END AS ITEM_TYPE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+		     	    WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+		    	    ELSE MC3.CODE_NM
+		      	END AS ITEM_TYPE_CD_NM
+		     , ISNULL(IC.SALES_PRICE_KRW,MI.ITEM_COST_KRW) AS ITEM_COST_KRW
+			 , ISNULL(IC.SALES_PRICE_KRW,MI.ITEM_COST_KRW) AS ITEM_COST_KRW_NM
+		     , ISNULL(MI.UOM_CD,'') AS UOM_CD
+			 , ISNULL(MI.UOM_CD,'') AS UOM_CD_NM
+			 
+		     /* 210115 이큰산 - 작지의 라우팅 기준 변경 */
+			 --,ISNULL(MIP.ROUTING_ID, '') AS ROUTING_ID
+			 --,ISNULL(MIP.ROUTING_ID, '') AS ROUTING_ID_NM
+			 , ISNULL(TMR.ROUTING_ID, '') AS ROUTING_ID
+			 , ISNULL(TMR.ROUTING_ID, '') AS ROUTING_ID_NM	
+			
+		     , ISNULL(CT.REP_CUST_GROUP_NM,'') AS REP_CUST_GROUP_NM
+			 , ISNULL(CT.REP_CUST_GROUP_NM,'') AS REP_CUST_GROUP_NM_NM
+		     , ISNULL(CT.CUST_NM,'') AS REP_CUST_NM
+			 , ISNULL(CT.CUST_NM,'') AS REP_CUST_NM_NM
+		     , ISNULL(MI.ITEM_GROUP_CD,'') AS ITEM_GROUP_CD
+			 , ISNULL(MI.ITEM_GROUP_CD,'') AS ITEM_GROUP_CD_NM
+		     , ISNULL(IG.ITEM_GROUP_NM,'') AS ITEM_GROUP_NM
+		     , ISNULL(IG.ITEM_GROUP_NM,'') AS ITEM_GROUP_NM_NM
+			 , MIP.SS_QTY AS SS_QTY
+		     , MIP.SS_QTY AS SS_QTY_NM
+			 , ISNULL(MI.CPFR_YN,'') AS CPFR_YN
+		     , ISNULL(MI.CPFR_YN,'') AS CPFR_YN_NM
+			 , ISNULL(DPOH.PROD_ORDER_NO,'') AS PROD_ORDER_NO
+		     , ISNULL(DPOH.PROD_ORDER_NO,'') AS PROD_ORDER_NO_NM
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+ 		    	    WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+		    	    ELSE MC4.CODE_NM
+		      	END AS ORDER_STATUS
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+		    	    ELSE MC4.CODE_NM
+		      	END AS ORDER_STATUS_NM
+			 , ISNULL(DPOH.ROUTING_NO,'') AS ROUTING_NO
+		     , ISNULL(DPOH.ROUTING_NO,'') AS ROUTING_NO_NM
+			 , ISNULL(DPOH.BOM_NO,'') AS BOM_NO
+		     , ISNULL(DPOH.BOM_NO,'') AS BOM_NO_NM
+			 , ISNULL(DPOH.PARENT_PROD_ORDER_NO,'') AS PARENT_PROD_ORDER_NO
+		     , ISNULL(DPOH.PARENT_PROD_ORDER_NO,'') AS PARENT_PROD_ORDER_NO_NM
+			 , ISNULL(DPOH.WORKER_GROUP,'') AS WORKER_GROUP
+		     , ISNULL(DPOH.WORKER_GROUP,'') AS WORKER_GROUP_NM
+			 , DPOH.PROD_ORDER_QTY AS PROD_ORDER_QTY
+		     , DPOH.PROD_ORDER_QTY AS PROD_ORDER_QTY_NM
+			 , ISNULL(DWR.JOB_CD,'') AS JOB_CD
+		     , ISNULL(DWR.JOB_CD,'') AS JOB_CD_NM
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+		    	    ELSE MC2.CODE_NM
+		   	  	END AS JOB_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+		    	    ELSE MC2.CODE_NM
+		      	END AS JOB_NM_NM
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+		    	    ELSE MC5.CODE_NM
+		      	END AS JOB_STATUS
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+		    	    ELSE MC5.CODE_NM
+		      	END AS JOB_STATUS_NM
+			 , ISNULL(MWC.WC_NM,'') AS WC_NM_PE
+		     , ISNULL(MWC.WC_NM,'') AS WC_NM_PE_NM
+			 , ISNULL(MR.RESOURCE_NM,'') AS RESOURCE1_NM
+		     , ISNULL(MR.RESOURCE_NM,'') AS RESOURCE1_NM_NM
+			 , ISNULL(DWRW.USER_NM,'') AS USER_NM
+		     , ISNULL(DWRW.USER_NM,'') AS USER_NM_NM
+			 , ISNULL(CONVERT(VARCHAR(30), DWR.START_DTTM, 120),'') AS START_DTTM
+		     , ISNULL(CONVERT(VARCHAR(30), DWR.START_DTTM, 120),'') AS START_DTTM_NM
+			 , ROUND(CAST(DWR.TOT_INPUT_TIME AS DECIMAL)/3600,1) AS TOT_INPUT_TIME
+		     , ROUND(CAST(DWR.TOT_INPUT_TIME AS DECIMAL)/3600,1) AS TOT_INPUT_TIME_NM
+			 , DWR.GOODS_QTY AS GOODS_QTY
+		     , DWR.GOODS_QTY AS GOODS_QTY_NM
+			 , DWR.DEFECT_QTY AS DEFECT_QTY
+			 , DWR.DEFECT_QTY AS DEFECT_QTY_NM
+		     , CASE WHEN MC1.CODE_CD IS NOT NULL THEN 'Y' ELSE 'N' END AS CLEANING_YN
+		     , CASE WHEN MC1.CODE_CD IS NOT NULL THEN 'Y' ELSE 'N' END AS CLEANING_YN_NM
+		     , DWR.REMAIN_QTY AS WAIT_QTY
+             , DWR.REMAIN_QTY AS WAIT_QTY_NM
+             , CASE WHEN 'ko' = @{GV_LANG} THEN MC9.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC9.CODE_NM_CN
+		    	    ELSE MC9.CODE_NM
+		       	END CAMPUS_NM_NM
+			#if($_parameter.planId and $_parameter.planId != "" and $_parameter.planId != "null" and $_parameter.versionType and $_parameter.versionType != "" and $_parameter.versionType != "null")
+             , CASE WHEN 'ko' = @{GV_LANG} THEN MC7.CODE_NM_KR
+		    	   	WHEN 'cn' = @{GV_LANG} THEN MC7.CODE_NM_CN
+		    	   	ELSE MC7.CODE_NM
+		      	END AS EXP_ORDER_STATUS
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC7.CODE_NM_KR
+		    	   	WHEN 'cn' = @{GV_LANG} THEN MC7.CODE_NM_CN
+		    	   	ELSE MC7.CODE_NM
+		   	  	END AS EXP_ORDER_STATUS_NM
+		     , DWR.EXP_JOB_CD AS EXP_JOB_CD
+		     , DWR.EXP_JOB_CD AS EXP_JOB_CD_NM
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN MC6.CODE_NM_KR
+		     	   	WHEN 'cn' = @{GV_LANG} THEN MC6.CODE_NM_CN
+		      	   	ELSE MC6.CODE_NM
+		      	END AS EXP_JOB_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC6.CODE_NM_KR
+		    	   	WHEN 'cn' = @{GV_LANG} THEN MC6.CODE_NM_CN
+		      	   	ELSE MC6.CODE_NM
+		      	END AS EXP_JOB_NM_NM
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN MC8.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC8.CODE_NM_CN
+		      	    ELSE MC8.CODE_NM
+		      	END AS EXP_JOB_STATUS
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC8.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC8.CODE_NM_CN
+		      	    ELSE MC8.CODE_NM
+		      	END AS EXP_JOB_STATUS_NM
+             , DWR.EXP_REMAIN_QTY AS EXP_REMAIN_QTY
+             , DWR.EXP_REMAIN_QTY AS EXP_REMAIN_QTY_NM
+			#end
+             , CASE WHEN 'ko' = @{GV_LANG} THEN MC10.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC10.CODE_NM_CN
+		    	    ELSE MC10.CODE_NM
+		        END EXP_CAMPUS_NM_NM
+             , CASE WHEN DPOD.OPERATION_NO IS NOT NULL THEN 'Y'
+                   	ELSE 'N'
+                END AS AVAIL_FLAG_NM_NM -- 재공 가용여부 (N일 경우 빨간색 배경)
+		FROM TB_MST_ITEM MI WITH(NOLOCK)
+	    LEFT OUTER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+	      ON MI.COMPANY_CD    = CT.COMPANY_CD
+	     AND MI.BU_CD         = CT.BU_CD 
+	     AND MI.REP_CUST_CD   = CT.CUST_CD
+	    LEFT OUTER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+	      ON MI.COMPANY_CD    = IG.COMPANY_CD
+	     AND MI.BU_CD         = IG.BU_CD
+	     AND MI.ITEM_GROUP_CD = IG.ITEM_GROUP_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+	       ON MIP.COMPANY_CD = MI.COMPANY_CD
+	      AND MIP.BU_CD = MI.BU_CD
+	      AND MIP.PLANT_CD = 'WF01'
+	      AND MIP.ITEM_CD = MI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = MIP.BU_CD
+	     AND MC1.GROUP_CD = 'CL_SL_CD'
+	     AND MC1.CODE_CD = MIP.RCPT_SL_CD
+	     AND MC1.USE_FLAG = 'Y'
+	    INNER JOIN TB_DYN_PROD_ORDER_HDR_DAILY DPOH WITH(NOLOCK)
+           ON DPOH.COMPANY_CD = MI.COMPANY_CD
+          AND DPOH.BU_CD = MI.BU_CD
+          AND DPOH.YYYYMMDD = @{fromCal}
+          AND DPOH.ITEM_CD = MI.ITEM_CD
+          AND DPOH.DEL_FLAG = 'N'
+        
+        /* 210115 이큰산 - 작지의 라우팅 기준 변경위해 추가 */
+		/* 210118 이큰산 - 추가수정 */
+		CROSS APPLY (SELECT DISTINCT ROUTING_ID
+			   FROM TB_MST_ROUTING TMR WITH(NOLOCK)
+			  WHERE TMR.COMPANY_CD = MI.COMPANY_CD AND TMR.BU_CD = MI.BU_CD AND TMR.ITEM_CD = MI.ITEM_CD AND TMR.ROUTING_NO = DPOH.ROUTING_NO) AS TMR
+		--INNER JOIN TB_MST_ROUTING	TMR WITH(NOLOCK) ON TMR.COMPANY_CD = MI.COMPANY_CD AND TMR.BU_CD = MI.BU_CD AND TMR.ITEM_CD = MI.ITEM_CD AND TMR.ROUTING_NO = DPOH.ROUTING_NO
+          	  
+	    INNER JOIN 
+	    (
+			SELECT DWR.COMPANY_CD
+                 , DWR.BU_CD
+                 , DWR.WIP_DATE
+                 , DWR.PROD_ORDER_NO
+                 , DWR.OPERATION_NO
+                 , DWR.JOB_CD
+                 , DWR.START_DTTM
+                 , DWR.TOT_INPUT_TIME
+                 , DWR.REMAIN_QTY
+                 , DWR.GOODS_QTY
+                 , DWR.DEFECT_QTY
+                 , DWR.RESOURCE_CD
+                 , DWR.JOB_STATUS
+                 , HAPP.CAMPUS_CD
+                 , DWRE.ORDER_STATUS AS EXP_ORDER_STATUS
+                 , DWRE.JOB_CD AS EXP_JOB_CD
+                 , DWRE.JOB_STATUS AS EXP_JOB_STATUS
+                 , DWRE.REMAIN_QTY AS EXP_REMAIN_QTY
+                 , HAPP2.CAMPUS_CD AS EXP_CAMPUS_CD
+			FROM TB_DYN_WIP_ROUTING DWR WITH(NOLOCK)
+            LEFT OUTER JOIN TB_DYN_WIP_ROUTING_EXPECT DWRE WITH(NOLOCK)
+              ON DWRE.COMPANY_CD = DWR.COMPANY_CD
+             AND DWRE.BU_CD = DWR.BU_CD
+             AND DWRE.WIP_DATE = DWR.WIP_DATE
+             AND DWRE.PROD_ORDER_NO = DWR.PROD_ORDER_NO
+             AND DWRE.OPERATION_NO = DWR.OPERATION_NO     
+             AND DWRE.PLAN_ID = @{planId}                 
+             AND DWRE.VERSION_TYPE_CD = @{versionType}
+			OUTER APPLY
+			(
+				SELECT TOP 1 HAPP.CAMPUS_CD
+				FROM TB_HIS_APS_PLAN_PEGGING HAPP WITH(NOLOCK)
+                WHERE HAPP.PLAN_ID = DWR.WIP_DATE
+                  AND HAPP.VERSION_ID = DWR.WIP_DATE + '_F'
+                  AND HAPP.COMPANY_CD = DWR.COMPANY_CD
+                  AND HAPP.BU_CD = DWR.BU_CD
+                  AND HAPP.PROD_ORDER_NO = DWR.PROD_ORDER_NO
+                  AND HAPP.OPERATION_NO = DWR.OPERATION_NO
+                  AND HAPP.CAMPUS_CD IS NOT NULL
+				ORDER BY HAPP.START_DTTM
+			) HAPP
+            OUTER APPLY
+            (
+            	SELECT TOP 1 HAPP2.CAMPUS_CD
+                FROM TB_HIS_APS_PLAN_PEGGING HAPP2 WITH(NOLOCK)
+                WHERE HAPP2.PLAN_ID = DWRE.WIP_DATE
+                  AND HAPP2.VERSION_ID = DWRE.WIP_DATE + '_F'
+                  AND HAPP2.COMPANY_CD = DWRE.COMPANY_CD
+                  AND HAPP2.BU_CD = DWRE.BU_CD
+                  AND HAPP2.PROD_ORDER_NO = DWRE.PROD_ORDER_NO
+                  AND HAPP2.OPERATION_NO = DWRE.OPERATION_NO
+                  AND HAPP2.CAMPUS_CD IS NOT NULL
+				ORDER BY HAPP2.START_DTTM
+			) HAPP2
+			WHERE DWR.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DWR.BU_CD = @{GV_BU_CD}
+              AND DWR.WIP_DATE = @{fromCal}
+			UNION ALL
+            SELECT DWRE.COMPANY_CD
+                 , DWRE.BU_CD
+                 , DWRE.WIP_DATE
+                 , DWRE.PROD_ORDER_NO
+                 , DWRE.OPERATION_NO
+                 , NULL AS JOB_CD
+                 , NULL AS START_DTTM
+                 , NULL AS TOT_INPUT_TIME
+                 , NULL AS REMAIN_QTY
+                 , NULL AS GOODS_QTY
+                 , NULL AS DEFECT_QTY
+                 , NULL AS RESOURCE_CD
+                 , NULL AS JOB_STATUS
+                 , NULL AS CAMPUS_CD
+                 , DWRE.ORDER_STATUS AS EXP_ORDER_STATUS
+                 , DWRE.JOB_CD AS EXP_JOB_CD
+                 , DWRE.JOB_STATUS AS EXP_JOB_STATUS
+                 , DWRE.REMAIN_QTY AS EXP_REMAIN_QTY
+                 , HAPP.CAMPUS_CD AS EXP_CAMPUS_CD
+			FROM TB_DYN_WIP_ROUTING_EXPECT DWRE WITH(NOLOCK)
+			OUTER APPLY
+			(
+				SELECT TOP 1 HAPP.CAMPUS_CD
+                FROM TB_HIS_APS_PLAN_PEGGING HAPP WITH(NOLOCK)
+                WHERE HAPP.PLAN_ID = DWRE.WIP_DATE
+                  AND HAPP.VERSION_ID = DWRE.WIP_DATE + '_F'
+                  AND HAPP.COMPANY_CD = DWRE.COMPANY_CD
+                  AND HAPP.BU_CD = DWRE.BU_CD
+                  AND HAPP.PROD_ORDER_NO = DWRE.PROD_ORDER_NO
+                  AND HAPP.OPERATION_NO = DWRE.OPERATION_NO
+                  AND HAPP.CAMPUS_CD IS NOT NULL
+				ORDER BY HAPP.START_DTTM
+			) HAPP
+			WHERE DWRE.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DWRE.BU_CD = @{GV_BU_CD}
+              AND DWRE.WIP_DATE = @{fromCal}
+              AND DWRE.PLAN_ID = @{planId}  
+              AND DWRE.VERSION_TYPE_CD = @{versionType}    
+              AND NOT EXISTS (
+                     			SELECT 1
+                       			FROM TB_DYN_WIP_ROUTING DWR WITH(NOLOCK)
+                      			WHERE DWR.COMPANY_CD = DWRE.COMPANY_CD
+                        		  AND DWR.BU_CD = DWRE.BU_CD
+		                          AND DWR.WIP_DATE = DWRE.WIP_DATE
+		                          AND DWR.PROD_ORDER_NO = DWRE.PROD_ORDER_NO
+		                          AND DWR.OPERATION_NO = DWRE.OPERATION_NO
+                   			 )
+			UNION ALL
+            SELECT DPOHD.COMPANY_CD
+                   , DPOHD.BU_CD
+                   , DPOHD.YYYYMMDD AS WIP_DATE
+                   , DPOHD.PROD_ORDER_NO
+                   , NULL AS OPERATION_NO
+                   , NULL AS JOB_CD
+                   , NULL AS START_DTTM
+                   , NULL AS TOT_INPUT_TIME
+                   , NULL AS REMAIN_QTY
+                   , NULL AS GOODS_QTY
+                   , NULL AS DEFECT_QTY
+                   , NULL AS RESOURCE_CD
+                   , NULL AS JOB_STATUS
+                   , NULL AS CAMPUS_CD
+                   , NULL AS EXP_ORDER_STATUS
+                   , NULL AS EXP_JOB_CD
+                   , NULL AS EXP_JOB_STATUS
+                   , NULL AS EXP_REMAIN_QTY
+                   , NULL AS EXP_CAMPUS_CD
+			FROM TB_DYN_PROD_ORDER_HDR_DAILY DPOHD WITH(NOLOCK)
+            WHERE DPOHD.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DPOHD.BU_CD = @{GV_BU_CD}
+              AND DPOHD.YYYYMMDD = @{fromCal}
+              AND DPOHD.ORDER_STATUS = 'OP'
+              AND NOT EXISTS (
+                                 SELECT 1
+                                 FROM TB_DYN_WIP_ROUTING DWR WITH(NOLOCK)
+                                 WHERE DWR.COMPANY_CD = DPOHD.COMPANY_CD
+                                   AND DWR.BU_CD = DPOHD.BU_CD
+                                   AND DWR.WIP_DATE = DPOHD.YYYYMMDD
+                                   AND DWR.PROD_ORDER_NO = DPOHD.PROD_ORDER_NO
+                             )
+			  AND NOT EXISTS (
+                                 SELECT 1
+                                 FROM TB_DYN_WIP_ROUTING_EXPECT DWRE WITH(NOLOCK)
+                                 WHERE DWRE.COMPANY_CD = DPOHD.COMPANY_CD
+                                   AND DWRE.BU_CD = DPOHD.BU_CD
+                                   AND DWRE.WIP_DATE = DPOHD.YYYYMMDD
+                                   AND DWRE.PROD_ORDER_NO = DPOHD.PROD_ORDER_NO
+                                   AND DWRE.PLAN_ID = @{planId}  
+                                   AND DWRE.VERSION_TYPE_CD = @{versionType}    
+                             )
+                   
+		) DWR
+   	    ON DWR.COMPANY_CD = DPOH.COMPANY_CD
+   	    AND DWR.BU_CD = DPOH.BU_CD
+   	    AND DWR.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+	    LEFT OUTER JOIN 
+	    (
+        	SELECT DISTINCT A.COMPANY_CD
+				 , A.BU_CD
+				 , A.WIP_DATE
+				 , A.PROD_ORDER_NO
+				 , A.OPERATION_NO
+			     , STUFF((
+			        		SELECT ',' + dbo.UFN_GET_USER_NAME(B.USER_ID)
+			              	FROM TB_DYN_WIP_ROUTING_WORKER B WITH(NOLOCK) 
+			             	WHERE A.COMPANY_CD = B.COMPANY_CD
+			                  AND A.BU_CD = B.BU_CD
+			                  AND A.WIP_DATE = B.WIP_DATE
+			                  AND A.PROD_ORDER_NO = B.PROD_ORDER_NO
+			                  AND A.OPERATION_NO = B.OPERATION_NO FOR XML PATH ('')), 1, 1, ''
+			        ) AS USER_NM    
+			FROM TB_DYN_WIP_ROUTING_WORKER A WITH(NOLOCK)
+		) DWRW 
+		ON DWRW.COMPANY_CD = DWR.COMPANY_CD
+		AND DWRW.BU_CD = DWR.BU_CD
+		AND DWRW.WIP_DATE = DWR.WIP_DATE
+		AND DWRW.PROD_ORDER_NO = DWR.PROD_ORDER_NO
+		AND DWRW.OPERATION_NO = DWR.OPERATION_NO 	
+	    LEFT OUTER JOIN TB_MST_RESOURCE MR WITH (NOLOCK)
+	      ON DWR.COMPANY_CD = MR.COMPANY_CD
+	     AND DWR.BU_CD = MR.BU_CD
+	     AND DWR.RESOURCE_CD = MR.RESOURCE_CD
+	     AND MR.PLANT_CD ='WF01'
+	    LEFT OUTER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+	      ON MR.COMPANY_CD = MWC.COMPANY_CD
+	     AND MR.BU_CD = MWC.BU_CD
+	     AND MR.WC_CD = MWC.WC_CD
+	     AND MWC.PLANT_CD = 'WF01'
+	    LEFT OUTER JOIN TB_MST_REP_CUST RC WITH(NOLOCK)
+	      ON RC.COMPANY_CD    = MI.COMPANY_CD
+	     AND RC.BU_CD         = MI.BU_CD
+	     AND RC.REP_CUST_CD   = MI.REP_CUST_CD
+	    LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP IC WITH(NOLOCK)
+	      ON IC.COMPANY_CD    = MI.COMPANY_CD
+	     AND IC.BU_CD         = MI.BU_CD
+	     AND IC.ITEM_CD       = MI.ITEM_CD
+	     AND IC.CUST_GROUP_CD = RC.CUST_GROUP_CD
+	    LEFT OUTER JOIN 
+	    (
+        	SELECT BU_CD
+                 , CODE_CD
+                 , CODE_NM
+                 , CODE_NM_KR
+                 , CODE_NM_CN
+            FROM TB_MST_CODE WITH(NOLOCK)
+            WHERE GROUP_CD = 'ROUTE_CD'
+            AND USE_FLAG = 'Y'
+            UNION ALL
+            SELECT BU_CD
+                 , CODE_CD
+                 , CODE_NM
+                 , CODE_NM_KR
+                 , CODE_NM_CN
+            FROM TB_MST_CODE WITH(NOLOCK)
+            WHERE GROUP_CD = 'FQC_ROUTE_CD'
+              AND USE_FLAG = 'Y'
+		) MC2
+	    ON MC2.BU_CD = MIP.BU_CD
+	    AND MC2.CODE_CD = DWR.JOB_CD
+	    LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+	      ON MC3.GROUP_CD = 'ITEM_TYPE'
+	     AND MC3.CODE_CD = MI.ITEM_TYPE
+	     AND MC3.USE_FLAG = 'Y'
+        LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+	      ON MC4.BU_CD = MI.BU_CD
+	     AND MC4.GROUP_CD = 'ORDER_STATUS'
+	     AND MC4.CODE_CD = DPOH.ORDER_STATUS
+	     AND MC4.USE_FLAG = 'Y'
+        LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+          ON MC5.BU_CD = MI.BU_CD
+	     AND MC5.GROUP_CD = 'JOB_STATUS_CD'
+	     AND MC5.CODE_CD = DWR.JOB_STATUS
+	     AND MC5.USE_FLAG = 'Y'		
+	 	LEFT OUTER JOIN 
+	 	(
+        	SELECT BU_CD
+                 , CODE_CD
+                 , CODE_NM
+                 , CODE_NM_KR
+                 , CODE_NM_CN
+			FROM TB_MST_CODE WITH(NOLOCK)
+            WHERE GROUP_CD = 'ROUTE_CD'
+              AND USE_FLAG = 'Y'
+			UNION ALL
+            SELECT BU_CD
+                 , CODE_CD
+                 , CODE_NM
+                 , CODE_NM_KR
+                 , CODE_NM_CN
+			FROM TB_MST_CODE WITH(NOLOCK)
+            WHERE GROUP_CD = 'FQC_ROUTE_CD'
+              AND USE_FLAG = 'Y'
+		) MC6
+	    ON MC6.BU_CD = MIP.BU_CD
+	    AND MC6.CODE_CD = DWR.EXP_JOB_CD
+        LEFT OUTER JOIN TB_MST_CODE MC7 WITH(NOLOCK)
+          ON MC7.BU_CD = DWR.BU_CD
+	     AND MC7.GROUP_CD = 'ORDER_STATUS'
+	     AND MC7.CODE_CD = DWR.EXP_ORDER_STATUS
+	     AND MC7.USE_FLAG = 'Y'
+        LEFT OUTER JOIN TB_MST_CODE MC8 WITH(NOLOCK)
+          ON MC8.BU_CD = DWR.BU_CD
+	     AND MC8.GROUP_CD = 'JOB_STATUS_CD'
+	     AND MC8.CODE_CD = DWR.EXP_JOB_STATUS
+	     AND MC8.USE_FLAG = 'Y'	
+	    LEFT OUTER JOIN TB_MST_CODE MC9 WITH(NOLOCK)
+          ON MC9.BU_CD = DWR.BU_CD
+         AND MC9.GROUP_CD = 'CAMPUS_CD'
+         AND MC9.CODE_CD = DWR.CAMPUS_CD
+         AND MC9.USE_FLAG = 'Y'   
+        LEFT OUTER JOIN TB_MST_CODE MC10 WITH(NOLOCK)
+          ON MC10.BU_CD = DWR.BU_CD
+         AND MC10.GROUP_CD = 'CAMPUS_CD'
+         AND MC10.CODE_CD = DWR.EXP_CAMPUS_CD
+         AND MC10.USE_FLAG = 'Y'   
+        LEFT OUTER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+          ON DPOD.COMPANY_CD = DWR.COMPANY_CD
+         AND DPOD.BU_CD = DWR.BU_CD
+         AND DPOD.PROD_ORDER_NO = DWR.PROD_ORDER_NO
+         AND DPOD.ROUTE_ORDER IN ('S', 'L') 
+		WHERE 1 = 1 
+		#if($_parameter.item_nm and $_parameter.item_nm != ""  )
+		  AND (MI.ITEM_CD  LIKE '%'+'$_parameter.item_nm'+'%' OR MI.ITEM_NM LIKE '%'+'$_parameter.item_nm'+'%' or 
+				 MI.ITEM_CD IN ('$_parameter.item_nm.replace(",","','")') )
+		#end
+		#if($_parameter.itemType and $_parameter.itemType != "")
+		  AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+		#end
+		#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+		#end
+	 	#if($_parameter.route and $_parameter.route != "")
+		  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")') 
+		#end
+		#if($_parameter.cleanYn and $_parameter.cleanYn != "")
+		  AND CASE WHEN MC1.CODE_CD IS NOT NULL THEN 'Y' ELSE 'N' END = '$_parameter.cleanYn'
+		#end
+		#if($_parameter.workerGroup and $_parameter.workerGroup != "")
+		  AND DPOH.WORKER_GROUP IN ('$_parameter.workerGroup.replace(",","','")') 
+		#end
+		#if($_parameter.woStatus and $_parameter.woStatus != "")
+		  AND DPOH.ORDER_STATUS IN ('$_parameter.woStatus.replace(",","','")') 
+		#end
+		#if($_parameter.workplaces and $_parameter.workplaces != "")
+		  AND MR.WC_CD IN ('$_parameter.workplaces.replace(",","','")') 
+		#end
+		#if($_parameter.woNo and $_parameter.woNo != "")
+		  AND (DPOH.PROD_ORDER_NO LIKE '%$_parameter.woNo%' OR DPOH.PROD_ORDER_NO LIKE '%$_parameter.woNo%' ) 
+		#end
+		#if($_parameter.parentWoNo and $_parameter.parentWoNo != "")
+		  AND (DPOH.PARENT_PROD_ORDER_NO LIKE '%$_parameter.parentWoNo%' OR DPOH.PARENT_PROD_ORDER_NO LIKE '%$_parameter.parentWoNo%' ) 
+		#end 	
+		ORDER BY MI.ITEM_CD, DPOH.PROD_ORDER_NO, CAST(DWR.OPERATION_NO AS INT)
+	</select>
+	  	
+</mapper>

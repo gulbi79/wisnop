@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="planIdWorkOrderSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.planIdWorkOrderSelect ] ******/
+		SELECT B1.*
+		     , B1.PLAN_ID AS CODE_CD
+		     , B1.PLAN_ID AS CODE_NM
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_START_WEEK AND DAY_NM = 'SUN') AS START_DAY         
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_END_WEEK AND DAY_NM = 'SAT') AS END_DAY
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_CLOSE_WEEK AND DAY_NM = 'SAT') AS CLOSE_DAY
+		FROM
+		(
+		  	SELECT PLAN_ID
+		         , APS_START_WEEK
+		         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.APS_START_WEEK AND DAY_NM = 'SUN')) AS APS_END_WEEK
+		         , APS_END_WEEK AS APS_CLOSE_WEEK       
+		  	FROM TB_MST_PLAN_VERSION A1 WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND PLAN_TYPE_CD = 'MP'
+		) B1
+		ORDER BY B1.APS_START_WEEK DESC
+	</select>			
+	
+	<select id="planVersionWorkOrderSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.planVersionWorkOrderSelect ] ******/
+		SELECT VERSION_ID AS CODE_CD
+		     , VERSION_ID AS CODE_NM
+		FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_ID = @{planId}
+		  AND PROD_PART = @{prodPart}
+		ORDER BY SEQ DESC
+	</select>
+
+	<select id="workOrderListSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.workOrderListSelect ] ******/
+				
+		/* 210119 이큰산 추가 */
+		DECLARE @PLAN_ID		NVARCHAR(8)
+			  , @BASE_DT		NVARCHAR(8)
+		      , @P_YEARWEEK     NVARCHAR(6)
+     		  , @P_YYYYMMDD_MON     NVARCHAR(8)
+			  , @P_YYYYMMDD_FRI           NVARCHAR(8)
+		      
+		SET @PLAN_ID = @{planId}				---- 조회조건의 계획ID
+		
+		
+		SELECT @BASE_DT = MC.YYYYMMDD
+		FROM TB_MST_PLAN_VERSION		MPV(NOLOCK)
+		JOIN TB_MST_CALENDAR				MC(NOLOCK)
+		ON MPV.PLAN_ID = @PLAN_ID AND MPV.APS_START_WEEK = MC.YEARWEEK AND MPV.PLAN_TYPE_CD = 'MP' AND MC.DAY_NM = 'FRI'
+		
+			
+			
+	    SELECT @P_YEARWEEK = LEFT(@PLAN_ID,6)
+	
+	     
+	
+	    SELECT @P_YYYYMMDD_MON = YYYYMMDD 
+	    FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+	    WHERE YEARWEEK = @P_YEARWEEK 
+	    AND DAY_NM = 'MON'
+	
+	
+	    SELECT @P_YYYYMMDD_FRI   = YYYYMMDD 
+	    FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+	    WHERE YEARWEEK = @P_YEARWEEK 
+	    AND DAY_NM = 'FRI';
+		
+		
+		
+		SELECT DI.ITEM_CD
+			, SUM(DI.INV_QTY) AS INV_QTY
+			INTO #W_INV
+			FROM UV_DYN_INVENTORY DI WITH (NOLOCK)
+			INNER JOIN TB_MST_ITEM MI WITH (NOLOCK)
+				ON MI.COMPANY_CD = DI.COMPANY_CD
+				AND MI.BU_CD = DI.BU_CD
+				AND MI.ITEM_CD = DI.ITEM_CD
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH (NOLOCK)
+				ON MIP.COMPANY_CD = DI.COMPANY_CD
+				AND MIP.BU_CD = DI.BU_CD
+				AND MIP.PLANT_CD = DI.PLANT_CD
+				AND MIP.ITEM_CD = DI.ITEM_CD
+			WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+				AND DI.BU_CD = @{GV_BU_CD}
+				AND DI.PLANT_CD = 'WF01'
+				AND DI.INV_DATE = @BASE_DT
+			GROUP BY DI.ITEM_CD
+		
+		SELECT MI.ITEM_CD
+			, SUM(DWR.REMAIN_QTY) AS WIP_QTY
+			INTO #W_WIP
+			FROM TB_MST_ITEM MI WITH (NOLOCK)
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH (NOLOCK)
+				ON MIP.COMPANY_CD = MI.COMPANY_CD
+				AND MIP.BU_CD = MI.BU_CD
+				AND MIP.PLANT_CD = 'WF01'
+				AND MIP.ITEM_CD = MI.ITEM_CD
+			INNER JOIN TB_DYN_PROD_ORDER_HDR_DAILY DPOH WITH (NOLOCK)
+				ON DPOH.COMPANY_CD = MI.COMPANY_CD
+				AND DPOH.BU_CD = MI.BU_CD
+				AND DPOH.YYYYMMDD = @BASE_DT
+				AND DPOH.ITEM_CD = MI.ITEM_CD
+				AND DPOH.DEL_FLAG = 'N'
+			/* 211201 이큰산 - 재공변경(새벽 재공데이터만 반영) */
+            INNER JOIN TB_DYN_WIP_ROUTING DWR WITH (NOLOCK)
+               ON DWR.COMPANY_CD = MI.COMPANY_CD
+              AND DWR.BU_CD = MI.BU_CD
+              AND DWR.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+              AND DWR.WIP_DATE = @BASE_DT
+            /* 211201 이큰산 - 재공변경(새벽 재공데이터만 반영) */
+
+
+            /* 211201 이큰산 - 주석처리 */
+            --INNER JOIN (
+            --          SELECT DWR.COMPANY_CD
+            --                      , DWR.BU_CD
+            --                      , DWR.PROD_ORDER_NO
+            --                      , DWR.REMAIN_QTY
+            --                      , DWR.WIP_DATE
+            --              FROM TB_DYN_WIP_ROUTING DWR WITH (NOLOCK)
+            --              WHERE DWR.COMPANY_CD = 'KO316'
+            --                  AND DWR.BU_CD = 'QT'
+            --                  AND DWR.WIP_DATE = @BASE_DT
+    
+            --              UNION ALL
+    
+            --          SELECT DPOHD.COMPANY_CD
+            --                      , DPOHD.BU_CD
+            --                      , DPOHD.PROD_ORDER_NO
+            --                      , DPOHD.PROD_ORDER_QTY AS REMAIN_QTY
+            --                      , DPOHD.YYYYMMDD AS WIP_DATE
+            --              FROM TB_DYN_PROD_ORDER_HDR_DAILY DPOHD WITH (NOLOCK)
+            --              WHERE DPOHD.COMPANY_CD = 'KO316'
+            --                  AND DPOHD.BU_CD = 'QT'
+            --                  AND DPOHD.YYYYMMDD = @BASE_DT
+            --                  AND DPOHD.ORDER_STATUS = 'OP'
+            --                  AND NOT EXISTS (SELECT 1
+            --                                  FROM TB_DYN_WIP_ROUTING DWR WITH (NOLOCK)
+            --                                  WHERE DWR.COMPANY_CD = DPOHD.COMPANY_CD
+            --                                  AND DWR.BU_CD = DPOHD.BU_CD
+            --                                  AND DWR.WIP_DATE = DPOHD.YYYYMMDD
+            --                                  AND DWR.PROD_ORDER_NO = DPOHD.PROD_ORDER_NO)
+            --                  AND NOT EXISTS (SELECT 1
+            --                                  FROM TB_DYN_WIP_ROUTING_EXPECT DWRE WITH (NOLOCK)
+            --                                  WHERE DWRE.COMPANY_CD = DPOHD.COMPANY_CD
+            --                                  AND DWRE.BU_CD = DPOHD.BU_CD
+            --                                  AND DWRE.WIP_DATE = DPOHD.YYYYMMDD
+            --                                  AND DWRE.PROD_ORDER_NO = DPOHD.PROD_ORDER_NO
+            --                                  AND DWRE.PLAN_ID = ''
+            --                                  AND DWRE.VERSION_TYPE_CD = '')
+            --      ) DWR ON DWR.COMPANY_CD = DPOH.COMPANY_CD
+            --                  AND DWR.BU_CD = DPOH.BU_CD
+            --                  AND DWR.PROD_ORDER_NO = DPOH.PROD_ORDER_NO 
+                /* 211201 이큰산 - 주석처리 */
+		WHERE 1 = 1
+		GROUP BY MI.ITEM_CD
+		------------------------------------------------
+		
+		
+		
+		
+		SELECT HAW.PROD_ORDER_NO 
+		     , HAW.PARENT_PROD_ORDER_NO
+		     , RANK() OVER(PARTITION BY HAW.COMPANY_CD, HAW.BU_CD, HAW.PLAN_ID, HAW.PROD_PART, ISNULL(HAW.PARENT_PROD_ORDER_NO, HAW.PROD_ORDER_NO) ORDER BY HAW.PROD_ORDER_NO) AS SEQ2_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+	                ELSE MC2.CODE_NM
+	           END PROD_PART_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+	                ELSE MC3.CODE_NM
+	           END APS_DEMAND_TYPE_NM
+		     , HAW.DEMAND_ID AS DEMAND_ID_NM
+		     , HAW.ITEM_CD AS ITEM_CD_NM
+		     , MI.ITEM_NM AS ITEM_NM_NM
+		     , MIP.ROUTING_ID AS ROUTING_ID_NM
+		     , MI.SPEC AS SPEC_NM
+		     , MI.ITEM_GROUP_CD AS ITEM_GROUP_CD_NM
+		     , MIG.ITEM_GROUP_NM AS ITEM_GROUP_NM_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+	                ELSE MC4.CODE_NM
+	           END ITEM_GRADE_NM
+		     , MC5.CODE_CD AS ITEM_TYPE_CD_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+	                ELSE MC5.CODE_NM
+	           END ITEM_TYPE_NM_NM
+	         , CASE WHEN 'ko' = @{GV_LANG} THEN MC6.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC6.CODE_NM_CN
+	                ELSE MC6.CODE_NM
+	           END PROCUR_TYPE_NM  
+		     , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) AS SALES_PRICE_KRW_NM   
+		     , MC.CUST_CD AS REP_CUST_CD_NM
+		     , MC.CUST_NM AS REP_CUST_NM_NM
+		     , MC.CUST_GROUP_CD AS CUST_GROUP_CD_NM
+		     , MC.CUST_GROUP_NM AS CUST_GROUP_NM_NM
+		     , MC.REP_CUST_GROUP_CD AS REP_CUST_GROUP_CD_NM
+		     , MC.REP_CUST_GROUP_NM AS REP_CUST_GROUP_NM_NM
+		     , MIP.SS_QTY AS SS_QTY_NM
+		     , MI.CPFR_YN AS CPFR_YN_NM
+		     , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END RCPT_SL_CD_NM
+		     , MI.FIREWORK_YN AS FIREWORK_YN_NM
+		     , MIP.FIXED_MRP_QTY AS FIXED_MRP_QTY_NM
+		     , HAW.ROUTING_NO AS ROUTING_NO2_NM
+		     , HAW.PROD_ORDER_QTY AS PROD_ORDER_QTY2_NM
+		     , HAW.START_DATE AS START_DATE_NM
+		     , HAW.END_DATE AS END_DATE_NM
+		     , HAW.DUE_DATE AS DUE_DATE_NM
+		     , DATEDIFF(D, HAW.END_DATE, HAW.DUE_DATE) AS REMAIN_DAYS_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC7.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC7.CODE_NM_CN
+	                ELSE MC7.CODE_NM
+	           END WORKER_GROUP_NM
+		     , ISNULL(HAM.ALT_YN, 'N') AS ALT_YN_NM
+		     , HAW.COMPANY_CD AS COMPANY_CD_HD
+		     , HAW.BU_CD AS BU_CD_HD
+		     , HAW.PLAN_ID AS PLAN_ID_HD
+		     , HAW.PROD_PART AS PROD_PART_HD
+		     , HAW.ITEM_CD AS ITEM_CD_HD
+		     , MI.ITEM_NM AS ITEM_NM_HD
+		     , HAW.RELEASE_DATE AS RELEASE_DATE2
+		     , HAW.RELEASE_DATE AS RELEASE_DATE2_NM
+		     
+		     /* 210119 이큰산 추가 */
+			 , WIP.WIP_QTY AS WIP_MFG_QTY2
+			 , WIP.WIP_QTY AS WIP_MFG_QTY2_NM
+			 , INV.INV_QTY AS INV_QTY
+			 , INV.INV_QTY AS INV_QTY_NM
+			 -----------------------
+		     
+		     -- 20210909 김수호 디멘전추가: ENGINE_RESULT (엔진결과) 
+		     , HAW.START_DATE_ENGINE AS ENGINE_RESULT
+		     , HAW.START_DATE_ENGINE AS ENGINE_RESULT_NM
+		     -----------------------------------------------
+		     
+		     -- 20211208 김수호 추가: 153번, 2: 출하잔여수량  컬럼 추가 ->당주 출하계획확정 수량- 당주 출하실적(금요일 새벽 12:30) = 출하잔량수량 (마이너스 값일 경우 0처리), 품목기준
+		     
+		     
+		     , CASE WHEN ISNULL(KSP.SALES_CFM_QTY,0) - ISNULL(HSRWFMF.SALES_RESULT_QTY,0)  <![CDATA[<]]> 0 THEN 0 
+              ELSE ISNULL(KSP.SALES_CFM_QTY,0) - ISNULL(HSRWFMF.SALES_RESULT_QTY,0)
+              END SALES_REMAIN_QTY
+             , CASE WHEN ISNULL(KSP.SALES_CFM_QTY,0) - ISNULL(HSRWFMF.SALES_RESULT_QTY,0)  <![CDATA[<]]> 0 THEN 0 
+		      ELSE ISNULL(KSP.SALES_CFM_QTY,0) - ISNULL(HSRWFMF.SALES_RESULT_QTY,0)
+		      END SALES_REMAIN_QTY_NM
+		      
+		     
+		     
+		     -----------------------------------------------------------------------------------------------------------------------------------
+		     
+		     
+		FROM TB_HIS_APS_WORKORDER HAW WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = HAW.COMPANY_CD
+		  AND MI.BU_CD = HAW.BU_CD
+		  AND MI.ITEM_CD = HAW.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		
+		/* 210119 이큰산 추가 */
+		LEFT JOIN #W_WIP			WIP ON HAW.ITEM_CD = WIP.ITEM_CD
+		LEFT JOIN #W_INV			INV ON HAW.ITEM_CD = INV.ITEM_CD
+		-----------------------
+		
+		
+		LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+		  ON MRC.COMPANY_CD = MI.COMPANY_CD
+		 AND MRC.BU_CD = MI.BU_CD
+		 AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MRC.COMPANY_CD
+		 AND MC.BU_CD = MRC.BU_CD
+		 AND MC.CUST_CD = MRC.REP_CUST_CD
+		LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+		  ON MICG.COMPANY_CD = MI.COMPANY_CD
+		 AND MICG.BU_CD = MI.BU_CD
+		 AND MICG.ITEM_CD = MI.ITEM_CD
+		 AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+		LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		  ON MIG.COMPANY_CD = MI.COMPANY_CD
+		 AND MIG.BU_CD = MI.BU_CD
+		 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = MIP.BU_CD
+		 AND MC1.GROUP_CD = 'CL_SL_CD'
+		 AND MC1.CODE_CD = MIP.RCPT_SL_CD
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = HAW.BU_CD
+		 AND MC2.GROUP_CD = 'PROD_PART'
+		 AND MC2.CODE_CD = HAW.PROD_PART
+		 AND MC2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		  ON MC3.BU_CD = HAW.BU_CD
+		 AND MC3.GROUP_CD = 'APS_DEMAND_TYPE'
+		 AND MC3.CODE_CD = HAW.APS_DEMAND_TYPE
+		 AND MC3.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+		  ON MC4.BU_CD = 'ALL'
+		 AND MC4.GROUP_CD = 'ITEM_GRADE'
+		 AND MC4.CODE_CD = MI.ITEM_GRADE
+		 AND MC4.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+		  ON MC5.BU_CD = 'ALL'
+		 AND MC5.GROUP_CD = 'ITEM_TYPE'
+		 AND MC5.CODE_CD = MI.ITEM_TYPE
+		 AND MC5.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC7 WITH(NOLOCK)
+		  ON MC7.BU_CD = HAW.BU_CD
+		 AND MC7.GROUP_CD = 'WORKER_GROUP'
+		 AND MC7.CODE_CD = HAW.WORKER_GROUP
+		 AND MC7.USE_FLAG = 'Y' 
+		LEFT OUTER JOIN TB_MST_CODE MC6 WITH(NOLOCK)
+		  ON MC6.BU_CD = 'ALL'
+		 AND MC6.GROUP_CD = 'PROCUR_TYPE'
+		 AND MC6.CODE_CD = MIP.PROCUR_TYPE
+		 AND MC6.USE_FLAG = 'Y'
+		OUTER APPLY 
+		(
+			SELECT TOP 1 HAM.ALT_YN
+            FROM TB_HIS_APS_WORKORDER_MRP HAM WITH(NOLOCK)
+            WHERE HAM.COMPANY_CD = HAW.COMPANY_CD
+              AND HAM.BU_CD = HAW.BU_CD
+              AND HAM.PLAN_ID = HAW.PLAN_ID
+              AND HAM.PROD_PART = HAW.PROD_PART
+              AND HAM.PROD_ORDER_NO = HAW.PROD_ORDER_NO
+              AND HAM.ALT_YN = 'Y'
+		) HAM
+		-- 20211208 김수호 추가: 153번, 2: 출하잔여수량  컬럼 추가 ->당주 출하계획확정 수량- 당주 출하실적(금요일 새벽 12:30) = 출하잔량수량 (마이너스 값일 경우 0처리), 품목기준
+		-----------------------------------------------------------------------------------------------------------------------------------
+		LEFT OUTER JOIN(
+		  
+			        SELECT COMPANY_CD
+			        , BU_CD
+			        , ITEM_CD
+			        , YEARWEEK
+			        --, '' AS SALES_DATE
+			        , AMT AS SALES_CFM_AMT
+			        , QTY AS SALES_CFM_QTY
+			        FROM TB_KPI_SALES_PLAN WITH (NOLOCK)
+			        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			        AND BU_CD =  @{GV_BU_CD}
+			        AND YEARWEEK = @P_YEARWEEK
+			        AND MEAS_CD = 'CFM_SP'
+		
+		)  KSP
+		ON MI.COMPANY_CD = KSP.COMPANY_CD
+        AND MI.BU_CD = KSP.BU_CD
+        AND MI.ITEM_CD = KSP.ITEM_CD
+		LEFT OUTER JOIN (
+		
+					SELECT A1.COMPANY_CD
+			        , A1.BU_CD
+			        , A1.ITEM_CD
+			        , A3.YEARWEEK
+			        , SUM(A1.AMT_KRW) AS SALES_RESULT_AMT
+			        , SUM(A1.QTY) AS SALES_RESULT_QTY
+			        FROM TB_HIS_SALES_RESULT_WEEKLY_FROM_MON_TO_FRI A1 WITH (NOLOCK)
+			        INNER JOIN TB_MST_CALENDAR A3 WITH (NOLOCK) 
+			        ON A1.SALES_DATE = A3.YYYYMMDD
+			        WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			        AND A1.BU_CD =  @{GV_BU_CD}
+			        AND A1.PLANT_CD = 'WF01'
+			        AND A1.DEL_FLAG = 'N'
+			        AND A1.SALES_DATE <![CDATA[>=]]> @P_YYYYMMDD_MON
+			        AND A1.SALES_DATE <![CDATA[<=]]> @P_YYYYMMDD_FRI
+			        GROUP BY A1.COMPANY_CD
+			        ,A1.BU_CD
+			        ,A1.ITEM_CD
+			        ,A3.YEARWEEK
+		
+		) HSRWFMF
+		ON MI.COMPANY_CD = HSRWFMF.COMPANY_CD
+        AND MI.BU_CD = HSRWFMF.BU_CD
+        AND MI.ITEM_CD = HSRWFMF.ITEM_CD
+		-----------------------------------------------------------------------------------------------------------------------------------
+		WHERE HAW.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND HAW.BU_CD = @{GV_BU_CD}
+		  AND HAW.PLAN_ID = @{planId}
+		  AND HAW.START_DATE BETWEEN @{fromCal} AND @{toCal}
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+		  AND HAW.PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+	 	#end
+	 	#if($_parameter.itemType and $_parameter.itemType != "")
+		  AND MC5.CODE_CD IN ('$_parameter.itemType.replace(",","','")')
+	 	#end
+	 	#if($_parameter.procurType and $_parameter.procurType != "")
+		  AND MC6.CODE_CD IN ('$_parameter.procurType.replace(",","','")')
+	 	#end
+	 	#if($_parameter.apsDemandType and $_parameter.apsDemandType != "")
+		  AND MC3.CODE_CD IN ('$_parameter.apsDemandType.replace(",","','")')
+	 	#end
+	 	#if($_parameter.route and $_parameter.route != "")
+		  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+	 	#end
+	 	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+	 	#end
+	 	#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+		  AND MC.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+	 	#end
+	 	#if($_parameter.reptCust and $_parameter.reptCust != "")
+	      AND (MC.CUST_CD LIKE '%'+@{reptCust}+'%' OR MC.CUST_NM LIKE '%'+@{reptCust}+'%')
+	    #end
+	 	#if($_parameter.item_cd and $_parameter.item_cd != "")
+		  AND HAW.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		  AND (HAW.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		#end
+		#if($_parameter.myItem_cd and $_parameter.myItem_cd != "")
+		  AND EXISTS (
+                      	SELECT 1
+                        FROM TB_HIS_APS_WORKORDER_MRP HAM1 WITH(NOLOCK)
+                        LEFT OUTER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+                          ON MI1.COMPANY_CD = HAM1.COMPANY_CD
+                         AND MI1.BU_CD = HAM1.BU_CD
+                         AND MI1.ITEM_CD = HAM1.ITEM_CD
+                        LEFT OUTER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+                          ON MI2.COMPANY_CD = HAM1.COMPANY_CD
+                         AND MI2.BU_CD = HAM1.BU_CD
+                         AND MI2.ITEM_CD = HAM1.MAIN_ITEM_CD
+                       	WHERE HAM1.COMPANY_CD = HAW.COMPANY_CD
+                          AND HAM1.BU_CD = HAW.BU_CD
+                          AND HAM1.PLAN_ID = HAW.PLAN_ID
+                          AND HAM1.PROD_PART = HAW.PROD_PART
+                          AND HAM1.PROD_ORDER_NO = HAW.PROD_ORDER_NO
+                          AND (MI1.ITEM_CD IN ('$_parameter.myItem_cd.replace(",","','")') OR MI2.ITEM_CD IN ('$_parameter.myItem_cd.replace(",","','")'))
+                     )
+		#elseif($_parameter.myItem_nm and $_parameter.myItem_nm != "")
+		  AND EXISTS (
+                      	SELECT 1
+                        FROM TB_HIS_APS_WORKORDER_MRP HAM1 WITH(NOLOCK)
+                        LEFT OUTER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+                          ON MI1.COMPANY_CD = HAM1.COMPANY_CD
+                         AND MI1.BU_CD = HAM1.BU_CD
+                         AND MI1.ITEM_CD = HAM1.ITEM_CD
+                        LEFT OUTER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+                          ON MI2.COMPANY_CD = HAM1.COMPANY_CD
+                         AND MI2.BU_CD = HAM1.BU_CD
+                         AND MI2.ITEM_CD = HAM1.MAIN_ITEM_CD
+                       	WHERE HAM1.COMPANY_CD = HAW.COMPANY_CD
+                          AND HAM1.BU_CD = HAW.BU_CD
+                          AND HAM1.PLAN_ID = HAW.PLAN_ID
+                          AND HAM1.PROD_PART = HAW.PROD_PART
+                          AND HAM1.PROD_ORDER_NO = HAW.PROD_ORDER_NO
+                          AND (MI1.ITEM_CD LIKE '%'+@{myItem_nm}+'%' OR MI1.ITEM_NM LIKE '%'+@{myItem_nm}+'%' OR MI2.ITEM_CD LIKE '%'+@{myItem_nm}+'%' OR MI2.ITEM_NM LIKE '%'+@{myItem_nm}+'%')
+                     )
+		#end
+	 	#if($_parameter.demandId and $_parameter.demandId != "")
+		  AND HAW.DEMAND_ID LIKE '%'+@{demandId}+'%'
+	 	#end
+	 	#if($_parameter.prodOrderNo and $_parameter.prodOrderNo != "")
+	 	  AND HAW.PROD_ORDER_NO LIKE '%'+@{prodOrderNo}+'%'
+	 	#end
+	 	#if($_parameter.replaceMaterials and $_parameter.replaceMaterials != "")
+		  AND ISNULL(HAM.ALT_YN, 'N') = @{replaceMaterials}
+	 	#end
+		ORDER BY HAW.PROD_ORDER_NO 
+		
+		
+				
+		/* 210119 이큰산 추가 */
+		DROP TABLE #W_INV
+		DROP TABLE #W_WIP
+		-----------------------
+		
+	</select>
+	
+	<select id="workOrderReplaceSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.workOrderReplaceSelect ] ******/
+		SELECT HAM.PROD_ORDER_NO
+		     , MC.CODE_NM AS JOB_CD
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, HAM.REQ_DATE), 23) AS REQ_DATE
+		     , CASE WHEN HAM.ALT_YN = 'Y' THEN HAM.MAIN_ITEM_CD
+		            ELSE HAM.ITEM_CD
+		       END AS ITEM_CD
+		     , MI1.ITEM_NM
+		     , MI1.SPEC
+		     , CASE WHEN HAM.ALT_YN = 'Y' THEN 0
+		            ELSE HAM.REQ_QTY
+		       END AS REQ_QTY
+		     , CASE WHEN HAM.ALT_YN = 'Y' THEN HAM.ITEM_CD
+		            ELSE NULL
+		       END AS ALT_ITEM_CD
+		     , MI2.ITEM_NM AS ALT_ITEM_NM
+		     , MI2.SPEC AS ALT_SPEC
+		     , CASE WHEN HAM.ALT_YN = 'Y' THEN HAM.REQ_QTY
+		            ELSE NULL
+		       END AS ALT_REQ_QTY
+		FROM TB_HIS_APS_WORKORDER_MRP HAM WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+	       ON MI1.COMPANY_CD = HAM.COMPANY_CD
+		  AND MI1.BU_CD = HAM.BU_CD
+		  AND MI1.ITEM_CD = CASE WHEN HAM.ALT_YN = 'Y' THEN HAM.MAIN_ITEM_CD
+		                         ELSE HAM.ITEM_CD
+		                     END
+		LEFT OUTER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+	       ON MI2.COMPANY_CD = HAM.COMPANY_CD
+	      AND MI2.BU_CD = HAM.BU_CD
+		  AND MI2.ITEM_CD = CASE WHEN HAM.ALT_YN = 'Y' THEN HAM.ITEM_CD
+		                         ELSE NULL
+		                     END
+		LEFT OUTER JOIN TB_MST_CODE MC WITH(NOLOCK)
+	      ON MC.BU_CD = HAM.BU_CD
+	     AND MC.GROUP_CD = 'ROUTE_CD'
+	     AND MC.CODE_CD = HAM.JOB_CD
+	     AND MC.USE_FLAG = 'Y'
+		WHERE HAM.COMPANY_CD = @{company_cd}
+		  AND HAM.BU_CD = @{bu_cd}
+		  AND HAM.PLAN_ID = @{plan_id}
+		  AND HAM.PROD_PART = @{prod_part}
+		  AND HAM.PROD_ORDER_NO = @{prod_order_no}
+	</select>
+	
+	<select id="workOrderSummarySelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.workOrderSummarySelect ] ******/
+		SELECT MIP.ROUTING_ID
+		     , HAW.ITEM_CD
+		     , MI.ITEM_NM
+		     , MI.SPEC
+		     , MI.ITEM_GROUP_CD
+		     , MC.CUST_NM
+		     , SUM(HAW.PROD_ORDER_QTY) AS PROD_ORDER_QTY
+		FROM TB_HIS_APS_WORKORDER HAW WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = HAW.COMPANY_CD
+		  AND MI.BU_CD = HAW.BU_CD
+		  AND MI.ITEM_CD = HAW.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+	       ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MI.COMPANY_CD
+		 AND MC.BU_CD = MI.BU_CD
+		 AND MC.CUST_CD = MI.REP_CUST_CD
+		WHERE HAW.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND HAW.BU_CD = @{GV_BU_CD}
+		  AND HAW.PLAN_ID = @{plan_id}
+		#if($_parameter.route and $_parameter.route != "")
+	      AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+	  	#end
+	  	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+	      AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+	  	#end
+	  	#if($_parameter.item and $_parameter.item != "")
+	      AND (HAW.ITEM_CD LIKE '%'+@{item}+'%' OR MI.ITEM_NM LIKE '%'+@{item}+'%')
+	    #end
+	  	#if($_parameter.reptCust and $_parameter.reptCust != "")
+	      AND (MI.REP_CUST_CD LIKE '%'+@{reptCust}+'%' OR MC.CUST_NM LIKE '%'+@{reptCust}+'%')
+	    #end
+		GROUP BY MIP.ROUTING_ID, HAW.ITEM_CD, MI.ITEM_NM, MI.SPEC, MI.ITEM_GROUP_CD, MC.CUST_NM
+	</select>
+	
+	<select id="workOrderDailyBucketSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.workOrderDailyBucketSelect ] ******/
+		SELECT MPV.PLAN_ID
+     		 , CONVERT(NVARCHAR, DATEADD(DAY, (SELECT CAST(ATTB_10_CD AS INT) * -1 FROM TB_MST_CODE WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'PROD_PART' AND CODE_CD = @{prodPart}), MCAL.START_DATE), 112) AS START_DATE
+     		 , CONVERT(NVARCHAR, DATEADD(DAY, (SELECT CAST(ATTB_10_CD AS INT) * -1 FROM TB_MST_CODE WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'PROD_PART' AND CODE_CD = @{prodPart}), DATEADD(WEEK, CAST(MC.ATTB_1_CD AS INT) - 1, MCAL.END_DATE)), 112) AS END_DATE
+  		FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+ 		INNER JOIN 
+ 		(
+        	SELECT YEARWEEK
+                 , MIN(MCAL.YYYYMMDD) AS START_DATE
+                 , MAX(MCAL.YYYYMMDD) AS END_DATE
+            FROM TB_MST_CALENDAR MCAL WITH(NOLOCK)
+            GROUP BY YEARWEEK
+		) AS MCAL
+    	ON MCAL.YEARWEEK = MPV.START_WEEK
+  		LEFT OUTER JOIN TB_MST_CODE MC WITH(NOLOCK)
+    	  ON MC.BU_CD = MPV.BU_CD
+   		 AND MC.GROUP_CD = 'CB_WO_RELEASE_WEEK'
+   		 AND MC.CODE_CD = MPV.WO_RELEASE_WEEK
+ 		WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+   		  AND MPV.BU_CD = @{GV_BU_CD}
+   		  AND MPV.PLAN_TYPE_CD = 'MP'
+   		  AND MPV.PLAN_ID = @{plan_id}
+	</select>
+	
+	<select id="workOrderDailySelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.workOrderDailySelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT HAW.ITEM_CD AS ITEM_CD
+				 , HAW.ITEM_CD AS ITEM_CD_NM
+			     , MI.SPEC AS SPEC
+			     , MI.SPEC AS SPEC_NM
+			     , HAW.START_DATE
+			     , COUNT(*) AS CNT
+			FROM TB_HIS_APS_WORKORDER HAW WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+			   ON MI.COMPANY_CD = HAW.COMPANY_CD
+			  AND MI.BU_CD = HAW.BU_CD
+			  AND MI.ITEM_CD = HAW.ITEM_CD
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		      ON MIP.COMPANY_CD = MI.COMPANY_CD
+			 AND MIP.BU_CD = MI.BU_CD
+			 AND MIP.PLANT_CD = 'WF01'
+			 AND MIP.ITEM_CD = MI.ITEM_CD
+			LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+			  ON MC.COMPANY_CD = MI.COMPANY_CD
+			 AND MC.BU_CD = MI.BU_CD
+			 AND MC.CUST_CD = MI.REP_CUST_CD  
+			WHERE HAW.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND HAW.BU_CD = @{GV_BU_CD}
+			  AND HAW.PLAN_ID = @{plan_id}
+			  AND HAW.PROD_PART = @{prodPart}
+			#if($_parameter.route and $_parameter.route != "")
+			  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+			#end
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+			  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			#end
+			#if($_parameter.item and $_parameter.item != "")
+			  AND (HAW.ITEM_CD LIKE '%'+@{item}+'%' OR MI.ITEM_NM LIKE '%'+@{item}+'%')
+			#end
+			#if($_parameter.reptCust and $_parameter.reptCust != "")
+			  AND (MI.REP_CUST_CD LIKE '%'+@{reptCust}+'%' OR MC.CUST_NM LIKE '%'+@{reptCust}+'%')
+			#end
+			GROUP BY HAW.ITEM_CD, MI.SPEC, HAW.START_DATE
+		)
+		SELECT NULL AS TMP_COL
+			<include refid="include.getCdDimTotal"/>
+            <include refid="include.getGrpLvlId"/>
+			#foreach($bucketMap in $_parameter.bucketList)
+		    #set($paramData = "$bucketMap.BUCKET_VAL")
+			 , SUM(CASE WHEN T1.START_DATE = '$paramData' THEN CNT END) AS $bucketMap.CD
+			#end
+	     	 , SUM(CNT) AS TOTAL
+		FROM W_MAIN T1
+	    GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+	    ORDER BY TMP_COL, T1.ITEM_CD, T1.SPEC
+	</select>
+	
+	<select id="workOrderReplaceExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ aps.planResult.workOrderReplaceExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+	
+	
+</mapper>

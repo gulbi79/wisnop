@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="quality">
+
+    <select id="claimStatusSelect" parameterType="map" resultType="map">
+		/****** [ quality.claimStatusSelect ] ******/
+		
+		BEGIN
+		    DECLARE @P_FROM_DT  NVARCHAR(8) = LEFT (@{fromMon}, 4) + '0101';
+		    DECLARE @P_CUR_YEAR NVARCHAR(4) = LEFT (CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112), 4);
+		    
+		    IF LEFT (@{fromMon}, 4) = @P_CUR_YEAR
+		       SET @P_FROM_DT   = @{fromMon} + '01'; 
+		    
+			WITH W_ITEM AS 
+			(
+		    	<include refid="snop.common.t_itemCust" />
+			),
+			W_CLM AS 
+			(
+			    SELECT COMPANY_CD
+			         , BU_CD
+			         , ITEM_CD
+			         , RECEIVE_DATE YYYYMMDD
+			         , QTY
+			         , 'CLAIM'  FLAG
+				FROM TB_DYN_CLAIM CLM WITH(NOLOCK)
+			    WHERE CLM.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND CLM.BU_CD      = @{GV_BU_CD}
+			      AND CLM.RECEIVE_DATE BETWEEN @P_FROM_DT AND @{toMon} + '31'
+			    UNION ALL
+			    SELECT COMPANY_CD
+			         , BU_CD
+			         , ITEM_CD
+			         , GI_DATE
+			         , QTY
+			         , 'GI'  FLAG
+			    FROM TB_DYN_GI GI WITH(NOLOCK)
+			    WHERE GI.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND GI.BU_CD      = @{GV_BU_CD}
+			      AND GI.DEL_FLAG   = 'N'
+			      AND GI.PLANT_CD   = 'WF01'
+			      AND GI.GI_DATE BETWEEN @P_FROM_DT AND @{toMon} + '31' 
+			)
+			SELECT NULL AS TMP_COL
+			    <include refid="include.getCdDimTotal"/>
+			    <include refid="include.getGrpLvlId"/>
+				#foreach( $bucketMap in $_parameter.bucketList )
+				#set( $month = "$bucketMap.BUCKET_VAL" )
+				    #if($bucketMap.CD.indexOf("MT") > -1)
+				        #if(($month == $_parameter.startYear) and ($month == $_parameter.endYear))
+					        #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+	                        , SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END)   AS $bucketMap.CD
+	                        #elseif($bucketMap.CD.indexOf("_GI") > -1)
+	                        , SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS $bucketMap.CD
+	                        #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+	                        , ROUND (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+	                           NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000, 0) AS $bucketMap.CD
+	                        #end
+				        #elseif($month == $_parameter.startYear)
+				            #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                            , SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END)   AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                            , SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                            , ROUND (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                              NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000, 0) AS $bucketMap.CD
+                            #end    
+				        #elseif($month == $_parameter.endYear)
+				            #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                            , SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END)   AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                            , SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                            , ROUND (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                              NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000, 0) AS $bucketMap.CD
+                            #end
+				        #else
+				            #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                            , SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END)   AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                            , SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                            , ROUND (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                              NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000, 0) AS $bucketMap.CD
+                            #end
+				        #end
+				
+				    #else
+				        #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                        , SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN CLM_QTY ELSE NULL END)   AS $bucketMap.CD
+                        #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                        , SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN GI_QTY ELSE NULL END) AS $bucketMap.CD
+                        #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                        , ROUND (CAST (SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                           NULLIF (CAST (SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000, 0) AS $bucketMap.CD
+                        #end
+				    #end
+				#end
+				#if ($_parameter.bucketList.size() > 0)
+					#foreach( $bucketMap in $_parameter.bucketList )
+					#set( $month = "$bucketMap.BUCKET_VAL" )
+			  			#if($velocityCount > 1)
+						  
+						  #if($bucketMap.CD.indexOf("MT") > -1)
+						        #if(($month == $_parameter.startYear) and ($month == $_parameter.endYear))
+                                    #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                       + ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                         NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                    #end
+                                    
+                                #elseif($month == $_parameter.startYear)
+                                    #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN GI_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                       + ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                         NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                    #end
+                                        
+                                #elseif($month == $_parameter.endYear)
+                                    #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                       + ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                         NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                    #end
+                                    
+                                #else
+                                    #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                       + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN GI_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                       + ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                         NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                    #end
+                                    
+                                #end
+						  
+						  
+						  #else
+						      #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                   + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN CLM_QTY ELSE NULL END)), 0)
+                              #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                   + ISNULL(ABS(SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN GI_QTY ELSE NULL END)), 0)
+                              #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                   + ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                     NULLIF (CAST (SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                              #end
+						  #end
+							  	
+			  			#else
+						  	#if($bucketMap.CD.indexOf("MT") > -1)
+		                        #if(($month == $_parameter.startYear) and ($month == $_parameter.endYear))
+		                            #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END)), 0)
+	                                #elseif($bucketMap.CD.indexOf("_GI") > -1)
+	                                   , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END)), 0)
+	                                #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+	                                   , ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+	                                     NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+	                                #end
+		                            
+		                        #elseif($month == $_parameter.startYear)
+		                            #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                       , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN GI_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                       , ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                         NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN @{fromMon} + '01' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                    #end
+		                                
+		                        #elseif($month == $_parameter.endYear)
+		                            #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                       , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                       , ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                         NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND @{toMon} + '31' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                    #end
+		                            
+		                        #else
+		                            #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                       , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                       , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN GI_QTY ELSE NULL END)), 0)
+                                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                       , ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                         NULLIF (CAST (SUM (CASE WHEN YYYYMMDD BETWEEN '$month' + '0101' AND '$month' + '1231' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                    #end
+		                            
+		                        #end
+		                
+		                    #else
+		                        #if($bucketMap.CD.indexOf("_CLAIM") > -1)
+                                   , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN CLM_QTY ELSE NULL END)), 0)
+                                #elseif($bucketMap.CD.indexOf("_GI") > -1)
+                                   , ISNULL(ABS(SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN GI_QTY ELSE NULL END)), 0)
+                                #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                                   , ISNULL(ABS(CAST (SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN CLM_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                                     NULLIF (CAST (SUM (CASE WHEN YYYYMMDD LIKE '$month' + '%' THEN GI_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 1000000), 0)
+                                #end
+		                    #end
+			  			#end
+					#end AS OMIT_FLAG
+				#else 
+		  		, 0 AS OMIT_FLAG
+				#end
+			FROM 
+			(
+				SELECT IT.COMPANY_CD
+                     , IT.BU_CD
+                     , ISNULL (IT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+                     , ISNULL (IT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+                     , ISNULL (IT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+                     , ISNULL (IT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+                     , ISNULL (IT.ROUTING_ID, ' ')        AS ROUTING_ID
+                     , ISNULL (IT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+                     , ISNULL (IT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+                     , ISNULL (IT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+                     , ISNULL (IT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+                     , ISNULL (IT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+                     , ISNULL (IT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+                     , ISNULL (IT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+                     , ISNULL (IT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+                     , ISNULL (IT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+                     , ISNULL (IT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+                     , ISNULL (IT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+                     , ISNULL (IT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+                     , ISNULL (IT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+                     , ISNULL (IT.ITEM_CD, ' ')           AS ITEM_CD
+                     , ISNULL (IT.ITEM_CD, ' ')           AS ITEM_CD_NM
+                     , ISNULL (IT.ITEM_NM, ' ')           AS ITEM_NM
+                     , ISNULL (IT.ITEM_NM, ' ')           AS ITEM_NM_NM
+                     , ISNULL (IT.SPEC, ' ')              AS SPEC
+                     , ISNULL (IT.SPEC, ' ')              AS SPEC_NM
+                     , ISNULL (IT.DRAW_NO, ' ')           AS DRAW_NO
+                     , ISNULL (IT.DRAW_NO, ' ')           AS DRAW_NO_NM
+                     , ISNULL (IT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+                     , ISNULL (IT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+                     , ISNULL (IT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+                     , ISNULL (IT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+                     , ISNULL (IT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+                     , ISNULL (IT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+                     , ISNULL (IT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+                     , ISNULL (IT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+                     , ISNULL (IT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+                     , ISNULL (IT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+                     , ISNULL (IT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+                     , ISNULL (IT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+                     , IT.KEY_GROUP_YN
+                     , CLM.YYYYMMDD
+                     , CASE CLM.FLAG WHEN 'CLAIM' THEN CLM.QTY ELSE NULL END CLM_QTY 
+                     , CASE CLM.FLAG WHEN 'GI'    THEN CLM.QTY ELSE NULL END GI_QTY 
+				FROM W_ITEM IT
+		        INNER JOIN W_CLM CLM 
+		           ON IT.COMPANY_CD = CLM.COMPANY_CD
+		          AND IT.BU_CD      = CLM.BU_CD
+		          AND IT.ITEM_CD    = CLM.ITEM_CD
+		        WHERE IT.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND IT.BU_CD      = @{GV_BU_CD}
+		          AND IT.ITEM_TYPE IN ('10', '50')
+		  		--------------------------------------------------------
+		  		-- 20210602 김수호 추가
+		  		  AND IT.REP_CUST_GROUP_CD IS NOT NULL
+		  		
+                --------------------------------------------------------		  		
+		  		#if($_parameter.item_cd and $_parameter.item_cd != "")
+				  AND IT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+				#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+				  AND (IT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+				#end
+				#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+				  AND IT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+				#end
+				#if($_parameter.route and $_parameter.route != "")
+				  AND IT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+				#end
+				#if($_parameter.reptItemGroup and $_parameter.reptItemGroup != "")
+				  AND IT.REP_ITEM_GROUP_CD IN ('$_parameter.reptItemGroup.replace(",","','")')
+				#end
+				#if($_parameter.keyGroupYn and $_parameter.keyGroupYn != "")
+				  AND IT.KEY_GROUP_YN  = @{keyGroupYn}
+				#end
+			) A
+			GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+		    ORDER BY TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+			           , A.$dimMap.DIM_CD
+			#end
+		END;
+    </select>
+</mapper>

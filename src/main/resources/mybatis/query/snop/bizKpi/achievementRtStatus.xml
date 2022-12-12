@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.bizKpi">
+
+    <select id="achievementRtStatusSelect" parameterType="map" resultType="map">
+    	/****** [ snop.bizKpi.achievementRtStatusSelect ] ******/
+    
+		BEGIN
+		    DECLARE @P_CUR_WEEK  NVARCHAR (8)
+		    DECLARE @P_LST_WEEK  NVARCHAR (8)
+		    DECLARE @P_PRE_WEEK  NVARCHAR (8)
+		    DECLARE @P_PRE_DAY   NVARCHAR (8)
+		    DECLARE @P_MONTH     NVARCHAR (2) = SUBSTRING (CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112), 5, 2)
+		    DECLARE @P_YYYYMM    NVARCHAR (6) = LEFT (CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112), 6)
+		
+		    SELECT @P_CUR_WEEK = MIN (CASE WHEN YYYYMMDD >= CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112) THEN YEARPWEEK ELSE NULL END)
+			     , @P_LST_WEEK = MAX (CASE WHEN YYYYMMDD >= CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112) THEN YEARPWEEK ELSE NULL END)
+			     , @P_PRE_WEEK = MAX (CASE WHEN YYYYMMDD <![CDATA[<]]> CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112) AND DAY_NM = 'SAT' THEN YEARPWEEK ELSE NULL END)
+			     , @P_PRE_DAY  = MAX (CASE WHEN YYYYMMDD <![CDATA[<]]> CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112) AND DAY_NM = 'SAT' THEN  YYYYMMDD ELSE NULL END)
+			 FROM TB_MST_CALENDAR
+			WHERE YEARMONTH = @P_YYYYMM;    
+		    
+		    <include refid="snop.common.w_cust" />
+			, W_RES AS 
+			(
+			    SELECT OD.COMPANY_CD
+			         , OD.BU_CD
+			         , CT.CUST_GROUP_CD
+			         , OD.ITEM_CD
+			         , @P_YYYYMM     YEARMONTH
+			         , SUM (OD.AMT_KRW)  AMT
+			         , SUM (CASE WHEN OD.SALES_DATE BETWEEN @P_YYYYMM + '01' AND @P_PRE_DAY THEN OD.AMT_KRW ELSE NULL END) PRE_OD_AMT
+			         , 'BILL'        FLAG
+				FROM TB_DYN_SALES_RESULT OD WITH(NOLOCK) 
+			    INNER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+			       ON OD.COMPANY_CD = CT.COMPANY_CD
+			      AND OD.BU_CD      = CT.BU_CD
+			      AND OD.CUST_CD    = CT.CUST_CD
+			    WHERE OD.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND OD.BU_CD      = @{GV_BU_CD}
+			      AND OD.PLANT_CD   = 'WF01'
+			      AND OD.DEL_FLAG   = 'N'
+			      AND LEFT (OD.SALES_DATE, 6) = @P_YYYYMM
+			    GROUP BY OD.COMPANY_CD, OD.BU_CD, CT.CUST_GROUP_CD, OD.ITEM_CD
+			    UNION ALL
+			    SELECT SP.COMPANY_CD
+			         , SP.BU_CD
+			         , SP.CUST_GROUP_CD
+			         , SP.ITEM_CD
+			         , MAX (CAL.YEARMONTH) YEARMONTH
+			         , SUM (SP.QTY)        AMT
+			         , NULL                PRE_OD_AMT
+			         , 'SALES_PLAN'        FLAG
+				FROM TB_KPI_SALES_PLAN SP WITH(NOLOCK)
+			    INNER JOIN 
+			    (
+			    	SELECT YEARMONTH
+			             , YEARPWEEK
+					FROM TB_MST_CALENDAR WITH(NOLOCK)
+			        WHERE YEARPWEEK <![CDATA[>=]]> @P_CUR_WEEK
+			          AND YEARPWEEK <![CDATA[<=]]> @P_LST_WEEK
+			        GROUP BY YEARMONTH, YEARPWEEK
+				) CAL
+			    ON CAL.YEARPWEEK = SP.YEARPWEEK
+			    WHERE SP.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND SP.BU_CD      = @{GV_BU_CD}
+			      AND SP.MEAS_CD    = 'CFM_SP'
+			      AND SP.YEARPWEEK <![CDATA[>=]]> @P_CUR_WEEK
+			      AND SP.YEARPWEEK <![CDATA[<=]]> @P_LST_WEEK
+			    GROUP BY SP.COMPANY_CD, SP.BU_CD, SP.CUST_GROUP_CD, SP.ITEM_CD
+				UNION ALL
+			    SELECT BP.COMPANY_CD
+			         , BP.BU_CD
+			         , BP.CUST_GROUP_CD
+			         , BP.ITEM_CD
+			         , @P_YYYYMM YEARMONTH
+			         , SUM (CASE @P_MONTH
+			                  WHEN '01' THEN BP.M1_VAL 
+			                  WHEN '02' THEN BP.M2_VAL 
+			                  WHEN '03' THEN BP.M3_VAL 
+			                  WHEN '04' THEN BP.M4_VAL 
+			                  WHEN '05' THEN BP.M5_VAL 
+			                  WHEN '06' THEN BP.M6_VAL 
+			                  WHEN '07' THEN BP.M7_VAL 
+			                  WHEN '08' THEN BP.M8_VAL 
+			                  WHEN '09' THEN BP.M9_VAL 
+			                  WHEN '10' THEN BP.M10_VAL 
+			                  WHEN '11' THEN BP.M11_VAL 
+			                  WHEN '12' THEN BP.M12_VAL 
+			                 END )  BP_VAL
+			         , NULL         PRE_OD_AMT
+			         , 'BIZ_PLAN'   FLAG
+				FROM TB_DYN_BIZ_PLAN BP WITH(NOLOCK)
+			    WHERE BP.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND BP.BU_CD      = @{GV_BU_CD}
+			      AND BP.[YEAR]     = LEFT (CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112), 4)
+			      AND BP.MEAS_CD    = 'YP_AMT_KRW'
+			    GROUP BY BP.COMPANY_CD, BP.BU_CD, BP.CUST_GROUP_CD, BP.ITEM_CD
+				UNION ALL
+			    SELECT AP.COMPANY_CD
+			         , AP.BU_CD
+			         , AP.CUST_GROUP_CD
+			         , AP.ITEM_CD
+			         , MAX(AP.YEARMONTH) YEARMONTH
+			         , SUM (AP.QTY)      AMT
+			         , NULL              PRE_OD_AMT
+			         , 'ACTION_PLAN'     FLAG
+				FROM TB_KPI_ACTION_PLAN AP WITH(NOLOCK)
+			    WHERE AP.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND AP.BU_CD      = @{GV_BU_CD}
+			      AND AP.YEARMONTH  = @P_YYYYMM
+			      AND AP.MEAS_CD    = 'CFM_SP'
+			    GROUP BY AP.COMPANY_CD, AP.BU_CD, AP.CUST_GROUP_CD, AP.ITEM_CD
+			)
+			SELECT NULL AS TMP_COL
+			    <include refid="include.getCdDimTotal"/>
+			    <include refid="include.getGrpLvlId"/>
+		         , SUM (BP_VAL) BP_VAL
+		         , SUM (AP_AMT) AP_AMT
+		         , SUM (OD_AMT) OD_AMT
+		         , ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0)  AS FCST_AMT
+		         , ISNULL (SUM (OD_AMT), 0) - ISNULL (SUM (BP_VAL), 0)      AS BIZ_DIFF
+		         , SUM (OD_AMT) / NULLIF (SUM (BP_VAL), 0)  * 100           AS BIZ_JIN
+		         , ISNULL (SUM (OD_AMT), 0) - ISNULL (SUM (AP_AMT), 0)      AS ACT_DIFF
+		         , SUM (OD_AMT) / NULLIF (SUM (AP_AMT), 0) * 100            AS ACT_JIN
+		         , ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0) - ISNULL (SUM (BP_VAL), 0)           AS FCST_BIZ_DIFF
+		         , ( ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0) ) / NULLIF (SUM (BP_VAL), 0) * 100 AS FCST_BIZ_DAL
+		         , ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0) - ISNULL (SUM (AP_AMT), 0)           AS FCST_ACT_DIFF
+		         , ( ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0) ) / NULLIF (SUM (AP_AMT), 0) * 100 AS FCST_ACT_DAL
+		         , ISNULL(ABS(SUM (BP_VAL)), 0)
+		         + ISNULL(ABS(SUM (AP_AMT)), 0)
+		         + ISNULL(ABS(SUM (OD_AMT)), 0)
+		         + ISNULL(ABS(ISNULL (SUM (BP_VAL), 0) - ISNULL (SUM (OD_AMT), 0)), 0)
+		         + ISNULL(ABS(SUM (OD_AMT) / NULLIF (SUM (BP_VAL), 0)  * 100), 0)
+		         + ISNULL(ABS(ISNULL (SUM (AP_AMT), 0) - ISNULL (SUM (OD_AMT), 0)), 0)
+		         + ISNULL(ABS(SUM (OD_AMT) / NULLIF (SUM (AP_AMT), 0) * 100), 0)
+		         + ISNULL(ABS(ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0)), 0)
+		         + ISNULL(ABS(ISNULL (SUM (BP_VAL), 0) - ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0)), 0)
+		         + ISNULL(ABS(( ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0) ) / NULLIF (SUM (BP_VAL), 0) * 100), 0)
+		         + ISNULL(ABS(ISNULL (SUM (AP_AMT), 0) - ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0)), 0)
+		         + ISNULL(ABS(( ISNULL (SUM (PRE_OD_AMT), 0) + ISNULL (SUM (SP_AMT), 0) ) / NULLIF (SUM (AP_AMT), 0) * 100), 0)
+		         AS OMIT_FLAG
+			FROM 
+			(
+				SELECT CT.COMPANY_CD
+	                 , CT.BU_CD
+	                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+	                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+	                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+	                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+	                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID
+	                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+	                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+	                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+	                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+	                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+	                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+	                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+	                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+	                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+	                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+	                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+	                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+	                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+	                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD
+	                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD_NM
+	                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM
+	                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM_NM
+	                 , ISNULL (CT.SPEC, ' ')              AS SPEC
+	                 , ISNULL (CT.SPEC, ' ')              AS SPEC_NM
+	                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO
+	                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO_NM
+	                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+	                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+	                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+	                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+	                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+	                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+	                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+	                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+	                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+	                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+	                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+	                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+	                 , ISNULL(CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+	                 , ISNULL(CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+	                 , CASE RS.FLAG WHEN 'BILL'        THEN RS.PRE_OD_AMT ELSE NULL END  AS PRE_OD_AMT
+	                 , CASE RS.FLAG WHEN 'BILL'        THEN RS.AMT ELSE NULL END  AS OD_AMT
+	                 , CASE RS.FLAG WHEN 'BIZ_PLAN'    THEN RS.AMT ELSE NULL END  AS BP_VAL
+	                 , CASE RS.FLAG WHEN 'ACTION_PLAN' THEN RS.AMT * CT.SALES_PRICE_KRW ELSE NULL END  AS AP_AMT
+	                 , CASE RS.FLAG WHEN 'SALES_PLAN'  THEN RS.AMT * CT.SALES_PRICE_KRW ELSE NULL END  AS SP_AMT
+				FROM W_CUST CT
+			    INNER JOIN W_RES RS
+			       ON CT.COMPANY_CD     = RS.COMPANY_CD
+			      AND CT.BU_CD          = RS.BU_CD
+			      AND CT.ITEM_CD        = RS.ITEM_CD
+			      AND CT.CUST_GROUP_CD  = RS.CUST_GROUP_CD
+			    WHERE CT.COMPANY_CD    = @{GV_COMPANY_CD}
+			      AND CT.BU_CD         = @{GV_BU_CD}
+			  	#if($_parameter.item_cd and $_parameter.item_cd != "")
+			      AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+			  	#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+			      AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+			  	#end
+			  	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+			      AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			  	#end
+			  	#if($_parameter.route and $_parameter.route != "")
+			      AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+			  	#end
+			  	#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+			      AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+			  	#end
+			  	#if($_parameter.custGroup and $_parameter.custGroup != "")
+			      AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+			  	#end
+			) A
+		    GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+		    ORDER BY TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+				, A.$dimMap.DIM_CD
+			#end
+    
+END;
+    </select>
+</mapper>

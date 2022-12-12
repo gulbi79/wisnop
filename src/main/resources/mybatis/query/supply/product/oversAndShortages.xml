@@ -1,0 +1,1303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+    <select id="oversAndShortagesSelect" parameterType="map" resultType="map">
+        /****** [ supply.product.oversAndShortagesSelect ]  과부족현황  ******/   
+                  
+                DECLARE @V_APS_START_WEEK NVARCHAR(6)
+                
+                SELECT @V_APS_START_WEEK = APS_START_WEEK
+                FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                AND BU_CD = @{GV_BU_CD}
+                AND PLAN_TYPE_CD = 'MP'
+                AND PLAN_ID      = @{planId}
+                
+                
+               -- 20220314 김수호 수정: VOC 199,   조회 조건 별, 신규 필요수량 수량에 반영 from 김지혜D
+               ------  수요현황-신규필요수량(AP2 출하계획): 사용자 선택에 따른
+
+               SELECT HSP.COMPANY_CD
+                        , HSP.BU_CD
+                        , HSP.ITEM_CD
+                        , HSP.QTY AS POST_YEAR_QTY
+                   INTO #W_TA
+                   FROM TB_MST_ITEM              A(NOLOCK)
+                    INNER JOIN TB_MST_ITEM_PLANT    B(NOLOCK)
+                    ON B.COMPANY_CD = A.COMPANY_CD
+                    AND B.BU_CD = A.BU_CD
+                    AND B.ITEM_CD = A.ITEM_CD
+                    AND B.PLANT_CD = 'WF01'
+                    INNER JOIN (
+                    
+                    
+                           SELECT HSP.COMPANY_CD
+                           , HSP.BU_CD
+                           , HSP.ITEM_CD
+                           , SUM(ISNULL(HSP.QTY, 0))  AS QTY
+                           FROM (   
+                           
+                               SELECT HSP.COMPANY_CD
+                               , HSP.BU_CD
+                               , HSP.PLAN_ID
+                               , HSP.CUST_GROUP_CD
+                               , HSP.ITEM_CD
+                               , HSP.MEAS_CD
+                               , HSP.YEARPWEEK
+                               , HSP.QTY
+                        
+                               , MIN(MC.YYYYMMDD) AS YYYYMMDD
+                               FROM TB_HIS_SALES_PLAN          HSP(NOLOCK)
+                               INNER JOIN TB_MST_CALENDAR MC(NOLOCK)
+                               ON HSP.YEARPWEEK = MC.YEARPWEEK
+                               WHERE HSP.PLAN_ID = (
+                                                                    
+                                    SELECT  PLAN_ID
+                                    FROM TB_MST_PLAN_VERSION
+                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                    AND BU_CD = @{GV_BU_CD}
+                                    AND PLAN_TYPE_CD = 'DP_W'
+                                    AND START_WEEK  = @V_APS_START_WEEK
+                                                                        
+                               )
+                               AND HSP.COMPANY_CD = @{GV_COMPANY_CD}
+                               AND HSP.BU_CD      = @{GV_BU_CD}
+                               AND HSP.YEARWEEK > @V_APS_START_WEEK         -- 201213 이큰산 추가   
+                               AND HSP.MEAS_CD = 'AP2_SP'
+                               GROUP BY HSP.COMPANY_CD
+                               , HSP.BU_CD
+                               , HSP.PLAN_ID
+                               , HSP.CUST_GROUP_CD
+                               , HSP.ITEM_CD
+                               , HSP.MEAS_CD
+                               , HSP.YEARPWEEK
+                               , HSP.QTY
+                             
+                          ) HSP
+                          INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+                          ON HSP.YYYYMMDD = MC.YYYYMMDD
+                          WHERE 1=1
+                          AND MC.YEARMONTH <![CDATA[<=]]> @{demandReflectionPeriod}
+                          GROUP BY HSP.COMPANY_CD, HSP.BU_CD, HSP.ITEM_CD
+                            
+                        
+                    ) HSP 
+                    ON 
+                    A.COMPANY_CD = HSP.COMPANY_CD
+                    AND A.BU_CD  = HSP.BU_CD
+                    AND A.ITEM_CD= HSP.ITEM_cD
+                    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                    AND A.BU_CD        = @{GV_BU_CD}
+                    AND B.ITEM_TYPE = '10'
+                    
+                
+
+               SELECT A.COMPANY_CD
+                , A.BU_CD
+                , A.ITEM_CD
+                , IFCD.QTY AS POST_YEAR_QTY
+                INTO #W_TB
+                FROM TB_MST_ITEM              A(NOLOCK)
+                INNER JOIN TB_MST_ITEM_PLANT    B(NOLOCK)
+                ON B.COMPANY_CD = A.COMPANY_CD
+                AND B.BU_CD = A.BU_CD
+                AND B.ITEM_CD = A.ITEM_CD
+                AND B.PLANT_CD = 'WF01'
+                INNER JOIN (
+                    
+                    SELECT   @{GV_COMPANY_CD}       AS COMPANY_CD
+                    , @{GV_BU_CD}                   AS BU_CD             
+                    , IFCDI.CHILD_ITEM_CD           AS ITEM_CD
+                    , SUM(ISNULL(IFCDI.REQ_QTY, 0)) AS QTY
+                    FROM IF_I_ITEM_FCST_CONS_DTL_INFO  IFCDI(NOLOCK)
+                    INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+                    ON MC.YYYYMMDD = IFCDI.REQ_DT
+                    
+                    WHERE IFCDI.PLAN_WEEK = @V_APS_START_WEEK
+                    AND IFCDI.MEAS_CD = 'P'
+                    AND MC.YEARMONTH <![CDATA[<=]]> @{demandReflectionPeriod}
+                    GROUP BY 
+                    IFCDI.CHILD_ITEM_CD
+                
+                ) IFCD 
+                ON 
+                A.COMPANY_CD  = IFCD.COMPANY_CD
+                AND A.BU_CD   = IFCD.BU_CD
+                AND A.ITEM_CD = IFCD.ITEM_CD
+                WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+              AND A.BU_CD = @{GV_BU_CD}
+              AND A.VALID_FLAG = 'Y'
+              AND B.VALID_FLAG = 'Y'
+              AND (B.ITEM_TYPE IN('30') OR (B.ITEM_TYPE = '20' AND B.PROCUR_TYPE IN('MH', 'OH','MM')));
+               
+
+               WITH TEMP AS (
+               SELECT *
+               FROM #W_TA 
+               
+               UNION ALL
+               
+               SELECT *
+               FROM #W_TB 
+               
+               )           
+
+               , DPMLI AS(
+                
+                SELECT DPML_INFO.COMPANY_CD
+                , DPML_INFO.BU_CD
+                , DPML_INFO.ITEM_CD                                 -- 품목
+                , DPML_INFO.AVAIL_QTY                               -- 가용수량
+                , DPML_INFO.INV_QTY                                 -- 현재고
+                , DPML_INFO.WIP_QTY                                 -- WIP
+                , DPML_INFO.OPEN_ORDER_QTY                          -- OPEN 
+                , DPML_INFO.GR_SCHED_QTY                            -- 입고예정
+                , DPML_INFO.SBS_QTY                                 -- 전략재고     
+                , DPML_INFO.SS_QTY                                  -- 안전재고
+                , DPML_INFO.WEEK_REMN_QTY                           -- 당주잔량
+                , T.POST_YEAR_QTY                                   -- 신규필요수량 M0 ~ 사용자 선택 MONTH 까지
+                , DPML_INFO.NON_MOV_QTY                             -- 미이동
+                , DPML_INFO.OPEN_MAT_QTY                            -- 미투입
+                , DPML_INFO.K_QTY                                   -- 과부족량
+                , DPML_INFO.K_WIP_QTY                               -- 과재공량
+                
+                FROM TB_DYN_P_MORE_LESS_INFO        DPML_INFO(NOLOCK)
+                LEFT OUTER JOIN TEMP T
+                ON 
+                DPML_INFO.COMPANY_CD  = T.COMPANY_CD
+                AND DPML_INFO.BU_CD   = T.BU_CD
+                AND DPML_INFO.ITEM_CD = T.ITEM_CD
+                
+                
+                WHERE DPML_INFO.PLAN_ID =  @{planId}
+                AND DPML_INFO.COMPANY_CD = @{GV_COMPANY_CD}
+                AND DPML_INFO.BU_CD =  @{GV_BU_CD}
+                )
+                
+                 
+                -- 20220314 김수호 수정: VOC 199,   조회 조건 별, 신규 필요수량 수량에 반영 from 김지혜D
+                ------  수요현황-신규필요수량(AP2 출하계획): 사용자 선택에 따른    
+                ,  BOM AS
+                (
+                    SELECT A.COMPANY_CD
+                         , A.BU_CD
+                         , A.PLANT_CD
+                         , A.PARENT_BOM_NO
+                         , A.PARENT_ITEM_CD AS ITEM_CD
+                         , A.PARENT_ITEM_CD
+                         , A.CHILD_ITEM_CD
+                         , A.CHILD_ITEM_QTY
+                         , 1 AS SORT
+                      FROM TB_MST_BOM A WITH(NOLOCK)
+                     UNION ALL
+                    SELECT A.COMPANY_CD
+                         , A.BU_CD
+                         , A.PLANT_CD
+                         , A.PARENT_BOM_NO
+                         , B.ITEM_CD
+                         , A.PARENT_ITEM_CD
+                         , A.CHILD_ITEM_CD
+                         , CAST(A.CHILD_ITEM_QTY * B.CHILD_ITEM_QTY AS NUMERIC(21, 6)) AS CHILD_ITEM_QTY
+                         , B.SORT + 1 AS SORT
+                      FROM TB_MST_BOM A WITH(NOLOCK)
+                     INNER JOIN BOM B
+                        ON B.COMPANY_CD = A.COMPANY_CD
+                       AND B.BU_CD = A.BU_CD
+                       AND B.PLANT_CD = A.PLANT_CD
+                       AND B.PARENT_BOM_NO = A.PARENT_BOM_NO
+                       AND B.CHILD_ITEM_CD = A.PARENT_ITEM_CD
+                )
+                
+                , W_MAT_ISSUE_ITEM_Y AS (
+                
+                      SELECT A.COMPANY_CD
+                    , A.BU_CD
+                    , A.ITEM_CD
+                    , MAX(HPOP.MAT_ISSUE_FLAG) AS MAT_ISSUE_FLAG
+                    FROM BOM A WITH(NOLOCK)
+                    INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                    ON A.COMPANY_CD = MI.COMPANY_CD
+                    AND A.BU_CD         = MI.BU_CD
+                    AND A.ITEM_CD     = MI.ITEM_CD
+                    LEFT OUTER JOIN TB_HIS_PUR_ORDER_PLAN HPOP WITH(NOLOCK)
+                    ON HPOP.COMPANY_CD = A.COMPANY_CD
+                    AND HPOP.BU_CD = A.BU_CD
+                    AND HPOP.PLAN_ID = @{planId}
+                    AND HPOP.ITEM_CD = A.CHILD_ITEM_CD
+                    WHERE HPOP.MAT_ISSUE_FLAG = 'Y'
+                    GROUP BY A.COMPANY_CD
+                    , A.BU_CD
+                    , A.ITEM_CD
+                                    
+                     UNION ALL
+                    
+                    SELECT 
+                    MI.COMPANY_CD
+                    , MI.BU_CD
+                    , MI.ITEM_CD
+                    , HPOP.MAT_ISSUE_FLAG
+                    FROM TB_MST_ITEM MI WITH(NOLOCK)
+                    LEFT OUTER JOIN TB_HIS_PUR_ORDER_PLAN HPOP WITH(NOLOCK)
+                    ON HPOP.COMPANY_CD = MI.COMPANY_CD
+                    AND HPOP.BU_CD = MI.BU_CD
+                    AND HPOP.PLAN_ID = @{planId}
+                    AND HPOP.ITEM_CD = MI.ITEM_CD         
+                    WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+                    AND MI.BU_CD              = @{GV_BU_CD}
+                    AND HPOP.MAT_ISSUE_FLAG = 'Y'
+                                
+                )
+        
+                
+                , W_ITEM AS(
+                
+                SELECT IT.COMPANY_CD
+                 , IT.BU_CD
+                 , CT.REP_CUST_GROUP_CD
+                 , CT.REP_CUST_GROUP_NM
+                 , CT.CUST_GROUP_CD
+                 , CT.CUST_GROUP_NM
+                 , IG.REP_ITEM_GROUP_CD
+                 , RG.REP_ITEM_GROUP_NM
+                 , IT.ITEM_GROUP_CD
+                 , IG.ITEM_GROUP_NM
+                 , IT.ITEM_CD
+                 , IT.ITEM_NM
+                 , IT.ITEM_TYPE
+                 , CASE WHEN 'ko' = @{GV_LANG} THEN CD.CODE_NM_KR
+                        WHEN 'cn' = @{GV_LANG} THEN CD.CODE_NM_CN
+                        ELSE CD.CODE_NM
+                   END ITEM_TYPE_NM
+                 , IT.SPEC
+                 , IT.DRAW_NO
+                 , IP.ROUTING_ID
+                 , IP.MFG_LT
+                 , IP.PUR_LT
+                 , IP.SS_QTY
+                 , CT.CUST_CD
+                 , CT.CUST_NM
+                 , CT.COUNTRY_CD
+                 , CT.CURRENCY
+                 , CT.DEAL_TYPE
+                 , CT.PAY_METH
+                 , IT.UOM_CD
+                 , CT.BIZ_GROUP_CD
+                 , CT.BIZ_GROUP_NM
+                 , IG.KEY_GROUP_YN
+                 
+                 
+                 -- 20210806 김수호 수정(김지혜D 요청:  과부족 현황 조회 시 모든 단가 데이터는 품목관리의 단가 기준으로 변경)
+                 -------------------------------------------------------------------------
+                 , ISNULL(IC.SALES_PRICE_KRW, IT.ITEM_COST_KRW) AS SALES_PRICE_KRW
+                 -------------------------------------------------------------------------
+                
+                 , IC.SALES_ORG_LVL4_CD
+                 , SO.SALES_ORG_LVL4_NM
+                 , IC.SALES_ORG_LVL5_CD
+                 , SO.SALES_ORG_LVL5_NM
+                 , IP.PROCUR_TYPE
+                 , IP.PROCUR_TYPE_CD
+                 , IT.CPFR_YN
+                 , IG.UPPER_ITEM_GROUP_CD
+                 , IG.UPPER_ITEM_GROUP_NM
+                 , ISNULL(IT.SS_YN, 'N') AS SS_YN
+                 , IT.FIREWORK_YN
+                 , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+                 , IP.SS_QTY_DISP
+                 , IT.ITEM_COST_KRW
+                 , IT.BEF_LAST_GR_AVG_QTY
+                 , IT.BEF_LAST_PROD_AVG_QTY
+                 , IT.LAST_GR_AVG_QTY
+                 , IT.LAST_PROD_AVG_QTY
+                 , IT.SBS_QTY
+                 , IT.BOM_CNT
+                 
+                 -- 20210806 김수호 수정( VOC 333,김지혜D 요청:   장납기 원자재 품목 음영표기)
+                 , HPOP.MAT_ISSUE_FLAG
+              
+              FROM TB_MST_ITEM  IT WITH(NOLOCK)
+              LEFT OUTER JOIN TB_MST_REP_CUST RC WITH(NOLOCK)
+                ON RC.COMPANY_CD    = IT.COMPANY_CD
+               AND RC.BU_CD         = IT.BU_CD
+               AND RC.REP_CUST_CD   = IT.REP_CUST_CD
+              LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP IC WITH(NOLOCK)
+                ON IC.COMPANY_CD    = IT.COMPANY_CD
+               AND IC.BU_CD         = IT.BU_CD
+               AND IC.ITEM_CD       = IT.ITEM_CD
+               AND IC.CUST_GROUP_CD = RC.CUST_GROUP_CD
+               
+               -- 20210806 김수호 수정( VOC 333,김지혜D 요청:   장납기 원자재 품목 음영표기)
+               LEFT OUTER JOIN (
+                            
+                            
+                          SELECT DISTINCT COMPANY_CD
+                          , BU_CD
+                          , ITEM_CD
+                          , MAT_ISSUE_FLAG
+                          FROM W_MAT_ISSUE_ITEM_Y  
+
+
+               ) HPOP
+               ON HPOP.COMPANY_CD = IT.COMPANY_CD
+               AND HPOP.BU_CD = IT.BU_CD
+               AND HPOP.ITEM_CD = IT.ITEM_CD 
+               
+               
+              LEFT OUTER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+                ON IG.COMPANY_CD    = IT.COMPANY_CD
+               AND IG.BU_CD         = IT.BU_CD
+               AND IG.ITEM_GROUP_CD = IT.ITEM_GROUP_CD
+              LEFT OUTER JOIN TB_MST_REP_ITEM_GROUP RG WITH(NOLOCK)
+                ON RG.COMPANY_CD    = IG.COMPANY_CD
+               AND RG.BU_CD         = IG.BU_CD
+               AND RG.REP_ITEM_GROUP_CD = IG.REP_ITEM_GROUP_CD
+              LEFT OUTER JOIN (SELECT COMPANY_CD 
+                                    , BU_CD 
+                                    , ITEM_CD 
+                                    , MAX (ROUTING_ID)  AS ROUTING_ID 
+                                    , MAX (PUR_LT)      AS PUR_LT
+                                    , MAX (MFG_LT)      AS MFG_LT
+                                    , SUM (SS_QTY)      AS SS_QTY
+                                    , MAX (PROCUR_TYPE) AS PROCUR_TYPE_CD
+                                    , (
+                                        SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                                    WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                                    ELSE CODE_NM
+                                               END AS CODE_NM
+                                        FROM TB_MST_CODE WITH(NOLOCK)
+                                        WHERE GROUP_CD = 'PROCUR_TYPE'
+                                          AND CODE_CD = MAX (PROCUR_TYPE)
+                                          AND USE_FLAG = 'Y'
+                                       ) AS PROCUR_TYPE
+                                    , MAX(RCPT_SL_CD) AS RCPT_SL_CD
+                                    , MAX(SS_QTY_DISP) AS SS_QTY_DISP
+                                 FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+                                 WHERE PLANT_CD = 'WF01'
+          #if($_parameter.procurType and $_parameter.procurType != "")
+                                AND PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+          #end
+                                GROUP BY COMPANY_CD
+                                       , BU_CD
+                                       , ITEM_CD) IP
+                ON IT.COMPANY_CD    = IP.COMPANY_CD
+               AND IT.BU_CD         = IP.BU_CD
+               AND IT.ITEM_CD       = IP.ITEM_CD
+              LEFT OUTER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK) 
+                ON IT.COMPANY_CD    = CT.COMPANY_CD
+               AND IT.BU_CD         = CT.BU_CD 
+               AND IT.REP_CUST_CD   = CT.CUST_CD
+              LEFT OUTER JOIN UV_MAP_SALES_ORG SO
+                ON IT.COMPANY_CD        = SO.COMPANY_CD
+               AND IT.BU_CD             = SO.BU_CD
+               AND IC.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+               AND IC.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD
+              LEFT OUTER JOIN TB_MST_CODE CD WITH(NOLOCK)
+                ON CD.GROUP_CD = 'ITEM_TYPE'
+               AND CD.CODE_CD  = IT.ITEM_TYPE
+               AND CD.USE_FLAG = 'Y'
+              LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+                ON MC1.BU_CD = IP.BU_CD
+               AND MC1.GROUP_CD = 'CL_SL_CD'
+               AND MC1.CODE_CD = IP.RCPT_SL_CD
+               AND MC1.USE_FLAG = 'Y'
+             WHERE IT.COMPANY_CD    = @{GV_COMPANY_CD}
+               AND IT.BU_CD         = @{GV_BU_CD}
+          #if($_parameter.item_cd and $_parameter.item_cd != "")
+               AND IT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+          #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+               AND (IT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR IT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+          #end
+          
+          #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+               AND IT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+          #end
+          #if($_parameter.route and $_parameter.route != "")
+               AND IP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+          #end
+          #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+               AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+          #end
+          #if($_parameter.custGroup and $_parameter.custGroup != "")
+               AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+          #end
+          #if($_parameter.salesOrgLvl5Cd and $_parameter.salesOrgLvl5Cd != "")
+               AND IC.SALES_ORG_LVL5_CD IN ('$_parameter.salesOrgLvl5Cd.replace(",","','")')
+          #end
+          #if($_parameter.itemType and $_parameter.itemType != "")
+               AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+          #end
+          #if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+               AND IG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+          #end
+          #if($_parameter.procurType and $_parameter.procurType != "")
+               AND IP.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+          #end
+          
+          #if($_parameter.cpfrYn and $_parameter.cpfrYn != "")
+               AND ISNULL(IT.CPFR_YN, 'N') IN ('$_parameter.cpfrYn.replace(",","','")')
+          #end
+          #if($_parameter.ssYn and $_parameter.ssYn != "")
+               AND ISNULL(IT.SS_YN, 'N') IN ('$_parameter.ssYn.replace(",","','")')
+          #end
+          #if($_parameter.validYn and $_parameter.validYn != "")
+               AND ISNULL(IT.USE_FLAG, 'N') IN ('$_parameter.validYn.replace(",","','")')
+          #end
+                
+                
+                
+                )
+                        
+                
+                SELECT TMP_COL
+                    #foreach($dimMap in $_parameter.dimList)
+                        #if($dimMap.DIM_CD == "MFG_LT"||$dimMap.DIM_CD == "PUR_LT"||$dimMap.DIM_CD == "BOM_CNT")
+                            , CASE WHEN GRP_LVL_ID = 0 THEN $dimMap.DIM_CD ELSE NULL END $dimMap.DIM_CD 
+                            , CASE WHEN GRP_LVL_ID = 0 THEN ${dimMap.DIM_CD}_NM ELSE NULL END ${dimMap.DIM_CD}_NM 
+                        #else
+                            , $dimMap.DIM_CD
+                            , ${dimMap.DIM_CD}_NM   
+                        #end
+                    #end
+                , GRP_LVL_ID
+                , CASE WHEN GRP_LVL_ID = 0 THEN 'Y' ELSE 'N' END DETAIL_INFO
+                , AVAIL_QTY
+                , INV_QTY
+                , WIP_QTY
+                , OPEN_ORDER_QTY
+                , GR_SCHED_QTY
+                , SBS_QTY
+                , SS_QTY
+                , WEEK_REMN_QTY
+                , POST_YEAR_QTY
+                , NON_MOV_QTY
+                , OPEN_MAT_QTY
+                , K_QTY
+                , K_WIP_QTY
+                , K_QTY_PRICE
+                , K_WIP_QTY_PRICE
+                
+                
+                -- 20210126 김수호 추가:필요수량(전략재고 + 안전재고 + 당주잔량 + 신규필요수량 + 미이동 + 미투입) 
+                
+                , NEED_QTY
+                , CF.REVIEW_CONTENTS_SALES
+                , CF.REVIEW_CONTENTS_PURCHASE
+                , CF.REVIEW_CONTENTS_PRODUCTION
+                ----------------------------------------------------------------
+                , COMPANY_CD
+                , BU_CD
+                , PLAN_ID
+                
+                , ISNULL(ABS(AVAIL_QTY),0)
+                + ISNULL(ABS(INV_QTY),0)
+                + ISNULL(ABS(WIP_QTY),0)
+                + ISNULL(ABS(OPEN_ORDER_QTY),0)
+                + ISNULL(ABS(GR_SCHED_QTY),0)
+                + ISNULL(ABS(SBS_QTY),0)
+                + ISNULL(ABS(SS_QTY),0)
+                + ISNULL(ABS(WEEK_REMN_QTY),0)
+                + ISNULL(ABS(POST_YEAR_QTY),0)
+                + ISNULL(ABS(NON_MOV_QTY),0)
+                + ISNULL(ABS(OPEN_MAT_QTY),0)
+                + ISNULL(ABS(K_QTY),0)
+                + ISNULL(ABS(K_WIP_QTY),0)
+                + ISNULL(ABS(K_QTY_PRICE),0)
+                + ISNULL(ABS(K_WIP_QTY_PRICE),0)
+                + ISNULL(ABS(NEED_QTY),0)
+                AS OMIT_FLAG
+                        
+                FROM        
+                (               
+                SELECT NULL AS TMP_COL
+                    <include refid="include.getCdDimTotal"/>
+                    <include refid="include.getGrpLvlId"/>
+                     , ROW_NUMBER() OVER(ORDER BY 
+                        #foreach($dimMap in $_parameter.dimList)
+                            #if($velocityCount > 1)
+                                , A.$dimMap.DIM_CD 
+                            #else
+                                A.$dimMap.DIM_CD
+                            #end
+                        #end
+                       ) AS RN
+                , SUM(AVAIL_QTY) AS AVAIL_QTY
+                , SUM(INV_QTY) AS INV_QTY
+                , SUM(WIP_QTY) AS WIP_QTY
+                , SUM(OPEN_ORDER_QTY) AS OPEN_ORDER_QTY
+                , SUM(GR_SCHED_QTY) AS GR_SCHED_QTY
+                , SUM(SBS_QTY) AS SBS_QTY
+                , SUM(SS_QTY) AS SS_QTY
+                , SUM(WEEK_REMN_QTY) AS WEEK_REMN_QTY
+                , SUM(POST_YEAR_QTY) AS POST_YEAR_QTY
+                , SUM(NON_MOV_QTY) AS NON_MOV_QTY
+                , SUM(OPEN_MAT_QTY) AS OPEN_MAT_QTY
+                , SUM(K_QTY) AS K_QTY
+                , SUM(K_WIP_QTY) AS K_WIP_QTY
+                , SUM(K_QTY_PRICE) AS K_QTY_PRICE
+                , SUM(K_WIP_QTY_PRICE) AS K_WIP_QTY_PRICE
+                -- 20210126 김수호 추가:필요수량(전략재고 + 안전재고 + 당주잔량 + 신규필요수량 + 미이동 + 미투입) 
+                
+                , SUM(NEED_QTY) AS NEED_QTY  
+                
+                ----------------------------------------------------------------
+                
+                , A.PLAN_ID
+                , A.COMPANY_CD
+                , A.BU_CD
+                FROM
+                (
+                     SELECT 
+                     
+                     IT.COMPANY_CD
+                     , IT.BU_CD
+                     , @{planId} AS PLAN_ID  
+                     , ISNULL(IT.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD                   -- 품목그룹
+                     , ISNULL(IT.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM                -- 품목그룹
+                     , ISNULL(IT.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM                   -- 품목그룹명
+                     , ISNULL(IT.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM                -- 품목그룹명
+                     , ISNULL(DPML.ITEM_CD, ' ') AS ITEM_CD                             -- 품목
+                     , ISNULL(DPML.ITEM_CD, ' ') AS ITEM_CD_NM                          -- 품목
+                     , ISNULL(IT.ITEM_NM, ' ') AS ITEM_NM                               -- 품목명
+                     , ISNULL(IT.ITEM_NM, ' ') AS ITEM_NM_NM                            -- 품목명
+                     , ISNULL(IT.PROCUR_TYPE, ' ') AS PROCUR_CATE_NAME                  -- 조달구분명
+                     , ISNULL(IT.PROCUR_TYPE, ' ') AS PROCUR_CATE_NAME_NM               -- 조달구분명
+                     , ISNULL(IT.PROCUR_TYPE_CD, ' ') AS PROCUR_CATE                    -- 조달구분
+                     , ISNULL(IT.PROCUR_TYPE_CD, ' ') AS PROCUR_CATE_NM                 -- 조달구분
+                     , ISNULL(IT.SPEC, ' ') AS SPEC                                     -- 규격
+                     , ISNULL(IT.SPEC, ' ') AS SPEC_NM                                  -- 규격
+                     , ISNULL(IT.DRAW_NO, ' ') AS DRAW_NO                               -- 도면번호
+                     , ISNULL(IT.DRAW_NO, ' ') AS DRAW_NO_NM                            -- 도면번호
+                     , ISNULL(IT.MFG_LT, ' ') AS MFG_LT                                 -- 제조 L/T   
+                     , ISNULL(IT.MFG_LT, ' ') AS MFG_LT_NM                              -- 제조 L/T
+                     , ISNULL(IT.UOM_CD, ' ') AS UOM_CD                                 -- 단위
+                     , ISNULL(IT.UOM_CD, ' ') AS UOM_CD_NM                              -- 단위
+                     , ISNULL(IT.PUR_LT, ' ') AS PUR_LT                                 -- 구매 L/T
+                     , ISNULL(IT.PUR_LT, ' ') AS PUR_LT_NM                              -- 구매 L/T
+                     , ISNULL(IT.ITEM_TYPE, ' ') AS ITEM_TYPE_CD                        -- 품목유형
+                     , ISNULL(IT.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM                     -- 품목유형
+                     , ISNULL(IT.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM                     -- 품목유형명
+                     , ISNULL(IT.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM                  -- 품목유형명
+                     , ISNULL(IT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD           -- 대표품목 그룹
+                     , ISNULL(IT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM        -- 대표품목 그룹
+                     , ISNULL(IT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM           -- 대표품목 그룹 명
+                     , ISNULL(IT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM        -- 대표품목 그룹 명
+                     , ISNULL(IT.ROUTING_ID, ' ') AS ROUTING_ID                         -- Routing
+                     , ISNULL(IT.ROUTING_ID, ' ') AS ROUTING_ID_NM                      -- Routing
+                     , ISNULL(IT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD           -- 대표거래처 그룹
+                     , ISNULL(IT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM        -- 대표거래처 그룹
+                     , ISNULL(IT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM           -- 대표거래처 그룹 명
+                     , ISNULL(IT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM        -- 대표거래처 그룹 명
+                     , ISNULL(IT.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD                   -- 대표거래처 소그룹
+                     , ISNULL(IT.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM                -- 대표거래처 소그룹
+                     , ISNULL(IT.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM                   -- 대표거래처 소그룹 명
+                     , ISNULL(IT.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM                -- 대표거래처 소그룹 명
+                     , ISNULL(IT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD           -- 영업팀
+                     , ISNULL(IT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM        -- 영업팀
+                     , ISNULL(IT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM           -- 영업팀명
+                     , ISNULL(IT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM        -- 영업팀명
+                     , ISNULL(IT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD           -- 영업파트
+                     , ISNULL(IT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM        -- 영업파트
+                     , ISNULL(IT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM           -- 영업파트명
+                     , ISNULL(IT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM        -- 영업파트명
+                     
+                     --20220313 김수호 추가: MAT_ISSUE_FLAG                                 -- Issue자재포함 여부   
+                     , ISNULL(IT.MAT_ISSUE_FLAG, ' ') AS MAT_ISSUE_FLAG
+                     , ISNULL(IT.MAT_ISSUE_FLAG, ' ') AS MAT_ISSUE_FLAG_NM
+                     
+                     , ISNULL(CAST(IT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW             -- 단가
+                     , ISNULL(CAST(IT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM          -- 단가
+                     
+                     -- 20210126 김수호 추가
+                     , ISNULL(IT.BOM_CNT, ' ') AS BOM_CNT                       -- BOM 제품수
+                     , ISNULL(IT.BOM_CNT, ' ') AS BOM_CNT_NM                    -- BOM 제품수
+                     
+                     , DPML.AVAIL_QTY   AS  AVAIL_QTY                                   -- 가용수량
+                     , DPML.INV_QTY     AS  INV_QTY                                     -- 현재고
+                     , DPML.WIP_QTY     AS  WIP_QTY                                     -- WIP
+                     , DPML.OPEN_ORDER_QTY  AS  OPEN_ORDER_QTY                          -- OPEN
+                     , DPML.GR_SCHED_QTY    AS  GR_SCHED_QTY                            -- 입고예정
+                     , DPML.SBS_QTY         AS  SBS_QTY                                 -- 전략재고
+                     , DPML.SS_QTY          AS  SS_QTY                                  -- 안전재고
+                     , CASE WHEN DPML.WEEK_REMN_QTY <![CDATA[<]]> 0  THEN 0 ELSE DPML.WEEK_REMN_QTY END   AS WEEK_REMN_QTY -- 당주잔량
+                     , ISNULL(DPML.POST_YEAR_QTY,0) AS  POST_YEAR_QTY                           -- 신규필요수량(1년)
+                     , DPML.NON_MOV_QTY     AS  NON_MOV_QTY                             -- 미이동
+                     , DPML.OPEN_MAT_QTY    AS  OPEN_MAT_QTY                            -- 미투입
+                     
+                     
+                     
+                     , CASE WHEN IT.ITEM_TYPE = '10' THEN CASE WHEN ISNULL(DPML.WEEK_REMN_QTY,0) <![CDATA[<]]> 0 THEN ISNULL(DPML.INV_QTY,0)+ISNULL(DPML.WIP_QTY,0)+ISNULL(DPML.OPEN_ORDER_QTY,0) - (ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+(0)+ISNULL(DPML.POST_YEAR_QTY,0)) -- 제품
+                                                          ELSE ISNULL(DPML.INV_QTY,0) + ISNULL(DPML.WIP_QTY,0) + ISNULL(DPML.OPEN_ORDER_QTY,0) - (ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.WEEK_REMN_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0)) END
+                       WHEN IT.ITEM_TYPE IN ('20','30')      THEN ISNULL(DPML.AVAIL_QTY,0) - (ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.OPEN_MAT_QTY,0)+ISNULL(DPML.NON_MOV_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0)) -- 반제품/원자재
+                       END                    AS  K_QTY                                   -- 과부족량
+                   
+                     
+                     , CASE WHEN IT.ITEM_TYPE = '10' THEN CASE WHEN ISNULL(DPML.INV_QTY,0) - (CASE WHEN ISNULL(DPML.WEEK_REMN_QTY,0) <![CDATA[<]]> 0 THEN ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0) + 0 + ISNULL(DPML.POST_YEAR_QTY,0) ELSE ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.WEEK_REMN_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0) END) <![CDATA[>=]]> 0  THEN ISNULL(DPML.WIP_QTY,0)+ISNULL(DPML.OPEN_ORDER_QTY,0)   -- 제품
+                                                               ELSE ISNULL(DPML.WIP_QTY,0)+ISNULL(DPML.OPEN_ORDER_QTY,0) - (CASE WHEN ISNULL(DPML.WEEK_REMN_QTY,0) <![CDATA[<]]> 0 THEN ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0) + 0 + ISNULL(DPML.POST_YEAR_QTY,0) ELSE ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.WEEK_REMN_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0) END - ISNULL(DPML.INV_QTY,0)) END
+                       WHEN IT.ITEM_TYPE      = '20' THEN CASE WHEN (ISNULL(DPML.INV_QTY,0) + ISNULL(DPML.GR_SCHED_QTY,0) - (ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.OPEN_MAT_QTY,0)+ISNULL(DPML.NON_MOV_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0))) <![CDATA[>= 0]]> THEN ISNULL(DPML.WIP_QTY,0) + ISNULL(DPML.OPEN_ORDER_QTY,0) -- 반제품
+                                                          ELSE ISNULL(DPML.WIP_QTY,0) + ISNULL(DPML.OPEN_ORDER_QTY,0) - (ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.OPEN_MAT_QTY,0)+ISNULL(DPML.NON_MOV_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0)-ISNULL(DPML.INV_QTY,0)-ISNULL(DPML.GR_SCHED_QTY,0)) END
+                       WHEN IT.ITEM_TYPE      = '30' THEN 0 END                     AS  K_WIP_QTY -- 과재공량
+                   
+                   
+                   
+                     , CASE WHEN IT.ITEM_TYPE = '10' THEN CASE WHEN ISNULL(DPML.WEEK_REMN_QTY,0) <![CDATA[<]]> 0 THEN ISNULL(DPML.INV_QTY,0)+ISNULL(DPML.WIP_QTY,0)+ISNULL(DPML.OPEN_ORDER_QTY,0) - (ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+(0)+ISNULL(DPML.POST_YEAR_QTY,0)) -- 제품
+                                                          ELSE ISNULL(DPML.INV_QTY,0) + ISNULL(DPML.WIP_QTY,0) + ISNULL(DPML.OPEN_ORDER_QTY,0) - (ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.WEEK_REMN_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0)) END
+                       WHEN IT.ITEM_TYPE IN ('20','30')      THEN ISNULL(DPML.AVAIL_QTY,0) - (ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.OPEN_MAT_QTY,0)+ISNULL(DPML.NON_MOV_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0)) -- 반제품/원자재
+                       END * ISNULL(SALES_PRICE_KRW, 0) AS K_QTY_PRICE               -- 과부족 금액
+                   
+                     
+                     , CASE WHEN IT.ITEM_TYPE = '10' THEN CASE WHEN ISNULL(DPML.INV_QTY,0) - (CASE WHEN ISNULL(DPML.WEEK_REMN_QTY,0) <![CDATA[<]]> 0 THEN ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0) + 0 + ISNULL(DPML.POST_YEAR_QTY,0) ELSE ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.WEEK_REMN_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0) END) <![CDATA[>=]]> 0  THEN ISNULL(DPML.WIP_QTY,0)+ISNULL(DPML.OPEN_ORDER_QTY,0)   -- 제품
+                                                               ELSE ISNULL(DPML.WIP_QTY,0)+ISNULL(DPML.OPEN_ORDER_QTY,0) - (CASE WHEN ISNULL(DPML.WEEK_REMN_QTY,0) <![CDATA[<]]> 0 THEN ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0) + 0 + ISNULL(DPML.POST_YEAR_QTY,0) ELSE ISNULL(DPML.SBS_QTY,0)+ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.WEEK_REMN_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0) END - ISNULL(DPML.INV_QTY,0)) END
+                       WHEN IT.ITEM_TYPE      = '20' THEN CASE WHEN (ISNULL(DPML.INV_QTY,0) + ISNULL(DPML.GR_SCHED_QTY,0) - (ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.OPEN_MAT_QTY,0)+ISNULL(DPML.NON_MOV_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0))) <![CDATA[>= 0]]> THEN ISNULL(DPML.WIP_QTY,0) + ISNULL(DPML.OPEN_ORDER_QTY,0) -- 반제품
+                                                          ELSE ISNULL(DPML.WIP_QTY,0) + ISNULL(DPML.OPEN_ORDER_QTY,0) - (ISNULL(DPML.SS_QTY,0)+ISNULL(DPML.OPEN_MAT_QTY,0)+ISNULL(DPML.NON_MOV_QTY,0)+ISNULL(DPML.POST_YEAR_QTY,0)-ISNULL(DPML.INV_QTY,0)-ISNULL(DPML.GR_SCHED_QTY,0)) END
+                       WHEN IT.ITEM_TYPE      = '30' THEN 0 END * ISNULL(SALES_PRICE_KRW, 0) AS    K_WIP_QTY_PRICE    -- 과재공 금액             
+                     
+                     
+                     -- 20210126 김수호 추가:필요수량(전략재고 + 안전재고 + 당주잔량 + 신규필요수량 + 미이동 + 미투입) 
+                     --, (DPML.SBS_QTY+DPML.SS_QTY+DPML.WEEK_REMN_QTY+ ISNULL(DPML.POST_YEAR_QTY,0)+DPML.NON_MOV_QTY+DPML.OPEN_MAT_QTY) AS NEED_QTY -- 필요수량
+                     
+                     -- 20211202 김수호 수정:  VOC 298번, * Total>필요수량 Column,  : 당주잔량이 음수인 경우 0처리되고 있으나 음수값이 계산에 반영되고 있음, 당주잔량이 음수인 경우 0, 그외 당주잔량 계산 FROM 김지혜D
+                     , CASE WHEN DPML.WEEK_REMN_QTY <![CDATA[<]]> 0 THEN (ISNULL(DPML.SBS_QTY,0) + ISNULL(DPML.SS_QTY,0) +  0 + ISNULL(DPML.POST_YEAR_QTY,0) + ISNULL(DPML.NON_MOV_QTY,0) + ISNULL(DPML.OPEN_MAT_QTY,0)) 
+                          ELSE (ISNULL(DPML.SBS_QTY,0) + ISNULL(DPML.SS_QTY,0) +  ISNULL(DPML.WEEK_REMN_QTY,0) + ISNULL(DPML.POST_YEAR_QTY,0) + ISNULL(DPML.NON_MOV_QTY,0) + ISNULL(DPML.OPEN_MAT_QTY,0))
+                          END AS NEED_QTY --필요수량
+                     ----------------------------------------------------------------
+                     
+                     
+                     FROM DPMLI DPML (NOLOCK)
+                     INNER JOIN W_ITEM IT(NOLOCK)
+                     ON DPML.ITEM_CD = IT.ITEM_CD
+                     AND DPML.COMPANY_CD = IT.COMPANY_CD
+                     AND DPML.BU_CD  = IT.BU_CD
+                     AND IT.ITEM_TYPE NOT IN ('25', '35')
+                     #if($_parameter.excessShortQty and $_parameter.excessShortQty != "")
+                         #if($_parameter.excessShortQty == 'BELOW')      
+                           AND DPML.K_QTY <![CDATA[<=]]> 0 
+                         #elseif($_parameter.excessShortQty  == 'EXCESS')
+                           AND DPML.K_QTY <![CDATA[>]]> 0  
+                         #else
+                           
+                         #end
+                        
+                     #end
+                     #if($_parameter.overWorkItem and $_parameter.overWorkItem != "")
+                         #if($_parameter.overWorkItem == 'BELOW')      
+                           AND DPML.K_WIP_QTY <![CDATA[<=]]> 0 
+                         #elseif($_parameter.overWorkItem  == 'EXCESS')
+                           AND DPML.K_WIP_QTY <![CDATA[>]]> 0  
+                         #else
+                           
+                         #end
+                        
+                     #end
+                     
+                     
+                )A
+                WHERE 1 = 1
+                GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), COMPANY_CD, BU_CD, PLAN_ID
+                 
+                 
+                
+            )B
+            -- 20210527 김수호 추가
+            -------------------------------------------------------------
+            OUTER APPLY 
+            (
+                SELECT B2.REVIEW_CONTENTS_SALES
+                , B2.REVIEW_CONTENTS_PURCHASE
+                , B2.REVIEW_CONTENTS_PRODUCTION
+                , B2.COMPANY_CD  AS COMPANY_CD_B2
+                , B2.BU_CD       AS BU_CD_B2
+                , B2.ITEM_CD     AS ITEM_CD_B2
+                , B2.PLAN_ID     AS PLAN_ID_B2
+                FROM TB_DYN_P_MORE_LESS_INFO B2 WITH(NOLOCK)
+                WHERE B.COMPANY_CD = B2.COMPANY_CD
+                AND B.BU_CD      = B2.BU_CD
+                AND B.PLAN_ID    = B2.PLAN_ID
+                AND B.ITEM_CD    = B2.ITEM_CD
+                                  
+            ) CF    
+            
+            
+            -------------------------------------------------------------    
+            ORDER BY RN
+            
+            
+            
+            DROP TABLE #W_TA
+            DROP TABLE #W_TB            
+    </select>
+    
+    <select id="detailInfoListSelect" parameterType="map" resultType="map">
+        /****** [ supply.product.detailInfoListSelect ] ******/
+        <![CDATA[
+        
+        
+
+
+DECLARE 
+        @V_CURRENT_DATE     DATETIME,
+        @V_PGM_ID           VARCHAR(100),
+        @V_STEP_ID          VARCHAR(100),
+        @V_TRANSACTION_ID   VARCHAR(50),
+        @V_ERR_MSG          NVARCHAR(4000),
+                @I_COMPANY_CD nvarchar(5), 
+                @I_BU_CD nvarchar(3)
+
+
+DECLARE
+       
+        @V_START_WEEK       NVARCHAR(6),
+        @V_M12              NVARCHAR(6),
+        @V_M11               NVARCHAR(6),
+        @V_M10              NVARCHAR(6),
+        @V_M9               NVARCHAR(6),
+        @V_M8               NVARCHAR(6),
+        @V_M7               NVARCHAR(6),
+        @V_M6               NVARCHAR(6),
+        @V_M5               NVARCHAR(6),
+        @V_M4               NVARCHAR(6),
+        @V_M3               NVARCHAR(6),
+        @V_M2               NVARCHAR(6),
+        @V_M1               NVARCHAR(6),
+        @V_M0               NVARCHAR(6),
+        @V_W1               NVARCHAR(6),
+        @V_W2               NVARCHAR(6),
+        @V_W3               NVARCHAR(6),
+        @V_W4               NVARCHAR(6),
+        @V_CUR_DATE         NVARCHAR(8)
+       
+SET @I_COMPANY_CD = 'KO316';
+SET @I_BU_CD = 'QT';
+
+SET @V_PGM_ID = 'USP_TB_HIS_PUR_ORDER_PLAN_DTL';
+SET @V_CURRENT_DATE = DBO.UFN_GETDATE();
+
+
+
+
+
+SET @V_CUR_DATE = CONVERT(NVARCHAR, @V_CURRENT_DATE, 112)
+
+SELECT @V_M0 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YYYYMMDD = @V_CUR_DATE
+
+SELECT TOP 1
+    @V_W1 = YEARWEEK
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARWEEK > @V_START_WEEK
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_W2 = YEARWEEK
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARWEEK > @V_W1
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_W3 = YEARWEEK
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARWEEK > @V_W2
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_W4 = YEARWEEK
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARWEEK > @V_W3
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M1 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M0
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M2 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M1
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M3 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M2
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M4 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M3
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M5 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M4
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M6 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M5
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M7 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M6
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M8 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M7
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M9 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M8
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M10 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M9
+ORDER BY YYYYMMDD
+
+SELECT TOP 1
+    @V_M11 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M10
+ORDER BY YYYYMMDD
+
+
+
+SELECT TOP 1
+    @V_M12 = YEARMONTH
+FROM TB_MST_CALENDAR WITH(NOLOCK)
+WHERE YEARMONTH > @V_M11
+ORDER BY YYYYMMDD;
+        
+        
+        
+        
+WITH
+    BOM
+    AS
+    (
+                    SELECT A.COMPANY_CD
+                 , A.BU_CD
+                 , A.PLANT_CD
+                 , A.PARENT_BOM_NO
+                 , A.CHILD_ITEM_CD AS ITEM_CD
+                 , A.PARENT_ITEM_CD
+                 , A.CHILD_ITEM_CD
+                 , A.CHILD_ITEM_QTY
+                 , 1 AS SORT
+            FROM TB_MST_BOM A
+        UNION ALL
+            SELECT A.COMPANY_CD
+                 , A.BU_CD
+                 , A.PLANT_CD
+                 , A.PARENT_BOM_NO
+                 , B.ITEM_CD
+                 , A.PARENT_ITEM_CD
+                 , A.CHILD_ITEM_CD
+                 , CAST(A.CHILD_ITEM_QTY * B.CHILD_ITEM_QTY AS NUMERIC(21, 6)) AS CHILD_ITEM_QTY
+                 , B.SORT + 1 AS SORT
+            FROM TB_MST_BOM A
+                INNER JOIN BOM B
+                ON B.COMPANY_CD = A.COMPANY_CD
+                    AND B.BU_CD = A.BU_CD
+                    AND B.PLANT_CD = A.PLANT_CD
+                    AND B.PARENT_BOM_NO = A.PARENT_BOM_NO
+                    AND B.PARENT_ITEM_CD = A.CHILD_ITEM_CD
+    )
+
+
+, TEMP AS (
+
+
+-----------------------------------    AP2     -----------------------------------------------
+
+SELECT MI.COMPANY_CD
+             , MI.BU_CD
+             , @{planId} AS PLAN_ID
+             , MI.ITEM_CD
+             , 'AP2' AS MEAS_CD
+             , A.PARENT_ITEM_CD
+             , A.CHILD_ITEM_QTY
+             , SUM(CASE WHEN HSP.YEARWEEK = @V_W1 THEN HSP.QTY END) AS W1_QTY
+             , SUM(CASE WHEN HSP.YEARWEEK = @V_W2 THEN HSP.QTY END) AS W2_QTY
+             , SUM(CASE WHEN HSP.YEARWEEK = @V_W3 THEN HSP.QTY END) AS W3_QTY
+             , SUM(CASE WHEN HSP.YEARWEEK = @V_W4 THEN HSP.QTY END) AS W4_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M0 THEN HSP.QTY END) AS M0_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M1 THEN HSP.QTY END) AS M1_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M2 THEN HSP.QTY END) AS M2_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M3 THEN HSP.QTY END) AS M3_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M4 THEN HSP.QTY END) AS M4_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M5 THEN HSP.QTY END) AS M5_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M6 THEN HSP.QTY END) AS M6_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M7 THEN HSP.QTY END) AS M7_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M8 THEN HSP.QTY END) AS M8_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M9 THEN HSP.QTY END) AS M9_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M10 THEN HSP.QTY END) AS M10_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M11 THEN HSP.QTY END) AS M11_QTY
+             , SUM(CASE WHEN MC.YEARMONTH = @V_M12 THEN HSP.QTY END) AS M12_QTY
+             , @V_PGM_ID AS CREATE_ID
+             , @V_CURRENT_DATE AS CREATE_DTTM
+             , NULL AS UNREG_QTY
+FROM TB_MST_ITEM MI WITH(NOLOCK)
+    INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+    ON MIP.COMPANY_CD = MI.COMPANY_CD
+        AND MIP.BU_CD = MI.BU_CD
+        AND MIP.PLANT_CD = 'WF01'
+        AND MIP.ITEM_CD = MI.ITEM_CD
+    INNER JOIN (
+
+                        SELECT A.COMPANY_CD
+                            , A.BU_CD
+                            , A.PLANT_CD
+                            , A.PARENT_BOM_NO
+                            , A.ITEM_CD
+                            , A.PARENT_ITEM_CD
+                            , SUM(A.CHILD_ITEM_QTY) AS CHILD_ITEM_QTY
+                            FROM BOM A
+                            GROUP BY A.COMPANY_CD
+                                                , A.BU_CD
+                                                , A.PLANT_CD
+                                                , A.PARENT_BOM_NO
+                                                , A.ITEM_CD
+                                                , A.PARENT_ITEM_CD
+
+    ) A
+    ON A.COMPANY_CD = MI.COMPANY_CD
+        AND A.BU_CD = MI.BU_CD
+        AND A.PLANT_CD = 'WF01'
+        AND A.ITEM_CD = MI.ITEM_CD
+    INNER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+    ON MI2.COMPANY_CD = A.COMPANY_CD
+        AND MI2.BU_CD = A.BU_CD
+        AND MI2.ITEM_CD = A.PARENT_ITEM_CD
+        AND MI2.ITEM_TYPE = '10'
+    LEFT OUTER JOIN TB_HIS_SALES_PLAN HSP WITH(NOLOCK)
+    ON HSP.PLAN_ID = @{planId}
+        AND HSP.COMPANY_CD = A.COMPANY_CD
+        AND HSP.BU_CD = A.BU_CD
+        AND HSP.ITEM_CD = A.PARENT_ITEM_CD
+        AND HSP.MEAS_CD = 'AP2_SP'
+    LEFT OUTER JOIN (
+    							        -- 20220913 ITSM #60, 과부족 현황 ->상세정보의 AP2 출하계획수량이 AP2 출하계획 입력수량과 다름 수정요청 FROM 김영락K
+    									SELECT DISTINCT YEARPWEEK
+                                        --SELECT DISTINCT YEARWEEK
+                                                , YEARMONTH
+                                        FROM TB_MST_CALENDAR WITH(NOLOCK)
+                    ) MC
+    -- 20220913 ITSM #60, 과부족 현황 ->상세정보의 AP2 출하계획수량이 AP2 출하계획 입력수량과 다름 수정요청 FROM 김영락K
+	  ON MC.YEARPWEEK = HSP.YEARPWEEK
+	--ON MC.YEARWEEK = HSP.YEARWEEK
+WHERE MI.COMPANY_CD = @I_COMPANY_CD
+    AND MI.BU_CD = @I_BU_CD
+  --  AND (MI.ITEM_TYPE = '30' OR (MI.ITEM_TYPE = '20' AND MIP.PROCUR_TYPE = 'OH'))
+GROUP BY MI.COMPANY_CD
+             , MI.BU_CD
+             , MI.ITEM_CD
+             , A.PARENT_ITEM_CD
+             , A.CHILD_ITEM_QTY
+
+    
+
+
+
+)
+
+      
+        ]]>  
+        
+        
+        
+        
+        
+        SELECT *
+        FROM
+        (
+            SELECT NULL AS TMP_COL
+                <include refid="include.getCdDimTotal"/>
+                <include refid="include.getGrpLvlId"/>
+                 , MAX(MEAS_CD) AS MEAS_CD
+                 , MAX(MEAS_CD) AS MEAS_CD_NM
+                 , SUM(CHILD_ITEM_QTY) AS CHILD_ITEM_QTY 
+                 , SUM(W1_QTY) AS W1_QTY
+                 , SUM(W2_QTY) AS W2_QTY
+                 , SUM(W3_QTY) AS W3_QTY
+                 , SUM(W4_QTY) AS W4_QTY
+                 , SUM(M0_QTY) AS M0_QTY
+                 , SUM(M1_QTY) AS M1_QTY
+                 , SUM(M2_QTY) AS M2_QTY
+                 , SUM(M3_QTY) AS M3_QTY
+                 , SUM(M4_QTY) AS M4_QTY
+                 , SUM(M5_QTY) AS M5_QTY
+                 , SUM(M6_QTY) AS M6_QTY
+                 , SUM(M7_QTY) AS M7_QTY
+                 , SUM(M8_QTY) AS M8_QTY
+                 , SUM(M9_QTY) AS M9_QTY
+                 , SUM(M10_QTY) AS M10_QTY
+                 , SUM(M11_QTY) AS M11_QTY
+                 , SUM(M12_QTY) AS M12_QTY
+                 , SUM(TOTAL) AS TOTAL
+                 , MAX(SORT) AS SORT
+            FROM
+            (
+            
+                  
+                  
+                     SELECT ISNULL(HPOPD.MEAS_CD, ' ') AS MEAS_CD 
+                     , ISNULL(HPOPD.MEAS_CD, ' ') AS MEAS_CD_NM
+                     , ISNULL(CASE WHEN HPOPD.MEAS_CD = 'AP2' THEN dbo.UFN_GET_TRANSLATE('lbl', 'ap2Cnt', @{GV_LANG})
+                                                   END, ' ') AS MEAS_NM    
+                     , ISNULL(CASE WHEN HPOPD.MEAS_CD = 'AP2' THEN dbo.UFN_GET_TRANSLATE('lbl', 'ap2Cnt', @{GV_LANG})
+                           
+                        END, ' ') AS MEAS_NM_NM                                
+                                , ISNULL(HPOPD.ITEM_CD, ' ') AS ITEM_CD
+                                , ISNULL(HPOPD.ITEM_CD, ' ') AS ITEM_CD_NM
+                                , ISNULL(MI1.ITEM_NM, ' ') AS ITEM_NM
+                                , ISNULL(MI1.ITEM_NM, ' ') AS ITEM_NM_NM
+                                , ISNULL(MI1.SPEC, ' ') AS SPEC
+                                , ISNULL(MI1.SPEC, ' ') AS SPEC_NM
+                                , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+                                , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+                                , ISNULL(HPOPD.PARENT_ITEM_CD, ' ') AS PARENT_ITEM_CD
+                                , ISNULL(HPOPD.PARENT_ITEM_CD, ' ') AS PARENT_ITEM_CD_NM
+                                , ISNULL(MI2.SPEC, ' ') AS PARENT_SPEC
+                                , ISNULL(MI2.SPEC, ' ') AS PARENT_SPEC_NM
+                                , HPOPD.CHILD_ITEM_QTY
+                                , HPOPD.W1_QTY
+                                , HPOPD.W2_QTY
+                                , HPOPD.W3_QTY
+                                , HPOPD.W4_QTY
+                                , HPOPD.M0_QTY
+                                , HPOPD.M1_QTY
+                                , HPOPD.M2_QTY
+                                , HPOPD.M3_QTY
+                                , HPOPD.M4_QTY
+                                , HPOPD.M5_QTY
+                                , HPOPD.M6_QTY
+                                , HPOPD.M7_QTY
+                                , HPOPD.M8_QTY
+                                , HPOPD.M9_QTY
+                                , HPOPD.M10_QTY
+                                , HPOPD.M11_QTY
+                                , HPOPD.M12_QTY
+                                , CASE  WHEN HPOPD.MEAS_CD = 'AP2' THEN 1
+                                    END SORT
+                                , ISNULL(M0_QTY, 0) + ISNULL(M1_QTY, 0) + ISNULL(M2_QTY, 0) + ISNULL(M3_QTY, 0) + ISNULL(M4_QTY, 0)
+                                + ISNULL(M5_QTY, 0) + ISNULL(M6_QTY, 0) + ISNULL(M7_QTY, 0) + ISNULL(M8_QTY, 0) + ISNULL(M9_QTY, 0)
+                                + ISNULL(M10_QTY, 0) + ISNULL(M11_QTY, 0) + ISNULL(M12_QTY, 0) AS TOTAL
+FROM TEMP HPOPD WITH(NOLOCK)
+    INNER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+    ON MI1.COMPANY_CD = HPOPD.COMPANY_CD
+        AND MI1.BU_CD = HPOPD.BU_CD
+        AND MI1.ITEM_CD = HPOPD.ITEM_CD
+    LEFT OUTER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+    ON MI2.COMPANY_CD = HPOPD.COMPANY_CD
+        AND MI2.BU_CD = HPOPD.BU_CD
+        AND MI2.ITEM_CD = HPOPD.PARENT_ITEM_CD
+    LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+    ON MC.COMPANY_CD = MI2.COMPANY_CD
+        AND MC.BU_CD = MI2.BU_CD
+        AND MC.CUST_CD = MI2.REP_CUST_CD
+WHERE HPOPD.COMPANY_CD = 'KO316'
+    AND HPOPD.BU_CD = 'QT'
+    AND HPOPD.PLAN_ID = @{planId}
+    AND HPOPD.ITEM_CD = @{itemCd}
+                  
+                  
+                  
+            ) A
+            GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)  
+        ) B
+        WHERE B.MEAS_NM IS NOT NULL
+          AND (B.GRP_LVL_ID = 0 OR B.MEAS_CD != 'MAT_SCHED')
+        ORDER BY SORT, GRP_LVL_ID
+        
+        
+    </select>
+    
+    
+    <update id="oversAndShortagesAddReviewContentsUpdate" parameterType="map">
+    /****** [ supply.product.oversAndShortagesAddReviewContentsUpdate ] ******/
+    
+       UPDATE TB_DYN_P_MORE_LESS_INFO
+            SET REVIEW_CONTENTS_SALES      =  @{REVIEW_CONTENTS_SALES}
+              , REVIEW_CONTENTS_PURCHASE   =  @{REVIEW_CONTENTS_PURCHASE}
+              , REVIEW_CONTENTS_PRODUCTION =  @{REVIEW_CONTENTS_PRODUCTION}
+              WHERE COMPANY_CD             =   @{GV_COMPANY_CD}
+                    AND BU_CD              =   @{GV_BU_CD}
+                    AND PLAN_ID           =   @{PLAN_ID}
+                    AND ITEM_CD            =   @{ITEM_CD}
+                    
+    </update>
+    
+    
+    <select id="hasWriteRoleSelect" parameterType="map" resultType="map">
+    /*** supply.product.hasWriteRoleSelect ***/
+    /*
+  
+       검토내용 (영업): 영업,   SCM팀 수정권한
+    AP2QT0001
+    
+    검토내용 (구매): 구매팀, SCM팀 수정권한
+    PUR0001, PUR0002, GOCQT0001
+    
+    검토내용 (생산): 생산팀/생산기획팀원, SCM팀 수정권한
+    PRO0001, GOCQT0001
+    
+    */
+    BEGIN
+            
+    with USER_ROLE AS(
+        select *
+        from TB_MAP_USER_ROLE
+    where USER_ID = @{USER_ID})
+    
+    SELECT COUNT(CASE WHEN ROLE_CD = 'AP2QT0001'                       THEN 1 END) AS SALES_ROLE_CNT
+    , COUNT(CASE WHEN ROLE_CD      = 'PUR0001' OR ROLE_CD = 'PUR0002'  THEN 1 END) AS PURCHASE_ROLE_CNT
+    , COUNT(CASE WHEN ROLE_CD      = 'PRO0001'                         THEN 1 END) AS PRODUCTION_ROLE_CNT
+    , COUNT(CASE WHEN ROLE_CD      = 'GOCQT0001'  THEN 1 END) AS SCM_ROLE_CNT
+    FROM USER_ROLE
+    WHERE ROLE_CD IN ('AP2QT0001','PUR0001','PUR0002','PRO0001','GOCQT0001')
+    
+    
+    END;
+    
+    </select>
+    
+    <!-- MP PLAN ID 기준 APS_START_WEEK의  첫번째 MONTH 부터 12번째 MONTH 까지 조회 -->
+    <select id="apsStartWeekMonthSelect" parameterType="map" resultType="map">
+     /*** supply.product.apsStartWeekMonthSelect ***/
+    
+    DECLARE
+        @V_W0               NVARCHAR(6),
+        @V_M0               NVARCHAR(6),
+        @V_M1               NVARCHAR(6),
+        @V_M2               NVARCHAR(6),
+        @V_M3               NVARCHAR(6),
+        @V_M4               NVARCHAR(6),
+        @V_M5               NVARCHAR(6),
+        @V_M6               NVARCHAR(6),
+        @V_M7               NVARCHAR(6),
+        @V_M8               NVARCHAR(6),
+        @V_M9               NVARCHAR(6),
+        @V_M10              NVARCHAR(6),
+        @V_M11              NVARCHAR(6),
+        @V_M12              NVARCHAR(6)
+
+    SELECT @V_W0 = APS_START_WEEK
+          FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+         WHERE COMPANY_CD = @{GV_COMPANY_CD}
+           AND BU_CD = @{GV_BU_CD}
+           AND PLAN_TYPE_CD = 'MP'
+           AND PLAN_ID = @{I_PLAN_ID}
+         
+
+    SELECT TOP 1 @V_M0 = YEARMONTH
+          FROM TB_MST_CALENDAR WITH(NOLOCK)
+         WHERE YEARWEEK = @V_W0
+         ORDER BY YYYYMMDD
+         
+        SELECT TOP 1 @V_M1 = YEARMONTH
+          FROM TB_MST_CALENDAR WITH(NOLOCK)
+         WHERE YEARMONTH > @V_M0
+         ORDER BY YYYYMMDD
+         
+        SELECT TOP 1 @V_M2 = YEARMONTH
+          FROM TB_MST_CALENDAR WITH(NOLOCK)
+         WHERE YEARMONTH > @V_M1
+         ORDER BY YYYYMMDD
+         
+        SELECT TOP 1 @V_M3 = YEARMONTH
+          FROM TB_MST_CALENDAR WITH(NOLOCK)
+         WHERE YEARMONTH > @V_M2
+         ORDER BY YYYYMMDD
+ 
+            SELECT TOP 1 @V_M4 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M3
+             ORDER BY YYYYMMDD
+     
+            SELECT TOP 1 @V_M5 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M4
+             ORDER BY YYYYMMDD
+     
+            SELECT TOP 1 @V_M6 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M5
+             ORDER BY YYYYMMDD
+     
+            SELECT TOP 1 @V_M7 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M6
+             ORDER BY YYYYMMDD
+     
+            SELECT TOP 1 @V_M8 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M7
+             ORDER BY YYYYMMDD
+     
+            SELECT TOP 1 @V_M9 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M8
+             ORDER BY YYYYMMDD
+     
+            SELECT TOP 1 @V_M10 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M9
+             ORDER BY YYYYMMDD
+     
+            SELECT TOP 1 @V_M11 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M10
+             ORDER BY YYYYMMDD
+            
+            SELECT TOP 1 @V_M12 = YEARMONTH
+              FROM TB_MST_CALENDAR WITH(NOLOCK)
+             WHERE YEARMONTH > @V_M11
+             ORDER BY YYYYMMDD
+            
+            
+            
+    
+    SELECT @V_M0 AS CODE_CD, '~M0' AS CODE_NM
+    UNION ALL
+    SELECT @V_M1 AS CODE_CD, '~M1' AS CODE_NM
+    UNION ALL
+    SELECT @V_M2 AS CODE_CD, '~M2' AS CODE_NM
+    UNION ALL
+    SELECT @V_M3 AS CODE_CD, '~M3' AS CODE_NM
+    UNION ALL
+    SELECT @V_M4 AS CODE_CD, '~M4' AS CODE_NM
+    UNION ALL
+    SELECT @V_M5 AS CODE_CD, '~M5' AS CODE_NM
+    UNION ALL
+    SELECT @V_M6 AS CODE_CD, '~M6' AS CODE_NM
+    UNION ALL
+    SELECT @V_M7 AS CODE_CD, '~M7' AS CODE_NM
+    UNION ALL
+    SELECT @V_M8 AS CODE_CD, '~M8' AS CODE_NM
+    UNION ALL
+    SELECT @V_M9 AS CODE_CD, '~M9' AS CODE_NM
+    UNION ALL
+    SELECT @V_M10 AS CODE_CD, '~M10' AS CODE_NM
+    UNION ALL
+    SELECT @V_M11 AS CODE_CD, '~M11' AS CODE_NM
+    UNION ALL
+    SELECT @V_M12 AS CODE_CD, '~M12' AS CODE_NM
+    
+    
+    
+    </select>
+    
+</mapper>

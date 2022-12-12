@@ -1,0 +1,1517 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.planSalesCpfr">
+	<select id="planSalesCpfrVersionSelect" parameterType="map" resultType="map">
+		/****** [ dp.planSalesCpfr.planSalesCpfrVersionSelect ] ******/
+		SELECT PLAN_ID AS CODE_CD
+		     , PLAN_ID AS CODE_NM
+		     , CPFR_START_MONTH
+		     , CPFR_END_MONTH
+		     , CONFIRM_FLAG
+		     , (SELECT YEARPWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112)) AS CURRENT_WEEK
+		FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_TYPE_CD = 'DP_M'
+		#if($_parameter.planId and $_parameter.planId != "")
+		  AND PLAN_ID = @{planId}
+		#end
+		ORDER BY PLAN_ID DESC
+	</select>
+	
+	<select id="planSalesCpfrAuthSelect" parameterType="map" resultType="map">
+		/****** [ dp.planSalesCpfr.planSalesCpfrAuthSelect ] ******/
+		SELECT CASE WHEN A1.ROLE_CD = 'ADMINDP0001' THEN 'ADMIN'
+		            WHEN A1.ROLE_CD = 'GOCQT0001' THEN 'SCM'
+		            ELSE NULL
+		        END ROLE_CD
+		FROM TB_MST_ROLE A1 WITH(NOLOCK)
+		INNER JOIN TB_MAP_USER_ROLE A2 WITH(NOLOCK)
+		   ON A1.BU_CD = A2.BU_CD
+		  AND A1.ROLE_CD = A2.ROLE_CD
+		INNER JOIN TB_MST_USER A3 WITH(NOLOCK)
+		   ON A2.USER_ID = A3.USER_ID
+		WHERE A1.BU_CD = @{GV_BU_CD}
+		  AND A1.ROLE_CD IN ('ADMINDP0001', 'GOCQT0001')
+		  AND A1.USE_FLAG = 'Y'
+		  AND A2.USE_FLAG = 'Y'
+		  AND A3.DEL_FLAG = 'N'
+		  AND A3.USE_FLAG = 'Y'
+		  AND A3.USER_ID = @{GV_USER_ID}
+		GROUP BY A1.BU_CD, A2.USER_ID, A1.ROLE_CD
+	</select>
+	
+	<select id="bucketAllSelect" parameterType="map" resultType="map">
+		/****** [ dp.planSalesCpfr.bucketAllSelect ] ******/
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'OEMS' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'oems', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+		UNION ALL
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'PLAN_CPFR' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'cpfrSpQty', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+		#if($_parameter.excelFlag == "N")
+		UNION ALL
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'PROD_CPFR' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'cpfrSpAmtKrw', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+		UNION ALL
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'CURRENT_CPFR' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'currentCpfr', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE   
+		#end
+	</select>
+	
+	<select id="bucketAll2Select" parameterType="map" resultType="map">
+		/****** [ dp.planSalesCpfr.bucketAll2Select ] ******/
+		SELECT 'OEMS_' + YEARMONTH AS BUCKET_ID
+		     , 'OEMS_M' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARMONTH ASC) - 1) AS BUCKET_VAL
+		     , 'OEMS_M' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARMONTH ASC) - 1) AS CD
+		     , 'M' + YEARMONTH AS NM
+		     , 'OEMS' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , 'N' AS FLAG
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARMONTH BETWEEN @{fromMonth} AND @{toMonth}
+		GROUP BY YEARMONTH
+		#if($_parameter.excelFlag == "N")
+		UNION ALL
+		SELECT 'OEMS_TOT' AS BUCKET_ID
+		     , 'OEMS_TOT' AS BUCKET_VAL
+		     , 'OEMS_TOT' AS CD
+		     , 'TOTAL' AS NM
+		     , 'OEMS' AS ROOT_CD
+		     , NULL AS TYPE
+		     , 'MT' AS TOT_TYPE
+		     , 'N' AS FLAG
+		#end
+    	UNION ALL
+		SELECT 'PLAN_CPFR_' + YEARMONTH AS BUCKET_ID
+		     , 'M' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARMONTH ASC) - 1) AS BUCKET_VAL
+		     , 'M' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARMONTH ASC) - 1) AS CD
+		     , 'M' + YEARMONTH AS NM
+		     , 'PLAN_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , 'N' AS FLAG
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARMONTH BETWEEN @{fromMonth} AND @{toMonth}
+		GROUP BY YEARMONTH
+		#if($_parameter.excelFlag == "N")
+		UNION ALL
+		SELECT 'PLAN_CPFR_TOT' AS BUCKET_ID
+		     , 'PLAN_CPFR_TOT' AS BUCKET_VAL
+		     , 'PLAN_CPFR_TOT' AS CD
+		     , 'TOTAL' AS NM
+		     , 'PLAN_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , 'MT' AS TOT_TYPE
+		     , 'N' AS FLAG
+		UNION ALL
+		SELECT 'PROD_CPFR_' + YEARPWEEK AS BUCKET_ID
+		     , YEARPWEEK AS BUCKET_VAL
+		     , 'PROD_CPFR_' + YEARPWEEK AS CD
+		     , YEARPWEEK AS NM
+		     , 'PROD_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , CASE WHEN CONVERT(INT, SUBSTRING(YEARPWEEK, 1, 6)) - CONVERT(INT, (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112))) <![CDATA[<]]> 0
+		            THEN 'P'
+		            WHEN CONVERT(INT, SUBSTRING(YEARPWEEK, 1, 6)) - CONVERT(INT, (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112))) <![CDATA[=]]> 0
+		            THEN 'C'
+		            ELSE 'F'
+		        END FLAG
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARMONTH = @{fromMonth}
+		GROUP BY YEARPWEEK
+		UNION ALL
+		SELECT 'PROD_CPFR_TOT' AS BUCKET_ID
+		     , 'PROD_CPFR_TOT' AS BUCKET_VAL
+		     , 'PROD_CPFR_TOT' AS CD
+		     , 'TOTAL' AS NM
+		     , 'PROD_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , 'MT' AS TOT_TYPE
+		     , 'N' AS FLAG
+		UNION ALL
+		SELECT 'MONTH_REMAIN_QTY' AS BUCKET_ID
+		     , 'MONTH_REMAIN_QTY' AS BUCKET_VAL
+		     , 'MONTH_REMAIN_QTY' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'monthRemainQty', @{GV_LANG}) AS NM
+		     , 'PROD_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , 'N' AS FLAG
+		UNION ALL
+		SELECT 'THIS_WEEK_RESULT' AS BUCKET_ID
+		     , 'THIS_WEEK_RESULT' AS BUCKET_VAL
+		     , 'THIS_WEEK_RESULT' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'thisWeekShipResult', @{GV_LANG}) AS NM
+		     , 'CURRENT_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , 'N' AS FLAG		     
+		UNION ALL
+		SELECT 'THIS_MONTH_RATE' AS BUCKET_ID
+		     , 'THIS_MONTH_RATE' AS BUCKET_VAL
+		     , 'THIS_MONTH_RATE' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'thisMonthRate', @{GV_LANG}) AS NM
+		     , 'CURRENT_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , 'N' AS FLAG
+		UNION ALL
+		SELECT 'CPFR_INV' AS BUCKET_ID
+		     , 'CPFR_INV' AS BUCKET_VAL
+		     , 'CPFR_INV' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'prodInvStatus', @{GV_LANG}) AS NM
+		     , 'CURRENT_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , 'N' AS FLAG
+		UNION ALL
+		SELECT 'RETENTION_RATE' AS BUCKET_ID
+		     , 'RETENTION_RATE' AS BUCKET_VAL
+		     , 'RETENTION_RATE' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'retentionRate', @{GV_LANG}) AS NM
+		     , 'CURRENT_CPFR' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , 'N' AS FLAG
+		#end
+	</select>
+	
+	<select id="planSalesCpfrSelect" parameterType="map" resultType="map">
+		/****** [ dp.planSalesCpfr.planSalesCpfrSelect ] ******/
+		BEGIN
+		
+			DECLARE @PLAN_ID_M_1 NVARCHAR(8);
+			DECLARE @PLAN_ID_M_2 NVARCHAR(8);
+			DECLARE @PLAN_ID_M_3 NVARCHAR(8);
+			DECLARE @INV_DATE_SET NVARCHAR(8);
+		
+			SELECT @PLAN_ID_M_1 = MAX(PLAN_ID_M1)
+		         , @PLAN_ID_M_2 = MAX(PLAN_ID_M2)
+		         , @PLAN_ID_M_3 = MAX(PLAN_ID_M3)
+			FROM
+		    (
+				SELECT CASE WHEN RN = 1 THEN PLAN_ID END PLAN_ID_M1
+				     , CASE WHEN RN = 2 THEN PLAN_ID END PLAN_ID_M2
+					 , CASE WHEN RN = 3 THEN PLAN_ID END PLAN_ID_M3
+				FROM
+				(
+					SELECT TOP 3 PLAN_ID
+					     , ROW_NUMBER() OVER(ORDER BY PLAN_ID DESC) AS RN
+					FROM TB_MST_PLAN_VERSION
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					  AND BU_CD = @{GV_BU_CD}
+					  AND PLAN_TYPE_CD = 'DP_M'
+					  AND PLAN_ID <![CDATA[<]]> @{planId}
+				) A
+			) B
+			;
+			
+			#if($_parameter.currentYn == "Y")
+				SELECT @INV_DATE_SET = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112);
+			#else
+				SELECT @INV_DATE_SET = YYYYMMDD 
+				FROM
+				(
+					SELECT YYYYMMDD
+	               		 , ROW_NUMBER() OVER(ORDER BY YYYYMMDD DESC) RN
+					FROM TB_MST_CALENDAR WITH(NOLOCK)
+					WHERE YEARMONTH = @{fromMonth}
+				) A
+				WHERE A.RN = 1
+				;				
+			#end
+		
+			<include refid="snop.common.w_item" />
+			,
+			W_MAIN_ITEM AS
+			(
+				SELECT C1.*
+					#if($_parameter.authSelect != "ADMIN" and $_parameter.authSelect != "SCM")
+					 , CASE WHEN C2.ITEM_CD IS NULL THEN 'N' ELSE 'Y' END ITEM_SELECT
+					#else
+					 , CASE WHEN @{authSelect} = 'ADMIN' OR @{authSelect} = 'SCM' THEN 'Y' ELSE 'N' END ITEM_SELECT
+					#end
+				FROM
+				(
+					SELECT A1.COMPANY_CD
+			             , A1.BU_CD
+			             , ISNULL(A1.ROUTING_ID, ' ') AS ROUTING_ID
+			             , ISNULL(A1.ROUTING_ID, ' ') AS ROUTING_ID_NM
+			             , ISNULL(A1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			             , ISNULL(A1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			             , ISNULL(A1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			             , ISNULL(A1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			             , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD
+			             , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD_NM
+			             , ISNULL(A1.ITEM_NM, ' ') AS ITEM_NM
+			             , ISNULL(A1.ITEM_NM, ' ') AS ITEM_NM_NM
+			             , ISNULL(A1.SPEC, ' ') AS SPEC
+			             , ISNULL(A1.SPEC, ' ') AS SPEC_NM
+			             , ISNULL(A1.DRAW_NO, ' ') AS DRAW_NO
+			             , ISNULL(A1.DRAW_NO, ' ') AS DRAW_NO_NM
+			             , ISNULL(CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+			             , ISNULL(CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+			             , ISNULL(A1.SALES_PRICE_KRW, 0) AS SALES_PRICE_KRW_HIDDEN
+			             , ISNULL(A1.CPFR_YN, ' ') AS CPFR_YN
+			             , ISNULL(A1.CPFR_YN, ' ') AS CPFR_YN_NM
+			             , ISNULL(A1.CLEANING_YN, ' ') AS CLEANING_YN
+			             , ISNULL(A1.CLEANING_YN, ' ') AS CLEANING_YN_NM
+						 , A1.CUST_GROUP_CD
+					FROM W_ITEM A1
+					WHERE A1.CUST_GROUP_CD IN
+					(
+						SELECT CUST_GROUP_CD
+						FROM TB_MST_CUST_GROUP WITH(NOLOCK)
+						WHERE REP_CUST_GROUP_CD IN 
+						(
+							SELECT REP_CUST_GROUP_CD
+							FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+							WHERE COMPANY_CD = @{GV_COMPANY_CD}
+							  AND BU_CD = @{GV_BU_CD}
+							  AND CUST_CATE = 'SAM'
+						)
+					)
+				) C1
+				#if($_parameter.authSelect != "ADMIN" and $_parameter.authSelect != "SCM")
+				LEFT OUTER JOIN
+				(
+					SELECT B1.COMPANY_CD
+		                 , B1.BU_CD
+		                 , B1.ITEM_CD
+		                 , B1.CUST_GROUP_CD 
+					FROM TB_MAP_ITEM_CUST_GROUP_AP1 B1 WITH(NOLOCK)
+		            INNER JOIN TB_MAP_AP1_AP2 B2 WITH(NOLOCK)
+					   ON B1.COMPANY_CD  = B2.COMPANY_CD
+		              AND B1.AP1_USER_ID = B2.AP1_USER_ID
+					  AND (B2.AP2_USER_ID = @{GV_USER_ID} OR B2.AP1_USER_ID = @{GV_USER_ID})
+					WHERE B1.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND B1.BU_CD = @{GV_BU_CD}
+					  AND B1.USE_FLAG = 'Y'
+					GROUP BY B1.COMPANY_CD, B1.BU_CD, B1.ITEM_CD, B1.CUST_GROUP_CD 
+				) C2
+				ON C1.COMPANY_CD     = C2.COMPANY_CD
+				AND C1.BU_CD         = C2.BU_CD
+	            AND C1.ITEM_CD       = C2.ITEM_CD
+	            AND C1.CUST_GROUP_CD = C2.CUST_GROUP_CD
+	            #end
+			),
+			W_MEASURE AS 
+			(
+		    	SELECT CATEGORY_CD
+		    	     , CATEGORY_NM
+		    	     , CATEGORY_IDX 
+		        FROM 
+		        (
+		        	SELECT NULL AS CATEGORY_CD
+		        	     , NULL AS CATEGORY_NM
+		        	     , NULL AS CATEGORY_IDX
+					#foreach( $meaMap in $_parameter.meaList )
+		            UNION ALL 
+		            SELECT '$meaMap.CD'
+		                 , '$meaMap.NM'
+		                 , $velocityCount 
+					#end
+				) A
+		        WHERE CATEGORY_CD IS NOT NULL
+			),
+			W_MAIN_OEMS AS
+			(
+				/*삼성전자 OEMS CPFR_계획수량*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , OEMS_QTY_M0 AS OEMS_M0
+			         , OEMS_QTY_M1 AS OEMS_M1
+			         , OEMS_QTY_M2 AS OEMS_M2
+			         , OEMS_QTY_M3 AS OEMS_M3
+			         , ISNULL(OEMS_QTY_M0, 0) + ISNULL(OEMS_QTY_M1, 0) + ISNULL(OEMS_QTY_M2, 0) + ISNULL(OEMS_QTY_M3, 0) AS OEMS_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @{planId}
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_OEMS_VARY AS
+			(
+				/*삼성전자 OEMS CPFR_변동수량*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , OEMS_QTY_M0 AS OEMS_M0
+			         , OEMS_QTY_M1 AS OEMS_M1
+			         , OEMS_QTY_M2 AS OEMS_M2
+			         , OEMS_QTY_M3 AS OEMS_M3
+			         , ISNULL(OEMS_QTY_M0, 0) + ISNULL(OEMS_QTY_M1, 0) + ISNULL(OEMS_QTY_M2, 0) + ISNULL(OEMS_QTY_M3, 0) AS OEMS_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @{planId}
+				  AND MEAS_CD = 'ADJ'
+			),
+			W_MAIN_OEMS_M_1 AS
+			(
+				/*삼성전자 OEMS CPFR_계획수량(M-1)*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , OEMS_QTY_M2 AS OEMS_M0
+			         , OEMS_QTY_M3 AS OEMS_M1
+			         , OEMS_QTY_M4 AS OEMS_M2
+			         , NULL AS OEMS_M3
+			         , NULL AS OEMS_M4
+			         , ISNULL(OEMS_QTY_M2, 0) + ISNULL(OEMS_QTY_M3, 0) + ISNULL(OEMS_QTY_M4, 0) AS OEMS_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @PLAN_ID_M_1
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_OEMS_M_2 AS
+			(
+				/*삼성전자 OEMS CPFR_계획수량(M-2)*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , OEMS_QTY_M3 AS OEMS_M0
+			         , OEMS_QTY_M4 AS OEMS_M1
+			         , NULL AS OEMS_M2
+			         , NULL AS OEMS_M3
+			         , NULL AS OEMS_M4
+			         , ISNULL(OEMS_QTY_M3, 0) + ISNULL(OEMS_QTY_M4, 0) AS OEMS_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @PLAN_ID_M_2
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_OEMS_M_3 AS
+			(
+				/*삼성전자 OEMS CPFR_계획수량(M-3)*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , OEMS_QTY_M4 AS OEMS_M0
+			         , NULL AS OEMS_M1
+			         , NULL AS OEMS_M2
+			         , NULL AS OEMS_M3
+			         , NULL AS OEMS_M4
+			         , ISNULL(OEMS_QTY_M4, 0) AS OEMS_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @PLAN_ID_M_3
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_CPFR AS
+			(
+				/*CPFR 출하계획 CPFR_계획수량*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , SALES_PLAN_QTY_M0 AS M0
+			         , SALES_PLAN_QTY_M1 AS M1
+			         , SALES_PLAN_QTY_M2 AS M2
+			         , SALES_PLAN_QTY_M3 AS M3
+			         , ISNULL(SALES_PLAN_QTY_M0, 0) + ISNULL(SALES_PLAN_QTY_M1, 0) + ISNULL(SALES_PLAN_QTY_M2, 0) + ISNULL(SALES_PLAN_QTY_M3, 0) AS PLAN_CPFR_TOT
+			         , RETENTION_RATE
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @{planId}
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_CPFR_M_1 AS
+			(
+				/*CPFR 출하계획 CPFR_계획수량(M-1)*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , SALES_PLAN_QTY_M2 AS M0
+			         , SALES_PLAN_QTY_M3 AS M1
+			         , SALES_PLAN_QTY_M4 AS M2
+			         , NULL AS M3
+			         , NULL AS M4
+			         , ISNULL(SALES_PLAN_QTY_M2, 0) + ISNULL(SALES_PLAN_QTY_M3, 0) + ISNULL(SALES_PLAN_QTY_M4, 0) AS PLAN_CPFR_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @PLAN_ID_M_1
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_CPFR_M_2 AS
+			(
+				/*CPFR 출하계획 CPFR_계획수량(M-2)*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , SALES_PLAN_QTY_M3 AS M0
+			         , SALES_PLAN_QTY_M4 AS M1
+			         , NULL AS M2
+			         , NULL AS M3
+			         , NULL AS M4
+			         , ISNULL(SALES_PLAN_QTY_M3, 0) + ISNULL(SALES_PLAN_QTY_M4, 0) AS PLAN_CPFR_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @PLAN_ID_M_2
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_CPFR_M_3 AS
+			(
+				/*CPFR 출하계획 CPFR_계획수량(M-3)*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , SALES_PLAN_QTY_M4 AS M0
+			         , NULL AS M1
+			         , NULL AS M2
+			         , NULL AS M3
+			         , NULL AS M4
+			         , ISNULL(SALES_PLAN_QTY_M4, 0) AS PLAN_CPFR_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @PLAN_ID_M_3
+				  AND MEAS_CD = 'PLN'
+			),
+			W_MAIN_CPFR_VARY AS
+			(
+				/*CPFR 출하계획 CPFR_변동수량*/
+				SELECT COMPANY_CD
+			         , BU_CD
+			         , PLAN_ID
+			         , ITEM_CD
+			         , SALES_PLAN_QTY_M0 AS M0
+			         , SALES_PLAN_QTY_M1 AS M1
+			         , SALES_PLAN_QTY_M2 AS M2
+			         , SALES_PLAN_QTY_M3 AS M3
+			         , ISNULL(SALES_PLAN_QTY_M0, 0) + ISNULL(SALES_PLAN_QTY_M1, 0) + ISNULL(SALES_PLAN_QTY_M2, 0) + ISNULL(SALES_PLAN_QTY_M3, 0) AS PLAN_CPFR_TOT
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @{planId}
+				  AND MEAS_CD = 'ADJ'
+			),
+			W_MAIN_PAST_RESULT AS
+			(
+				/*CPFR 출하실적_당주계획 과거, 당주출하실적*/
+				SELECT A1.COMPANY_CD
+				     , A1.BU_CD
+				     , A1.ITEM_CD
+					#foreach($bucketMap in $_parameter.bucketList)
+					#set($paramWeek = "$bucketMap.BUCKET_VAL")
+						#if($bucketMap.ROOT_CD.indexOf("PROD_CPFR") != -1)
+							#if($bucketMap.CD.indexOf("PROD_CPFR_TOT") > -1)
+							#elseif($bucketMap.CD.indexOf("MONTH_REMAIN_QTY") > -1)
+							#else
+								#if($bucketMap.FLAG.indexOf("P") != -1)
+									, SUM(CASE WHEN A2.YEARPWEEK = '$paramWeek' THEN A1.QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.FLAG.indexOf("C") != -1)
+									, SUM(CASE WHEN A2.YEARPWEEK = '$paramWeek' THEN A1.QTY END) AS THIS_WEEK_RESULT
+								#end
+							#end
+						#end
+					#end
+				FROM TB_DYN_SALES_RESULT A1 WITH(NOLOCK)
+				INNER JOIN TB_MST_CALENDAR A2 WITH(NOLOCK)
+				   ON A1.SALES_DATE = A2.YYYYMMDD
+				WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND A1.BU_CD = @{GV_BU_CD}
+				  AND A1.PLANT_CD = 'WF01'
+				  AND A1.DEL_FLAG = 'N'
+				  AND ISNULL(A1.CPFR_FLAG, 'N') = 'Y'
+				  AND A2.YEARMONTH = @{fromMonth}
+				GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+			),
+			W_MAIN_CURRENT_FUTURE_RESULT AS
+			(
+				/*CPFR 출하실적_당주계획 현재, 미래*/
+				SELECT KSP.COMPANY_CD
+				     , KSP.BU_CD
+				     , KSP.ITEM_CD
+				    #foreach($bucketMap in $_parameter.bucketList)
+					#set($paramWeek = "$bucketMap.BUCKET_VAL")
+						#if($bucketMap.ROOT_CD.indexOf("PROD_CPFR") != -1)
+							#if($bucketMap.CD.indexOf("PROD_CPFR_TOT") > -1)
+							#elseif($bucketMap.CD.indexOf("MONTH_REMAIN_QTY") > -1)
+							#else
+								#if($bucketMap.FLAG.indexOf("P") == -1)
+									, SUM(CASE WHEN KSP.YEARPWEEK = '$paramWeek' THEN KSP.QTY END) AS $bucketMap.CD
+								#end
+							#end
+						#end
+					#end
+				FROM TB_KPI_SALES_PLAN KSP WITH(NOLOCK)
+				INNER JOIN TB_MST_CUST_GROUP MCG WITH(NOLOCK)
+				   ON MCG.COMPANY_CD = KSP.COMPANY_CD
+				  AND MCG.BU_CD = KSP.BU_CD
+				  AND MCG.CUST_GROUP_CD = KSP.CUST_GROUP_CD
+				INNER JOIN TB_MST_REP_CUST_GROUP MRCG WITH(NOLOCK)
+				   ON MRCG.COMPANY_CD = MCG.COMPANY_CD
+				  AND MRCG.BU_CD = MCG.BU_CD
+				  AND MRCG.REP_CUST_GROUP_CD = MCG.REP_CUST_GROUP_CD
+				  AND MRCG.CUST_CATE = 'SAM'
+				WHERE KSP.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND KSP.BU_CD = @{GV_BU_CD}
+				  AND KSP.MEAS_CD = 'CFM_DMD1_SP'
+	              AND KSP.YEARPWEEK = @{currentWeek}
+	            GROUP BY KSP.COMPANY_CD, KSP.BU_CD, KSP.ITEM_CD
+			),
+			W_MAIN_INV AS
+			(
+				/*CPFR 현황 재고*/
+				SELECT COMPANY_CD
+				     , BU_CD
+				     , ITEM_CD
+				     , SUM(INV_QTY) AS CPFR_INV
+				     , SUM(INV_AMT_KRW) AS CPFR_INV_AMT_KRW
+				FROM UV_DYN_INVENTORY WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLANT_CD = 'WF01'
+				  AND INV_DATE = @INV_DATE_SET
+				GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+			)
+			SELECT NULL AS TMP_COL
+			     <include refid="include.getDimTotal"/>
+			     , CASE WHEN GRP_LVL_ID = 0 THEN F1.CPFR_YN ELSE NULL END CPFR_YN
+			     , CASE WHEN GRP_LVL_ID = 0 THEN F1.CPFR_YN ELSE NULL END CPFR_YN_NM
+			     , F1.GRP_LVL_ID
+			     , F1.CATEGORY_CD
+			     , F1.CATEGORY_NM
+			     , F1.CATEGORY_IDX
+			     , CASE WHEN GRP_LVL_ID != 0 THEN 'N'
+			            WHEN CPFR_YN = 'N' THEN 'N'
+			            WHEN CATEGORY_CD = 'CPFR_SP' AND @{confirmFlag} = 'N' THEN CASE WHEN @{authSelect} = 'ADMIN' OR @{authSelect} = 'SCM' THEN 'Y' ELSE CASE WHEN ITEM_SELECT = 'Y' THEN 'Y' ELSE 'N' END END
+			            WHEN CATEGORY_CD = 'CPFR_VARY_SP' AND @{confirmFlag} = 'N' THEN CASE WHEN @{authSelect} = 'ADMIN' OR @{authSelect} = 'SCM' THEN 'Y' ELSE 'N' END
+			            ELSE 'N'
+			        END CONFIRM_FLAG
+			     , CASE WHEN GRP_LVL_ID != 0 THEN 'N'
+			            WHEN @{confirmFlag} = 'N' THEN 'Y'
+			            ELSE 'N'
+			        END CONFIRM_FLAG2
+			     , ITEM_SELECT
+				#foreach( $bucketMap in $_parameter.bucketList )
+			     , $bucketMap.CD
+			    #end
+			FROM
+			(
+				SELECT NULL AS TMP_COL
+					#foreach( $dimMap in $_parameter.dimList )
+				     , E1.$dimMap.DIM_CD
+				     , MAX(E1.${dimMap.DIM_CD}_NM) AS ${dimMap.DIM_CD}_NM
+				    #end
+				    #foreach( $bucketMap in $_parameter.bucketList )
+				    
+				    #if($bucketMap.CD.indexOf("THIS_WEEK_RESULT") > -1)
+				    	#if($_parameter.currentYn == "Y")
+				    	 , SUM(E1.$bucketMap.CD) AS $bucketMap.CD
+				    	#else
+				    	 , NULL AS $bucketMap.CD
+				    	#end
+				    #elseif($bucketMap.CD.indexOf("THIS_MONTH_RATE") > -1)
+				    	#if($_parameter.currentYn == "Y")
+				    	 , ((ISNULL(SUM(E1.THIS_WEEK_RESULT), 0) + ISNULL(SUM(E1.PROD_PAST_TOT), 0)) / NULLIF(SUM(E1.M0), 0)) * 100 AS $bucketMap.CD
+				    	#else
+				    	 , NULL AS $bucketMap.CD
+				    	#end
+				   	#elseif($bucketMap.CD.indexOf("RETENTION_RATE") > -1)
+				   	 , AVG(E1.$bucketMap.CD) AS $bucketMap.CD
+				    #else
+				     , SUM(E1.$bucketMap.CD) AS $bucketMap.CD
+				    #end
+				    #end
+				     , MAX(E1.CPFR_YN) AS CPFR_YN
+				     , MAX(E1.CPFR_YN_NM) AS CPFR_YN_NM
+				     , MAX(E1.ITEM_SELECT) AS ITEM_SELECT
+				     , E1.CATEGORY_CD
+				     , E1.CATEGORY_NM
+				     , E1.CATEGORY_IDX
+				     <include refid="include.getGrpLvlId"/>
+				FROM
+				(
+					SELECT NULL AS TMP_COL
+						#foreach( $dimMap in $_parameter.dimList )
+				         , D1.$dimMap.DIM_CD 
+				         , D1.${dimMap.DIM_CD}_NM
+						#end
+						 , D1.CPFR_YN
+						 , D1.CPFR_YN_NM
+						 , D1.ITEM_SELECT
+						 , D5.CATEGORY_CD
+				         , D5.CATEGORY_NM
+				         , D5.CATEGORY_IDX
+				        #set($strProdCpfrTot = "")
+				        #set($strProdPastTot= "")
+						#foreach($bucketMap in $_parameter.bucketList)
+						#set($paramWeek = "$bucketMap.BUCKET_VAL")
+						
+							#if($bucketMap.ROOT_CD.indexOf("OEMS") != -1)
+								, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN  D7.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D7.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN  D8.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D8.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN  D9.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN D9.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN  D10.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN D10.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN  D11.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN D11.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								   END $bucketMap.CD
+							#elseif($bucketMap.ROOT_CD.indexOf("PLAN_CPFR") != -1)
+								, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN  D2.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D2.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN  D6.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D6.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN  D12.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN D12.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN  D13.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN D13.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN  D14.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN D14.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								   END $bucketMap.CD
+							#elseif($bucketMap.ROOT_CD.indexOf("PROD_CPFR") != -1)
+								#if($bucketMap.CD.indexOf("MONTH_REMAIN_QTY") > -1)
+								#elseif($bucketMap.CD.indexOf("PROD_CPFR_TOT") > -1)
+									, CASE WHEN (CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN D6.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D6.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									   			 END 
+									   			 -
+									   			CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 
+									    		 END) <![CDATA[>]]> 0 
+									       THEN (CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN D6.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D6.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN D2.M0 
+									       			  WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+									   			 END 
+									   			 -
+									   			CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									        		 WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									    		 END) 
+									    	ELSE 0
+									   	END MONTH_REMAIN_QTY
+									, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									   END $bucketMap.CD
+									
+									#if($strProdPastTot == "")
+										, 0 as PROD_PAST_TOT
+									#else
+										, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN (ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN (ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN (ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN (ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN (ISNULL($strProdPastTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+									   END PROD_PAST_TOT
+									#end   
+									#set($strProdCpfrTot = "")
+									#set($strProdPastTot = "")
+								#else
+									#if($bucketMap.FLAG.indexOf("P") != -1)
+										, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN $bucketMap.CD 
+										       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN $bucketMap.CD 
+										       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN $bucketMap.CD 
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN $bucketMap.CD 
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN $bucketMap.CD 
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										   END $bucketMap.CD
+										#set($strProdPastTot = $strProdPastTot + "," +$bucketMap.CD)
+									#else
+										, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN $bucketMap.CD 
+										       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN $bucketMap.CD
+										       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN $bucketMap.CD
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN $bucketMap.CD
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN $bucketMap.CD
+										       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+										   END $bucketMap.CD
+									#end
+									#set($strProdCpfrTot = $strProdCpfrTot + "," +$bucketMap.CD)
+								#end
+							#elseif($bucketMap.ROOT_CD.indexOf("CURRENT_CPFR") != -1)
+								#if($bucketMap.CD.indexOf("THIS_WEEK_RESULT") > -1)
+									#if($_parameter.currentYn == "Y")
+									, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN  D3.${bucketMap.CD} 
+									       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D3.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN  D3.${bucketMap.CD} 
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D3.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN  D3.${bucketMap.CD} 
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN D3.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN  D3.${bucketMap.CD} 
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN D3.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN  D3.${bucketMap.CD} 
+									       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN D3.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+									   END $bucketMap.CD
+									#end
+								#elseif($bucketMap.CD.indexOf("THIS_MONTH_RATE") > -1)
+								#elseif($bucketMap.CD.indexOf("CPFR_INV") > -1)
+								, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN  D15.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D15.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN  D15.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D15.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN  D15.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN D15.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN  D15.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN D15.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN  D15.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN D15.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+								   END $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("RETENTION_RATE") > -1)
+								, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN  D2.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D2.${bucketMap.CD}
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN  D2.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D2.${bucketMap.CD}
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP' THEN  D2.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_1_SP_AMT_KRW' THEN D2.${bucketMap.CD}
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP' THEN  D2.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_2_SP_AMT_KRW' THEN D2.${bucketMap.CD}
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP' THEN  D2.${bucketMap.CD} 
+								       WHEN D5.CATEGORY_CD = 'CPFR_M_3_SP_AMT_KRW' THEN D2.${bucketMap.CD}
+								   END $bucketMap.CD
+								#end
+							#end
+						#end
+					FROM W_MAIN_ITEM D1
+					LEFT OUTER JOIN W_MAIN_CPFR D2
+					  ON D1.COMPANY_CD = D2.COMPANY_CD
+					 AND D1.BU_CD = D2.BU_CD
+					 AND D1.ITEM_CD = D2.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_CPFR_VARY D6 
+					  ON D1.COMPANY_CD = D6.COMPANY_CD
+					 AND D1.BU_CD = D6.BU_CD
+					 AND D1.ITEM_CD = D6.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_PAST_RESULT D3
+					  ON D1.COMPANY_CD = D3.COMPANY_CD
+					 AND D1.BU_CD = D3.BU_CD
+					 AND D1.ITEM_CD = D3.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_CURRENT_FUTURE_RESULT D4
+					  ON D1.COMPANY_CD = D4.COMPANY_CD
+					 AND D1.BU_CD = D4.BU_CD
+					 AND D1.ITEM_CD = D4.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_OEMS D7
+					  ON D1.COMPANY_CD = D7.COMPANY_CD
+					 AND D1.BU_CD = D7.BU_CD
+					 AND D1.ITEM_CD = D7.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_OEMS_VARY D8
+					  ON D1.COMPANY_CD = D8.COMPANY_CD
+					 AND D1.BU_CD = D8.BU_CD
+					 AND D1.ITEM_CD = D8.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_OEMS_M_1 D9
+					  ON D1.COMPANY_CD = D9.COMPANY_CD
+					 AND D1.BU_CD = D9.BU_CD
+					 AND D1.ITEM_CD = D9.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_OEMS_M_2 D10
+					  ON D1.COMPANY_CD = D10.COMPANY_CD
+					 AND D1.BU_CD = D10.BU_CD
+					 AND D1.ITEM_CD = D10.ITEM_CD 
+					LEFT OUTER JOIN W_MAIN_OEMS_M_3 D11
+					  ON D1.COMPANY_CD = D11.COMPANY_CD
+					 AND D1.BU_CD = D11.BU_CD
+					 AND D1.ITEM_CD = D11.ITEM_CD 
+					LEFT OUTER JOIN W_MAIN_CPFR_M_1 D12
+					  ON D1.COMPANY_CD = D12.COMPANY_CD
+					 AND D1.BU_CD = D12.BU_CD
+					 AND D1.ITEM_CD = D12.ITEM_CD
+					LEFT OUTER JOIN W_MAIN_CPFR_M_2 D13
+					  ON D1.COMPANY_CD = D13.COMPANY_CD
+					 AND D1.BU_CD = D13.BU_CD
+					 AND D1.ITEM_CD = D13.ITEM_CD 
+					LEFT OUTER JOIN W_MAIN_CPFR_M_3 D14
+					  ON D1.COMPANY_CD = D14.COMPANY_CD
+					 AND D1.BU_CD = D14.BU_CD
+					 AND D1.ITEM_CD = D14.ITEM_CD  
+					LEFT OUTER JOIN W_MAIN_INV D15
+					  ON D1.COMPANY_CD = D15.COMPANY_CD
+					 AND D1.BU_CD = D15.BU_CD
+					 AND D1.ITEM_CD = D15.ITEM_CD 
+					CROSS JOIN W_MEASURE D5
+				) E1
+				GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), E1.CATEGORY_CD, E1.CATEGORY_NM, E1.CATEGORY_IDX
+			) F1   
+			ORDER BY F1.TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+		    , F1.$dimMap.DIM_CD
+		    #end
+		    , F1.CATEGORY_IDX
+		END;
+		
+		
+		
+		<!-- <include refid="snop.common.w_item" />
+		,
+		W_MAIN_ITEM AS
+		(
+			SELECT C1.*
+				#if($_parameter.authSelect != "ADMIN" and $_parameter.authSelect != "SCM")
+				 , CASE WHEN C2.ITEM_CD IS NULL THEN 'N' ELSE 'Y' END ITEM_SELECT
+				#else
+				 , CASE WHEN @{authSelect} = 'ADMIN' OR @{authSelect} = 'SCM' THEN 'Y' ELSE 'N' END ITEM_SELECT
+				#end
+			FROM
+			(
+				SELECT A1.COMPANY_CD
+		             , A1.BU_CD
+		             , ISNULL(A1.ROUTING_ID, ' ') AS ROUTING_ID
+		             , ISNULL(A1.ROUTING_ID, ' ') AS ROUTING_ID_NM
+		             , ISNULL(A1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+		             , ISNULL(A1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+		             , ISNULL(A1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+		             , ISNULL(A1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+		             , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD
+		             , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD_NM
+		             , ISNULL(A1.ITEM_NM, ' ') AS ITEM_NM
+		             , ISNULL(A1.ITEM_NM, ' ') AS ITEM_NM_NM
+		             , ISNULL(A1.SPEC, ' ') AS SPEC
+		             , ISNULL(A1.SPEC, ' ') AS SPEC_NM
+		             , ISNULL(A1.DRAW_NO, ' ') AS DRAW_NO
+		             , ISNULL(A1.DRAW_NO, ' ') AS DRAW_NO_NM
+		             , ISNULL(CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+		             , ISNULL(CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+		             , ISNULL(A1.SALES_PRICE_KRW, 0) AS SALES_PRICE_KRW_HIDDEN
+		             , ISNULL(A1.CPFR_YN, ' ') AS CPFR_YN
+		             , ISNULL(A1.CPFR_YN, ' ') AS CPFR_YN_NM
+					 , A1.CUST_GROUP_CD
+				FROM W_ITEM A1
+				WHERE A1.CUST_GROUP_CD IN
+				(
+					SELECT CUST_GROUP_CD
+					FROM TB_MST_CUST_GROUP WITH(NOLOCK)
+					WHERE REP_CUST_GROUP_CD IN 
+					(
+						SELECT REP_CUST_GROUP_CD
+						FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+						WHERE COMPANY_CD = @{GV_COMPANY_CD}
+						  AND BU_CD = @{GV_BU_CD}
+						  AND CUST_CATE = 'SAM'
+					)
+				)
+			) C1
+			#if($_parameter.authSelect != "ADMIN" and $_parameter.authSelect != "SCM")
+			LEFT OUTER JOIN
+			(
+				SELECT B1.COMPANY_CD
+	                 , B1.BU_CD
+	                 , B1.ITEM_CD
+	                 , B1.CUST_GROUP_CD 
+				FROM TB_MAP_ITEM_CUST_GROUP_AP1 B1 WITH(NOLOCK)
+	            INNER JOIN TB_MAP_AP1_AP2 B2 WITH(NOLOCK)
+				   ON B1.COMPANY_CD  = B2.COMPANY_CD
+	              AND B1.AP1_USER_ID = B2.AP1_USER_ID
+				  AND (B2.AP2_USER_ID = @{GV_USER_ID} OR B2.AP1_USER_ID = @{GV_USER_ID})
+				WHERE B1.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND B1.BU_CD = @{GV_BU_CD}
+				  AND B1.USE_FLAG = 'Y'
+				GROUP BY B1.COMPANY_CD, B1.BU_CD, B1.ITEM_CD, B1.CUST_GROUP_CD 
+			) C2
+			ON C1.COMPANY_CD     = C2.COMPANY_CD
+			AND C1.BU_CD         = C2.BU_CD
+            AND C1.ITEM_CD       = C2.ITEM_CD
+            AND C1.CUST_GROUP_CD = C2.CUST_GROUP_CD
+            #end
+		),
+		W_MEASURE AS 
+		(
+	    	SELECT CATEGORY_CD
+	    	     , CATEGORY_NM
+	    	     , CATEGORY_IDX 
+	        FROM 
+	        (
+	        	SELECT NULL AS CATEGORY_CD
+	        	     , NULL AS CATEGORY_NM
+	        	     , NULL AS CATEGORY_IDX
+				#foreach( $meaMap in $_parameter.meaList )
+	            UNION ALL 
+	            SELECT '$meaMap.CD'
+	                 , '$meaMap.NM'
+	                 , $velocityCount 
+				#end
+			) A
+	        WHERE CATEGORY_CD IS NOT NULL
+		),
+		W_MAIN_CPFR AS
+		(
+			SELECT COMPANY_CD
+		         , BU_CD
+		         , PLAN_ID
+		         , ITEM_CD
+		         , SALES_PLAN_QTY_M0 AS M0
+		         , SALES_PLAN_QTY_M1 AS M1
+		         , SALES_PLAN_QTY_M2 AS M2
+		         , SALES_PLAN_QTY_M3 AS M3
+		         , SALES_PLAN_QTY_M4 AS M4
+		         , ISNULL(SALES_PLAN_QTY_M0, 0) + ISNULL(SALES_PLAN_QTY_M1, 0) + ISNULL(SALES_PLAN_QTY_M2, 0) + ISNULL(SALES_PLAN_QTY_M3, 0) + ISNULL(SALES_PLAN_QTY_M4, 0) AS PLAN_CPFR_TOT
+			FROM TB_DYN_CPFR WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND PLAN_ID = @{planId}
+			  AND MEAS_CD = 'PLN'
+		),
+		W_MAIN_CPFR_VARY AS
+		(
+			SELECT COMPANY_CD
+		         , BU_CD
+		         , PLAN_ID
+		         , ITEM_CD
+		         , SALES_PLAN_QTY_M0 AS M0
+		         , SALES_PLAN_QTY_M1 AS M1
+		         , SALES_PLAN_QTY_M2 AS M2
+		         , SALES_PLAN_QTY_M3 AS M3
+		         , SALES_PLAN_QTY_M4 AS M4
+		         , ISNULL(SALES_PLAN_QTY_M0, 0) + ISNULL(SALES_PLAN_QTY_M1, 0) + ISNULL(SALES_PLAN_QTY_M2, 0) + ISNULL(SALES_PLAN_QTY_M3, 0) + ISNULL(SALES_PLAN_QTY_M4, 0) AS PLAN_CPFR_TOT
+			FROM TB_DYN_CPFR WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND PLAN_ID = @{planId}
+			  AND MEAS_CD = 'ADJ'
+		),
+		W_MAIN_PAST_RESULT AS
+		(
+			SELECT A1.COMPANY_CD
+			     , A1.BU_CD
+			     , A1.ITEM_CD
+				#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramWeek = "$bucketMap.BUCKET_VAL")
+				#set($pcfFlag = "$bucketMap.FLAG")
+					#if($bucketMap.ROOT_CD.indexOf("PROD_CPFR") != -1)
+						#if($bucketMap.CD.indexOf("PROD_CPFR_TOT") > -1)
+						#elseif($bucketMap.CD.indexOf("MONTH_REMAIN_QTY") > -1)
+						#else
+							#if($bucketMap.FLAG.indexOf("P") != -1)
+								, SUM(CASE WHEN A2.YEARPWEEK = '$paramWeek' THEN A1.QTY END) AS $bucketMap.CD
+							#end
+						#end
+					#end
+				#end
+			FROM TB_DYN_SALES_RESULT A1 WITH(NOLOCK)
+			INNER JOIN TB_MST_CALENDAR A2 WITH(NOLOCK)
+			   ON A1.SALES_DATE = A2.YYYYMMDD
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.PLANT_CD = 'WF01'
+			  AND A1.DEL_FLAG = 'N'
+			  AND ISNULL(A1.CPFR_FLAG, 'N') = 'Y'
+			  AND A2.YEARMONTH = @{fromMonth}
+			GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+		),
+		W_MAIN_CURRENT_FUTURE_RESULT AS
+		(
+			SELECT KSP.COMPANY_CD
+			     , KSP.BU_CD
+			     , KSP.ITEM_CD
+			    #foreach($bucketMap in $_parameter.bucketList)
+				#set($paramWeek = "$bucketMap.BUCKET_VAL")
+				#set($pcfFlag = "$bucketMap.FLAG")
+					#if($bucketMap.ROOT_CD.indexOf("PROD_CPFR") != -1)
+						#if($bucketMap.CD.indexOf("PROD_CPFR_TOT") > -1)
+						#elseif($bucketMap.CD.indexOf("MONTH_REMAIN_QTY") > -1)
+						#else
+							#if($bucketMap.FLAG.indexOf("P") == -1)
+								, SUM(CASE WHEN KSP.YEARPWEEK = '$paramWeek' THEN KSP.QTY END) AS $bucketMap.CD
+							#end
+						#end
+					#end
+				#end
+			FROM TB_KPI_SALES_PLAN KSP WITH(NOLOCK)
+			INNER JOIN TB_MST_CUST_GROUP MCG WITH(NOLOCK)
+			   ON MCG.COMPANY_CD = KSP.COMPANY_CD
+			  AND MCG.BU_CD = KSP.BU_CD
+			  AND MCG.CUST_GROUP_CD = KSP.CUST_GROUP_CD
+			INNER JOIN TB_MST_REP_CUST_GROUP MRCG WITH(NOLOCK)
+			   ON MRCG.COMPANY_CD = MCG.COMPANY_CD
+			  AND MRCG.BU_CD = MCG.BU_CD
+			  AND MRCG.REP_CUST_GROUP_CD = MCG.REP_CUST_GROUP_CD
+			  AND MRCG.CUST_CATE = 'SAM'
+			WHERE KSP.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND KSP.BU_CD = @{GV_BU_CD}
+			  AND KSP.MEAS_CD = 'CFM_DMD1_SP'
+              AND KSP.YEARPWEEK = @{currentWeek}
+            GROUP BY KSP.COMPANY_CD, KSP.BU_CD, KSP.ITEM_CD
+		)
+		SELECT NULL AS TMP_COL
+		     <include refid="include.getDimTotal"/>
+		     , CASE WHEN GRP_LVL_ID = 0 THEN F1.CPFR_YN ELSE NULL END CPFR_YN
+		     , CASE WHEN GRP_LVL_ID = 0 THEN F1.CPFR_YN ELSE NULL END CPFR_YN_NM
+		     , F1.GRP_LVL_ID
+		     , F1.CATEGORY_CD
+		     , F1.CATEGORY_NM
+		     , F1.CATEGORY_IDX
+		     , CASE WHEN GRP_LVL_ID != 0 THEN 'N'
+		            WHEN CPFR_YN = 'N' THEN 'N'
+		            WHEN CATEGORY_CD = 'CPFR_SP' AND @{confirmFlag} = 'N' THEN CASE WHEN @{authSelect} = 'ADMIN' OR @{authSelect} = 'SCM' THEN 'Y' ELSE CASE WHEN ITEM_SELECT = 'Y' THEN 'Y' ELSE 'N' END END
+		            WHEN CATEGORY_CD = 'CPFR_VARY_SP' AND @{confirmFlag} = 'N' THEN CASE WHEN @{authSelect} = 'ADMIN' OR @{authSelect} = 'SCM' THEN 'Y' ELSE 'N' END
+		            ELSE 'N'
+		        END CONFIRM_FLAG
+		     , CASE WHEN GRP_LVL_ID != 0 THEN 'N'
+		            WHEN @{confirmFlag} = 'N' THEN 'Y'
+		            ELSE 'N'
+		        END CONFIRM_FLAG2
+		     , ITEM_SELECT
+		     #foreach( $bucketMap in $_parameter.bucketList )
+		     , $bucketMap.CD
+		     #end
+		FROM
+		(
+			SELECT NULL AS TMP_COL
+			     #foreach( $dimMap in $_parameter.dimList )
+			     , E1.$dimMap.DIM_CD
+			     , MAX(E1.${dimMap.DIM_CD}_NM) AS ${dimMap.DIM_CD}_NM
+			     #end
+			     #foreach( $bucketMap in $_parameter.bucketList )
+			     , SUM(E1.$bucketMap.CD) AS $bucketMap.CD
+			     #end
+			     , MAX(E1.CPFR_YN) AS CPFR_YN
+			     , MAX(E1.CPFR_YN_NM) AS CPFR_YN_NM
+			     , MAX(E1.ITEM_SELECT) AS ITEM_SELECT
+			     , E1.CATEGORY_CD
+			     , E1.CATEGORY_NM
+			     , E1.CATEGORY_IDX
+			     <include refid="include.getGrpLvlId"/>
+			FROM
+			(
+				SELECT NULL AS TMP_COL
+					#foreach( $dimMap in $_parameter.dimList )
+			         , D1.$dimMap.DIM_CD 
+			         , D1.${dimMap.DIM_CD}_NM
+					#end
+					 , D1.CPFR_YN
+					 , D1.CPFR_YN_NM
+					 , D1.ITEM_SELECT
+					 , D5.CATEGORY_CD
+			         , D5.CATEGORY_NM
+			         , D5.CATEGORY_IDX
+			        #set($strProdCpfrTot = "")
+					#foreach($bucketMap in $_parameter.bucketList)
+					#set($paramWeek = "$bucketMap.BUCKET_VAL")
+						#if($bucketMap.ROOT_CD.indexOf("PLAN_CPFR") != -1)
+							, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN  D2.${bucketMap.CD} 
+							       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D2.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+							       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN  D6.${bucketMap.CD} 
+							       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D6.${bucketMap.CD} * SALES_PRICE_KRW_HIDDEN
+							   END $bucketMap.CD
+						#elseif($bucketMap.ROOT_CD.indexOf("PROD_CPFR") != -1)
+							#if($bucketMap.CD.indexOf("MONTH_REMAIN_QTY") > -1)
+							#elseif($bucketMap.CD.indexOf("PROD_CPFR_TOT") > -1)
+								, CASE WHEN (CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN D2.M0 
+								       			  WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+								       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN D6.M0 
+								       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D6.M0 * SALES_PRICE_KRW_HIDDEN
+								   			 END 
+								   			 -
+								   			CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+								        		 WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+								        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+								        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+								    		 END) <![CDATA[>]]> 0 
+								       THEN (CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN D2.M0 
+								       			  WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN D2.M0 * SALES_PRICE_KRW_HIDDEN
+								       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN D6.M0 
+								       			  WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN D6.M0 * SALES_PRICE_KRW_HIDDEN
+								   			 END 
+								   			 -
+								   			CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+								        		 WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+								        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+								        		 WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+								    		 END) 
+								    	ELSE 0
+								   	END MONTH_REMAIN_QTY
+								, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+								       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)
+								       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN (ISNULL($strProdCpfrTot.substring(1).replace(",",",0)+ISNULL("),0)) * SALES_PRICE_KRW_HIDDEN
+								   END $bucketMap.CD
+								#set($strProdCpfrTot = "")
+							#else
+								#if($bucketMap.FLAG.indexOf("P") != -1)
+									, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN $bucketMap.CD 
+									       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN $bucketMap.CD 
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+									   END $bucketMap.CD
+								#else
+									, CASE WHEN D5.CATEGORY_CD = 'CPFR_SP' THEN $bucketMap.CD 
+									       WHEN D5.CATEGORY_CD = 'CPFR_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP' THEN $bucketMap.CD
+									       WHEN D5.CATEGORY_CD = 'CPFR_VARY_SP_AMT_KRW' THEN $bucketMap.CD * SALES_PRICE_KRW_HIDDEN
+									   END $bucketMap.CD
+								#end
+								#set($strProdCpfrTot = $strProdCpfrTot + "," +$bucketMap.CD)
+							#end
+						#end
+					#end
+				FROM W_MAIN_ITEM D1
+				LEFT OUTER JOIN W_MAIN_CPFR D2
+				  ON D1.COMPANY_CD = D2.COMPANY_CD
+				 AND D1.BU_CD = D2.BU_CD
+				 AND D1.ITEM_CD = D2.ITEM_CD
+				LEFT OUTER JOIN W_MAIN_CPFR_VARY D6 
+				  ON D1.COMPANY_CD = D6.COMPANY_CD
+				 AND D1.BU_CD = D6.BU_CD
+				 AND D1.ITEM_CD = D6.ITEM_CD
+				LEFT OUTER JOIN W_MAIN_PAST_RESULT D3
+				  ON D1.COMPANY_CD = D3.COMPANY_CD
+				 AND D1.BU_CD = D3.BU_CD
+				 AND D1.ITEM_CD = D3.ITEM_CD
+				LEFT OUTER JOIN W_MAIN_CURRENT_FUTURE_RESULT D4
+				  ON D1.COMPANY_CD = D4.COMPANY_CD
+				 AND D1.BU_CD = D4.BU_CD
+				 AND D1.ITEM_CD = D4.ITEM_CD 
+				CROSS JOIN W_MEASURE D5
+			) E1
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), E1.CATEGORY_CD, E1.CATEGORY_NM, E1.CATEGORY_IDX
+		) F1   
+		ORDER BY F1.TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+	    , F1.$dimMap.DIM_CD
+	    #end
+	    , F1.CATEGORY_IDX	    -->
+	</select>
+	
+	<update id="salesPlanCpfrUpdate" parameterType="map">
+	    /****** [ dp.planSalesCpfr.salesPlanCpfrUpdate ] ******/
+		MERGE INTO TB_DYN_CPFR A
+		USING
+		(
+			SELECT @{GV_COMPANY_CD} AS COMPANY_CD
+			     , @{GV_BU_CD} AS BU_CD
+			     , @{ITEM_CD} AS ITEM_CD
+			     , @{PLAN_ID} AS PLAN_ID
+			     , CASE WHEN @{MEAS_CD} = 'CPFR_SP' THEN 'PLN'
+			            WHEN @{MEAS_CD} = 'CPFR_VARY_SP' THEN 'ADJ'
+			        END MEAS_CD
+			     , @{SALES_PLAN_QTY_M0} AS SALES_PLAN_QTY_M0
+			     , @{SALES_PLAN_QTY_M1} AS SALES_PLAN_QTY_M1
+			     , @{SALES_PLAN_QTY_M2} AS SALES_PLAN_QTY_M2
+			     , @{SALES_PLAN_QTY_M3} AS SALES_PLAN_QTY_M3
+
+			     , @{OEMS_QTY_M0} AS OEMS_QTY_M0
+			     , @{OEMS_QTY_M1} AS OEMS_QTY_M1
+			     , @{OEMS_QTY_M2} AS OEMS_QTY_M2
+			     , @{OEMS_QTY_M3} AS OEMS_QTY_M3
+			     , @{GV_USER_ID} AS UPDATE_ID
+			     , DBO.UFN_GETDATE() AS UPDATE_DTTM
+		) B
+		ON
+		(
+			A.COMPANY_CD = B.COMPANY_CD
+		  AND A.BU_CD = B.BU_CD
+		  AND A.ITEM_CD = B.ITEM_CD
+		  AND A.PLAN_ID = B.PLAN_ID
+		  AND A.MEAS_CD = B.MEAS_cD
+		)
+		WHEN MATCHED THEN
+		UPDATE SET
+			SALES_PLAN_QTY_M0 = B.SALES_PLAN_QTY_M0
+		  , SALES_PLAN_QTY_M1 = B.SALES_PLAN_QTY_M1
+		  , SALES_PLAN_QTY_M2 = B.SALES_PLAN_QTY_M2
+		  , SALES_PLAN_QTY_M3 = B.SALES_PLAN_QTY_M3
+
+		  , OEMS_QTY_M0 = B.OEMS_QTY_M0 
+		  , OEMS_QTY_M1 = B.OEMS_QTY_M1 
+		  , OEMS_QTY_M2 = B.OEMS_QTY_M2 
+		  , OEMS_QTY_M3 = B.OEMS_QTY_M3 
+
+		  , UPDATE_ID = B.UPDATE_ID
+		  , UPDATE_DTTM = B.UPDATE_DTTM
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+			COMPANY_CD
+		  , BU_CD
+		  , PLAN_ID
+		  , ITEM_CD
+		  , MEAS_CD
+		  , SALES_PLAN_QTY_M0
+		  , SALES_PLAN_QTY_M1
+		  , SALES_PLAN_QTY_M2
+		  , SALES_PLAN_QTY_M3
+		  , OEMS_QTY_M0
+		  , OEMS_QTY_M1
+		  , OEMS_QTY_M2
+		  , OEMS_QTY_M3
+		  , CREATE_ID
+		  , CREATE_DTTM
+		)VALUES(
+			B.COMPANY_CD
+		  , B.BU_CD
+		  , B.PLAN_ID
+		  , B.ITEM_CD
+		  , B.MEAS_CD
+		  , B.SALES_PLAN_QTY_M0
+		  , B.SALES_PLAN_QTY_M1
+		  , B.SALES_PLAN_QTY_M2
+		  , B.SALES_PLAN_QTY_M3
+		  , B.OEMS_QTY_M0
+		  , B.OEMS_QTY_M1
+		  , B.OEMS_QTY_M2
+		  , B.OEMS_QTY_M3
+		  , B.UPDATE_ID
+		  , B.UPDATE_DTTM
+		);
+    </update>
+	
+	<update id="salesPlanCpfrYnUpdate" parameterType="map">
+    	/****** [ dp.planSalesCpfr.salesPlanCpfrYnUpdate ] ******/
+    	UPDATE TB_MST_ITEM
+    	   SET CPFR_YN = @{CPFR_YN}
+    	     , UPDATE_ID = @{GV_USER_ID}
+    	     , UPDATE_DTTM = DBO.UFN_GETDATE()
+    	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+    	  AND BU_CD = @{GV_BU_CD}
+    	  AND ITEM_CD = @{ITEM_CD}
+   	</update>
+	
+	<update id="salesPlanConfirmYnUpdate" parameterType="map">
+    	/****** [ dp.planSalesCpfr.salesPlanCpfrYnUpdate ] ******/
+    	UPDATE TB_MST_PLAN_VERSION
+    	   SET CONFIRM_FLAG = @{CONFIRM_YN}
+    	     , UPDATE_ID = @{GV_USER_ID}
+    	     , UPDATE_DTTM = DBO.UFN_GETDATE()
+    	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_TYPE_CD = 'DP_M'
+		  AND PLAN_ID = @{PLAN_ID}
+    </update>
+	
+	<select id="salesPlanCpfrSummaryBucketSelect" parameterType="map" resultType="map">
+		/****** [ dp.planSalesCpfr.salesPlanCpfrSummaryBucketSelect ] ******/
+		SELECT 'M' + YEARMONTH AS BUCKET_ID
+		     , YEARMONTH + '_M' AS BUCKET_VAL
+		     , 'M' + YEARMONTH AS CD
+		     , 'M' + YEARMONTH AS NM
+		     , 'CPFR_SUMMARAY' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		     , ROW_NUMBER() OVER(ORDER BY YEARMONTH ASC) AS SORT
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YYYYMMDD BETWEEN CONVERT(VARCHAR, DATEADD(MM, -11, REPLACE(@{planId}, '_M', '') + '01'), 112) AND CONVERT(VARCHAR, DATEADD(MM, 4, REPLACE(@{planId}, '_M', '') + '01'), 112)
+		GROUP BY YEARMONTH
+	</select>
+	
+	<select id="salesPlanCpfrSummarySelect" parameterType="map" resultType="map">
+		/****** [ dp.planSalesCpfr.salesPlanCpfrSummarySelect ] ******/
+		<include refid="snop.common.w_item" />
+		,
+		W_PLAN_ROW AS
+		(
+			SELECT YEARMONTH + '_M' AS PLAN_ID
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YYYYMMDD BETWEEN CONVERT(VARCHAR, DATEADD(MM, -11, REPLACE(@{planId}, '_M', '') + '01'), 112) AND REPLACE(@{planId}, '_M', '') + '01'
+			GROUP BY YEARMONTH
+		),
+		W_DATA AS
+		(
+		#foreach( $bucketMap in $_parameter.bucketList )
+			#set($sort1 = $velocityCount)
+			#set($sort2 = $velocityCount + 1)
+			#set($sort3 = $velocityCount + 2)
+			#set($sort4 = $velocityCount + 3)
+			#set($sort5 = $velocityCount + 4)
+			#if($velocityCount == 1)
+				SELECT COMPANY_CD
+				     , BU_CD
+				     , PLAN_ID
+				     , ITEM_CD
+					#foreach( $bucketMap in $_parameter.bucketList )
+					#set($bucketSort = "$bucketMap.SORT")
+					 , CASE WHEN '$sort1' = '$bucketSort' THEN SALES_PLAN_QTY_M0
+					        WHEN '$sort2' = '$bucketSort' THEN SALES_PLAN_QTY_M1
+					        WHEN '$sort3' = '$bucketSort' THEN SALES_PLAN_QTY_M2
+					        WHEN '$sort4' = '$bucketSort' THEN SALES_PLAN_QTY_M3
+					        WHEN '$sort5' = '$bucketSort' THEN SALES_PLAN_QTY_M4
+					        ELSE NULL
+					    END $bucketMap.CD
+					#end
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = '${bucketMap.BUCKET_VAL}'
+				  AND MEAS_CD = 'PLN'
+			#elseif($velocityCount <![CDATA[<]]> 13)
+				UNION ALL
+				SELECT COMPANY_CD
+				     , BU_CD
+				     , PLAN_ID
+				     , ITEM_CD
+					#foreach( $bucketMap in $_parameter.bucketList )
+					#set($bucketSort = "$bucketMap.SORT")
+					 , CASE WHEN '$sort1' = '$bucketSort' THEN SALES_PLAN_QTY_M0
+					        WHEN '$sort2' = '$bucketSort' THEN SALES_PLAN_QTY_M1
+					        WHEN '$sort3' = '$bucketSort' THEN SALES_PLAN_QTY_M2
+					        WHEN '$sort4' = '$bucketSort' THEN SALES_PLAN_QTY_M3
+					        WHEN '$sort5' = '$bucketSort' THEN SALES_PLAN_QTY_M4
+					        ELSE NULL
+					    END $bucketMap.CD
+					#end
+				FROM TB_DYN_CPFR WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = '${bucketMap.BUCKET_VAL}'
+				  AND MEAS_CD = 'PLN'
+			#end
+		#end
+		)
+		SELECT ISNULL(C1.PLAN_ID, ' ') AS PLAN_ID_NM
+			#foreach( $bucketMap in $_parameter.bucketList )
+			 , $bucketMap.CD AS $bucketMap.CD
+			#end
+			 , (0 
+			#foreach( $bucketMap in $_parameter.bucketList )
+			 + ISNULL($bucketMap.CD, 0)
+			#end ) / 5.0 AS TOTAL
+		FROM W_PLAN_ROW C1
+		LEFT OUTER JOIN 
+		(
+			SELECT B1.COMPANY_CD
+			     , B1.BU_CD
+			     , ISNULL(B1.PLAN_ID, ' ') AS PLAN_ID
+			     , ISNULL(B1.PLAN_ID, ' ') AS PLAN_ID_NM
+				#foreach( $bucketMap in $_parameter.bucketList )
+				 , SUM($bucketMap.CD) AS $bucketMap.CD
+				#end
+			FROM
+			(
+				SELECT A2.COMPANY_CD
+				     , A2.BU_CD
+				     , A2.PLAN_ID
+				     , A2.ITEM_CD
+					#foreach( $bucketMap in $_parameter.bucketList )
+					#if($_parameter.qtyAmt == "QTY")
+					 , $bucketMap.CD AS $bucketMap.CD
+					#elseif($_parameter.qtyAmt == "AMT")
+					 , $bucketMap.CD * SALES_PRICE_KRW AS $bucketMap.CD
+					#end
+					#end
+				FROM W_ITEM A1
+				INNER JOIN W_DATA A2
+				   ON A1.COMPANY_CD = A2.COMPANY_CD
+				  AND A1.BU_CD = A2.BU_CD
+				  AND A1.ITEM_CD = A2.ITEM_CD
+			) B1
+			GROUP BY B1.COMPANY_CD, B1.BU_CD, B1.PLAN_ID
+		) C2
+		ON C1.PLAN_ID = C2.PLAN_ID
+		ORDER BY C1.PLAN_ID
+	</select>
+	
+	
+	
+	<select id="salesPlanCpfrSummaryExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ dp.planSalesCpfr.salesPlanCpfrSummaryExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+	
+</mapper>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+
+	<select id="fileMngSelect" parameterType="map" resultType="map">
+	    /****** [ admin.fileMngSelect ] ******/
+		WITH CTE 
+		(
+			COMPANY_CD
+	      , BU_CD
+	      , UPPER_PATH_NM
+	      , PATH_LVL
+	      , PATH_ID
+	      , PATH_NM
+	      , SORT
+	      , USE_FLAG
+	      , FILE_NO
+	      , PATH
+	      , ROOT_CD
+	      , ROOT_SORT
+	      , TREE_PATH
+		) AS (
+		    SELECT COMPANY_CD
+		         , BU_CD
+		         , UPPER_PATH_NM
+		         , PATH_LVL
+		         , PATH_ID
+		         , PATH_NM
+		         , SORT
+		         , USE_FLAG
+		         , FILE_NO
+		         , CONVERT(VARCHAR(100) ,'|' + PATH_NM) AS PATH
+		         , PATH_NM AS ROOT_CD
+		         , CONVERT(VARCHAR(100) ,''  + dbo.UFN_LPAD(SORT,3,'0')) AS ROOT_SORT
+		         , CONVERT(VARCHAR(100) ,''  + dbo.UFN_LPAD(REPLACE(PATH_NM,'.','||'), 15, '0')) AS TREE_PATH
+	    	FROM TB_MST_FILE WITH(NOLOCK)
+	    	WHERE ISNULL(UPPER_PATH_NM,' ') = ' '
+	    	  AND COMPANY_CD = @{GV_COMPANY_CD}
+	    	  AND BU_CD      = @{GV_BU_CD}
+	    	  AND USE_FLAG   = 'Y'
+	    	UNION ALL
+	    	SELECT A.COMPANY_CD
+	    	     , A.BU_CD
+	    	     , A.UPPER_PATH_NM
+	    	     , A.PATH_LVL
+	    	     , A.PATH_ID
+	    		 , A.PATH_NM
+	    		 , A.SORT
+	    		 , A.USE_FLAG
+	    		 , A.FILE_NO
+	    		 , CONVERT(VARCHAR(100),B.PATH + '|' + A.PATH_NM) AS PATH
+	    		 , B.ROOT_CD
+	    		 , CONVERT(VARCHAR(100) ,B.ROOT_SORT +       CONVERT(VARCHAR(100) ,dbo.UFN_LPAD(A.SORT,3,'0'))) AS ROOT_SORT
+	    		 , CONVERT(VARCHAR(100) ,B.TREE_PATH + '.' + CONVERT(VARCHAR(100) ,dbo.UFN_LPAD(REPLACE(A.PATH_NM,'.','||'), 15, '0'))) AS TREE_PATH
+	    	FROM TB_MST_FILE A WITH(NOLOCK)
+	    	   , CTE B
+	    	WHERE A.COMPANY_CD    = B.COMPANY_CD
+	    	  AND A.BU_CD         = B.BU_CD
+	    	  AND A.UPPER_PATH_NM = B.PATH_NM
+	    	  AND A.USE_FLAG      = B.USE_FLAG
+	    )
+	    SELECT *
+	    FROM CTE
+	    WHERE USE_FLAG = 'Y'
+	    ORDER BY ROOT_SORT
+	</select>
+
+	<update id="fileMngInsert" parameterType="map">
+		/****** [ admin.fileMngInsert ] ******/
+		INSERT INTO TB_MST_FILE 
+		(
+		    COMPANY_CD
+		  , BU_CD
+		  , PATH_LVL
+		  , PATH_NM
+		  , UPPER_PATH_NM
+		  , SORT
+		  , USE_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		  , UPDATE_ID
+		  , UPDATE_DTTM
+		) VALUES (
+		    @{GV_COMPANY_CD}
+		  , @{GV_BU_CD}
+		  , @{PATH_LVL}
+		  , @{PATH_NM}
+		  , @{UPPER_PATH_NM}
+		  , @{SORT}
+		  , 'Y'
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		)
+	</update>
+	
+	<update id="fileMngUpdate" parameterType="map">
+		/****** [ admin.fileMngUpdate ] ******/
+		UPDATE TB_MST_FILE
+		SET SORT        = @{SORT}
+		  , UPDATE_ID   = @{GV_USER_ID}
+		  , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND PATH_ID    = @{PATH_ID}
+	</update>
+	
+	<update id="fileMngDelete" parameterType="map">
+		/****** [ admin.fileMngDelete ] ******/
+		UPDATE TB_MST_FILE
+		SET USE_FLAG    = 'N'
+		  , UPDATE_ID   = @{GV_USER_ID}
+		  , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND PATH_ID    = @{PATH_ID}
+	</update>
+	
+	<update id="fileMngFileNoUpdate" parameterType="map">
+		/****** [ admin.fileMngFileNoUpdate ] ******/
+		UPDATE TB_MST_FILE
+		SET FILE_NO = @{FILE_NO}
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND PATH_ID    = @{PATH_ID}
+	</update>
+	
+</mapper>

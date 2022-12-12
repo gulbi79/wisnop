@@ -1,0 +1,981 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPlan">
+
+    <select id="prodCapaAllocSalesRoleSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPlan.prodCapaAllocSalesRoleSelect ] ******/
+	    WITH W_USER_ROLE AS 
+	    (
+	        SELECT R.BU_CD
+	             , R.ROLE_CD
+	        FROM TB_MST_USER U WITH(NOLOCK)
+	        JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+	          ON U.USER_ID  = R.USER_ID
+	         AND R.BU_CD    = @{GV_BU_CD}
+	         AND R.USE_FLAG = 'Y'
+	        WHERE U.USER_ID  = @{GV_USER_ID}
+	          AND U.USE_FLAG = 'Y'
+	          AND U.DEL_FLAG = 'N'
+	    )
+	    , W_CODE AS 
+	    (
+	        #set($_parameter.groupCd="DP_AUTH_CTRL")
+	        <include refid="include.mstCode"/>
+	    )
+	    SELECT (SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END
+	              FROM W_USER_ROLE R JOIN W_CODE C ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_6_CD = 'Y')) AS CONFIRM_ROLE_YN,
+	           (SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END
+	              FROM W_USER_ROLE R JOIN W_CODE C ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_3_CD = 'Y')) AS GOC_ROLE_YN,
+	           (SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END
+	              FROM W_USER_ROLE R JOIN W_CODE C ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_2_CD = 'Y')) AS AP2_ROLE_YN
+    </select>
+    
+    <select id="prodCapaAllocSalesTotalSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPlan.prodCapaAllocSalesTotalSelect ] ******/
+    	SELECT COUNT(*) AS TOT_CNT
+    	FROM
+    	(
+	    	SELECT CG.COMPANY_CD
+	             , CG.BU_CD
+	             , IT.PROD_LVL2_CD
+	             , IT.PROD_LVL2_NM
+	             , IP.ROUTING_ID
+	             , IT.PROD_LVL3_CD
+	             , IT.PROD_LVL3_NM
+	             , CT.CUST_LVL2_CD
+	             , CT.CUST_LVL2_NM
+	        FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+	        JOIN TB_MST_ITEM IT WITH(NOLOCK)
+	          ON (  CG.COMPANY_CD = IT.COMPANY_CD
+	              AND CG.BU_CD      = IT.BU_CD
+	              AND CG.ITEM_CD    = IT.ITEM_CD
+	             )
+			JOIN TB_MST_ITEM_PLANT IP WITH(NOLOCK)
+	          ON (  IT.COMPANY_CD = IP.COMPANY_CD
+	              AND IT.BU_CD      = IP.BU_CD
+	              AND IT.ITEM_CD    = IP.ITEM_CD
+	             )
+			JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+	          ON (  CG.COMPANY_CD    = CT.COMPANY_CD
+	              AND CG.BU_CD         = CT.BU_CD
+	              AND CG.CUST_GROUP_CD = CT.CUST_CD
+	             )
+			WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+	          AND CG.BU_CD         = @{GV_BU_CD}
+	          AND IP.PLANT_CD = 'WF01'
+	          AND IP.ROUTING_ID    IS NOT NULL
+	          AND IT.PROD_LVL2_CD  IS NOT NULL
+	          AND IT.PROD_LVL3_CD  IS NOT NULL
+	          AND CT.CUST_LVL2_CD  IS NOT NULL
+	          AND IT.ITEM_TYPE = '10'
+	          AND EXISTS 
+	          (
+	             SELECT 1
+	             FROM TB_HIS_CAPA_ALLOC_PROD AA
+	             WHERE AA.COMPANY_CD   = CG.COMPANY_CD
+	               AND AA.BU_CD        = CG.BU_CD
+	               AND AA.ROUTING_ID   = IP.ROUTING_ID
+	               AND AA.PROD_LVL3_CD = IT.PROD_LVL3_CD
+	               AND AA.PLAN_ID      = (
+							                SELECT TOP 1 PLAN_ID
+											FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+											WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+							  				  AND BU_CD        = @{GV_BU_CD}
+							  				  AND PLAN_TYPE_CD = 'DP_M'
+										 	ORDER BY PLAN_ID DESC
+										 )
+	          )
+	          GROUP BY CG.COMPANY_CD, CG.BU_CD, IT.PROD_LVL2_CD, IT.PROD_LVL2_NM, IP.ROUTING_ID, IT.PROD_LVL3_CD, IT.PROD_LVL3_NM, CT.CUST_LVL2_CD, CT.CUST_LVL2_NM
+		) A1
+	</select>
+    
+    <select id="prodCapaAllocSalesSelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPlan.prodCapaAllocSalesSelect ] ******/
+		    
+		BEGIN
+		    <include refid="include.macros"/>
+		    #getProductTree()
+		    #getCustomerTree()
+		    
+		#foreach( $dimMap in $_parameter.dimList )
+			#if( $dimMap.DIM_CD == "CUST_LVL2_CD" or $dimMap.DIM_CD == "CUST_LVL2_NM")
+		    	#set($dim_CUST_LVL2 = "Y")
+		  	#end
+		#end
+		    
+		    DECLARE @CUT_OFF_FLAG    nvarchar(1)
+		    DECLARE @START_PWEEK     nvarchar(7)
+		    DECLARE @CUR_MIN_DAY     nvarchar(8)
+		    DECLARE @CUR_PWEEK       nvarchar(7)
+		    DECLARE @INV_DAY         nvarchar(8)
+		    DECLARE @END_PWEEK       nvarchar(7)
+		    
+		    SELECT @CUT_OFF_FLAG = CUT_OFF_FLAG
+		    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+		    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+		      AND BU_CD        = @{GV_BU_CD}
+		      AND PLAN_TYPE_CD = 'DP_M'
+		      AND PLAN_ID      = @{planId};
+		       
+		    SELECT @START_PWEEK = MIN(YEARPWEEK)
+		    FROM TB_MST_CALENDAR WITH(NOLOCK)
+		    WHERE YEARMONTH = @{startMonth};
+		
+		    SELECT @CUR_PWEEK = YEARPWEEK
+		    FROM TB_MST_CALENDAR WITH(NOLOCK)
+		    WHERE YYYYMMDD = CONVERT(VARCHAR(8), DBO.UFN_GETDATE(), 112);
+		
+		    SELECT @CUR_MIN_DAY = MIN(YYYYMMDD)
+		    FROM TB_MST_CALENDAR WITH(NOLOCK)
+		    WHERE YEARPWEEK = @CUR_PWEEK;
+		     
+		    SELECT @INV_DAY = 
+		           CASE WHEN @{startMonth} = CONVERT(VARCHAR(6), DBO.UFN_GETDATE(), 112) THEN @CUR_MIN_DAY
+		                ELSE (SELECT MAX(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARMONTH = CONVERT(VARCHAR(6), DBO.UFN_GETDATE(), 112) AND DAY_NM = 'SUN')
+		            END
+			;
+		
+		    SELECT @END_PWEEK = MAX(YEARPWEEK)
+		    FROM TB_MST_CALENDAR WITH(NOLOCK)
+		    WHERE YEARMONTH = @{toMon};
+		
+		    WITH W_CODE AS 
+		    (
+		        #set($_parameter.groupCd="SO_TYPE")
+		        <include refid="include.mstCode"/>
+		    ),
+		    W_PWEEK_CALENDAR AS 
+		    (
+		        SELECT YEARMONTH, YEARPWEEK
+		        FROM TB_MST_CALENDAR WITH(NOLOCK)
+		        WHERE YEARMONTH BETWEEN @{fromMon} AND @{toMon}
+		        GROUP BY YEARMONTH, YEARPWEEK
+		    ),
+		    W_DIM AS 
+		    (
+		    	SELECT CG.COMPANY_CD
+		             , CG.BU_CD
+		             , IT.PROD_LVL2_CD
+		             , IT.PROD_LVL2_NM
+		             , IP.ROUTING_ID
+		             , IT.PROD_LVL3_CD
+		             , IT.PROD_LVL3_NM
+		             , CT.CUST_LVL2_CD
+		             , CT.CUST_LVL2_NM
+		             , IT.ITEM_CD
+		             , CG.CUST_GROUP_CD
+		        FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+		        JOIN TB_MST_ITEM IT WITH(NOLOCK)
+		          ON (  CG.COMPANY_CD = IT.COMPANY_CD
+		              AND CG.BU_CD      = IT.BU_CD
+		              AND CG.ITEM_CD    = IT.ITEM_CD
+		              #set($treeAlias = "IT")
+		              <include refid="include.productTree"/>
+		             )
+				JOIN TB_MST_ITEM_PLANT IP WITH(NOLOCK)
+		          ON (  IT.COMPANY_CD = IP.COMPANY_CD
+		              AND IT.BU_CD      = IP.BU_CD
+		              AND IT.ITEM_CD    = IP.ITEM_CD
+					#if($_parameter.routing and $_parameter.routing != "")
+		              AND IP.ROUTING_ID IN ('$_parameter.routing.replace(",","','")')
+					#end
+		             )
+				JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+		          ON (  CG.COMPANY_CD    = CT.COMPANY_CD
+		              AND CG.BU_CD         = CT.BU_CD
+		              AND CG.CUST_GROUP_CD = CT.CUST_CD
+		             )
+				WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+		          AND CG.BU_CD         = @{GV_BU_CD}
+		          AND IP.PLANT_CD = 'WF01'
+		          AND IP.ROUTING_ID    IS NOT NULL
+		          AND IT.PROD_LVL2_CD  IS NOT NULL
+		          AND IT.PROD_LVL3_CD  IS NOT NULL
+		          AND CT.CUST_LVL2_CD  IS NOT NULL
+		          AND IT.ITEM_TYPE = '10'
+		          AND EXISTS 
+		          (
+		             SELECT 1
+		             FROM TB_HIS_CAPA_ALLOC_PROD AA
+		             WHERE AA.COMPANY_CD   = CG.COMPANY_CD
+		               AND AA.BU_CD        = CG.BU_CD
+		               AND AA.ROUTING_ID   = IP.ROUTING_ID
+		               AND AA.PROD_LVL3_CD = IT.PROD_LVL3_CD
+		               AND AA.PLAN_ID      = @{planId}
+		          )
+				#if($_parameter.customerList and $_parameter.customerList.size() > 0)
+		          AND EXISTS 
+		          (
+		             SELECT 1
+		             FROM TB_MST_CUSTOMER TT
+		             WHERE TT.COMPANY_CD    = CG.COMPANY_CD
+		               AND TT.BU_CD         = CG.BU_CD
+		               AND TT.CUST_GROUP_CD = CG.CUST_GROUP_CD
+		               #set($treeAlias = "TT")
+		               <include refid="include.customerTree"/>
+		          )
+				#end
+		    ),
+		    W_DIM_GROUP AS 
+		    (
+		        SELECT CG.COMPANY_CD
+		             , CG.BU_CD
+		             , CG.PROD_LVL2_CD
+		             , CG.PROD_LVL2_NM
+		             , CG.ROUTING_ID
+		             , CG.PROD_LVL3_CD
+		             , CG.PROD_LVL3_NM
+		             , CG.CUST_LVL2_CD
+		             , CG.CUST_LVL2_NM
+		        FROM W_DIM CG
+		        GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.PROD_LVL2_NM, CG.ROUTING_ID, CG.PROD_LVL3_CD, CG.PROD_LVL3_NM, CG.CUST_LVL2_CD, CG.CUST_LVL2_NM
+		    ),
+		    W_DIM_GROUP_PROD AS 
+		    (
+		        SELECT CG.COMPANY_CD
+		             , CG.BU_CD
+		             , CG.PROD_LVL2_CD
+		             , CG.ROUTING_ID
+		             , CG.PROD_LVL3_CD
+		             <!-- , MIN(CG.CUST_LVL2_CD) AS CUST_LVL2_CD -->
+		             , CG.CUST_LVL2_CD
+		             , COUNT(*) OVER(PARTITION BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD) AS CNT
+		        FROM W_DIM_GROUP CG
+		        <!-- GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD -->
+		        GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD, CG.CUST_LVL2_CD
+		    ),
+		    W_PROD_CAPA_QTY AS 
+		    (
+		        SELECT CG.*
+		             , LC.YEARMONTH
+		             , ISNULL(LC.CAPA_QTY, 0) AS PROD_CAPA_QTY
+		        FROM W_DIM_GROUP_PROD CG
+		        JOIN TB_DYN_CAPA_ALLOC_PROD_LATEST LC WITH(NOLOCK)
+		          ON (  CG.COMPANY_CD     = LC.COMPANY_CD
+		              AND CG.BU_CD        = LC.BU_CD
+		              AND CG.ROUTING_ID   = LC.ROUTING_ID
+		              AND CG.PROD_LVL3_CD = LC.PROD_LVL3_CD
+		              AND LC.YEARMONTH    <![CDATA[< ]]> @{startMonth}  
+		              AND LC.YEARMONTH    <![CDATA[>=]]> @{fromMon}
+		              AND LC.YEARMONTH    <![CDATA[<=]]> @{toMon}
+		             )
+				UNION ALL
+		        SELECT CG.* 
+		             , HC.YEARMONTH
+		             , ISNULL(HC.CAPA_QTY, 0) AS PROD_CAPA_QTY
+		        FROM W_DIM_GROUP_PROD CG
+		        JOIN TB_HIS_CAPA_ALLOC_PROD HC WITH(NOLOCK)
+		          ON (  CG.COMPANY_CD     = HC.COMPANY_CD
+		              AND CG.BU_CD        = HC.BU_CD
+		              AND CG.ROUTING_ID   = HC.ROUTING_ID
+		              AND CG.PROD_LVL3_CD = HC.PROD_LVL3_CD
+		              AND HC.PLAN_ID      = @{planId}
+		              AND HC.YEARMONTH    <![CDATA[>=]]> @{startMonth}
+		              AND HC.YEARMONTH    <![CDATA[<=]]> @{endMonth}
+		              AND HC.YEARMONTH    <![CDATA[>=]]> @{fromMon}
+		              AND HC.YEARMONTH    <![CDATA[<=]]> @{toMon}
+		            )
+		    ),
+		    W_MEA AS 
+		    (
+		    	SELECT TM2.*
+		    	     <!-- , SUM(ALLOC_QTY_ORIGIN) OVER(PARTITION BY TM2.COMPANY_CD, TM2.BU_CD, TM2.PROD_LVL2_CD, TM2.ROUTING_ID, TM2.PROD_LVL3_CD, TM2.YEARMONTH) AS ALLOC_QTY_ORIGIN_SUM -->
+		    	     , SUM(ALLOC_QTY_ADJ) OVER(PARTITION BY TM2.COMPANY_CD, TM2.BU_CD, TM2.PROD_LVL2_CD, TM2.ROUTING_ID, TM2.PROD_LVL3_CD, TM2.YEARMONTH) AS ALLOC_QTY_ADJ_SUM
+		    	     , SUM(PROD_CAPA_QTY) OVER(PARTITION BY TM2.COMPANY_CD, TM2.BU_CD, TM2.PROD_LVL2_CD, TM2.ROUTING_ID, TM2.PROD_LVL3_CD, TM2.YEARMONTH) AS PROD_CAPA_QTY_SUM
+               		 , RANK() OVER(ORDER BY TM2.COMPANY_CD, TM2.BU_CD, TM2.PROD_LVL2_CD, TM2.ROUTING_ID, TM2.PROD_LVL3_CD, TM2.YEARMONTH) AS RANK_NUM
+		    	     , ISNULL(ROUND(ALLOC_QTY_ADJ / NULLIF(SUM(ALLOC_QTY_ORIGIN) OVER(PARTITION BY TM2.COMPANY_CD, TM2.BU_CD, TM2.PROD_LVL2_CD, TM2.ROUTING_ID, TM2.PROD_LVL3_CD, TM2.YEARMONTH) , 0) * 100, 1), 0) AS RATE_M
+		    	FROM
+		    	(
+			        SELECT TM.COMPANY_CD
+			             , TM.BU_CD
+			             , TM.PROD_LVL2_CD
+			             , TM.ROUTING_ID
+			             , TM.PROD_LVL3_CD
+			             , TM.CUST_LVL2_CD
+			             , TM.YEARMONTH
+			             , MAX(TM.OPEN_SO)                                  AS OPEN_SO
+			             , MAX(TM.OPEN_SO_SUM)                              AS OPEN_SO_SUM
+			             , MAX(TM.PROD_QTY_CUM) + MAX(TM.SP_QTY_REMAIN)     AS CFM_SP
+			             , MAX(TM.PROD_CAPA_QTY)                            AS PROD_CAPA_QTY
+			             , MAX(TM.ALLOC_QTY_ADJ)                            AS ALLOC_QTY_ADJ
+			             
+			             #if($_parameter.cutOffFlag == "Y")
+			             	, MAX(TM.ALLOC_QTY_ORIGIN)                         AS ALLOC_QTY_ORIGIN
+			                , MAX(TM.ALLOC_QTY_ADJ) - MAX(TM.ALLOC_QTY_ORIGIN) AS DELTA
+			             #elseif($_parameter.cutOffFlag == "N")
+			             	, ROUND(MAX(TM.OPEN_SO) / NULLIF(MAX(TM.OPEN_SO_SUM), 0) * MAX(TM.PROD_CAPA_QTY_SUM), 0) AS ALLOC_QTY_ORIGIN
+			                , MAX(TM.ALLOC_QTY_ADJ) - (ROUND(MAX(TM.OPEN_SO) / NULLIF(MAX(TM.OPEN_SO_SUM), 0) * MAX(TM.PROD_CAPA_QTY_SUM), 0)) AS DELTA
+			             #end
+			             
+			             , MAX(TM.PROD_QTY_CUM)                             AS PROD_QTY_CUM
+			             , MAX(TM.SP_QTY_REMAIN)                            AS SP_QTY_REMAIN
+			             , MAX(TM.SALES_QTY_CUM)                            AS SALES_QTY_CUM
+			             , MAX(TM.INV_BOH)                                  AS INV_BOH
+			             , MAX(TM.SP_QTY_REMAIN) - MAX(TM.INV_BOH)          AS REQ_PROD_QTY
+			             , MAX(TM.CONFIRM_YN)                               AS CONFIRM_YN
+			             , MAX(TM.WORKING_DAYS)                             AS WORKING_DAYS
+					FROM 
+					(
+			        	/* PROD_CAPA_QTY */
+			        	SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , CG.YEARMONTH
+				             , 0                         				   AS OPEN_SO
+				             , 0                        				   AS OPEN_SO_SUM
+				             , CAST(CG.PROD_CAPA_QTY AS NUMERIC(21,6)) / CNT AS PROD_CAPA_QTY
+				             , CG.PROD_CAPA_QTY          				   AS PROD_CAPA_QTY_SUM
+				             , 0                         				   AS ALLOC_QTY_ORIGIN
+				             , 0                                           AS ALLOC_QTY_ADJ
+				             , 0                                           AS PROD_QTY_CUM
+				             , 0                                           AS SP_QTY_REMAIN
+				             , 0                                           AS SALES_QTY_CUM
+				             , 0                                           AS INV_BOH
+				             , NULL                                        AS CONFIRM_YN
+				             , 0                                           AS WORKING_DAYS
+						FROM W_PROD_CAPA_QTY CG
+			         	UNION ALL
+			        	/* WORKING_DAYS */
+			        	SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , WD.YEARMONTH
+				             , 0    AS OPEN_SO
+				             , 0    AS OPEN_SO_SUM
+				             , 0    AS PROD_CAPA_QTY
+				             , 0    AS PROD_CAPA_QTY_SUM
+				             , 0    AS ALLOC_QTY_ORIGIN
+				             , 0    AS ALLOC_QTY_ADJ
+				             , 0    AS PROD_QTY_CUM
+				             , 0    AS SP_QTY_REMAIN
+				             , 0    AS SALES_QTY_CUM
+				             , 0    AS INV_BOH
+				             , NULL AS CONFIRM_YN
+				             , WD.WORKING_DAYS
+						FROM W_DIM_GROUP CG
+			          	CROSS JOIN 
+			          	(
+							SELECT YEARMONTH
+			                     , MAX(CAST(DAY AS NUMERIC(6,1))) AS WORKING_DAYS
+			                FROM TB_MST_CALENDAR WITH(NOLOCK)
+			               	WHERE YEARMONTH BETWEEN @{startMonth} AND @{toMon}
+			               	GROUP BY YEARMONTH
+			          	) WD
+			         	
+			         	
+			        	/* OPEN_SO */
+			        	#foreach( $monthMap in $_parameter.monthList )
+			        	#set($paramMonth = "$monthMap.BUCKET_VAL")
+			        	UNION ALL
+			        	SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , '$paramMonth'             AS YEARMONTH
+				             , SUM(SO.SO_QTY) OVER (PARTITION BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD, CG.CUST_LVL2_CD) AS OPEN_SO
+				             , SUM(SO.SO_QTY) OVER (PARTITION BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD) AS OPEN_SO_SUM
+				             , 0                         AS PROD_CAPA_QTY
+				             , 0    					 AS PROD_CAPA_QTY_SUM
+				             , 0                         AS ALLOC_QTY_ORIGIN
+				             , 0                         AS ALLOC_QTY_ADJ
+				             , 0                         AS PROD_QTY_CUM
+				             , 0                         AS SP_QTY_REMAIN
+				             , 0                         AS SALES_QTY_CUM
+				             , 0                         AS INV_BOH
+				             , NULL                      AS CONFIRM_YN
+				             , 0                         AS WORKING_DAYS
+						FROM W_DIM CG
+				        JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+			              ON (  CG.COMPANY_CD        = CM.COMPANY_CD
+			              		AND CG.BU_CD         = CM.BU_CD
+			              		AND CG.CUST_GROUP_CD = CM.CUST_GROUP_CD
+			            	 )
+			          	JOIN 
+			          	(
+				          	SELECT B1.COMPANY_CD
+					      	     , B1.BU_CD
+					      	     , B1.ITEM_CD
+					      	     , B1.CUST_CD
+					      	     , ISNULL(SO_QTY, 0) - ISNULL(INV_QTY, 0) AS SO_QTY
+							FROM 
+				          	(
+				          		SELECT A1.COMPANY_CD
+					          	     , A1.BU_CD
+					          	     , A1.ITEM_CD
+					          	     , A1.CUST_CD
+					          	     , SUM(SO_QTY - GI_QTY) AS SO_QTY
+				          		FROM
+				          		(
+									SELECT *
+						          	FROM TB_DYN_SALES_ORDER WITH(NOLOCK)
+						          	WHERE CLOSE_YN = 'N'
+						          	  AND DEL_FLAG = 'N'
+						          	  <!-- AND REQ_DLV_DATE <![CDATA[<=]]> '$paramMonth' + '31'
+						              AND '$paramMonth' BETWEEN @{fromMon} AND @{toMon} -->
+						        ) A1
+					          	JOIN W_CODE CD
+						        ON A1.SO_TYPE    = CD.CODE_CD
+						        AND CD.GROUP_CD  = 'SO_TYPE'
+						        AND CD.ATTB_1_CD = 'Y'
+					          	GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.CUST_CD
+							) B1
+					        LEFT OUTER JOIN
+							(
+								SELECT COMPANY_CD
+								     , BU_CD
+								     , ITEM_CD 
+								  , SUM(INV_QTY) AS INV_QTY
+								FROM TB_DYN_INVENTORY_OTHERS WITH(NOLOCK)
+								WHERE INV_DATE = CONVERT(VARCHAR(8), DBO.UFN_GETDATE(), 112)
+								  AND SL_CD = 'D01'
+								  AND PLANT_CD = 'WF01'
+								GROUP BY COMPANY_CD, BU_CD, ITEM_CD 
+							) B2
+							ON B1.COMPANY_CD = B2.COMPANY_CD
+							AND B1.BU_CD     = B2.BU_CD
+							AND B1.ITEM_CD   = B2.ITEM_CD
+						) SO
+						ON (
+			              	CG.COMPANY_CD    = SO.COMPANY_CD
+			              	AND CG.BU_CD         = SO.BU_CD
+			              	AND CG.ITEM_CD       = SO.ITEM_CD
+			              	AND CM.CUST_CD       = SO.CUST_CD
+			               )
+			        	
+			        	
+			        	#end
+			        	
+			         	UNION ALL
+			         	
+			        	/* INV_BOH */
+				        SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , @{startMonth}              AS YEARMONTH
+				             , 0                          AS OPEN_SO
+				             , 0                          AS OPEN_SO_SUM
+				             , 0                          AS PROD_CAPA_QTY
+				             , 0    					  AS PROD_CAPA_QTY_SUM
+				             , 0                          AS ALLOC_QTY_ORIGIN
+				             , 0                          AS ALLOC_QTY_ADJ
+				             , 0                          AS PROD_QTY_CUM
+				             , 0                          AS SP_QTY_REMAIN
+				             , 0                          AS SALES_QTY_CUM
+				             , ISNULL(SUM(IV.INV_QTY), 0) AS INV_BOH
+				             , NULL                       AS CONFIRM_YN
+				             , 0                          AS WORKING_DAYS
+						FROM W_DIM CG
+			          	JOIN UV_DYN_INVENTORY IV WITH(NOLOCK)
+			              ON (  CG.COMPANY_CD = IV.COMPANY_CD
+				                AND CG.BU_CD      = IV.BU_CD
+			                    AND CG.ITEM_CD    = IV.ITEM_CD
+			                    AND IV.PLANT_CD   = 'WF01'
+			              	    AND IV.INV_DATE   = @INV_DAY
+			                 )
+			        	GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD, CG.CUST_LVL2_CD
+			         	UNION ALL
+			         	
+			        	/* SALES_QTY_CUM */
+			        	SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , @{startMonth}             AS YEARMONTH
+				             , 0                         AS OPEN_SO
+				             , 0                         AS OPEN_SO_SUM
+				             , 0                         AS PROD_CAPA_QTY
+				             , 0    					 AS PROD_CAPA_QTY_SUM
+				             , 0                         AS ALLOC_QTY_ORIGIN
+				             , 0                         AS ALLOC_QTY_ADJ
+				             , 0                         AS PROD_QTY_CUM
+				             , 0                         AS SP_QTY_REMAIN
+				             , ISNULL(SUM(SR.QTY), 0)    AS SALES_QTY_CUM
+				             , 0                         AS INV_BOH
+				             , NULL                      AS CONFIRM_YN
+				             , 0                         AS WORKING_DAYS
+						FROM W_DIM CG
+			          	JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+			              ON (  CG.COMPANY_CD        = CT.COMPANY_CD
+			              	    AND CG.BU_CD         = CT.BU_CD
+			              	    AND CG.CUST_GROUP_CD = CT.CUST_GROUP_CD
+		 		             )
+			          	JOIN TB_DYN_SALES_RESULT SR WITH(NOLOCK)
+			              ON (  CG.COMPANY_CD = SR.COMPANY_CD
+				               AND CG.BU_CD      = SR.BU_CD
+				               AND CG.ITEM_CD    = SR.ITEM_CD
+				               AND CT.CUST_CD    = SR.CUST_CD
+				               AND SR.PLANT_CD = 'WF01'
+				               AND SR.DEL_FLAG   = 'N'
+				               AND SR.SALES_DATE <![CDATA[>=]]> @{startMonth}+'01'
+				               AND SR.SALES_DATE <![CDATA[<=]]> @{startMonth}+'31'
+				               AND SR.SALES_DATE <![CDATA[<]]> @CUR_MIN_DAY
+				             )
+			        	GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD, CG.CUST_LVL2_CD
+			         	UNION ALL
+			         	
+			        	/* SP_QTY_REMAIN */
+				        SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , PC.YEARMONTH
+				             , 0                      AS OPEN_SO
+				             , 0                      AS OPEN_SO_SUM
+				             , 0                      AS PROD_CAPA_QTY
+				             , 0    				  AS PROD_CAPA_QTY_SUM
+				             , 0                      AS ALLOC_QTY_ORIGIN
+				             , 0                      AS ALLOC_QTY_ADJ
+				             , 0                      AS PROD_QTY_CUM
+				             , ISNULL(SUM(SP.QTY), 0) AS SP_QTY_REMAIN
+				             , 0                      AS SALES_QTY_CUM
+				             , 0                      AS INV_BOH
+				             , NULL                   AS CONFIRM_YN
+				             , 0                      AS WORKING_DAYS
+			          	FROM W_DIM CG
+			          	JOIN TB_KPI_SALES_PLAN SP WITH(NOLOCK)
+			              ON (  CG.COMPANY_CD        = SP.COMPANY_CD
+			              	    AND CG.BU_CD         = SP.BU_CD
+			              		AND CG.ITEM_CD       = SP.ITEM_CD
+			              		AND CG.CUST_GROUP_CD = SP.CUST_GROUP_CD
+			              		AND SP.MEAS_CD       = 'CFM_SP'
+			              		AND SP.YEARPWEEK <![CDATA[>=]]> @START_PWEEK
+			              		AND SP.YEARPWEEK <![CDATA[>=]]> @CUR_PWEEK
+			              		AND SP.YEARPWEEK <![CDATA[<=]]> @END_PWEEK
+			            	 )
+			          	JOIN W_PWEEK_CALENDAR PC
+			              ON (SP.YEARPWEEK = PC.YEARPWEEK)
+			        	GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD, CG.CUST_LVL2_CD, PC.YEARMONTH
+			         	UNION ALL
+			         	
+			        	/* PROD_QTY_CUM */
+			        	SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , DC.YEARMONTH
+				             , 0                      AS OPEN_SO
+				             , 0                      AS OPEN_SO_SUM
+				             , 0                      AS PROD_CAPA_QTY
+				             , 0    				  AS PROD_CAPA_QTY_SUM
+				             , 0                      AS ALLOC_QTY_ORIGIN
+				             , 0                      AS ALLOC_QTY_ADJ
+				             , ISNULL(SUM(PR.QTY), 0) AS PROD_QTY_CUM
+				             , 0                      AS SP_QTY_REMAIN
+				             , 0                      AS SALES_QTY_CUM
+				             , 0                      AS INV_BOH
+				             , NULL                   AS CONFIRM_YN
+				             , 0                      AS WORKING_DAYS
+						FROM W_DIM CG
+			          	JOIN UV_PROD_RESULT PR WITH(NOLOCK)
+			              ON (  CG.COMPANY_CD    = PR.COMPANY_CD
+			              	    AND CG.BU_CD     = PR.BU_CD
+			                    AND CG.ITEM_CD   = PR.ITEM_CD
+			                    AND PR.PLANT_CD  = 'WF01'
+			              		AND PR.PROD_DATE <![CDATA[>=]]> @{startMonth}+'01'
+			              		AND PR.PROD_DATE <![CDATA[<]]> @CUR_MIN_DAY
+			            	 )
+			          	JOIN TB_MST_CALENDAR DC WITH(NOLOCK)
+			              ON (PR.PROD_DATE = DC.YYYYMMDD)
+			        	GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.PROD_LVL2_CD, CG.ROUTING_ID, CG.PROD_LVL3_CD, CG.CUST_LVL2_CD, DC.YEARMONTH
+			         	UNION ALL
+			         	
+			        	/* ALLOC_QTY_ORIGIN, ALLOC_QTY_ADJ */
+			        	SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , LC.YEARMONTH
+				             , 0                          AS OPEN_SO
+				             , 0                          AS OPEN_SO_SUM
+				             , 0                          AS PROD_CAPA_QTY
+				             , 0    					  AS PROD_CAPA_QTY_SUM
+				             , ISNULL(LC.CAPA_QTY, 0)     AS ALLOC_QTY_ORIGIN
+				             , ISNULL(LC.ADJ_CAPA_QTY, 0) AS ALLOC_QTY_ADJ
+				             , 0                          AS PROD_QTY_CUM
+				             , 0                          AS SP_QTY_REMAIN
+				             , 0                          AS SALES_QTY_CUM
+				             , 0                          AS INV_BOH
+				             , 'Y'                        AS CONFIRM_YN
+				             , 0                          AS WORKING_DAYS
+						FROM W_DIM_GROUP CG
+			          	JOIN TB_DYN_CAPA_ALLOC_SALES_LATEST LC WITH(NOLOCK)
+			              ON (  CG.COMPANY_CD       = LC.COMPANY_CD
+			              		AND CG.BU_CD        = LC.BU_CD
+			              		AND CG.ROUTING_ID   = LC.ROUTING_ID
+					            AND CG.PROD_LVL3_CD = LC.PROD_LVL3_CD
+					            AND CG.CUST_LVL2_CD = LC.CUST_LVL2_CD
+					            AND LC.YEARMONTH    <![CDATA[< ]]> @{startMonth}  
+					            AND LC.YEARMONTH    <![CDATA[>=]]> @{fromMon}
+					            AND LC.YEARMONTH    <![CDATA[<=]]> @{toMon}
+			            	 )
+			         	UNION ALL
+			         	
+			        	/* ALLOC_QTY_ORIGIN, ALLOC_QTY_ADJ, DELTA */
+				        SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , HC.YEARMONTH
+				             , 0                                                                      AS OPEN_SO
+				             , 0                         											  AS OPEN_SO_SUM
+				             , 0                                                                      AS PROD_CAPA_QTY
+				             , 0    																  AS PROD_CAPA_QTY_SUM
+				             , ISNULL(HC.CAPA_QTY, 0)                                                 AS ALLOC_QTY_ORIGIN
+				             , ISNULL(HC.ADJ_CAPA_QTY, 0)                                             AS ALLOC_QTY_ADJ
+				             , 0                                                                      AS PROD_QTY_CUM
+				             , 0                                                                      AS SP_QTY_REMAIN
+				             , 0                                                                      AS SALES_QTY_CUM
+				             , 0                                                                      AS INV_BOH
+				             , 'Y'                                                                    AS CONFIRM_YN
+				             , 0                                                                      AS WORKING_DAYS
+			          	FROM W_DIM_GROUP CG
+			          	JOIN TB_HIS_CAPA_ALLOC_SALES HC WITH(NOLOCK)
+			              ON (  @CUT_OFF_FLAG   = 'Y'
+			              		AND CG.COMPANY_CD   = HC.COMPANY_CD
+			              		AND CG.BU_CD        = HC.BU_CD
+			              		AND CG.ROUTING_ID   = HC.ROUTING_ID
+			              		AND CG.PROD_LVL3_CD = HC.PROD_LVL3_CD
+			              		AND CG.CUST_LVL2_CD = HC.CUST_LVL2_CD
+			              		AND HC.PLAN_ID      = @{planId}
+			              		AND HC.YEARMONTH    <![CDATA[>=]]> @{startMonth}
+			              		AND HC.YEARMONTH    <![CDATA[<=]]> @{endMonth}
+			              		AND HC.YEARMONTH    <![CDATA[>=]]> @{fromMon}
+			              		AND HC.YEARMONTH    <![CDATA[<=]]> @{toMon}
+			            	 )
+			         	UNION ALL
+			         	
+			        	/* ALLOC_QTY_ORIGIN, ALLOC_QTY_ADJ, DELTA */
+				        SELECT CG.COMPANY_CD
+				             , CG.BU_CD
+				             , CG.PROD_LVL2_CD
+				             , CG.ROUTING_ID
+				             , CG.PROD_LVL3_CD
+				             , CG.CUST_LVL2_CD
+				             , DC.YEARMONTH
+				             , 0                                                                      AS OPEN_SO
+				             , 0											                          AS OPEN_SO_SUM
+				             , 0                                                                      AS PROD_CAPA_QTY
+				             , 0    																  AS PROD_CAPA_QTY_SUM
+				             , ISNULL(DC.CAPA_QTY, 0)                                                 AS ALLOC_QTY_ORIGIN
+				             , ISNULL(DC.ADJ_CAPA_QTY, 0)                                             AS ALLOC_QTY_ADJ
+				             , 0                                                                      AS PROD_QTY_CUM
+				             , 0                                                                      AS SP_QTY_REMAIN
+				             , 0                                                                      AS SALES_QTY_CUM
+				             , 0                                                                      AS INV_BOH
+				             , ISNULL(DC.CONFIRM_YN, 'N')                                             AS CONFIRM_YN
+				             , 0                                                                      AS WORKING_DAYS
+			          	FROM W_DIM_GROUP CG
+			          	JOIN TB_DYN_CAPA_ALLOC_SALES DC WITH(NOLOCK)
+			              ON (  @CUT_OFF_FLAG   = 'N'
+			              		AND CG.COMPANY_CD   = DC.COMPANY_CD
+			              		AND CG.BU_CD        = DC.BU_CD
+			              		AND CG.ROUTING_ID   = DC.ROUTING_ID
+			              		AND CG.PROD_LVL3_CD = DC.PROD_LVL3_CD
+			              		AND CG.CUST_LVL2_CD = DC.CUST_LVL2_CD
+			              		AND DC.YEARMONTH    <![CDATA[>=]]> @{startMonth}
+			              		AND DC.YEARMONTH    <![CDATA[<=]]> @{endMonth}
+			            	 )
+					) TM
+			        GROUP BY TM.COMPANY_CD, TM.BU_CD, TM.PROD_LVL2_CD, TM.ROUTING_ID, TM.PROD_LVL3_CD, TM.CUST_LVL2_CD, TM.YEARMONTH
+				) TM2
+		    ),
+		    W_CONFIRM_YN AS 
+		    (
+		        SELECT COMPANY_CD
+		             , BU_CD
+		             , PROD_LVL2_CD
+		             , ROUTING_ID
+		             , PROD_LVL3_CD
+		             , CUST_LVL2_CD
+		             , MAX(CONFIRM_YN) AS CONFIRM_YN
+				FROM W_MEA
+		        WHERE YEARMONTH <![CDATA[>=]]> @{startMonth}
+		          AND YEARMONTH <![CDATA[<=]]> @{endMonth}
+		        GROUP BY COMPANY_CD, BU_CD, PROD_LVL2_CD, ROUTING_ID, PROD_LVL3_CD, CUST_LVL2_CD
+		    ),
+		    W_DIM_CONFIRM AS 
+		    (
+		        SELECT D.*
+		             , ISNULL(C.CONFIRM_YN, @CUT_OFF_FLAG) AS CONFIRM_YN
+		        FROM W_DIM_GROUP D
+		        LEFT OUTER JOIN W_CONFIRM_YN C 
+		          ON (  D.COMPANY_CD   = C.COMPANY_CD
+		                AND D.BU_CD        = C.BU_CD
+		                AND D.ROUTING_ID   = C.ROUTING_ID
+		                AND D.PROD_LVL3_CD = C.PROD_LVL3_CD
+		                AND D.CUST_LVL2_CD = C.CUST_LVL2_CD
+		             )
+	    	),
+		    W_ROW AS 
+		    (
+		        SELECT NULL AS TMP_COL
+					#foreach( $dimMap in $_parameter.dimList )
+		             , D.$dimMap.DIM_CD 
+		             , D.$dimMap.DIM_CD AS ${dimMap.DIM_CD}_NM 
+					#end
+		             , D.CONFIRM_YN
+		             , C.YEARMONTH
+		             , C.OPEN_SO
+		             , C.CFM_SP
+		             , C.PROD_CAPA_QTY
+		             , C.PROD_CAPA_QTY_SUM
+		             , C.ALLOC_QTY_ORIGIN
+		             , C.ALLOC_QTY_ADJ
+		             , C.ALLOC_QTY_ADJ_SUM
+		             , C.RANK_NUM
+		             , C.DELTA
+		             , C.RATE_M
+		             , C.PROD_QTY_CUM
+		             , C.SP_QTY_REMAIN
+		             , C.SALES_QTY_CUM
+		             , C.INV_BOH
+		             , CASE WHEN C.REQ_PROD_QTY <![CDATA[>]]> 0 THEN C.REQ_PROD_QTY
+		                    ELSE 0
+		                END AS REQ_PROD_QTY
+		             , C.WORKING_DAYS
+				FROM W_DIM_CONFIRM D
+		        LEFT OUTER JOIN W_MEA C
+		          ON (  D.COMPANY_CD   = C.COMPANY_CD
+		                AND D.BU_CD        = C.BU_CD
+		                AND D.ROUTING_ID   = C.ROUTING_ID
+		                AND D.PROD_LVL3_CD = C.PROD_LVL3_CD
+		                AND D.CUST_LVL2_CD = C.CUST_LVL2_CD
+		                AND C.YEARMONTH   <![CDATA[>=]]> @{fromMon}
+		              	AND C.YEARMONTH   <![CDATA[<=]]> @{toMon}
+		             )
+		    ),
+		    W_MAIN AS 
+		    (
+		        SELECT NULL AS TMP_COL
+					#foreach( $dimMap in $_parameter.dimList )
+		             , $dimMap.DIM_CD 
+		             , ${dimMap.DIM_CD}_NM 
+					#end
+		             , MAX(CONFIRM_YN) AS CONFIRM_YN
+		             <include refid="include.getGrpLvlId"/>
+					#foreach( $bucketMap in $_parameter.bucketList )
+		 				#if ($bucketMap.CD.indexOf("WORKING_DAYS") > -1 or $bucketMap.CD.indexOf("RATE_M") > -1)
+		             		, MAX(CASE WHEN YEARMONTH = '$bucketMap.BUCKET_VAL' THEN $bucketMap.CD.substring(8) ELSE 0 END) AS $bucketMap.CD
+		 				#elseif ($bucketMap.CD.indexOf("ALLOC_QTY_W") == -1 and $bucketMap.CD.indexOf("RATE") == -1)
+		 					
+		 					#if ($bucketMap.CD.indexOf("PROD_CAPA_QTY") > -1)
+		 						, SUM(CASE WHEN YEARMONTH = '$bucketMap.BUCKET_VAL' THEN $bucketMap.CD.substring(8) ELSE 0 END) AS $bucketMap.CD
+		 						, SUM(CASE WHEN YEARMONTH = '$bucketMap.BUCKET_VAL' THEN $bucketMap.CD_SUB.substring(8) ELSE 0 END) AS $bucketMap.CD_SUB
+		 						, SUM(CASE WHEN YEARMONTH = '$bucketMap.BUCKET_VAL' THEN $bucketMap.CD_SUB2.substring(8) ELSE 0 END) AS $bucketMap.CD_SUB2
+		 						
+		 					#elseif ($bucketMap.CD.indexOf("ALLOC_QTY_ADJ") > -1)
+		 						, SUM(CASE WHEN YEARMONTH = '$bucketMap.BUCKET_VAL' THEN $bucketMap.CD.substring(8) ELSE 0 END) AS $bucketMap.CD
+		 						, SUM(CASE WHEN YEARMONTH = '$bucketMap.BUCKET_VAL' THEN $bucketMap.CD_SUB.substring(8) ELSE 0 END) AS $bucketMap.CD_SUB
+		 					#else
+		 						, SUM(CASE WHEN YEARMONTH = '$bucketMap.BUCKET_VAL' THEN $bucketMap.CD.substring(8) ELSE 0 END) AS $bucketMap.CD
+		 					#end	
+		 				#end
+					#end
+				FROM W_ROW
+		        GROUP BY ROLLUP (<include refid="include.getRollup"/>)
+			)
+		    SELECT NULL AS TMP_COL
+		         <include refid="include.getDimTotal"/>
+		         , CONFIRM_YN
+		         , GRP_LVL_ID
+				#foreach( $bucketMap in $_parameter.bucketList )
+		 			#if ($bucketMap.CD.indexOf("PROD_CAPA_QTY") > -1)
+		   				#if ($dim_CUST_LVL2 == "Y")
+		         			, CASE WHEN GRP_LVL_ID = 0 
+		                		   THEN NULL
+		                		   ELSE $bucketMap.CD
+		            		   END AS $bucketMap.CD
+		            		, $bucketMap.CD_SUB
+		         	 		, $bucketMap.CD_SUB2
+		   				#else
+		         			, $bucketMap.CD
+		         			, $bucketMap.CD_SUB
+		         	 		, $bucketMap.CD_SUB2
+		   				#end
+		 			#elseif ($bucketMap.CD.indexOf("RATE_M") > -1)
+		   				#if ($dim_CUST_LVL2 == "Y")
+		         			, CASE WHEN GRP_LVL_ID = 0
+		                		   THEN $bucketMap.CD
+		                		   ELSE ISNULL(ROUND(M${bucketMap.BUCKET_VAL}_ALLOC_QTY_ADJ / NULLIF(M${bucketMap.BUCKET_VAL}_ALLOC_QTY_ORIGIN, 0) * 100, 1) ,0)
+		            		   END AS $bucketMap.CD
+		   				#else
+		         			, ISNULL(ROUND(M${bucketMap.BUCKET_VAL}_ALLOC_QTY_ADJ / NULLIF(M${bucketMap.BUCKET_VAL}_ALLOC_QTY_ORIGIN, 0) * 100, 1) ,0) AS $bucketMap.CD
+		   				#end 
+		 			#elseif ($bucketMap.CD.indexOf("ALLOC_QTY_W") > -1)
+		         		, ISNULL(ROUND(M${bucketMap.BUCKET_VAL}_ALLOC_QTY_ADJ / NULLIF(M${bucketMap.BUCKET_VAL}_WORKING_DAYS, 0) * 7, 1), 0) AS $bucketMap.CD
+		 			#elseif ($bucketMap.CD.indexOf("RATE") > -1)
+		         		, ISNULL(ROUND((M${bucketMap.BUCKET_VAL}_SALES_QTY_CUM + M${bucketMap.BUCKET_VAL}_REQ_PROD_QTY) / NULLIF(M${bucketMap.BUCKET_VAL}_ALLOC_QTY_ADJ, 0) * 100, 1), 0) AS $bucketMap.CD
+		         	#elseif ($bucketMap.CD.indexOf("ALLOC_QTY_ADJ") > -1)
+		         		, $bucketMap.CD 
+		         	 	, $bucketMap.CD_SUB
+		         	 	
+		 			#else
+		         		, $bucketMap.CD 
+		 			#end
+				#end
+			FROM W_MAIN A
+		    ORDER BY TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+		         , A.${dimMap.DIM_CD}_NM, A.$dimMap.DIM_CD
+			#end
+			;
+		END
+		
+    </select>
+    
+    <update id="prodCapaAllocSalesUpdate" parameterType="map">
+    /****** [ dp.salesPlan.prodCapaAllocSalesUpdate ] ******/
+    BEGIN
+        
+        DECLARE @CUT_OFF_FLAG    nvarchar(1)
+        DECLARE @CONFIRM_YN      nvarchar(1)
+        
+        /* Select : CUT_OFF_FLAG ---------------------------- */
+        SELECT @CUT_OFF_FLAG = CUT_OFF_FLAG
+          FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+         WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+           AND BU_CD        = @{GV_BU_CD}
+           AND PLAN_TYPE_CD = 'DP_M'
+           AND PLAN_ID      = @{planId};
+        
+        IF (@CUT_OFF_FLAG != 'Y')
+            BEGIN /* 1 : Begin */
+            
+                /* Select : CONFIRM_YN ---------------------------- */
+                SELECT @CONFIRM_YN = ISNULL(MAX(CONFIRM_YN), @CUT_OFF_FLAG)
+                  FROM TB_DYN_CAPA_ALLOC_SALES WITH(NOLOCK)
+                 WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+                   AND BU_CD        = @{GV_BU_CD}
+                   AND ROUTING_ID   = @{ROUTING_ID}
+                   AND PROD_LVL3_CD = @{PROD_LVL3_CD}
+                   AND CUST_LVL2_CD = @{CUST_LVL2_CD}
+                   AND YEARMONTH   <![CDATA[>=]]> @{startMonth}
+                   AND YEARMONTH   <![CDATA[<=]]> @{endMonth}
+                   ;
+
+                IF (@CONFIRM_YN != 'Y')
+                    BEGIN /* 2 : Begin */
+                
+                        /* Month Cursor ----------------------------------------------------- */
+                        DECLARE BUCKET_LIST CURSOR FOR
+#foreach ($bucketMap in $_parameter.BUCKET_LIST)
+#if ($foreach.count != 1)
+                             UNION ALL
+#end
+                            SELECT '$bucketMap.YEARMONTH' AS YEARMONTH, $bucketMap.CAPA_QTY AS CAPA_QTY, $bucketMap.ADJ_CAPA_QTY AS ADJ_CAPA_QTY
+#end
+
+                        /* Open : Month Cursor ---------------------------------------------- */
+                        OPEN BUCKET_LIST
+                        
+                        DECLARE @YEARMONTH    nvarchar(6)
+                        DECLARE @CAPA_QTY     numeric(21,6)
+                        DECLARE @ADJ_CAPA_QTY numeric(21,6)
+                        
+                        FETCH NEXT FROM BUCKET_LIST INTO @YEARMONTH, @CAPA_QTY, @ADJ_CAPA_QTY
+                    
+                        WHILE (@@FETCH_STATUS = 0)
+                            BEGIN
+                            
+                                /* Start Save : TB_DYN_CAPA_ALLOC_SALES ----------------------------- */
+                                
+                                MERGE TB_DYN_CAPA_ALLOC_SALES AS A
+                                USING (SELECT 'X' AS DUAL) AS B
+                                   ON (  COMPANY_CD   = @{GV_COMPANY_CD}
+                                     AND BU_CD        = @{GV_BU_CD}
+                                     AND ROUTING_ID   = @{ROUTING_ID}
+                                     AND PROD_LVL3_CD = @{PROD_LVL3_CD}
+                                     AND CUST_LVL2_CD = @{CUST_LVL2_CD}
+                                     AND YEARMONTH    = @YEARMONTH
+                                   )
+                                 WHEN MATCHED THEN
+                                   UPDATE
+                                      SET CAPA_QTY     = CASE WHEN @CAPA_QTY     = -1                                                                                 THEN CAPA_QTY     ELSE @CAPA_QTY END 
+                                        , ADJ_CAPA_QTY = CASE WHEN @ADJ_CAPA_QTY = -1                                                                                 THEN ADJ_CAPA_QTY ELSE @ADJ_CAPA_QTY END
+                                        , UPDATE_ID    = CASE WHEN (@CAPA_QTY = -1 AND @ADJ_CAPA_QTY = -1) OR (CAPA_QTY = @CAPA_QTY AND ADJ_CAPA_QTY = @ADJ_CAPA_QTY) THEN UPDATE_ID    ELSE @{GV_USER_ID} END
+                                        , UPDATE_DTTM  = CASE WHEN (@CAPA_QTY = -1 AND @ADJ_CAPA_QTY = -1) OR (CAPA_QTY = @CAPA_QTY AND ADJ_CAPA_QTY = @ADJ_CAPA_QTY) THEN UPDATE_DTTM  ELSE DBO.UFN_GETDATE() END
+                                 WHEN NOT MATCHED THEN
+                                   INSERT (
+                                       COMPANY_CD,
+                                       BU_CD,
+                                       ROUTING_ID,
+                                       PROD_LVL3_CD,
+                                       CUST_LVL2_CD,
+                                       YEARMONTH,
+                                       CAPA_QTY,
+                                       ADJ_CAPA_QTY,
+                                       CONFIRM_YN,
+                                       CREATE_ID,
+                                       CREATE_DTTM,
+                                       UPDATE_ID,
+                                       UPDATE_DTTM
+                                   ) VALUES (
+                                       @{GV_COMPANY_CD},
+                                       @{GV_BU_CD},
+                                       @{ROUTING_ID},
+                                       @{PROD_LVL3_CD},
+                                       @{CUST_LVL2_CD},
+                                       @YEARMONTH,
+                                       CASE WHEN @CAPA_QTY     != -1 THEN @CAPA_QTY     ELSE 0 END,
+                                       CASE WHEN @ADJ_CAPA_QTY != -1 THEN @ADJ_CAPA_QTY ELSE 0 END,
+                                       'N',
+                                       @{GV_USER_ID},
+                                       DBO.UFN_GETDATE(),
+                                       @{GV_USER_ID},
+                                       DBO.UFN_GETDATE()
+                                   );
+                                
+                                /* End Save : TB_DYN_CAPA_ALLOC_SALES ----------------------------- */
+
+                                FETCH NEXT FROM BUCKET_LIST INTO @YEARMONTH, @CAPA_QTY, @ADJ_CAPA_QTY
+                                
+                            END
+                            
+                        CLOSE BUCKET_LIST
+                        DEALLOCATE BUCKET_LIST
+                        /* Close : Month Cursor --------------------------------------------- */
+                    
+                    END /* 2 : End */
+            
+            END /* 1 : End */
+    END;
+    </update>
+    
+    <update id="prodCapaAllocSalesConfirmUpdate" parameterType="map">
+	    /****** [ dp.salesPlan.prodCapaAllocSalesConfirmUpdate ] ******/
+	    UPDATE TB_DYN_CAPA_ALLOC_SALES
+	       SET CONFIRM_YN   = @{CONFIRM_YN}
+	         , UPDATE_ID    = CASE WHEN CONFIRM_YN = @{CONFIRM_YN} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	         , UPDATE_DTTM  = CASE WHEN CONFIRM_YN = @{CONFIRM_YN} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	     WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+	       AND BU_CD        = @{GV_BU_CD}
+	       AND ROUTING_ID   = @{ROUTING_ID}
+	       AND PROD_LVL3_CD = @{PROD_LVL3_CD}
+	       AND CUST_LVL2_CD = @{CUST_LVL2_CD}
+	       AND YEARMONTH   <![CDATA[>=]]> @{startMonth}
+	       AND YEARMONTH   <![CDATA[<=]]> @{endMonth}
+    </update>
+
+</mapper>

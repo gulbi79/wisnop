@@ -1,0 +1,1856 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+
+    <select id="prodPlanLoadingSelect" parameterType="map" resultType="map">
+        /****** [ supply.product.prodPlanLoadingSelect ] ******/
+        SELECT CUT_OFF_FLAG -- 'N'
+             , RELEASE_FLAG -- 'Y' 일때 활성화
+        FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+          AND BU_CD = @{GV_BU_CD}
+          AND PLAN_TYPE_CD = 'MP'
+          AND PLAN_ID = @{planId}
+    </select>
+    
+    <select id="prodPlanConfirmSelect" parameterType="map" resultType="map">
+        /****** [ supply.product.prodPlanConfirmSelect ] ******/
+        SELECT CONFIRM_FLAG
+        FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+         WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+           AND BU_CD        = @{GV_BU_CD}
+           AND PLAN_TYPE_CD = 'MP'
+           AND PLAN_ID      = @{planId}
+    </select>
+    
+    <select id="prodPlanScmWeekSelect" parameterType="map" resultType="map">
+        /****** [ supply.product.prodPlanScmWeekSelect ] ******/
+        SELECT START_WEEK
+        FROM TB_MST_PLAN_VERSION
+        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+          AND BU_CD = @{GV_BU_CD}
+          AND PLAN_TYPE_CD = 'DP_W'
+          AND START_WEEK = ( 
+                                SELECT YEARWEEK
+                                FROM TB_MST_CALENDAR
+                                WHERE YYYYMMDD = (
+                                                    SELECT CONVERT (NVARCHAR, DATEADD (DAY, -7, MIN (DTTM)), 112)
+                                                    FROM TB_MST_CALENDAR
+                                                    WHERE YEARWEEK = (
+                                                                        SELECT START_WEEK
+                                                                        FROM TB_MST_PLAN_VERSION
+                                                                        WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+                                                                          AND BU_CD        = @{GV_BU_CD}
+                                                                          AND PLAN_ID      = @{planId}
+                                                                          AND PLAN_TYPE_CD = 'MP')));
+    </select>
+    
+    <select id="prodPlanSelect" parameterType="map" resultType="map">
+        /****** [ supply.product.prodPlanSelect ] ******/
+        BEGIN
+            
+            
+
+            DECLARE @P_CUT_YN NVARCHAR(1) = '$_parameter.CONFIRM_YN';
+            
+            DECLARE @P_BEFORE_WEEK NVARCHAR(6);
+            DECLARE @P_BEFORE_THU NVARCHAR(8);
+            DECLARE @P_BEFORE_SAT NVARCHAR(8);
+            DECLARE @P_SALES_PLAN_ID NVARCHAR(8);
+            DECLARE @P_SALES_START_WEEK NVARCHAR(6);
+            DECLARE @P_SALES_PLAN_ID_DP_M NVARCHAR(8);
+            DECLARE @P_CPFR_START_MONTH NVARCHAR(6);
+            DECLARE @P_CURRENT_WEEK NVARCHAR(8);
+            DECLARE @P_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR(8), DBO.UFN_GETDATE(), 112);
+            
+            SELECT @P_CURRENT_WEEK = YEARPWEEK 
+            FROM TB_MST_CALENDAR WITH(NOLOCK) 
+            WHERE YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112);
+            
+            SELECT @P_BEFORE_WEEK = YEARWEEK
+                 , @P_BEFORE_THU = CONVERT (NVARCHAR (30), DATEADD (DAY, 4, CAST (YYYYMMDD AS DATE)), 112)
+                 , @P_BEFORE_SAT = CONVERT (NVARCHAR (30), DATEADD (DAY, 6, CAST (YYYYMMDD AS DATE)), 112)
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YYYYMMDD = (
+                                SELECT CONVERT (NVARCHAR, DATEADD (DAY, -7, MIN (DTTM)), 112)
+                                FROM TB_MST_CALENDAR WITH(NOLOCK)
+                                WHERE YEARWEEK = (
+                                                    SELECT START_WEEK
+                                                    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+                                                    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+                                                    AND BU_CD        = @{GV_BU_CD}
+                                                    AND PLAN_ID      = @{planId}
+                                                    AND PLAN_TYPE_CD = 'MP'));
+            
+            SELECT @P_SALES_PLAN_ID = PLAN_ID 
+                 , @P_SALES_START_WEEK = START_WEEK
+            FROM TB_MST_PLAN_VERSION
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'DP_W'
+              AND START_WEEK = @P_BEFORE_WEEK;
+                                                                              
+            SELECT @P_SALES_PLAN_ID_DP_M = PLAN_ID
+                 , @P_CPFR_START_MONTH = CPFR_START_MONTH
+            FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+            WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+              AND MPV.BU_CD = @{GV_BU_CD}
+              AND MPV.PLAN_TYPE_CD = 'DP_M'
+              AND MPV.CPFR_START_MONTH = (
+                                            SELECT TOP 1 MC.YEARMONTH_STD
+                                            FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+                                            INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+                                               ON MC.YEARWEEK = MPV.APS_START_WEEK
+                                            WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+                                              AND MPV.BU_CD = @{GV_BU_CD}
+                                              AND MPV.PLAN_TYPE_CD = 'MP'
+                                              AND MPV.PLAN_ID = @{planId}
+                                      );
+            
+            
+            
+            #foreach($dimMap in $_parameter.dimList)
+                #if($dimMap.DIM_CD == "TEL_CNC") #set($dim_TEL_CNC = "Y")
+                #elseif($dimMap.DIM_CD == "TEL_MCT") #set($dim_TEL_MCT = "Y")
+                #elseif($dimMap.DIM_CD == "LAM_CNC") #set($dim_LAM_CNC = "Y")
+                #elseif($dimMap.DIM_CD == "LAM_MCT") #set($dim_LAM_MCT = "Y")
+                #elseif($dimMap.DIM_CD == "DIFF_CNC") #set($dim_DIFF_CNC = "Y")
+                #elseif($dimMap.DIM_CD == "DIFF_MCT") #set($dim_DIFF_MCT = "Y")
+                #elseif($dimMap.DIM_CD == "TEL_REPT") #set($dim_TEL_REPT = "Y")
+                #elseif($dimMap.DIM_CD == "DIFF_REPT") #set($dim_DIFF_REPT = "Y")
+                #end
+            #end
+           ----------------------------------------------------------------------------
+           
+            
+            
+        WITH W_ITEM AS 
+        (
+            <include refid="snop.common.t_itemCust" />
+        ),
+        W_PROD_PR AS
+        (
+            SELECT B1.COMPANY_CD
+                 , B1.BU_CD
+                 , B1.ITEM_CD
+                 , CASE WHEN ISNULL(PLAN_QTY, 0) - ISNULL(RESULT_QTY, 0) <![CDATA[>]]> 0 
+                        THEN ISNULL(PLAN_QTY, 0) - ISNULL(RESULT_QTY, 0) 
+                        ELSE 0
+                    END DIM_PROD_QTY
+            FROM
+            (
+                SELECT HAPPD.COMPANY_CD
+                     , HAPPD.BU_CD
+                     , HAPPD.ITEM_CD
+                     , SUM(HAPPD.QTY) AS PLAN_QTY
+                FROM TB_HIS_APS_PROD_PLAN_DAILY HAPPD WITH(NOLOCK)
+                WHERE HAPPD.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND HAPPD.BU_CD = @{GV_BU_CD}
+                  AND HAPPD.PLAN_ID = @P_BEFORE_THU
+                  AND HAPPD.YYYYMMDD BETWEEN @P_BEFORE_THU AND @P_BEFORE_SAT
+                GROUP BY HAPPD.COMPANY_CD, HAPPD.BU_CD, HAPPD.ITEM_CD
+            ) B1
+            LEFT OUTER JOIN
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , SUM(QTY) AS RESULT_QTY
+                FROM
+                (
+                    SELECT PR.COMPANY_CD
+                         , PR.BU_CD
+                         , PR.ITEM_CD
+                         , PR.QTY
+                    FROM UV_PROD_RESULT PR WITH(NOLOCK)
+                    WHERE PR.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND PR.BU_CD = @{GV_BU_CD}
+                      AND PR.PLANT_CD = 'WF01'
+                      AND PR.PROD_DATE BETWEEN @P_BEFORE_THU AND @P_BEFORE_SAT
+                    UNION ALL
+                    SELECT DGP.COMPANY_CD
+                         , DGP.BU_CD
+                         , DGP.ITEM_CD
+                         , DGP.GR_QTY
+                    FROM TB_DYN_GR_PROD DGP WITH(NOLOCK)
+                    WHERE DGP.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND DGP.BU_CD = @{GV_BU_CD}
+                      AND DGP.PLANT_CD = 'WF01'
+                      AND DGP.GR_DATE BETWEEN @P_BEFORE_THU AND @P_BEFORE_SAT
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD 
+            ) B2
+            ON B1.COMPANY_CD = B2.COMPANY_CD
+            AND B1.BU_CD = B2.BU_CD
+            AND B1.ITEM_CD = B2.ITEM_CD
+        ),
+        W_PROD AS
+        (
+            SELECT HAPPW.COMPANY_CD
+                 , HAPPW.BU_CD
+                 , HAPPW.ITEM_CD
+                 , SUM(CASE WHEN MC.ATTB_2_CD = 'PROD_1ST_QTY' THEN HAPPW.QTY END) AS DIM_PROD_1ST_QTY
+                 , SUM(CASE WHEN MC.ATTB_2_CD = 'PROD_2ND_QTY' THEN HAPPW.QTY END) AS DIM_PROD_2ND_QTY
+                 , SUM(CASE WHEN MC.ATTB_2_CD = 'PROD_3RD_QTY' THEN HAPPW.QTY END) AS DIM_PROD_3RD_QTY
+            FROM TB_HIS_APS_PROD_PLAN_WEEKLY HAPPW WITH(NOLOCK)
+            INNER JOIN TB_MST_CALENDAR MCAL WITH(NOLOCK)
+               ON MCAL.YYYYMMDD = HAPPW.YYYYMMDD
+              AND MCAL.YEARWEEK = (
+                                    SELECT START_WEEK
+                                    FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                      AND BU_CD = @{GV_BU_CD}
+                                      AND PLAN_TYPE_CD = 'MP'
+                                      AND PLAN_ID = @{planId}
+                                   )
+            INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+               ON MC.BU_CD = HAPPW.BU_CD
+              AND MC.GROUP_CD = 'DAY_INDEX'
+              AND MC.CODE_CD = MCAL.DAY_NM
+            WHERE HAPPW.COMPANY_CD = @{GV_COMPANY_CD}
+              AND HAPPW.BU_CD = @{GV_BU_CD}
+              AND HAPPW.PLAN_ID = @{planId}
+            GROUP BY HAPPW.COMPANY_CD, HAPPW.BU_CD, HAPPW.ITEM_CD
+        ),
+        W_CPFR AS 
+        (
+            SELECT DC1.COMPANY_CD
+                 , DC1.BU_CD
+                 , DC1.ITEM_CD
+                 , ISNULL(DC2.SALES_PLAN_QTY_M0, ISNULL(DC1.SALES_PLAN_QTY_M0, 0)) AS SALES_PLAN_QTY_M0
+                 , ISNULL(DC2.SALES_PLAN_QTY_M1, ISNULL(DC1.SALES_PLAN_QTY_M1, 0)) AS SALES_PLAN_QTY_M1
+                 , ISNULL(DC2.SALES_PLAN_QTY_M2, ISNULL(DC1.SALES_PLAN_QTY_M2, 0)) AS SALES_PLAN_QTY_M2
+            FROM TB_DYN_CPFR DC1 WITH(NOLOCK)
+            LEFT OUTER JOIN TB_DYN_CPFR DC2 WITH(NOLOCK)
+              ON DC2.COMPANY_CD = DC1.COMPANY_CD
+             AND DC2.BU_CD = DC1.BU_CD
+             AND DC2.PLAN_ID = DC1.PLAN_ID
+             AND DC2.ITEM_CD = DC1.ITEM_CD
+             AND DC2.MEAS_CD = 'ADJ'
+            WHERE DC1.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DC1.BU_CD = @{GV_BU_CD}
+              AND DC1.PLAN_ID = @P_SALES_PLAN_ID_DP_M
+              AND DC1.MEAS_CD = 'PLN'
+              AND EXISTS (
+                            SELECT 1
+                            FROM TB_MST_ITEM MI WITH(NOLOCK)
+                            WHERE MI.COMPANY_CD = DC1.COMPANY_CD
+                              AND MI.BU_CD = DC1.BU_CD
+                              AND MI.ITEM_CD = DC1.ITEM_CD
+                              AND ISNULL(MI.CPFR_YN, 'N') = 'Y'
+                         )
+        ),
+        W_CPFR_REMAIN AS
+        (
+            SELECT B1.COMPANY_CD, B1.BU_CD, B1.ITEM_CD
+                 , ISNULL(SUM(QTY), 0) AS QTY
+            FROM
+            (
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.QTY
+                FROM TB_DYN_SALES_RESULT A1 WITH(NOLOCK)
+                INNER JOIN TB_MST_CALENDAR A2 WITH(NOLOCK)
+                   ON A1.SALES_DATE = A2.YYYYMMDD
+                WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND A1.BU_CD = @{GV_BU_CD}
+                  AND A1.PLANT_CD = 'WF01'
+                  AND A1.DEL_FLAG = 'N'
+                  AND ISNULL(A1.CPFR_FLAG, 'N') = 'Y'
+                  AND A2.YEARMONTH = @P_CPFR_START_MONTH
+                  AND A2.YEARPWEEK <![CDATA[<]]> @P_CURRENT_WEEK
+                UNION ALL
+                SELECT KSP.COMPANY_CD
+                     , KSP.BU_CD
+                     , KSP.ITEM_CD
+                     , QTY
+                FROM TB_KPI_SALES_PLAN KSP WITH(NOLOCK)
+                INNER JOIN TB_MST_CUST_GROUP MCG WITH(NOLOCK)
+                   ON MCG.COMPANY_CD = KSP.COMPANY_CD
+                  AND MCG.BU_CD = KSP.BU_CD
+                  AND MCG.CUST_GROUP_CD = KSP.CUST_GROUP_CD
+                INNER JOIN TB_MST_REP_CUST_GROUP MRCG WITH(NOLOCK)
+                   ON MRCG.COMPANY_CD = MCG.COMPANY_CD
+                  AND MRCG.BU_CD = MCG.BU_CD
+                  AND MRCG.REP_CUST_GROUP_CD = MCG.REP_CUST_GROUP_CD
+                  AND MRCG.CUST_CATE = 'SAM'
+                WHERE KSP.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND KSP.BU_CD = @{GV_BU_CD}
+                  AND KSP.MEAS_CD = 'CFM_DMD1_SP'
+                  AND KSP.YEARPWEEK = @P_CURRENT_WEEK
+            ) B1
+            GROUP BY B1.COMPANY_CD, B1.BU_CD, B1.ITEM_CD
+        ),
+        W_HIS AS 
+        (
+            #if ($_parameter.CONFIRM_YN == "Y") 
+            <include refid="supply.product.CONFIRM"></include>
+            #else
+            <include refid="supply.product.HISTORY"></include>
+            #end
+        )
+        
+        
+            
+        
+          #if($dim_TEL_MCT == "Y" 
+           or $dim_TEL_CNC == "Y" 
+           or $dim_LAM_MCT == "Y" 
+           or $dim_LAM_CNC == "Y" 
+           or $dim_DIFF_CNC == "Y" 
+           or $dim_DIFF_MCT == "Y" 
+           or $dim_TEL_REPT == "Y" 
+           or $dim_DIFF_REPT == "Y")
+        ,
+        W_PROD_CATE AS
+        (
+            SELECT 
+             MI.COMPANY_CD
+             , MI.BU_CD
+             , MI.ITEM_CD
+	         #if($dim_TEL_CNC == "Y")
+             ,  TCC.CODE_NM AS TEL_CNC
+            #end
+            #if($dim_TEL_MCT == "Y")
+             ,  TMC.CODE_NM AS TEL_MCT
+            #end
+            #if($dim_LAM_CNC == "Y")
+             , LCC.CODE_NM AS LAM_CNC
+            #end
+            #if($dim_LAM_MCT == "Y")
+             , LMC.CODE_NM AS LAM_MCT
+            #end
+            #if($dim_DIFF_CNC == "Y")
+             , DCC.CODE_NM AS DIFF_CNC
+            #end
+            #if($dim_DIFF_MCT == "Y")
+             , DMC.CODE_NM AS DIFF_MCT
+            #end
+            
+            #if($dim_TEL_REPT == "Y")
+             , TRP.CODE_NM AS TEL_REPT
+            #end
+            
+            #if($dim_DIFF_REPT == "Y")
+             , DRP.CODE_NM AS DIFF_REPT
+            #end
+            
+            
+            FROM TB_MST_ITEM MI WITH(NOLOCK)
+            INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+               ON MIP.COMPANY_CD = MI.COMPANY_CD
+              AND MIP.BU_CD = MI.BU_CD
+              AND MIP.PLANT_CD = 'WF01'
+              AND MIP.ITEM_CD = MI.ITEM_CD
+            #if($dim_TEL_CNC == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP TC WITH(NOLOCK)
+                  ON TC.COMPANY_CD = MI.COMPANY_CD
+                 AND TC.BU_CD = MI.BU_CD
+                 AND TC.ITEM_CD = MI.ITEM_CD
+                 AND TC.PROD_GROUP = 'TEL_CNC'
+                 AND TC.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE TCC WITH(NOLOCK)
+                  ON TCC.BU_CD = TC.BU_CD
+                 AND TCC.CODE_CD = TC.PROD_GROUP_DET
+                 AND TCC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND TCC.USE_FLAG = 'Y'
+            #end
+            #if($dim_TEL_MCT == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP TM WITH(NOLOCK)
+                  ON TM.COMPANY_CD = MI.COMPANY_CD
+                 AND TM.BU_CD = MI.BU_CD
+                 AND TM.ITEM_CD = MI.ITEM_CD
+                 AND TM.PROD_GROUP = 'TEL_MCT'
+                 AND TM.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE TMC WITH(NOLOCK)
+                  ON TMC.BU_CD = TM.BU_CD
+                 AND TMC.CODE_CD = TM.PROD_GROUP_DET
+                 AND TMC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND TMC.USE_FLAG = 'Y'
+            #end
+            #if($dim_LAM_CNC == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP LC WITH(NOLOCK)
+                  ON LC.COMPANY_CD = MI.COMPANY_CD
+                 AND LC.BU_CD = MI.BU_CD
+                 AND LC.ITEM_CD = MI.ITEM_CD
+                 AND LC.PROD_GROUP = 'LAM_CNC'
+                 AND LC.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE LCC WITH(NOLOCK)
+                  ON LCC.BU_CD = LC.BU_CD
+                 AND LCC.CODE_CD = LC.PROD_GROUP_DET
+                 AND LCC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND LCC.USE_FLAG = 'Y'
+            #end
+            #if($dim_LAM_MCT == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP LM WITH(NOLOCK)
+                  ON LM.COMPANY_CD = MI.COMPANY_CD
+                 AND LM.BU_CD = MI.BU_CD
+                 AND LM.ITEM_CD = MI.ITEM_CD
+                 AND LM.PROD_GROUP = 'LAM_MCT'
+                 AND LM.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE LMC WITH(NOLOCK)
+                  ON LMC.BU_CD = LM.BU_CD
+                 AND LMC.CODE_CD = LM.PROD_GROUP_DET
+                 AND LMC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND LMC.USE_FLAG = 'Y'
+            #end
+            #if($dim_DIFF_CNC == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP DC WITH(NOLOCK)
+                  ON DC.COMPANY_CD = MI.COMPANY_CD
+                 AND DC.BU_CD = MI.BU_CD
+                 AND DC.ITEM_CD = MI.ITEM_CD
+                 AND DC.PROD_GROUP = 'DIFF_CNC'
+                 AND DC.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE DCC WITH(NOLOCK)
+                  ON DCC.BU_CD = DC.BU_CD
+                 AND DCC.CODE_CD = DC.PROD_GROUP_DET
+                 AND DCC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND DCC.USE_FLAG = 'Y'
+            #end
+            #if($dim_DIFF_MCT == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP DM WITH(NOLOCK)
+                  ON DM.COMPANY_CD = MI.COMPANY_CD
+                 AND DM.BU_CD = MI.BU_CD
+                 AND DM.ITEM_CD = MI.ITEM_CD
+                 AND DM.PROD_GROUP = 'DIFF_MCT'
+                 AND DM.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE DMC WITH(NOLOCK)
+                  ON DMC.BU_CD = DM.BU_CD
+                 AND DMC.CODE_CD = DM.PROD_GROUP_DET
+                 AND DMC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND DMC.USE_FLAG = 'Y'
+            #end
+                
+            #if($dim_DIFF_REPT == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP DR WITH(NOLOCK)
+                  ON DR.COMPANY_CD = MI.COMPANY_CD
+                 AND DR.BU_CD = MI.BU_CD
+                 AND DR.ITEM_CD = MI.ITEM_CD
+                 AND DR.PROD_GROUP = 'DIFF_REPT'
+                 AND DR.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE DRP WITH(NOLOCK)
+                  ON DRP.BU_CD = DR.BU_CD
+                 AND DRP.CODE_CD = DR.PROD_GROUP_DET
+                 AND DRP.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND DRP.USE_FLAG = 'Y'
+            #end
+                
+            #if($dim_TEL_REPT == "Y")
+                LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP TR WITH(NOLOCK)
+                  ON TR.COMPANY_CD = MI.COMPANY_CD
+                 AND TR.BU_CD = MI.BU_CD
+                 AND TR.ITEM_CD = MI.ITEM_CD
+                 AND TR.PROD_GROUP = 'TEL_REPT'
+                 AND TR.DEL_FLAG = 'N' 
+                LEFT OUTER JOIN TB_MST_CODE TRP WITH(NOLOCK)
+                  ON TRP.BU_CD = TR.BU_CD
+                 AND TRP.CODE_CD = TR.PROD_GROUP_DET
+                 AND TRP.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+                 AND TRP.USE_FLAG = 'Y'
+            #end
+                
+         
+            
+            )
+           
+        #end
+        ----------------------------------------------------------------------------------------
+        
+        
+        SELECT NULL AS TMP_COL
+            <include refid="include.getCdDimTotal"/>
+            <include refid="include.getGrpLvlId"/>
+            #foreach($bucketMap in $_parameter.bucketList)
+            #set($pWeek = "$bucketMap.BUCKET_VAL")
+             , SUM (SPW$pWeek) SPW$pWeek
+            #end
+             , SUM (SPW_TOT)         AS SPW_TOT
+             , SUM (SPW_AMT)         AS SPW_AMT
+             , SUM (INV_QTY)         AS INV_QTY
+             , SUM (INV_TOT)         AS INV_TOT
+             , SUM (INV_AMT)         AS INV_AMT
+             , SUM (INV_SP_QTY)      AS INV_SP_QTY
+             , SUM (INV_SP_AMT)      AS INV_SP_AMT
+             , SUM (SALE_REQ_QTY)    AS SALE_REQ_QTY
+             , SUM (SALE_REQ_AMT)    AS SALE_REQ_AMT      
+             , SUM (WIP_QTY)         AS WIP_QTY
+             , SUM (NON_DEPLOY_QTY)  AS NON_DEPLOY_QTY
+            #foreach($bucketMap in $_parameter.bucketList)
+            #set($pWeek = "$bucketMap.BUCKET_VAL")
+             , SUM (PPW$pWeek)       AS PPW$pWeek
+            #end 
+             , SUM (PPW_TOT)         AS PPW_TOT
+             , SUM (PPW_AMT)         AS PPW_AMT
+             
+             --20220926 김수호 추가, ITSM 883, 생산완료계획>출하가능수량/금액 Column 추가 요청 건 FROM 김지혜
+             , SUM(ISNULL(MIN_R126_TOT,0))     AS MIN_R126_TOT
+             , SUM(ISNULL(MIN_R126_AMT,0))     AS MIN_R126_AMT
+             ---------------------------------------------------------------------------------------------------------------------------------------
+             
+             , SUM (SALES_UNREL_QTY) AS SALES_UNREL_QTY
+             , SUM (SALES_UNREL_AMT) AS SALES_UNREL_AMT
+             , SUM (REMAIN_SALES_PLAN_QTY_M0) AS REMAIN_SALES_PLAN_QTY_M0
+             , SUM (SALES_PLAN_QTY_M1) AS SALES_PLAN_QTY_M1
+             , SUM (SALES_PLAN_QTY_M2) AS SALES_PLAN_QTY_M2
+             , MAX (REMARK)          AS REMARK
+             , MAX (SALES_MEMO)      AS SALES_MEMO
+             , MAX (MANUFACT_REPLY)  AS MANUFACT_REPLY
+             , ISNULL (ABS (SUM (SPW_TOT        )), 0) +
+               ISNULL (ABS (SUM (SPW_AMT        )), 0) +
+               ISNULL (ABS (SUM (INV_QTY        )), 0) +
+               ISNULL (ABS (SUM (INV_TOT        )), 0) +
+               ISNULL (ABS (SUM (INV_AMT        )), 0) +
+               ISNULL (ABS (SUM (INV_SP_QTY     )), 0) +
+               ISNULL (ABS (SUM (INV_SP_AMT     )), 0) +
+               ISNULL (ABS (SUM (SALE_REQ_QTY   )), 0) +
+               ISNULL (ABS (SUM (SALE_REQ_AMT   )), 0) +
+               ISNULL (ABS (SUM (WIP_QTY        )), 0) +
+               ISNULL (ABS (SUM (NON_DEPLOY_QTY )), 0) +
+               ISNULL (ABS (SUM (PPW_TOT        )), 0) +
+               ISNULL (ABS (SUM (PPW_AMT        )), 0) +
+               ISNULL (ABS (SUM (SALES_UNREL_QTY)), 0) +
+               ISNULL (ABS (SUM (REMAIN_SALES_PLAN_QTY_M0)), 0) +
+               ISNULL (ABS (SUM (SALES_PLAN_QTY_M1)), 0) +
+               ISNULL (ABS (SUM (SALES_UNREL_AMT)), 0) AS OMIT_FLAG
+        FROM 
+        (
+            SELECT CT.COMPANY_CD
+                 , CT.BU_CD
+                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID
+                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD
+                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD_NM
+                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM
+                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM_NM
+                 , ISNULL (CT.SPEC, ' ')              AS SPEC
+                 , ISNULL (CT.SPEC, ' ')              AS SPEC_NM
+                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO
+                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO_NM
+                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+                 , ISNULL (CT.CLEANING_YN, ' ')       AS CLEANING_YN
+                 , ISNULL (CT.CLEANING_YN, ' ')       AS CLEANING_YN_NM
+                 , ISNULL (CAST (CT.MFG_LT AS NVARCHAR(20)), ' ')          AS MFG_LT
+                 , ISNULL (CAST (CT.MFG_LT AS NVARCHAR(20)), ' ')          AS MFG_LT_NM
+                 , ISNULL (CAST (CT.SS_QTY AS NVARCHAR(20)), ' ')          AS SS_QTY
+                 , ISNULL (CAST (CT.SS_QTY AS NVARCHAR(20)), ' ')          AS SS_QTY_NM
+                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), CAST (CT.ITEM_COST_KRW AS NVARCHAR(20))) AS SALES_PRICE_KRW
+                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), CAST (CT.ITEM_COST_KRW AS NVARCHAR(20))) AS SALES_PRICE_KRW_NM
+                 , ISNULL (CAST (CAST(MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE DIM_PROD_1ST_QTY END) AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_1ST_QTY
+                 , ISNULL (CAST (CAST(MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE DIM_PROD_1ST_QTY END) AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_1ST_QTY_NM
+                 , ISNULL (CAST (CAST(MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE DIM_PROD_2ND_QTY END) AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_2ND_QTY
+                 , ISNULL (CAST (CAST(MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE DIM_PROD_2ND_QTY END) AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_2ND_QTY_NM
+                 , ISNULL (CAST (CAST(MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE DIM_PROD_3RD_QTY END) AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_3RD_QTY
+                 , ISNULL (CAST (CAST(MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE DIM_PROD_3RD_QTY END) AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_3RD_QTY_NM
+                 , ISNULL(CAST(CAST(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                                    WHEN ISNULL(CLEANING_YN, 'N') = 'N' THEN ISNULL(MAX(PR.DIM_PROD_QTY), 0) + ISNULL(MAX(DIM_PROD_1ST_QTY), 0) + ISNULL(MAX(DIM_PROD_2ND_QTY), 0)
+                                    ELSE ISNULL(MAX(PR.DIM_PROD_QTY), 0) + ISNULL(MAX(DIM_PROD_1ST_QTY), 0)
+                                END AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_QTY    
+                 , ISNULL(CAST(CAST(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                                    WHEN ISNULL(CLEANING_YN, 'N') = 'N' THEN ISNULL(MAX(PR.DIM_PROD_QTY), 0) + ISNULL(MAX(DIM_PROD_1ST_QTY), 0) + ISNULL(MAX(DIM_PROD_2ND_QTY), 0)
+                                    ELSE ISNULL(MAX(PR.DIM_PROD_QTY), 0) + ISNULL(MAX(DIM_PROD_1ST_QTY), 0)
+                                END AS INT) AS NVARCHAR(20)), ' ') AS DIM_PROD_QTY_NM
+                                
+                                
+                                
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                        WHEN MAX(CP.SALES_PLAN_QTY_M0 - CPR.QTY) <![CDATA[>]]> 0
+                        THEN MAX(CP.SALES_PLAN_QTY_M0 - CPR.QTY) 
+                        ELSE 0
+                    END REMAIN_SALES_PLAN_QTY_M0                     
+                 , MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE CP.SALES_PLAN_QTY_M1 END) AS SALES_PLAN_QTY_M1
+                 , MAX(CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE CP.SALES_PLAN_QTY_M2 END) AS SALES_PLAN_QTY_M2
+                #foreach($bucketMap in $_parameter.bucketList)
+                #set($pWeek = "$bucketMap.BUCKET_VAL")
+                 , SUM (CASE WHEN HIS.YEARWEEK = '$pWeek' THEN HIS.SP_QTY ELSE NULL END) SPW$pWeek
+                #end
+                 , SUM (HIS.SP_QTY) SPW_TOT
+                 , SUM (HIS.SP_QTY) * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) SPW_AMT
+                 , ISNULL (SUM (HIS.SUB_INV_QTY), 0) AS INV_TOT
+                 , SUM (CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE HIS.SUB_INV_QTY END) AS INV_QTY
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE ISNULL (SUM (HIS.SUB_INV_QTY), 0) * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) END INV_AMT
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL 
+                        WHEN ISNULL(SUM(HIS.SP_QTY), 0) <![CDATA[>=]]> ISNULL(SUM(HIS.SUB_INV_QTY), 0)
+                        THEN ISNULL(SUM(HIS.SUB_INV_QTY), 0)
+                        ELSE ISNULL(SUM(HIS.SP_QTY), 0)
+                   END AS INV_SP_QTY
+                 , (CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                         WHEN ISNULL(SUM(HIS.SP_QTY), 0) <![CDATA[>=]]> ISNULL(SUM(HIS.SUB_INV_QTY), 0)
+                         THEN ISNULL(SUM(HIS.SUB_INV_QTY), 0)
+                         ELSE ISNULL(SUM(HIS.SP_QTY), 0)
+                    END) * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) AS INV_SP_AMT
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                        WHEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) <![CDATA[>]]> 0  
+                        THEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) 
+                        ELSE 0
+                    END SALE_REQ_QTY
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                        WHEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) <![CDATA[>]]> 0  
+                        THEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) 
+                        ELSE 0
+                    END * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) AS SALE_REQ_AMT
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE SUM (ISNULL(HIS.SUB_WIP_QTY, 0) + ISNULL(HIS.SUB_WIP_QC_QTY, 0)) END WIP_QTY
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL ELSE SUM (HIS.SUB_NON_DEPLOY_QTY) END NON_DEPLOY_QTY
+                #foreach($bucketMap in $_parameter.bucketList)
+                #set($pWeek = "$bucketMap.BUCKET_VAL")
+                 , SUM (CASE WHEN HIS.YEARWEEK = '$pWeek' THEN HIS.PP_QTY ELSE NULL END) PPW$pWeek
+                #end 
+                 , SUM (HIS.PP_QTY) PPW_TOT
+                 , SUM (HIS.PP_QTY) * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) PPW_AMT
+                 
+                 --20220926 김수호 추가, ITSM 883, 생산완료계획>출하가능수량/금액 Column 추가 요청 건 FROM 김지혜
+                 , DBO.UFN_LEAST(SUM (HIS.SP_QTY), SUM (CASE WHEN CT.ITEM_TYPE = '20 'THEN ISNULL(NULL,0) ELSE ISNULL(HIS.SUB_INV_QTY,0) END) + SUM (HIS.PP_QTY) ) MIN_R126_TOT
+                 , DBO.UFN_LEAST(SUM (HIS.SP_QTY) * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW), CASE WHEN CT.ITEM_TYPE = '20 'THEN ISNULL(NULL,0) ELSE ISNULL (SUM (HIS.SUB_INV_QTY), 0) * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) END + SUM(HIS.PP_QTY)* ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) ) MIN_R126_AMT
+				 ---------------------------------------------------------------------------------------------------------------------------------------
+				 
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                        ELSE CASE WHEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) <![CDATA[>]]> 0  
+                                  THEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) 
+                                  ELSE 0
+                              END - ISNULL(SUM (HIS.PP_QTY), 0) 
+                    END SALES_UNREL_QTY
+                 , CASE WHEN CT.ITEM_TYPE = '20 'THEN NULL
+                        ELSE CASE WHEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) <![CDATA[>]]> 0  
+                                  THEN (ISNULL(SUM(HIS.SP_QTY), 0) + ISNULL(CT.SS_QTY, 0)) - ISNULL(SUM(HIS.SUB_INV_QTY), 0) 
+                                  ELSE 0
+                              END - ISNULL(SUM (HIS.PP_QTY), 0) 
+                    END * ISNULL(CT.SALES_PRICE_KRW, CT.ITEM_COST_KRW) AS SALES_UNREL_AMT 
+                 , MAX (HIS.SUB_REMARK) AS REMARK
+                 , MAX (HIS.SALES_MEMO) AS SALES_MEMO
+                 , MAX (HIS.MANUFACT_REPLY) AS MANUFACT_REPLY
+                 , ISNULL(CAST(SUM(EXP_INV_QTY) AS NVARCHAR(20)), ' ') AS EXP_INV_QTY2
+                 , ISNULL(CAST(SUM(EXP_INV_QTY) AS NVARCHAR(20)), ' ') AS EXP_INV_QTY2_NM
+            
+		        #if($dim_TEL_CNC == "Y")
+                     , ISNULL(WPC.TEL_CNC, ' ')  AS TEL_CNC
+                     , ISNULL(WPC.TEL_CNC, ' ') AS TEL_CNC_NM
+                #end
+                #if($dim_TEL_MCT == "Y")
+		             , ISNULL(WPC.TEL_MCT, ' ')  AS TEL_MCT
+		             , ISNULL(WPC.TEL_MCT, ' ') AS TEL_MCT_NM
+	            #end
+	            #if($dim_LAM_CNC == "Y") 
+	                 , ISNULL(WPC.LAM_CNC,' ')   AS LAM_CNC
+	                 , ISNULL(WPC.LAM_CNC,' ')  AS LAM_CNC_NM
+	            #end
+	            #if($dim_LAM_MCT == "Y") 
+	                 , ISNULL(WPC.LAM_MCT,' ')   AS LAM_MCT
+	                 , ISNULL(WPC.LAM_MCT,' ')  AS LAM_MCT_NM
+	            #end
+	            #if($dim_DIFF_CNC == "Y") 
+	                 , ISNULL(WPC.DIFF_CNC, ' ') AS DIFF_CNC
+	                 , ISNULL(WPC.DIFF_CNC, ' ') AS DIFF_CNC_NM
+	            #end
+	            #if($dim_DIFF_MCT == "Y") 
+	                 , ISNULL(WPC.DIFF_MCT,' ')  AS DIFF_MCT
+	                 , ISNULL(WPC.DIFF_MCT,' ')  AS DIFF_MCT_NM
+	            #end
+	            #if($dim_TEL_REPT == "Y")
+	                 , ISNULL(WPC.TEL_REPT, ' ')     AS TEL_REPT
+	                 , ISNULL(WPC.TEL_REPT, ' ')     AS TEL_REPT_NM
+	            #end
+	            #if($dim_DIFF_REPT == "Y")
+	                 , ISNULL(WPC.DIFF_REPT, ' ')    AS DIFF_REPT
+	                 , ISNULL(WPC.DIFF_REPT, ' ')    AS DIFF_REPT_NM
+	            #end
+	              
+		          
+		                   
+            FROM W_ITEM CT
+            LEFT OUTER JOIN W_CPFR CP
+              ON CT.COMPANY_CD = CP.COMPANY_CD
+             AND CT.BU_CD      = CP.BU_CD
+             AND CT.ITEM_CD    = CP.ITEM_CD
+            LEFT OUTER JOIN W_CPFR_REMAIN CPR 
+              ON CT.COMPANY_CD = CPR.COMPANY_CD
+             AND CT.BU_CD      = CPR.BU_CD
+             AND CT.ITEM_CD    = CPR.ITEM_CD
+            LEFT OUTER JOIN W_HIS HIS WITH(NOLOCK)
+              ON CT.COMPANY_CD = HIS.COMPANY_CD
+             AND CT.BU_CD      = HIS.BU_CD
+             AND CT.ITEM_CD    = HIS.ITEM_CD
+             AND CASE HIS.FLAG WHEN 'SALES_PLAN' THEN CT.CUST_GROUP_CD ELSE '' END = CASE HIS.FLAG WHEN 'SALES_PLAN' THEN HIS.CUST_GROUP_CD ELSE '' END
+            LEFT OUTER JOIN W_PROD PD 
+              ON CT.COMPANY_CD = PD.COMPANY_CD
+             AND CT.BU_CD      = PD.BU_CD
+             AND CT.ITEM_CD    = PD.ITEM_CD
+            LEFT OUTER JOIN W_PROD_PR PR
+              ON CT.COMPANY_CD = PR.COMPANY_CD
+             AND CT.BU_CD      = PR.BU_CD
+             AND CT.ITEM_CD    = PR.ITEM_CD
+         
+         
+         #if($dim_TEL_MCT == "Y" 
+          or $dim_LAM_CNC == "Y" 
+          or $dim_LAM_MCT == "Y" 
+          or $dim_TEL_CNC == "Y" 
+          or $dim_DIFF_CNC == "Y" 
+          or $dim_DIFF_MCT == "Y" 
+          or $dim_TEL_REPT == "Y" 
+          or $dim_DIFF_REPT == "Y")
+             LEFT OUTER JOIN W_PROD_CATE WPC
+             ON CT.COMPANY_CD = WPC.COMPANY_CD
+             AND CT.BU_CD      = WPC.BU_CD
+             AND CT.ITEM_CD    = WPC.ITEM_CD
+          #end
+       --------------------------------------------------------------------------------------------------
+             
+            WHERE CT.COMPANY_CD = @{GV_COMPANY_CD}
+              AND CT.BU_CD      = @{GV_BU_CD}
+              AND CT.PROCUR_TYPE_CD IN ('MG', 'MH')
+              AND CT.ITEM_TYPE IN ('10', '20')
+            #if($_parameter.item_cd and $_parameter.item_cd != "")
+              AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+            #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+              AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+            #end
+            #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+              AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+            #end
+            #if($_parameter.route and $_parameter.route != "")
+              AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+            #end
+            #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+              AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+            #end
+            #if($_parameter.custGroup and $_parameter.custGroup != "")
+              AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+            #end 
+            GROUP BY CT.COMPANY_CD, CT.BU_CD, CT.REP_ITEM_GROUP_CD, CT.REP_ITEM_GROUP_NM, CT.ROUTING_ID, CT.REP_CUST_GROUP_CD, CT.REP_CUST_GROUP_NM
+                , CT.CUST_GROUP_CD, CT.CUST_GROUP_NM, CT.ITEM_GROUP_CD, CT.ITEM_GROUP_NM, CT.ITEM_CD, CT.ITEM_NM, CT.SPEC, CT.MFG_LT, CT.DRAW_NO
+                , CT.ITEM_TYPE, CT.ITEM_TYPE_NM, CT.SALES_PRICE_KRW, CT.SS_QTY, CT.CLEANING_YN, CT.ITEM_COST_KRW
+                
+                #if($dim_TEL_CNC == "Y")
+                , WPC.TEL_CNC 
+                #end
+                #if($dim_TEL_MCT == "Y")
+                , WPC.TEL_MCT
+                #end 
+                #if($dim_LAM_CNC == "Y")
+                , WPC.LAM_CNC
+                #end 
+                #if($dim_LAM_MCT == "Y")
+                , WPC.LAM_MCT
+                #end
+                #if($dim_DIFF_CNC == "Y")
+                , WPC.DIFF_CNC
+                #end
+                #if($dim_DIFF_MCT == "Y")
+                , WPC.DIFF_MCT
+                #end
+                #if($dim_TEL_REPT == "Y")
+                , WPC.TEL_REPT
+                #end
+                #if($dim_DIFF_REPT == "Y")
+                , WPC.DIFF_REPT
+                #end
+                
+                
+                
+            #if($_parameter.excluded and $_parameter.excluded != "")
+                #if($_parameter.excluded == "Y")
+                HAVING ISNULL (SUM (HIS.PP_QTY), 0) <![CDATA[>]]> 
+                CASE WHEN (ISNULL(CT.SS_QTY, 0) + ISNULL(SUM(HIS.SP_QTY), 0)) - (ISNULL(SUM(HIS.SUB_INV_QTY), 0)) <![CDATA[<]]> 0 
+                     THEN 0
+                     ELSE (ISNULL(CT.SS_QTY, 0) + ISNULL(SUM(HIS.SP_QTY), 0)) - (ISNULL(SUM(HIS.SUB_INV_QTY), 0))
+                 END
+                #else
+                HAVING ISNULL (SUM (HIS.PP_QTY), 0) <![CDATA[<]]> 
+                CASE WHEN (ISNULL(CT.SS_QTY, 0) + ISNULL(SUM(HIS.SP_QTY), 0)) - (ISNULL(SUM(HIS.SUB_INV_QTY), 0)) <![CDATA[<]]> 0 
+                     THEN 0
+                     ELSE (ISNULL(CT.SS_QTY, 0) + ISNULL(SUM(HIS.SP_QTY), 0)) - (ISNULL(SUM(HIS.SUB_INV_QTY), 0))
+                 END
+                #end
+            #end
+        ) A
+        GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+        ORDER BY TMP_COL
+        #foreach( $dimMap in $_parameter.dimList )
+         , A.$dimMap.DIM_CD
+        #end
+        END;
+
+    </select>
+    
+    <sql id="CONFIRM">
+    
+    SELECT SP.COMPANY_CD
+         , SP.BU_CD
+         , SP.ITEM_CD
+         , SP.CUST_GROUP_CD
+         , SP.YEARPWEEK     YEARWEEK
+         , SP.QTY           SP_QTY
+         , NULL             PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             SUB_REMARK
+         , NULL             SALES_MEMO
+         , NULL             MANUFACT_REPLY
+         , NULL             EXP_INV_QTY
+         , 'SALES_PLAN'     FLAG
+      FROM TB_HIS_SALES_PLAN SP WITH(NOLOCK)
+     WHERE SP.COMPANY_CD = @{GV_COMPANY_CD}
+       AND SP.BU_CD      = @{GV_BU_CD}  
+       AND SP.MEAS_CD    = 'AP2_SP'
+       AND SP.YEARPWEEK   BETWEEN @{fromPWeek} AND @{toPWeek}
+       AND SP.PLAN_ID    = @P_SALES_PLAN_ID
+     UNION ALL
+    SELECT PP.COMPANY_CD
+         , PP.BU_CD
+         , PP.ITEM_CD
+         , ''               CUST_GROUP_CD
+         , PP.YEARPWEEK     YEARWEEK
+         , NULL             SP_QTY
+         , PP.QTY           PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             REMARK
+         , NULL             SALES_MEMO
+         , NULL             MANUFACT_REPLY
+         , NULL             EXP_INV_QTY
+         , 'PROD_PALN'      FLAG
+      FROM TB_DYN_PROD_PLAN PP WITH(NOLOCK)
+     WHERE PP.COMPANY_CD = @{GV_COMPANY_CD}
+       AND PP.BU_CD      = @{GV_BU_CD}  
+       AND PP.YEARPWEEK  BETWEEN  @{fromPWeek} AND @{toPWeek}
+     UNION ALL
+    SELECT INV.COMPANY_CD
+         , INV.BU_CD
+         , INV.ITEM_CD
+         , ''               CUST_GROUP_CD
+         , ''               YEARPWEEK
+         , NULL             SP_QTY
+         , NULL             PP_QTY
+         , INV.INV_QTY      SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             REMARK
+         , NULL             SALES_MEMO
+         , NULL             MANUFACT_REPLY
+         , NULL             EXP_INV_QTY
+         , 'INV'            FLAG
+      FROM UV_DYN_INVENTORY INV WITH(NOLOCK)
+     WHERE INV.COMPANY_CD = @{GV_COMPANY_CD}
+       AND INV.BU_CD      = @{GV_BU_CD}
+       AND INV.PLANT_CD   = 'WF01'
+       AND INV.INV_DATE   = @P_CUR_DATE  
+     UNION ALL
+     SELECT QC.COMPANY_CD
+          , QC.BU_CD
+          , PO.ITEM_CD
+          , ''               CUST_GROUP_CD
+          , ''               YEARWEEK
+          , NULL             SP_QTY
+          , NULL             PP_QTY
+          , NULL             SUB_INV_QTY
+          , QC.REMAIN_QTY    SUB_WIP_QC_QTY
+          , NULL             SUB_WIP_QTY
+          , NULL             SUB_NON_DEPLOY_QTY
+          , NULL             REMARK
+          , NULL             SALES_MEMO
+          , NULL             MANUFACT_REPLY
+          , NULL             EXP_INV_QTY
+          , 'QC'             FLAG
+     FROM TB_DYN_WIP_ROUTING QC WITH(NOLOCK)
+     INNER JOIN TB_DYN_PROD_ORDER_HDR PO WITH(NOLOCK)
+        ON QC.COMPANY_CD = PO.COMPANY_CD
+       AND QC.BU_CD = PO.BU_CD
+       AND QC.PROD_ORDER_NO = PO.PROD_ORDER_NO
+     WHERE QC.COMPANY_CD = @{GV_COMPANY_CD}
+       AND QC.BU_CD      = @{GV_BU_CD}
+       AND QC.WIP_DATE   = @P_CUR_DATE
+       AND QC.PROD_OR_QC = 'QC_PART'  
+    UNION ALL
+    SELECT QC.COMPANY_CD
+         , QC.BU_CD
+         , PO.ITEM_CD
+         , ''               CUST_GROUP_CD
+         , ''               YEARWEEK
+         , NULL             SP_QTY
+         , NULL             PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , QC.REMAIN_QTY    SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             REMARK
+         , NULL             SALES_MEMO
+         , NULL             MANUFACT_REPLY
+         , NULL             EXP_INV_QTY
+         , 'WIP'            FLAG
+     FROM TB_DYN_WIP_ROUTING QC WITH(NOLOCK)
+     INNER JOIN TB_DYN_PROD_ORDER_HDR PO WITH(NOLOCK)
+        ON QC.COMPANY_CD = PO.COMPANY_CD
+       AND QC.BU_CD = PO.BU_CD
+       AND QC.PROD_ORDER_NO = PO.PROD_ORDER_NO
+     WHERE QC.COMPANY_CD = @{GV_COMPANY_CD}
+       AND QC.BU_CD      = @{GV_BU_CD}
+       AND QC.WIP_DATE   = @P_CUR_DATE
+       AND QC.PROD_OR_QC = 'PROD_PART'  
+     UNION ALL
+    SELECT A.COMPANY_CD
+         , A.BU_CD
+         , A.ITEM_CD
+         , ''                     CUST_GROUP_CD
+         , ''                     YEARWEEK
+         , NULL                   SP_QTY
+         , NULL                   PP_QTY
+         , NULL                   SUB_INV_QTY
+         , NULL                   SUB_WIP_QC_QTY
+         , NULL                   SUB_WIP_QTY
+         , SUM(A.PROD_ORDER_QTY)  SUB_NON_DEPLOY_QTY
+         , NULL                   REMARK
+         , NULL                   SALES_MEMO
+         , NULL                   MANUFACT_REPLY
+         , NULL                   EXP_INV_QTY
+         , 'MOV'                  FLAG
+     FROM (
+            SELECT DISTINCT A.COMPANY_CD
+                 , A.BU_CD
+                 , A.PROD_ORDER_NO
+                 , A.ITEM_CD
+                 , A.PROD_ORDER_QTY
+              FROM TB_DYN_PROD_ORDER A WITH(NOLOCK)
+             INNER JOIN TB_MST_ITEM B WITH(NOLOCK)
+                ON B.COMPANY_CD = A.COMPANY_CD
+               AND B.BU_CD      = A.BU_CD
+               AND B.ITEM_CD    = A.ITEM_CD
+               AND B.ITEM_TYPE  = '10'
+             WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+               AND A.BU_CD      = @{GV_BU_CD} 
+               AND A.DEL_FLAG   = 'N'
+               AND A.RELEASE_DATE IS NULL
+         ) A
+    GROUP BY A.COMPANY_CD, A.BU_CD, A.ITEM_CD
+     UNION ALL
+    SELECT SUB.COMPANY_CD
+         , SUB.BU_CD
+         , SUB.ITEM_CD
+         , ''               CUST_GROUP_CD
+         , ''               YEARWEEK
+         , NULL             SP_QTY
+         , NULL             PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , REMARK           REMARK
+         , SALES_MEMO       SALES_MEMO
+         , MANUFACT_REPLY   MANUFACT_REPLY
+         , EXP_INV_QTY
+         , 'PLAN_SUB'       FLAG
+      FROM TB_HIS_PROD_PLAN_SUB SUB WITH(NOLOCK)
+     WHERE SUB.COMPANY_CD = @{GV_COMPANY_CD}
+       AND SUB.BU_CD      = @{GV_BU_CD}  
+       AND SUB.PLAN_ID    = @{planId}
+   
+    </sql>
+    
+    <sql id="HISTORY">
+    SELECT SP.COMPANY_CD
+         , SP.BU_CD
+         , SP.ITEM_CD
+         , SP.CUST_GROUP_CD
+         , SP.YEARPWEEK     YEARWEEK
+         , SP.QTY           SP_QTY
+         , NULL             PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             SUB_REMARK
+         , NULL             SALES_MEMO
+         , NULL             MANUFACT_REPLY
+         , NULL             EXP_INV_QTY
+         , 'SALES_PLAN'     FLAG
+      FROM TB_HIS_SALES_PLAN SP WITH(NOLOCK)
+     WHERE SP.COMPANY_CD = @{GV_COMPANY_CD}
+       AND SP.BU_CD      = @{GV_BU_CD}  
+       AND SP.MEAS_CD    = 'AP2_SP'
+       AND SP.YEARPWEEK   BETWEEN @{fromPWeek} AND @{toPWeek}
+       AND SP.PLAN_ID    = @P_SALES_PLAN_ID
+     UNION ALL
+    SELECT PP.COMPANY_CD
+         , PP.BU_CD
+         , PP.ITEM_CD
+         , ''               CUST_GROUP_CD
+         , PP.YEARPWEEK     YEARWEEK
+         , NULL             SP_QTY
+         , PP.QTY           PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             REMARK
+         , NULL             SALES_MEMO
+         , NULL             MANUFACT_REPLY
+         , NULL             EXP_INV_QTY
+         , 'PROD_PALN'      FLAG
+      FROM TB_HIS_PROD_PLAN PP WITH(NOLOCK)
+     WHERE PP.COMPANY_CD = @{GV_COMPANY_CD}
+       AND PP.BU_CD      = @{GV_BU_CD}  
+       AND PP.YEARPWEEK   BETWEEN  @{fromPWeek} AND @{toPWeek}
+       AND PP.PLAN_ID    = @{planId}
+     UNION ALL
+    SELECT SUB.COMPANY_CD
+         , SUB.BU_CD
+         , SUB.ITEM_CD
+         , ''                 CUST_GROUP_CD
+         , ''                 YEARWEEK
+         , NULL               SP_QTY
+         , NULL               PP_QTY
+         , SUB.INV_QTY        SUB_INV_QTY
+         , SUB.WIP_QC_QTY     SUB_WIP_QC_QTY
+         , SUB.WIP_QTY        SUB_WIP_QTY
+         , SUB.NON_DEPLOY_QTY SUB_NON_DEPLOY_QTY
+         , SUB.REMARK
+         , SUB.SALES_MEMO
+         , MANUFACT_REPLY     MANUFACT_REPLY
+         , EXP_INV_QTY
+         , 'PALN_SUB'         FLAG
+      FROM TB_HIS_PROD_PLAN_SUB SUB WITH(NOLOCK) 
+     WHERE SUB.COMPANY_CD = @{GV_COMPANY_CD}
+       AND SUB.BU_CD      = @{GV_BU_CD}  
+       AND SUB.PLAN_ID    = @{planId}
+    </sql>
+    
+    <select id="bucketProductSelect" parameterType="map" resultType="map">
+        SELECT 'R_8'       ROOT_CD
+             , 'CPFR'       BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM', @{GV_LANG})  BUCKET_VAL
+             , 'CPFR'       CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM', @{GV_LANG})  NM
+             , 'group'     TYPE 
+         UNION ALL
+        SELECT 'CPFR' ROOT_CD
+             , 'CPFR0' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM0', @{GV_LANG}) BUCKET_VAL
+             , 'REMAIN_SALES_PLAN_QTY_M0'    CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM0', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'CPFR' ROOT_CD
+             , 'CPFR1' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM1', @{GV_LANG}) BUCKET_VAL
+             , 'SALES_PLAN_QTY_M1'    CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM1', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+         SELECT 'CPFR' ROOT_CD
+             , 'CPFR2' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM2', @{GV_LANG}) BUCKET_VAL
+             , 'SALES_PLAN_QTY_M2'    CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlanQtyM2', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL 
+         
+        SELECT 'R_1'       ROOT_CD
+             , 'SPW'       BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlan', @{GV_LANG})  BUCKET_VAL
+             , 'SPW'       CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesPlan', @{GV_LANG})  NM
+             , 'group'     TYPE 
+         UNION ALL
+        SELECT 'SPW'   ROOT_CD
+             , 'SPW' + CAST (ROW_NUMBER() OVER(ORDER BY YEARPWEEK) AS NVARCHAR)  BUCKET_ID
+             , YEARPWEEK         BUCKET_VAL
+             , 'SPW' + YEARPWEEK CD
+             , YEARPWEEK         NM
+             , NULL             TYPE
+          FROM TB_MST_CALENDAR
+         WHERE YYYYMMDD BETWEEN @{fromDate} AND @{toDate}
+         GROUP BY YEARPWEEK 
+         UNION ALL
+        SELECT 'SPW'   ROOT_CD
+             , 'SPW98' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG})  BUCKET_VAL
+             , 'SPW_TOT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG})     NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'SPW'   ROOT_CD
+             , 'SPW99' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'totalAmt', @{GV_LANG})  BUCKET_VAL
+             , 'SPW_AMT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'totalAmt', @{GV_LANG}) NM
+             , NULL    TYPE 
+        UNION ALL
+        
+        SELECT 'R_2' ROOT_CD
+             , 'INV'  BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'prodInvStatus', @{GV_LANG}) BUCKET_VAL
+             , 'INV'        CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'prodInvStatus', @{GV_LANG}) NM
+             , 'group' TYPE 
+         UNION ALL
+        SELECT 'INV' ROOT_CD
+             , 'INV1' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'inv', @{GV_LANG}) BUCKET_VAL
+             , 'INV_QTY'    CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'inv', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'INV' ROOT_CD
+             , 'INV4' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG}) BUCKET_VAL
+             , 'INV_AMT'    CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG}) NM
+             , NULL    TYPE 
+          UNION ALL
+        
+        SELECT 'R_3'    ROOT_CD
+             , 'INV_SP'  BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesQtyInv', @{GV_LANG}) BUCKET_VAL
+             , 'INV_SP'     CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesQtyInv', @{GV_LANG}) NM
+             , 'group' TYPE 
+         UNION ALL
+        SELECT 'INV_SP' ROOT_CD
+             , 'INV_SP1' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'qty', @{GV_LANG}) BUCKET_VAL
+             , 'INV_SP_QTY' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'qty', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'INV_SP' ROOT_CD
+             , 'INV_SP2' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG}) BUCKET_VAL
+             , 'INV_SP_AMT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        
+        --20220926 김수호 추가, ITSM 883, 생산완료계획>출하가능수량/금액 Column 추가 요청 건 FROM 김지혜
+        SELECT 'R_1_R2_R6' ROOT_CD
+             , 'MIN_R126'    BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesAvailable', @{GV_LANG}) BUCKET_VAL
+             , 'MIN_R126'     CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesAvailable', @{GV_LANG}) NM
+             , 'group' TYPE 
+        UNION ALL
+        SELECT 'MIN_R126'   ROOT_CD
+             , 'MIN_R126_1' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) BUCKET_VAL
+             , 'MIN_R126_TOT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'MIN_R126'   ROOT_CD
+             , 'MIN_R126_2' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'totalAmt', @{GV_LANG}) BUCKET_VAL
+             , 'MIN_R126_AMT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'totalAmt', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        ------------------------------------------------------------------------------------
+        SELECT 'R_4'      ROOT_CD
+             , 'SALE_REQ'  BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'reqProdQty', @{GV_LANG}) BUCKET_VAL
+             , 'SALE_REQ'     CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'reqProdQty', @{GV_LANG}) NM
+             , 'group' TYPE 
+         UNION ALL
+        SELECT 'SALE_REQ' ROOT_CD
+             , 'SALE_REQ1' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'qty', @{GV_LANG}) BUCKET_VAL
+             , 'SALE_REQ_QTY' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'qty', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'SALE_REQ' ROOT_CD
+             , 'SALE_REQ2' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG}) BUCKET_VAL
+             , 'SALE_REQ_AMT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG})  NM
+             , NULL    TYPE 
+         UNION ALL
+        
+        SELECT 'R_5'   ROOT_CD
+             , 'PR_ST'  BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'wip', @{GV_LANG}) BUCKET_VAL
+             , 'PR_ST'          CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'wip', @{GV_LANG}) NM
+             , 'group' TYPE 
+         UNION ALL
+        SELECT 'PR_ST' ROOT_CD
+             , 'PR_ST2' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'remaining', @{GV_LANG}) BUCKET_VAL
+             , 'WIP_QTY'        CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'remaining', @{GV_LANG}) NM
+             , NULL    TYPE 
+        UNION ALL
+        SELECT 'PR_ST' ROOT_CD
+             , 'PR_ST3' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'noOrder', @{GV_LANG}) BUCKET_VAL
+             , 'NON_DEPLOY_QTY' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'noOrder', @{GV_LANG}) NM
+             , NULL    TYPE 
+        UNION ALL
+        
+        SELECT 'R_6' ROOT_CD
+             , 'PPW'    BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'prodPlan', @{GV_LANG}) BUCKET_VAL
+             , 'PPW'     CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'prodPlan', @{GV_LANG}) NM
+             , 'group' TYPE 
+         UNION ALL
+        SELECT 'PPW'   ROOT_CD
+             , 'PPW' + CAST (ROW_NUMBER() OVER(ORDER BY YEARPWEEK) AS NVARCHAR)  BUCKET_ID
+             , YEARPWEEK BUCKET_VAL
+             , 'PPW' + YEARPWEEK CD
+             , YEARPWEEK NM
+             , NULL TYPE
+          FROM TB_MST_CALENDAR
+         WHERE YYYYMMDD BETWEEN @{fromDate} AND @{toDate}
+         GROUP BY YEARPWEEK UNION ALL
+        SELECT 'PPW'   ROOT_CD
+             , 'PPW98' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) BUCKET_VAL
+             , 'PPW_TOT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'PPW'   ROOT_CD
+             , 'PPW99' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'totalAmt', @{GV_LANG}) BUCKET_VAL
+             , 'PPW_AMT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'totalAmt', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        
+        SELECT 'R_7'        ROOT_CD
+             , 'SALE_UNREL'  BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'excProdPlan', @{GV_LANG}) BUCKET_VAL
+             , 'SALES_UNREL'     CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'excProdPlan', @{GV_LANG}) NM
+             , 'group' TYPE 
+         UNION ALL
+        SELECT 'SALES_UNREL' ROOT_CD
+             , 'SALES_UNREL1' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'qty', @{GV_LANG}) BUCKET_VAL
+             , 'SALES_UNREL_QTY' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'qty', @{GV_LANG}) NM
+             , NULL    TYPE 
+         UNION ALL
+        SELECT 'SALES_UNREL' ROOT_CD
+             , 'SALES_UNREL2' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG}) BUCKET_VAL
+             , 'SALES_UNREL_AMT' CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'amt', @{GV_LANG}) NM
+             , NULL    TYPE 
+        
+         UNION ALL
+        SELECT 'SALES_UNREL' ROOT_CD
+             , 'SALES_UNREL3' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesReqMemo', @{GV_LANG}) BUCKET_VAL
+             , 'SALES_MEMO'       CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'salesReqMemo', @{GV_LANG}) NM
+             , NULL    TYPE
+        UNION ALL
+        SELECT 'SALES_UNREL' ROOT_CD
+             , 'SALES_UNREL4' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'manufctrReply', @{GV_LANG}) BUCKET_VAL
+             , 'MANUFACT_REPLY'       CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'manufctrReply', @{GV_LANG}) NM
+             , NULL    TYPE
+        UNION ALL
+        SELECT 'SALES_UNREL' ROOT_CD
+             , 'SALES_UNREL5' BUCKET_ID
+             , dbo.UFN_GET_TRANSLATE('lbl', 'mattersDiscussed', @{GV_LANG}) BUCKET_VAL
+             , 'REMARK'         CD
+             , dbo.UFN_GET_TRANSLATE('lbl', 'mattersDiscussed', @{GV_LANG}) NM
+             , NULL    TYPE
+    </select>
+    
+    <update id="prodPlanConfirmUpdate" parameterType="map" >
+        /****** [ supply.product.prodPlanConfirmUpdate ] ******/
+        UPDATE TB_MST_PLAN_VERSION
+           SET CONFIRM_FLAG = @{confirmYn}
+             , UPDATE_DTTM  = DBO.UFN_GETDATE()
+             , UPDATE_ID    = @{GV_USER_ID}
+         WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+           AND BU_CD        = @{GV_BU_CD}
+           AND PLAN_TYPE_CD = 'MP'
+           AND PLAN_ID      = @{planId}
+    </update>
+    
+    <update id="prodPlanLoadingUpdate" parameterType="map" >
+        /****** [ supply.product.prodPlanLoadingUpdate ] ******/
+        BEGIN
+            EXEC dbo.USP_TB_DYN_PROD_PLAN @{GV_COMPANY_CD}, @{GV_BU_CD};
+        END;
+    </update>
+    
+    <update id="prodPlanUpdate" parameterType="map" >
+        /****** [ supply.product.prodPlanUpdate ] ******/
+        
+        #set( $TMP_TAB = "#TMP_TAB" )
+        BEGIN
+        
+            DECLARE @P_PLAN_ID    NVARCHAR(8) = @{planId};
+            DECLARE @P_FROMPWEEK  NVARCHAR(7) = @{fromPWeek};
+            DECLARE @P_TOPWEEK    NVARCHAR(7) = @{toPWeek};
+            DECLARE @P_EXCEL_YN   NVARCHAR(1) = @{excelYn};
+            DECLARE @P_CONFIRM_YN NVARCHAR(1) = @{confirmYn};
+            DECLARE @P_COMPANY_CD NVARCHAR(5) = @{GV_COMPANY_CD};
+            DECLARE @P_BU_CD      NVARCHAR(3) = @{GV_BU_CD};
+            DECLARE @P_SALES_START_WEEK NVARCHAR(6);
+            
+            SELECT @P_SALES_START_WEEK = START_WEEK
+            FROM TB_MST_PLAN_VERSION
+            WHERE COMPANY_CD = @P_COMPANY_CD
+              AND BU_CD = @P_BU_CD
+              AND PLAN_TYPE_CD = 'DP_W'
+              AND START_WEEK = ( 
+                                    SELECT YEARWEEK
+                                    FROM TB_MST_CALENDAR
+                                    WHERE YYYYMMDD = (
+                                                        SELECT CONVERT (NVARCHAR, DATEADD (DAY, -7, MIN (DTTM)), 112)
+                                                        FROM TB_MST_CALENDAR
+                                                        WHERE YEARWEEK = (
+                                                                            SELECT START_WEEK
+                                                                            FROM TB_MST_PLAN_VERSION
+                                                                            WHERE COMPANY_CD   = @P_COMPANY_CD
+                                                                              AND BU_CD        = @P_BU_CD
+                                                                              AND PLAN_ID      = @P_PLAN_ID
+                                                                              AND PLAN_TYPE_CD = 'MP')));
+            
+            
+#if ($_parameter.rowList.size() > 0)
+            
+            CREATE TABLE $TMP_TAB 
+            (
+                COMPANY_CD     NVARCHAR(5)
+              , BU_CD          NVARCHAR(3)
+              , PLAN_ID        NVARCHAR(8)
+              , ITEM_CD        NVARCHAR(18)
+              , YEARPWEEK      NVARCHAR(7)
+              , YEARWEEK       NVARCHAR(6)
+              , AMT            NUMERIC(21, 6)
+              , QTY            NUMERIC(21, 6)
+              , SALES_MEMO     NVARCHAR(MAX)
+              , MANUFACT_REPLY NVARCHAR(MAX)
+              #if ($_parameter.hasSCMRoleYn == 'Y')
+              , REMARK         NVARCHAR(MAX)
+              #end
+            );
+            
+            INSERT INTO $TMP_TAB
+            ( 
+                COMPANY_CD
+              , BU_CD
+              , PLAN_ID
+              , ITEM_CD
+              , YEARPWEEK
+              , YEARWEEK
+              , AMT
+              , QTY
+              , SALES_MEMO
+              , MANUFACT_REPLY
+              #if ($_parameter.hasSCMRoleYn == 'Y')
+              , REMARK
+              #end
+              
+            )
+        #foreach( $rowMap in $_parameter.rowList )
+          #foreach($bucketMap in $_parameter.bucketList)
+            #set($pWeek = "$bucketMap.BUCKET_VAL")
+            #if($bucketMap.ROOT_CD == "PPW" and ($bucketMap.CD != "PPW_TOT" and $bucketMap.CD != "PPW_AMT"))
+            SELECT @P_COMPANY_CD AS COMPANY_CD
+                 , @P_BU_CD                          AS BU_CD
+                 , @P_PLAN_ID                        AS PLAN_ID
+                 , #if($rowMap.get("ITEM_CD")) '$rowMap.get("ITEM_CD")' #else '$rowMap.get("ITEM_CD_NM")' #end AS ITEM_CD
+                 , '$pWeek'                          AS YEARPWEEK
+                 , '$pWeek.replaceAll("[^0-9]", "")' AS YEARWEEK
+                 , (ISNULL (#if($rowMap.get("SALES_PRICE_KRW_NM")) CAST($rowMap.get("SALES_PRICE_KRW_NM") AS DECIMAL(21,6)) #else NULL #end, 0) * 
+                    ISNULL (#if($rowMap.get("$bucketMap.CD")) $rowMap.get("$bucketMap.CD") #else NULL #end, 0)) AS AMT
+                 , #if($rowMap.get("$bucketMap.CD")) $rowMap.get("$bucketMap.CD") #else NULL #end  AS QTY
+                 , #if($rowMap.get("SALES_MEMO")) '$rowMap.get("SALES_MEMO")' #else NULL #end  AS SALES_MEMO
+                 , #if($rowMap.get("MANUFACT_REPLY")) '$rowMap.get("MANUFACT_REPLY")' #else NULL #end  AS MANUFACT_REPLY
+                 #if ($_parameter.hasSCMRoleYn == 'Y')
+                 , #if($rowMap.get("REMARK")) '$rowMap.get("REMARK")' #else NULL #end  AS REMARK
+                 #end
+                #if("$pWeek" != "$_parameter.toPWeek" ) UNION ALL #end
+            #end
+          #end
+          #if($_parameter.rowList.size() > $foreach.count) UNION ALL #end
+        #end
+            
+            IF @P_EXCEL_YN = 'Y' 
+              BEGIN
+              
+                DELETE FROM TB_DYN_PROD_PLAN
+                WHERE YEARPWEEK BETWEEN @P_FROMPWEEK AND @P_TOPWEEK; 
+               
+              END;
+              
+            MERGE TB_DYN_PROD_PLAN AS A
+            USING 
+            (
+                SELECT * 
+                FROM $TMP_TAB
+            ) B
+            ON 
+            (
+                A.COMPANY_CD     = B.COMPANY_CD
+                AND A.BU_CD      = B.BU_CD
+                AND A.ITEM_CD    = B.ITEM_CD
+                AND A.YEARPWEEK  = B.YEARPWEEK
+            )
+            WHEN MATCHED THEN
+            UPDATE SET 
+                A.QTY         = B.QTY
+              , A.AMT         = B.AMT
+              , A.UPDATE_DTTM = DBO.UFN_GETDATE()
+              , A.UPDATE_ID   = @{GV_USER_ID}
+            WHEN NOT MATCHED THEN
+            INSERT 
+            (
+                COMPANY_CD
+              , BU_CD
+              , ITEM_CD
+              , YEARPWEEK
+              , YEARWEEK
+              , QTY
+              , AMT
+              , UPDATE_DTTM
+              , UPDATE_ID
+              , CREATE_DTTM
+              , CREATE_ID
+            ) VALUES 
+            (
+                B.COMPANY_CD
+              , B.BU_CD
+              , B.ITEM_CD
+              , B.YEARPWEEK
+              , B.YEARWEEK
+              , B.QTY
+              , B.AMT
+              , DBO.UFN_GETDATE()
+              , @{GV_USER_ID}
+              , DBO.UFN_GETDATE()
+              , @{GV_USER_ID}
+            );
+                
+            MERGE TB_HIS_PROD_PLAN_SUB AS A
+            USING 
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , PLAN_ID
+                     , ITEM_CD 
+                     , SALES_MEMO
+                     , MANUFACT_REPLY
+                     #if ($_parameter.hasSCMRoleYn == 'Y')
+                     , REMARK
+                     #end
+                FROM $TMP_TAB
+               #if ($_parameter.hasSCMRoleYn == 'Y')
+                WHERE (REMARK IS NOT NULL OR SALES_MEMO IS NOT NULL OR MANUFACT_REPLY IS NOT NULL OR REMARK != '' OR SALES_MEMO != '' OR MANUFACT_REPLY != '')
+                GROUP BY COMPANY_CD, BU_CD, PLAN_ID, ITEM_CD, REMARK, SALES_MEMO, MANUFACT_REPLY
+               #else
+                WHERE (SALES_MEMO IS NOT NULL OR MANUFACT_REPLY IS NOT NULL OR SALES_MEMO != '' OR MANUFACT_REPLY != '')
+                GROUP BY COMPANY_CD, BU_CD, PLAN_ID, ITEM_CD, SALES_MEMO, MANUFACT_REPLY
+               #end
+            
+            ) B
+            ON 
+            (
+                A.PLAN_ID        = B.PLAN_ID
+                AND A.COMPANY_CD = B.COMPANY_CD
+                AND A.BU_CD      = B.BU_CD
+                AND A.ITEM_CD    = B.ITEM_CD
+            )
+            WHEN MATCHED THEN
+            UPDATE SET
+            #if ($_parameter.hasSCMRoleYn == 'Y')
+                A.REMARK      = B.REMARK
+              , A.SALES_MEMO  = B.SALES_MEMO
+              , A.MANUFACT_REPLY = B.MANUFACT_REPLY
+              , A.UPDATE_DTTM = DBO.UFN_GETDATE()
+              , A.UPDATE_ID   = @{GV_USER_ID}
+            #else
+              A.SALES_MEMO  = B.SALES_MEMO
+              , A.MANUFACT_REPLY = B.MANUFACT_REPLY
+              , A.UPDATE_DTTM = DBO.UFN_GETDATE()
+              , A.UPDATE_ID   = @{GV_USER_ID}
+            #end
+            WHEN NOT MATCHED THEN
+            INSERT 
+            (
+                PLAN_ID
+              , COMPANY_CD
+              , BU_CD
+              , ITEM_CD
+              #if ($_parameter.hasSCMRoleYn == 'Y')
+              , REMARK
+              #end
+              , SALES_MEMO
+              , MANUFACT_REPLY
+              , UPDATE_DTTM
+              , UPDATE_ID
+              , CREATE_DTTM
+              , CREATE_ID
+            ) VALUES (
+                B.PLAN_ID
+              , B.COMPANY_CD
+              , B.BU_CD
+              , B.ITEM_CD
+              #if ($_parameter.hasSCMRoleYn == 'Y')
+              , B.REMARK
+              #end
+              , B.SALES_MEMO
+              , B.MANUFACT_REPLY
+              , DBO.UFN_GETDATE()
+              , @{GV_USER_ID}
+              , DBO.UFN_GETDATE()
+              , @{GV_USER_ID}
+            );
+            
+    #if($_parameter.scmPastWeek == "Y")
+            MERGE TB_HIS_PROD_PLAN AS A
+            USING 
+            (
+                SELECT * 
+                FROM $TMP_TAB
+                WHERE COMPANY_CD = @P_COMPANY_CD
+                  AND BU_CD = @P_BU_CD
+                  AND PLAN_ID = @P_PLAN_ID
+                  AND YEARWEEK = @P_SALES_START_WEEK
+            ) B
+            ON
+            (
+                A.PLAN_ID = B.PLAN_ID
+              AND A.COMPANY_CD = B.COMPANY_CD
+              AND A.BU_CD = B.BU_CD
+              AND A.ITEM_CD = B.ITEM_CD
+              AND A.YEARPWEEK = B.YEARPWEEK
+              AND A.YEARWEEK = B.YEARWEEK
+            )
+            WHEN MATCHED THEN
+            UPDATE SET
+                A.AMT         = B.AMT
+              , A.QTY         = B.QTY
+              , A.UPDATE_DTTM = DBO.UFN_GETDATE()
+              , A.UPDATE_ID   = @{GV_USER_ID}
+            WHEN NOT MATCHED THEN
+            INSERT 
+            (
+                PLAN_ID
+              , COMPANY_CD
+              , BU_CD
+              , ITEM_CD
+              , YEARPWEEK
+              , YEARWEEK
+              , AMT
+              , QTY
+              , UPDATE_DTTM
+              , UPDATE_ID
+              , CREATE_DTTM
+              , CREATE_ID
+            ) VALUES (
+                B.PLAN_ID
+              , B.COMPANY_CD
+              , B.BU_CD
+              , B.ITEM_CD
+              , B.YEARPWEEK
+              , B.YEARWEEK
+              , B.AMT
+              , B.QTY
+              , DBO.UFN_GETDATE()
+              , @{GV_USER_ID}
+              , DBO.UFN_GETDATE()
+              , @{GV_USER_ID}
+            );
+    #end
+    drop table $TMP_TAB
+#end
+        END;
+    </update>
+    
+    
+    
+    <select id="prodPlanSummarySelect" parameterType="map" resultType="map">
+    /****** [ supply.product.prodPlanSummarySelect ] ******/
+BEGIN
+    DECLARE @P_CUT_YN NVARCHAR(1) = '$_parameter.CONFIRM_YN';
+    
+    DECLARE @P_SALES_PLAN_ID NVARCHAR(8)
+    
+    SELECT @P_SALES_PLAN_ID = PLAN_ID 
+      FROM TB_MST_PLAN_VERSION
+     WHERE COMPANY_CD = @{GV_COMPANY_CD}
+       AND BU_CD      = @{GV_BU_CD}
+       AND PLAN_TYPE_CD = 'DP_W'
+       AND START_WEEK   = ( SELECT YEARWEEK
+                              FROM TB_MST_CALENDAR
+                             WHERE YYYYMMDD = (SELECT CONVERT (NVARCHAR, DATEADD (DAY, -7, MIN (DTTM)), 112)
+                                                 FROM TB_MST_CALENDAR
+                                                 WHERE YEARWEEK = (SELECT START_WEEK
+                                                                     FROM TB_MST_PLAN_VERSION
+                                                                    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+                                                                      AND BU_CD        = @{GV_BU_CD}
+                                                                      AND PLAN_ID      = @{planId}
+                                                                      AND PLAN_TYPE_CD = 'MP')));
+
+    
+    <include refid="snop.common.w_cust" />
+,
+W_HIS AS (
+#if ($_parameter.CONFIRM_YN == "Y") 
+
+    SELECT SP.COMPANY_CD
+         , SP.BU_CD
+         , SP.ITEM_CD
+         , SP.CUST_GROUP_CD
+         , SP.YEARPWEEK     YEARWEEK
+         , SP.QTY           SP_QTY
+         , NULL             PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             SUB_REMARK
+         , 'SALES_PLAN'     FLAG
+      FROM TB_HIS_SALES_PLAN SP WITH(NOLOCK)
+     WHERE SP.COMPANY_CD = @{GV_COMPANY_CD}
+       AND SP.BU_CD      = @{GV_BU_CD}  
+       AND SP.MEAS_CD    = 'AP2_SP'
+       AND SP.YEARPWEEK  BETWEEN @{fromPWeek} AND @{toPWeek}
+       AND SP.PLAN_ID    = @P_SALES_PLAN_ID
+     UNION ALL
+    SELECT PP.COMPANY_CD
+         , PP.BU_CD
+         , PP.ITEM_CD
+         , ''               CUST_GROUP_CD
+         , PP.YEARPWEEK     YEARWEEK
+         , NULL             SP_QTY
+         , PP.QTY           PP_QTY
+         , NULL             SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             REMARK
+         , 'PROD_PALN'     FLAG
+      FROM TB_DYN_PROD_PLAN PP WITH(NOLOCK)
+     WHERE PP.COMPANY_CD = @{GV_COMPANY_CD}
+       AND PP.BU_CD      = @{GV_BU_CD}  
+       AND PP.YEARPWEEK  BETWEEN  @{fromPWeek} AND @{toPWeek}
+     UNION ALL
+    SELECT INV.COMPANY_CD
+         , INV.BU_CD
+         , INV.ITEM_CD
+         , ''               CUST_GROUP_CD
+         , ''               YEARWEEK
+         , NULL             SP_QTY
+         , NULL             PP_QTY
+         , INV.INV_QTY      SUB_INV_QTY
+         , NULL             SUB_WIP_QC_QTY
+         , NULL             SUB_WIP_QTY
+         , NULL             SUB_NON_DEPLOY_QTY
+         , NULL             REMARK
+         , 'INV'     FLAG
+      FROM UV_DYN_INVENTORY INV WITH(NOLOCK)
+     WHERE INV.COMPANY_CD = @{GV_COMPANY_CD}
+       AND INV.BU_CD      = @{GV_BU_CD}  
+       AND INV.PLANT_CD   = 'WF01'
+       AND INV.INV_DATE   = CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112)
+     UNION ALL
+     SELECT QC.COMPANY_CD
+          , QC.BU_CD
+          , PO.ITEM_CD
+          , ''               CUST_GROUP_CD
+          , ''               YEARWEEK
+          , NULL             SP_QTY
+          , NULL             PP_QTY
+          , NULL             SUB_INV_QTY
+          , QC.REMAIN_QTY    SUB_WIP_QC_QTY
+          , NULL             SUB_WIP_QTY
+          , NULL             SUB_NON_DEPLOY_QTY
+          , NULL             REMARK
+          , 'QC'              FLAG
+     FROM TB_DYN_WIP_ROUTING QC WITH(NOLOCK)
+     INNER JOIN TB_DYN_PROD_ORDER_HDR PO WITH(NOLOCK)
+        ON QC.COMPANY_CD = PO.COMPANY_CD
+       AND QC.BU_CD = PO.BU_CD
+       AND QC.PROD_ORDER_NO = PO.PROD_ORDER_NO
+     WHERE QC.COMPANY_CD = @{GV_COMPANY_CD}
+       AND QC.BU_CD      = @{GV_BU_CD}
+       AND QC.WIP_DATE   = CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112)
+       AND QC.PROD_OR_QC = 'QC_PART'  
+#else
+<include refid="supply.product.HISTORY"></include>
+#end
+)
+    SELECT CASE C.NO 
+             WHEN 1 THEN dbo.UFN_GET_TRANSLATE('lbl', 'salesPlan',     @{GV_LANG}) 
+             WHEN 2 THEN dbo.UFN_GET_TRANSLATE('lbl', 'prodInvStatus', @{GV_LANG})
+             WHEN 3 THEN dbo.UFN_GET_TRANSLATE('lbl', 'prodPlan',      @{GV_LANG})
+           END [DESC]
+         , SUM (CASE C.NO 
+                  WHEN 1 THEN M.SP_TOT 
+                  WHEN 2 THEN M.INV_SP_QTY 
+                  WHEN 3 THEN M.PP_TOT 
+                END) TOT_QTY
+         , SUM (CASE C.NO 
+                  WHEN 1 THEN M.SP_AMT 
+                  WHEN 2 THEN M.INV_SP_AMT 
+                  WHEN 3 THEN M.PP_AMT 
+                END) TOT_AMT
+     FROM (
+        SELECT CT.ITEM_CD
+             , CT.SALES_PRICE_KRW
+             , SUM (HIS.SP_QTY)                      AS SP_TOT
+             , SUM (HIS.SP_QTY) * CT.SALES_PRICE_KRW AS SP_AMT
+             , CASE 
+                 WHEN SUM (HIS.SP_QTY) >= ISNULL (SUM (HIS.SUB_INV_QTY), 0)
+                 THEN ISNULL (SUM (HIS.SUB_INV_QTY), 0)  
+                 ELSE SUM (HIS.SP_QTY)
+               END INV_SP_QTY
+             , CASE 
+                 WHEN SUM (HIS.SP_QTY) >= ISNULL (SUM (HIS.SUB_INV_QTY), 0)
+                 THEN ISNULL (SUM (HIS.SUB_INV_QTY), 0) 
+                 ELSE SUM (HIS.SP_QTY)
+               END * CT.SALES_PRICE_KRW INV_SP_AMT
+             , SUM (HIS.PP_QTY)                      AS PP_TOT
+             , SUM (HIS.PP_QTY) * CT.SALES_PRICE_KRW AS PP_AMT
+             
+          FROM W_CUST CT
+          LEFT OUTER JOIN W_HIS HIS WITH(NOLOCK)
+            ON CT.COMPANY_CD = HIS.COMPANY_CD
+           AND CT.BU_CD      = HIS.BU_CD
+           AND CT.ITEM_CD    = HIS.ITEM_CD
+           AND CASE HIS.FLAG WHEN 'SALES_PLAN' THEN CT.CUST_GROUP_CD ELSE '' END = CASE HIS.FLAG WHEN 'SALES_PLAN' THEN HIS.CUST_GROUP_CD ELSE '' END
+           
+         WHERE CT.COMPANY_CD = @{GV_COMPANY_CD}
+           AND CT.BU_CD      = @{GV_BU_CD}
+          #if($_parameter.item_cd and $_parameter.item_cd != "")
+           AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+          #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+           AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+          #end
+          #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+           AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+          #end
+          #if($_parameter.route and $_parameter.route != "")
+           AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+          #end
+          #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+           AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+          #end
+          #if($_parameter.custGroup and $_parameter.custGroup != "")
+           AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+          #end 
+         GROUP BY CT.ITEM_CD
+             , CT.SALES_PRICE_KRW) M
+      CROSS JOIN (SELECT 1 NO UNION ALL
+                  SELECT 2    UNION ALL
+                  SELECT 3) C
+      GROUP BY C.NO
+      ORDER BY C.NO
+
+END;
+    </select>
+    
+    <select id="prodPlanSummaryExcelSqlSelect" parameterType="map" resultType="map">
+    /****** [ supply.product.prodPlanSummaryExcelSqlSelect ] ******/
+        SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+        , A2.ACTION_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+                 , ACTION_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD = @{popUpMenuCd}
+              AND ACTION_CD IN ('EXCEL','SQL')
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+        , A2.ACTION_CD
+    
+    </select>
+    
+    <select id="prodPlanSCMRoleYnSelect" parameterType="map" resultType="map">
+    /*** supply.product.prodPlanSalesRoleYn ***/
+    /* 사용자가 영업팀 권한을 가지고 있는지 여부를 확인하기 위함  */
+    
+    BEGIN
+    
+    with USER_ROLE AS(
+        select *
+        from TB_MAP_USER_ROLE
+    where USER_ID = @{USER_ID})
+ 
+    /* GOCQT0001: SCM팀        CODE */
+    
+    SELECT CASE WHEN COUNT(*) <![CDATA[>=]]> 1 THEN 'Y' ELSE 'N' END AS hasSCMRoleYn
+    FROM USER_ROLE
+    WHERE ROLE_CD  IN ('GOCQT0001')  
+    END;
+        
+    </select>
+    
+    <!-- //20220323 김수호 추가: 생산 완료 계획 페이지 생산계획수량 입력 권한 적용 요청 from 김동현B -->
+    <select id="prodPlanQtyWriteRoleYnSelect" parameterType="map" resultType="map">
+    /*** supply.product.prodPlanQtyWriteRoleYn ***/
+    /* 사용자가 생산기획공통권한(QT PRO0009 Diffusion 생산기획 공통, QT PRO0010 LAM 생산기획 공통, QT PRO0011 TEL 생산기획 공통) 권한을 가지고 있는지 여부를 확인하기 위함  */
+    
+    BEGIN
+    
+    with USER_ROLE AS(
+        select *
+        from TB_MAP_USER_ROLE
+    where USER_ID = @{USER_ID})
+ 
+    /* GOCQT0001: SCM팀        CODE */
+    
+    SELECT CASE WHEN COUNT(*) <![CDATA[>=]]> 1 THEN 'Y' ELSE 'N' END AS hasProdPlanQtyWriteRoleYn
+    FROM USER_ROLE
+    WHERE ROLE_CD  IN ('PRO0009','PRO0010','PRO0011')  
+    END;
+        
+    </select>
+    
+    
+    
+</mapper>

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	<select id="campusMovSchSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.campusMovSchSelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT MC2.CODE_CD AS FROM_CAMPUS_CD
+		         , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+		         		WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+		         		ELSE MC2.CODE_NM
+		           END AS FROM_CAMPUS_NM
+		         , MC3.CODE_CD AS TO_CAMPUS_CD
+		         , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+		         		WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+		         		ELSE MC3.CODE_NM
+		           END AS TO_CAMPUS_NM
+		         , MC1.ATTB_2_CD AS MOVE_TIME_CD
+		         , MC1.ATTB_3_CD AS MOVE_TIME
+		         , RANK() OVER(PARTITION BY MC2.CODE_CD, MC3.CODE_CD ORDER BY MCS.SEQ) AS RN
+		         , MCS.SEQ
+		         , MCS.START_TIME
+		         , REPLACE(CONVERT(NVARCHAR(5), DATEADD(MI, CAST(MC1.ATTB_3_CD AS INT), CAST('20190101' + ' ' + LEFT(REPLACE(MCS.START_TIME, '2400', '0000'), 2) + ':' + RIGHT(REPLACE(MCS.START_TIME, '2400', '0000'), 2) + ':00' AS DATETIME)), 108), ':', '') AS END_TIME
+		         , ISNULL(MCS.COMPANY_CD, @{GV_COMPANY_CD}) AS COMPANY_CD
+		         , ISNULL(MCS.BU_CD, @{GV_BU_CD}) AS BU_CD
+		         , MC2.SORT AS MC2_SORT
+		         , MC3.SORT AS MC3_SORT
+			FROM TB_MST_CODE MC1 WITH(NOLOCK)
+		    INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		       ON MC2.BU_CD = MC1.BU_CD
+		      AND MC2.GROUP_CD = 'CAMPUS_CD'
+		      AND MC2.CODE_CD = MC1.ATTB_1_CD
+		    INNER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		       ON MC3.BU_CD = MC1.BU_CD
+		      AND MC3.GROUP_CD = 'CAMPUS_CD'
+		      AND MC3.CODE_CD = MC1.ATTB_2_CD
+		    LEFT OUTER JOIN TB_MST_CAMPUS_SCHED MCS WITH(NOLOCK)
+		      ON MCS.COMPANY_CD = @{GV_COMPANY_CD}
+		     AND MCS.BU_CD = MC1.BU_CD
+		     AND MCS.FROM_CAMPUS_CD = MC1.ATTB_1_CD
+		     AND MCS.TO_CAMPUS_CD = MC1.ATTB_2_CD
+		     AND MCS.USE_FLAG = 'Y'
+		    WHERE MC1.BU_CD = @{GV_BU_CD}
+		      AND MC1.GROUP_CD = 'CAMPUS_DISTRIBUTION'
+		)
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.FROM_CAMPUS_CD
+		     , A.TO_CAMPUS_CD
+		     , ISNULL(A.FROM_CAMPUS_NM, ' ') AS FROM_CAMPUS_NM
+		     , ISNULL(A.FROM_CAMPUS_NM, ' ') AS FROM_CAMPUS_NM_NM
+		     , ISNULL(A.TO_CAMPUS_NM, ' ') AS TO_CAMPUS_NM
+		     , ISNULL(A.TO_CAMPUS_NM, ' ') AS TO_CAMPUS_NM_NM
+		     , ISNULL(A.MOVE_TIME, ' ') AS MOVE_TIME
+		     , ISNULL(A.MOVE_TIME, ' ') AS MOVE_TIME_NM
+		     , ISNULL(A.RN, 0) AS RN
+		     , ISNULL(A.RN, 0) AS RN_NM
+		     , A.SEQ
+		     , A.START_TIME
+		     , A.END_TIME
+		FROM W_MAIN A
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD = @{GV_BU_CD}
+		#if($_parameter.fromCampus and $_parameter.fromCampus != "")
+		  AND A.FROM_CAMPUS_CD = @{fromCampus}
+		#end
+		#if($_parameter.toCampus and $_parameter.toCampus != "")
+		  AND A.TO_CAMPUS_CD = @{toCampus}
+		#end
+		ORDER BY A.MC2_SORT, A.MC3_SORT, A.SEQ
+	</select>
+	
+	<insert id="campusMovSchMerge" parameterType="map">
+		/****** [ aps.static.campusMovSchMerge ] ******/
+		MERGE TB_MST_CAMPUS_SCHED A
+		USING 
+		(
+			SELECT @{COMPANY_CD} AS COMPANY_CD
+		         , @{BU_CD} AS BU_CD
+		         , @{FROM_CAMPUS_CD} AS FROM_CAMPUS_CD
+		         , @{TO_CAMPUS_CD} AS TO_CAMPUS_CD
+				#if($_parameter.SEQ and $_parameter.SEQ != "")
+		         , @{SEQ} AS SEQ
+				#else
+		         , (
+						SELECT ISNULL(MAX(SEQ), 0) + 1 
+						FROM TB_MST_CAMPUS_SCHED
+						WHERE COMPANY_CD     = @{COMPANY_CD}
+						  AND BU_CD          = @{BU_CD}
+						  AND FROM_CAMPUS_CD = @{FROM_CAMPUS_CD}
+						  AND TO_CAMPUS_CD   = @{TO_CAMPUS_CD}
+					) AS SEQ
+				#end
+		) B
+		ON 
+		(
+			A.COMPANY_CD         = B.COMPANY_CD
+		    AND A.BU_CD          = B.BU_CD
+		    AND A.FROM_CAMPUS_CD = B.FROM_CAMPUS_CD
+		    AND A.TO_CAMPUS_CD   = B.TO_CAMPUS_CD
+		    AND A.SEQ            = B.SEQ
+		)
+		WHEN MATCHED THEN
+		UPDATE SET START_TIME  = '$_parameter.START_TIME.replace(":","")'
+		         , USE_FLAG    = 'Y'
+		         , UPDATE_ID   = @{GV_USER_ID}
+		         , UPDATE_DTTM = dbo.UFN_GETDATE()
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+			COMPANY_CD
+          , BU_CD
+          , FROM_CAMPUS_CD
+          , TO_CAMPUS_CD
+          , SEQ
+          , START_TIME
+          , USE_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+		)VALUES(
+			B.COMPANY_CD
+          , B.BU_CD
+          , B.FROM_CAMPUS_CD
+          , B.TO_CAMPUS_CD
+          , B.SEQ
+          , '$_parameter.START_TIME.replace(":","")'
+          , 'Y'
+          , @{GV_USER_ID}
+          , dbo.UFN_GETDATE()
+		);
+	</insert>
+	
+	<insert id="campusMovSchDelete" parameterType="map">
+		/****** [ aps.static.campusMovSchDelete ] ******/
+		UPDATE TB_MST_CAMPUS_SCHED
+		   SET USE_FLAG       = 'N'
+		     , UPDATE_ID      = @{GV_USER_ID}
+		     , UPDATE_DTTM    = dbo.UFN_GETDATE()
+		 WHERE COMPANY_CD     = @{COMPANY_CD}
+		   AND BU_CD          = @{BU_CD}
+		   AND FROM_CAMPUS_CD = @{FROM_CAMPUS_CD}
+		   AND TO_CAMPUS_CD   = @{TO_CAMPUS_CD}
+		   AND SEQ            = @{SEQ}
+	</insert>
+
+</mapper>

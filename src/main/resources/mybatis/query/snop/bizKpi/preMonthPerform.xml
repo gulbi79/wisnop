@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.bizKpi">
+    <select id="preMonthPerformSelect" parameterType="map" resultType="map">
+        /****** [ snop.bizKpi.preMonthPerformSelect ] ******/
+	    BEGIN
+	    
+	        DECLARE @P_CUR_MONTH NVARCHAR(6) = @{fromMon}
+	        DECLARE @P_CUR_YEAR  NVARCHAR(4) = LEFT (@P_CUR_MONTH, 4)
+	        DECLARE @P_PRE_MONTH NVARCHAR(6) = LEFT (CONVERT(NVARCHAR(30), DATEADD(YEAR, -1, CAST(@P_CUR_MONTH + N'01' AS DATE)), 112), 6)
+	        DECLARE @P_PRE_YEAR  NVARCHAR(4) = LEFT (@P_PRE_MONTH, 4)
+	        
+		    SELECT C.BU_CD
+		         , C.BU_NM
+		         , C.CODE_CD
+		         , C.CODE_NM
+		         , @P_CUR_MONTH YEARMONTH
+		         , ISNULL (SUM (CASE WHEN @P_PRE_MONTH = B.YEARMONTH THEN B.PERFORM_AMT ELSE NULL END), 0)  AS PRE_PERFORM_AMT
+		         , ISNULL (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PLAN_AMT    ELSE NULL END), 0)  AS CUR_PLAN_AMT
+		         , ISNULL (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PERFORM_AMT ELSE NULL END), 0)  AS CUR_PERFORM_AMT
+		         , ISNULL (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PERFORM_AMT ELSE NULL END), 0) - 
+		           ISNULL (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PLAN_AMT    ELSE NULL END), 0)  AS CUR_DIFF_AMT
+		         , CASE WHEN C.CODE_CD IN ('SALES_AMT_KRW', 'PROD', 'OP_AMT_KRW','GP_KRW')
+		                THEN ISNULL (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PERFORM_AMT ELSE NULL END), 0) / 
+		                	 NULLIF (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PLAN_AMT    ELSE NULL END), 0) * 100  
+		             	ELSE ISNULL (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PLAN_AMT    ELSE NULL END), 0) / 
+		                	 NULLIF (SUM (CASE WHEN @P_CUR_MONTH = B.YEARMONTH THEN B.PERFORM_AMT ELSE NULL END), 0) * 100  
+		             END AS CUR_BIZ_DAL
+		         , ISNULL (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_PRE_YEAR + '01' AND @P_PRE_MONTH THEN B.PLAN_AMT    ELSE NULL END) , 0) AS PRE_PERFORM_ACML_AMT
+		         , ISNULL (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PLAN_AMT    ELSE NULL END) , 0) AS CUR_PLAN_ACML_AMT
+		         , ISNULL (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PERFORM_AMT ELSE NULL END) , 0) AS CUR_PERFORM_ACML_AMT
+		         , ISNULL (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PERFORM_AMT ELSE NULL END) , 0) -
+		           ISNULL (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PLAN_AMT    ELSE NULL END) , 0) AS CUR_DIFF_ACML_AMT
+		         , CASE WHEN C.CODE_CD IN ('SALES_AMT_KRW', 'PROD', 'OP_AMT_KRW','GP_KRW')
+		                THEN ISNULL (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PERFORM_AMT ELSE NULL END), 0) /
+		                     NULLIF (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PLAN_AMT    ELSE NULL END), 0) * 100  
+		             	ELSE ISNULL (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PLAN_AMT    ELSE NULL END), 0) /
+		                     NULLIF (SUM (CASE WHEN B.YEARMONTH BETWEEN @P_CUR_YEAR + '01' AND @P_CUR_MONTH THEN B.PERFORM_AMT ELSE NULL END), 0) * 100  
+		            END AS CUR_BIZ_ACML_DAL
+			FROM 
+		    (
+		    	SELECT BU.CODE_CD BU_CD
+	                 , CASE WHEN UPPER ('$_parameter.GV_LANG') = 'KO' AND BU.CODE_NM_KR ! = '' THEN ISNULL (BU.CODE_NM_KR, BU.CODE_NM)
+	                     	WHEN UPPER ('$_parameter.GV_LANG') = 'CN' AND BU.CODE_NM_CN ! = '' THEN ISNULL (BU.CODE_NM_CN, BU.CODE_NM)
+	                     	ELSE BU.CODE_NM
+	                    END AS BU_NM
+	                 , A.CODE_CD
+	                 , A.CODE_NM
+	                 , BU.SORT BU_SORT
+	                 , A.SORT  AC_SORT
+				FROM TB_MST_CODE BU WITH (NOLOCK)
+				CROSS JOIN 
+				(
+		        	SELECT AC.CODE_CD
+		            	 , CASE WHEN UPPER ('$_parameter.GV_LANG') = 'KO' AND AC.CODE_NM_KR ! = '' THEN ISNULL (AC.CODE_NM_KR, AC.CODE_NM)
+		                        WHEN UPPER ('$_parameter.GV_LANG') = 'CN' AND AC.CODE_NM_CN ! = '' THEN ISNULL (AC.CODE_NM_CN, AC.CODE_NM)
+		                        ELSE AC.CODE_NM
+							END AS CODE_NM
+						 , AC.SORT
+					FROM TB_MST_CODE AC WITH (NOLOCK)
+		            WHERE AC.GROUP_CD = 'ACCOUNT_CD'
+		              AND AC.USE_FLAG = 'Y'
+				) A
+		        WHERE BU.GROUP_CD  = 'BU_CD'
+		          AND BU.CODE_CD  != 'ALL'
+		          AND BU.USE_FLAG  = 'Y'
+			) C
+		    LEFT OUTER JOIN TB_KPI_BIZ_PERFORM B WITH (NOLOCK)
+		      ON C.BU_CD      = B.BU_CD
+		     AND C.CODE_CD    = B.ACCOUNT_CD
+		     AND B.YEARMONTH >= @P_PRE_MONTH
+		     AND B.YEARMONTH <![CDATA[<=]]> @P_CUR_MONTH
+		     AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		    WHERE 1 = 1
+			#if($_parameter.buCd and $_parameter.buCd != "ALL")
+		      AND C.BU_CD      = @{buCd}
+		 	#end 
+		    GROUP BY C.BU_CD, C.BU_NM, C.CODE_CD, C.CODE_NM, C.BU_SORT, C.AC_SORT
+		    ORDER BY C.BU_SORT, C.AC_SORT
+	    END;
+    </select>
+    
+    <update id="preMonthPerformUpdate" parameterType="map" >
+        /****** [ snop.bizKpi.preMonthPerformMerge ] ******/
+        
+	    #set( $TMP_TAB = "#TMP_TAB" )
+	    
+	    BEGIN
+	    
+	    DECLARE @P_COMPANY_CD NVARCHAR(5)   = @{GV_COMPANY_CD};
+	    DECLARE @P_USER_ID    NVARCHAR(100) = @{GV_USER_ID};
+	        
+	#if ($_parameter.rowList.size() > 0)
+	    CREATE TABLE $TMP_TAB (
+	          COMPANY_CD  NVARCHAR(5)
+	        , BU_CD       NVARCHAR(3)
+	        , YEARMONTH   NVARCHAR(6)
+	        , ACCOUNT_CD  NVARCHAR(13)
+	        , PLAN_AMT    NUMERIC(21, 6)
+	        , PERFORM_AMT NUMERIC(21, 6)
+	        , USER_ID     NVARCHAR(100)
+	    );
+	    
+	    
+	    INSERT INTO $TMP_TAB
+	         ( COMPANY_CD
+	         , BU_CD
+	         , YEARMONTH
+	         , ACCOUNT_CD
+	         , PLAN_AMT
+	         , PERFORM_AMT
+	         , USER_ID)
+	          
+	#foreach( $rowMap in $_parameter.rowList )
+	        SELECT @P_COMPANY_CD                     AS COMPANY_CD
+	             , '$rowMap.BU_CD'                   AS BU_CD
+	             , '$rowMap.YEARMONTH'               AS YEARMONTH
+	             , '$rowMap.CODE_CD'                 AS ACCOUNT_CD
+	             , #if($rowMap.get("CUR_PLAN_AMT"))    $rowMap.get("CUR_PLAN_AMT")    #else NULL #end AS PLAN_AMT
+	             , #if($rowMap.get("CUR_PERFORM_AMT")) $rowMap.get("CUR_PERFORM_AMT") #else NULL #end AS PERFORM_AMT
+	             , @P_USER_ID  AS USER_ID
+	  #if($_parameter.rowList.size() > $foreach.count) UNION ALL #end
+	#end
+	        
+	    MERGE TB_KPI_BIZ_PERFORM AS A
+	    USING (
+	           SELECT COMPANY_CD
+	                , BU_CD
+	                , YEARMONTH
+	                , ACCOUNT_CD 
+	                , CASE 
+	                    WHEN ACCOUNT_CD = 'COSTG_KRW' 
+	                    THEN SUM (CASE WHEN ACCOUNT_CD IN ('MAT', 'LABOR', 'EXP', 'SUB', 'INV') THEN PLAN_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH)
+	                    WHEN ACCOUNT_CD = 'GP_KRW'
+	                    THEN ISNULL (SUM (CASE WHEN ACCOUNT_CD = 'SALES_AMT_KRW' THEN PLAN_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0) - 
+	                         ISNULL (SUM (CASE WHEN ACCOUNT_CD IN ('MAT', 'LABOR', 'EXP', 'SUB', 'INV') THEN PLAN_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0)
+	                    WHEN ACCOUNT_CD = 'OP_AMT_KRW'
+	                    THEN (ISNULL (SUM (CASE WHEN ACCOUNT_CD = 'SALES_AMT_KRW' THEN PLAN_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0)  - 
+	                          ISNULL (SUM (CASE WHEN ACCOUNT_CD IN ('MAT', 'LABOR', 'EXP', 'SUB', 'INV') THEN PLAN_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0) )
+	                         - ISNULL (SUM (CASE WHEN ACCOUNT_CD = 'SGNA_KRW' THEN PLAN_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0) 
+	                    ELSE PLAN_AMT
+	                  END  PLAN_AMT
+	                , CASE 
+	                    WHEN ACCOUNT_CD = 'COSTG_KRW' 
+	                    THEN SUM (CASE WHEN ACCOUNT_CD IN ('MAT', 'LABOR', 'EXP', 'SUB', 'INV') THEN PERFORM_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH)
+	                    WHEN ACCOUNT_CD = 'GP_KRW'
+	                    THEN ISNULL (SUM (CASE WHEN ACCOUNT_CD = 'SALES_AMT_KRW' THEN PERFORM_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0) - 
+	                         ISNULL (SUM (CASE WHEN ACCOUNT_CD IN ('MAT', 'LABOR', 'EXP', 'SUB', 'INV') THEN PERFORM_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0)
+	                    WHEN ACCOUNT_CD = 'OP_AMT_KRW'
+	                    THEN (ISNULL (SUM (CASE WHEN ACCOUNT_CD = 'SALES_AMT_KRW' THEN PERFORM_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0)  - 
+	                          ISNULL (SUM (CASE WHEN ACCOUNT_CD IN ('MAT', 'LABOR', 'EXP', 'SUB', 'INV') THEN PERFORM_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0) )
+	                         - ISNULL (SUM (CASE WHEN ACCOUNT_CD = 'SGNA_KRW' THEN PERFORM_AMT ELSE NULL END) OVER (PARTITION BY COMPANY_CD, BU_CD, YEARMONTH), 0) 
+	                    ELSE PERFORM_AMT
+	                  END  PERFORM_AMT
+	                , USER_ID
+	            FROM $TMP_TAB
+	    ) B
+	    ON (
+	            A.COMPANY_CD = B.COMPANY_CD
+	        AND A.BU_CD      = B.BU_CD
+	        AND A.YEARMONTH  = B.YEARMONTH
+	        AND A.ACCOUNT_CD = B.ACCOUNT_CD
+	    )
+	    WHEN MATCHED THEN
+	        UPDATE SET
+	            A.PLAN_AMT     = B.PLAN_AMT
+	          , A.PERFORM_AMT  = B.PERFORM_AMT
+	          , A.UPDATE_DTTM  = DBO.UFN_GETDATE()
+	          , A.UPDATE_ID    = @{GV_USER_ID}
+	    WHEN NOT MATCHED THEN
+	        INSERT (
+	            COMPANY_CD
+	          , BU_CD
+	          , YEARMONTH
+	          , ACCOUNT_CD
+	          , PLAN_AMT
+	          , PERFORM_AMT
+	          , UPDATE_DTTM
+	          , UPDATE_ID
+	          , CREATE_DTTM
+	          , CREATE_ID
+	        ) VALUES (
+	            B.COMPANY_CD
+	          , B.BU_CD
+	          , B.YEARMONTH
+	          , B.ACCOUNT_CD
+	          , B.PLAN_AMT
+	          , B.PERFORM_AMT
+	          , DBO.UFN_GETDATE()
+	          , B.USER_ID
+	          , DBO.UFN_GETDATE()
+	          , B.USER_ID
+	        );
+	#end
+	    END;
+    </update>
+    
+</mapper>

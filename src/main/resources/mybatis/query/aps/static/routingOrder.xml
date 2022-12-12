@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	<select id="routingOrderListSelect" parameterType="map" resultType="map">
+		  /****** [ aps.static.routingOrderListSelect ] ******/
+        
+        DECLARE @V_CURRENT_DATE     DATETIME,
+                @V_CUR_DATE         NVARCHAR(8)
+        
+        SET @V_CURRENT_DATE = DBO.UFN_GETDATE();
+        SET @V_CUR_DATE = CONVERT(NVARCHAR, @V_CURRENT_DATE, 112);
+        
+        
+        WITH W_ITEM AS 
+        (
+            <include refid="snop.common.t_itemCust" />
+        ),
+        W_PROD_CATE AS
+        (
+            SELECT MR.COMPANY_CD
+                 , MR.BU_CD
+                 , MI.ITEM_CD
+                 , MR.CODE_CD
+                 , MR.CODE_NM
+                 , MR.ROUTING_NO
+                 , MR.MAJOR_FLAG
+                 , MR.ROUTE_DESC
+                 , CASE WHEN CAST(MRP.PRIORITY AS CHAR(10)) = '0'  THEN '' ELSE CAST(MRP.PRIORITY AS CHAR(10)) END AS PRIORITY
+                 , MRP.USE_FLAG
+                 , MR.ROUTING_ID
+            FROM TB_MST_ITEM MI WITH(NOLOCK)
+            INNER JOIN 
+            (
+                SELECT MR.COMPANY_CD
+                     , MR.BU_CD
+                     , MR.CODE_CD
+                     , MR.CODE_NM
+                     , MR.ITEM_CD
+                     , MR.ROUTING_NO
+                     , MR.MAJOR_FLAG
+                     , (
+                        SELECT STUFF((
+                                    SELECT '   ▶   ' + '[' + JOB_CD + '] ' + REPLACE(JOB_NM, '(QTZ)', '')
+                                    FROM TB_MST_ROUTING WITH(NOLOCK)
+                                    WHERE COMPANY_CD = MR.COMPANY_CD
+                                      AND BU_CD = MR.BU_CD
+                                      AND PLANT_CD = MR.PLANT_CD
+                                      AND ITEM_CD = MR.ITEM_CD
+                                      AND ROUTING_NO = MR.ROUTING_NO
+                                      AND PLANT_CD = 'WF01'
+                                    ORDER BY OPERATION_SEQ ASC
+                                    FOR XML PATH ('')), 1, 7, '') AS ROUTE_DESC
+                       ) AS ROUTE_DESC
+                     , MR.ROUTING_ID
+                FROM 
+                (
+                    SELECT DISTINCT MR.COMPANY_CD
+                         , MR.BU_CD
+                         , MR.PLANT_CD
+                         , MR.ITEM_CD
+                         , MR.ROUTING_NO
+                         , MR.MAJOR_FLAG
+                         , MC2.CODE_CD
+                         , MC2.CODE_NM AS CODE_NM
+                         , MR.ROUTING_ID
+                    FROM TB_MST_ROUTING MR WITH(NOLOCK)
+                    INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+                       ON MC1.BU_CD =  MR.BU_CD
+                      AND MC1.GROUP_CD = 'PROD_L2'
+                      AND MC1.CODE_CD =  MR.ROUTING_ID
+                    INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+                       ON MC2.BU_CD = MC1.BU_CD
+                      AND MC2.GROUP_CD = 'PROD_PART'
+                      AND MC2.CODE_CD = MC1.ATTB_2_CD
+                    WHERE MR.PLANT_CD = 'WF01'
+                ) MR
+            ) MR
+            ON MR.COMPANY_CD = MI.COMPANY_CD
+            AND MR.BU_CD = MI.BU_CD
+            AND MR.ITEM_CD = MI.ITEM_CD
+            LEFT OUTER JOIN TB_MST_ROUTING_PRIORITY MRP WITH(NOLOCK)
+              ON MRP.COMPANY_CD = MR.COMPANY_CD
+             AND MRP.BU_CD = MR.BU_CD
+             AND MRP.ITEM_CD = MR.ITEM_CD
+             AND MRP.ROUTING_NO = MR.ROUTING_NO
+            WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+              AND MI.BU_CD = @{GV_BU_CD}
+              AND MI.ITEM_TYPE IN ('10', '20')
+            #if($_parameter.prodPart and $_parameter.prodPart != "")
+              AND MR.CODE_CD IN ('$_parameter.prodPart.replace(",","','")')
+            #else
+              AND MR.CODE_CD IN ('DIFFUSION','LAM','TEL','MATERIAL')
+            #end
+            #if($_parameter.flagYn and $_parameter.flagYn != "")
+              AND MRP.USE_FLAG  = '$_parameter.flagYn'
+            #end
+        )
+        
+    /* 210610 이큰산 : 라우팅별 재공수량 추가 */
+    ,
+    W_WIP_ROUTING
+    AS
+    (
+        SELECT A1.COMPANY_CD
+        , A1.BU_CD
+        , A1.ITEM_CD
+        , A3.ROUTING_NO
+        , SUM(CASE WHEN A3.ORDER_STATUS = 'OP' THEN ISNULL(A3.PROD_ORDER_QTY, 0) ELSE ISNULL(A4.REMAIN_QTY, 0) END) AS REMAIN_QTY
+        FROM W_ITEM A1
+        INNER JOIN W_PROD_CATE A2 
+        ON A1.COMPANY_CD = A2.COMPANY_CD 
+        AND A1.BU_CD = A2.BU_CD 
+        AND A1.ITEM_CD = A2.ITEM_CD
+        INNER JOIN TB_DYN_PROD_ORDER_HDR_DAILY A3 
+        ON A1.COMPANY_CD = A3.COMPANY_CD 
+        AND A1.BU_CD = A3.BU_CD 
+        AND A1.ITEM_CD = A3.ITEM_CD 
+        AND A3.ORDER_STATUS IN('OP', 'RL', 'ST') 
+        AND A2.ROUTING_NO = A3.ROUTING_NO 
+        AND A3.DEL_FLAG = 'N'
+        LEFT JOIN TB_DYN_WIP_ROUTING A4 
+        ON A1.COMPANY_CD = A4.COMPANY_CD 
+        AND A1.BU_CD = A4.BU_CD 
+        AND A4.PROD_ORDER_NO = A3.PROD_ORDER_NO 
+        AND A3.YYYYMMDD = A4.WIP_DATE
+        WHERE ISNULl(A3.YYYYMMDD, @V_CUR_DATE) = @V_CUR_DATE
+        GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A3.ROUTING_NO
+    )
+    ------------------------------------------------
+        
+        
+        
+        
+        
+        SELECT B.*
+             , C.SORT
+        FROM
+        (
+            SELECT NULL AS TMP_COL
+            <include refid="include.getCdDimTotal"/>
+            <include refid="include.getGrpLvlId"/>
+            FROM
+            (
+                SELECT 
+                       A1.COMPANY_CD
+                     , A1.BU_CD
+                     , ISNULL (A1.REP_ITEM_GROUP_CD, '') AS REP_ITEM_GROUP_CD 
+                     , ISNULL (A1.REP_ITEM_GROUP_CD, '') AS REP_ITEM_GROUP_CD_NM 
+                     , ISNULL (A1.REP_ITEM_GROUP_NM, '') AS REP_ITEM_GROUP_NM 
+                     , ISNULL (A1.REP_ITEM_GROUP_NM, '') AS REP_ITEM_GROUP_NM_NM 
+                     , ISNULL (A2.ROUTING_ID, '')        AS ROUTING_ID
+                     , ISNULL (A2.ROUTING_ID, '')        AS ROUTING_ID_NM
+                     , ISNULL (A1.REP_CUST_GROUP_CD, '') AS REP_CUST_GROUP_CD
+                     , ISNULL (A1.REP_CUST_GROUP_NM, '') AS REP_CUST_GROUP_CD_NM
+                     , ISNULL (A1.REP_CUST_GROUP_NM, '') AS REP_CUST_GROUP_NM
+                     , ISNULL (A1.REP_CUST_GROUP_NM, '') AS REP_CUST_GROUP_NM_NM
+                     , ISNULL (A1.CUST_GROUP_CD, '')     AS CUST_GROUP_CD
+                     , ISNULL (A1.CUST_GROUP_CD, '')     AS CUST_GROUP_CD_NM
+                     , ISNULL (A1.CUST_GROUP_NM, '')     AS CUST_GROUP_NM
+                     , ISNULL (A1.CUST_GROUP_NM, '')     AS CUST_GROUP_NM_NM
+                     , ISNULL (A1.ITEM_GROUP_CD, '')     AS ITEM_GROUP_CD
+                     , ISNULL (A1.ITEM_GROUP_CD, '')     AS ITEM_GROUP_CD_NM
+                     , ISNULL (A1.ITEM_GROUP_NM, '')     AS ITEM_GROUP_NM
+                     , ISNULL (A1.ITEM_GROUP_NM, '')     AS ITEM_GROUP_NM_NM
+                     , ISNULL (A1.ITEM_CD, '')           AS ITEM_CD
+                     , ISNULL (A1.ITEM_CD, '')           AS ITEM_CD_NM
+                     , ISNULL (A1.ITEM_NM, '')           AS ITEM_NM
+                     , ISNULL (A1.ITEM_NM, '')           AS ITEM_NM_NM
+                     , ISNULL (A1.SPEC, '')              AS SPEC
+                     , ISNULL (A1.SPEC, '')              AS SPEC_NM
+                     , ISNULL (A1.DRAW_NO, '')           AS DRAW_NO
+                     , ISNULL (A1.DRAW_NO, '')           AS DRAW_NO_NM
+                     , ISNULL (A1.ITEM_TYPE, '')         AS ITEM_TYPE_CD
+                     , ISNULL (A1.ITEM_TYPE_NM, '')      AS ITEM_TYPE_CD_NM
+                     , ISNULL (A1.ITEM_TYPE_NM, '')      AS ITEM_TYPE_NM
+                     , ISNULL (A1.ITEM_TYPE_NM, '')      AS ITEM_TYPE_NM_NM
+                     , ISNULL (A1.PROCUR_TYPE, '') AS PROCUR_TYPE
+                     , ISNULL (A1.PROCUR_TYPE, '') AS PROCUR_TYPE_NM
+                     , ISNULL (CAST (A1.MFG_LT AS NVARCHAR(20)), '')          AS MFG_LT
+                     , ISNULL (CAST (A1.MFG_LT AS NVARCHAR(20)), '')          AS MFG_LT_NM
+                     , ISNULL (CAST (A1.PUR_LT AS NVARCHAR(20)), '')          AS PUR_LT
+                     , ISNULL (CAST (A1.PUR_LT AS NVARCHAR(20)), '')          AS PUR_LT_NM
+                     , ISNULL (CAST (A1.SS_QTY AS NVARCHAR(20)), '')          AS SS_QTY
+                     , ISNULL (CAST (A1.SS_QTY AS NVARCHAR(20)), '')          AS SS_QTY_NM
+                     , ISNULL (CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), '') AS SALES_PRICE_KRW
+                     , ISNULL (CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), '') AS SALES_PRICE_KRW_NM
+                     , ISNULL (A1.CPFR_YN, '') AS CPFR_YN
+                     , ISNULL (A1.CPFR_YN, '') AS CPFR_YN_NM
+                     , ISNULL (A1.UOM_CD, '') AS UOM_CD
+                     , ISNULL (A1.UOM_CD, '') AS UOM_CD_NM
+                     , ISNULL (A1.CUST_CD, '') AS REP_CUST_CD
+                     , ISNULL (A1.CUST_CD, '') AS REP_CUST_CD_NM
+                     , ISNULL (A1.CUST_NM, '') AS REP_CUST_NM
+                     , ISNULL (A1.CUST_NM, '') AS REP_CUST_NM_NM
+                     , ISNULL( A2.CODE_CD, '') AS PART_CD                
+                     , ISNULL( A2.CODE_CD, '') AS PART_CD_NM                 
+                     , ISNULL( A2.CODE_NM, '') AS PART_NM
+                     , ISNULL( A2.CODE_NM, '') AS PART_NM_NM
+                     , ISNULL( A1.SS_YN, '') AS SS_YN
+                     , ISNULL( A1.SS_YN, '') AS SS_YN_NM
+                     , ISNULL (A2.ROUTING_NO, '')      AS ROUTING_NO
+                     , ISNULL (A2.ROUTING_NO, '')      AS ROUTING_NO_NM
+                     , ISNULL (A2.MAJOR_FLAG, '')      AS MAJOR_FLAG
+                     , ISNULL (A2.MAJOR_FLAG, '')      AS MAJOR_FLAG_NM
+                     , ISNULL (A2.USE_FLAG, 'N')       AS USE_YN
+                     , ISNULL (A2.USE_FLAG, 'N')       AS USE_YN_NM
+                     , ISNULL (A2.PRIORITY,'') AS PRIORITY
+                     , ISNULL (A2.PRIORITY,'') AS PRIORITY_NM
+                     , ISNULL (A2.ROUTE_DESC, '')      AS ROUTE_DESC
+                     , ISNULL (A2.ROUTE_DESC, '')      AS ROUTE_DESC_NM
+                
+                    /* 210610 이큰산 : 라우팅별 재공수량 추가 */
+		            , ISNULL(CAST(A3.REMAIN_QTY AS NVARCHAR(20)), '') AS RESULT_QTY
+		            , ISNULL(CAST(A3.REMAIN_QTY AS NVARCHAR(20)), '') AS RESULT_QTY_NM
+		        ---------------------------------------
+                FROM W_ITEM A1
+                INNER JOIN W_PROD_CATE A2
+                   ON A1.COMPANY_CD = A2.COMPANY_CD
+                  AND A1.BU_CD = A2.BU_CD
+                  AND A1.ITEM_CD = A2.ITEM_CD
+                ---------------------------------------
+		        /* 210610 이큰산 : 라우팅별 재공수량 추가 */
+	            LEFT JOIN W_WIP_ROUTING A3
+	            ON A1.COMPANY_CD = A3.COMPANY_CD AND A1.BU_CD = A3.BU_CD AND A1.ITEM_CD = A3.ITEM_CD AND A2.ROUTING_NO = A3.ROUTING_NO
+		        ---------------------------------------
+		        
+                WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND A1.BU_CD      = @{GV_BU_CD}
+            ) A
+            GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+        ) B
+        INNER JOIN TB_MST_CODE C WITH(NOLOCK)
+           ON B.PART_CD = C.CODE_CD
+          AND C.BU_CD =  @{GV_BU_CD}
+          AND C.GROUP_CD = 'PROD_PART'
+        WHERE B.GRP_LVL_ID = 0
+        #if($_parameter.majorFlag and $_parameter.majorFlag != "")
+          AND B.MAJOR_FLAG  = '$_parameter.majorFlag'
+        #end
+        ORDER BY B.TMP_COL,C.SORT
+        #foreach( $dimMap in $_parameter.dimList )
+          , B.$dimMap.DIM_CD
+        #end 
+	</select>
+	
+	<select id="measureProductList2Select" parameterType="map" resultType="map">
+		/****** [ aps.static.measureProductListSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                ELSE CODE_NM
+	           END AS CODE_NM
+		     , ATTB_1_CD
+		     , ATTB_1_NM
+		     , ATTB_2_CD
+		     , ATTB_2_NM
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE GROUP_CD = 'PROD_ITEM_GROUP_MST'
+		  AND USE_FLAG = 'Y'
+		ORDER BY SORT 
+	</select>
+	
+	<select id="routingOrderAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.routingOrderAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS11301', 'APS11302', 'APS11303', 'APS11304')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD 
+	</select>
+	
+	<update id="routingOrderListUpdate" parameterType="map">
+		/****** [ aps.static.routingOrderListUpdate ] ******/
+		BEGIN
+		
+			MERGE TB_MST_ROUTING_PRIORITY WITH (HOLDLOCK) AS T 
+			USING 
+			(
+			     SELECT '$_parameter.GV_COMPANY_CD' AS COMPANY_CD
+		              , '$_parameter.GV_BU_CD' AS BU_CD
+		              , '$_parameter.ITEM_CD' AS ITEM_CD
+					  ,	'$_parameter.ROUTING_NO' AS ROUTING_NO
+					  ,	'$_parameter.PRIORITY' AS PRIORITY
+					  ,	'$_parameter.USE_FLAG' AS USE_FLAG
+					  , '$_parameter.GV_USER_ID' AS CREATE_ID
+					  ,	DBO.UFN_GETDATE() AS CREATE_DTTM
+					  ,	'$_parameter.GV_USER_ID' AS UPDATE_ID
+					  ,	DBO.UFN_GETDATE() AS UPDATE_DTTM
+			) AS S
+		    ON 
+		    (
+		    	T.COMPANY_CD = S.COMPANY_CD 
+		        AND T.BU_CD = S.BU_CD
+		        AND T.ITEM_CD = S.ITEM_CD
+		        AND T.ROUTING_NO = S.ROUTING_NO
+			)
+		    WHEN MATCHED THEN 
+		    UPDATE SET
+		    	UPDATE_ID = S.UPDATE_ID
+	          , UPDATE_DTTM = S.UPDATE_DTTM 
+			#if($_parameter.PRIORITY != "undefined")
+			  , PRIORITY = S.PRIORITY
+			#end
+			#if($_parameter.USE_FLAG != "USE_FLAG")
+			  , USE_FLAG = S.USE_FLAG
+			#end
+			WHEN NOT MATCHED THEN
+		    INSERT 
+		    (
+				COMPANY_CD
+	          , BU_CD
+	          , ITEM_CD
+	          , ROUTING_NO
+			#if($_parameter.PRIORITY != "undefined")
+	          , PRIORITY
+	        #end
+	        #if($_parameter.USE_FLAG != "undefined")
+	          , USE_FLAG
+	        #end
+	          , CREATE_ID
+	          , CREATE_DTTM
+	          , UPDATE_ID
+	          , UPDATE_DTTM
+			) VALUES (
+	          	S.COMPANY_CD
+	          , S.BU_CD
+	          , S.ITEM_CD
+	          , S.ROUTING_NO
+			#if($_parameter.PRIORITY != "undefined")
+	          , S.PRIORITY
+	        #end
+	        #if($_parameter.VALID_FLAG != "undefined")
+	          , S.USE_FLAG
+	        #end
+	          , S.CREATE_ID
+	          , S.CREATE_DTTM
+	          , S.UPDATE_ID
+	          , S.UPDATE_DTTM
+			);
+			
+			#if($_parameter.LAST_FALG == "Y")
+                exec dbo.USP_TB_MST_ROUTING_PRIORITY @{GV_COMPANY_CD}, @{GV_BU_CD};
+            #end
+				      
+		END
+	</update>
+</mapper>

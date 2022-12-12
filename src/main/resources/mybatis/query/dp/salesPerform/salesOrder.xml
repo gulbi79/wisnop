@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+
+    <select id="salesOrderSelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.salesOrderSelect ] ******/
+	    
+	    <include refid="snop.common.w_cust" />
+	    SELECT NULL AS TMP_COL
+	    <include refid="include.getCdDimTotal"/>
+	    <include refid="include.getGrpLvlId"/>
+		#foreach( $bucketMap in $_parameter.bucketList )
+	  	#set( $week = "$bucketMap.BUCKET_VAL" )
+	  		#if($_parameter.rdoAqType == "QTY")
+	    	 , SUM (CASE WHEN YEARWEEK = '$week' THEN SO_QTY END) AS $bucketMap.CD
+	  		#elseif ($_parameter.rdoAqType == "AMT")
+	         , SUM (CASE WHEN YEARWEEK = '$week' THEN SO_AMT END) AS $bucketMap.CD
+	  		#end
+		#end
+		FROM 
+		(
+	    	SELECT CT.COMPANY_CD
+                 , CT.BU_CD
+                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID
+                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD
+                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD_NM
+                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM
+                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM_NM
+                 , ISNULL (CT.SPEC, ' ')              AS SPEC
+                 , ISNULL (CT.SPEC, ' ')              AS SPEC_NM
+                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO
+                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO_NM
+                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+				#if ($_parameter.vhWeekType == "SW")
+                 , CAL.YEARWEEK
+				#else
+                 , CAL.YEARPWEEK YEARWEEK
+				#end
+                 , (ISNULL(SO.SO_QTY, 0) - ISNULL(SO.GI_QTY, 0)) * ISNULL(CT.SALES_PRICE_KRW, 0) AS SO_AMT
+                 , ISNULL(SO.SO_QTY, 0) - ISNULL(SO.GI_QTY, 0) AS SO_QTY 
+			FROM W_CUST CT
+	        INNER JOIN TB_DYN_SALES_ORDER SO WITH (NOLOCK)
+	           ON CT.COMPANY_CD = SO.COMPANY_CD
+	          AND CT.BU_CD      = SO.BU_CD
+	          AND CT.CUST_CD    = SO.CUST_CD
+	          AND CT.ITEM_CD    = SO.ITEM_CD
+	          AND SO.DEL_FLAG   = 'N' 
+			INNER JOIN TB_MST_CALENDAR CAL WITH (NOLOCK) 
+	           ON SO.REQ_DLV_DATE = CAL.YYYYMMDD
+			#if ($_parameter.vhWeekType == "SW")
+	          AND CAL.YEARWEEK  <![CDATA[>=]]> @{fromWeek}
+	          AND CAL.YEARWEEK  <![CDATA[<=]]> @{toWeek}
+			#else
+	          AND CAL.YEARPWEEK <![CDATA[>=]]> @{fromPWeek}
+			  AND CAL.YEARPWEEK <![CDATA[<=]]> @{toPWeek}
+			#end
+	        WHERE CT.COMPANY_CD   = @{GV_COMPANY_CD}
+	          AND CT.BU_CD        = @{GV_BU_CD}
+	          AND ISNULL(SO.CLOSE_YN, 'N') <![CDATA[<>]]> 'Y' 
+	  		#if($_parameter.item_cd and $_parameter.item_cd != "")
+			  AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+	  		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+	          AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+	  		#end
+	  		#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+	          AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+	  		#end
+	  		#if($_parameter.route and $_parameter.route != "")
+	          AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+	  		#end
+	  		#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+	          AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+	  		#end
+	  		#if($_parameter.custGroup and $_parameter.custGroup != "")
+	          AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+	  		#end
+		) A
+	    GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+	    ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+	           , A.$dimMap.DIM_CD
+		#end
+	</select>
+    
+    
+    
+    
+    
+    
+</mapper>

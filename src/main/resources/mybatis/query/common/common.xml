@@ -1,0 +1,1262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+	<select id="currWeekSelect" parameterType="map" resultType="String">
+		/****** [ common.currWeekSelect ] ******/
+		SELECT YEARWEEK
+		  FROM TB_MST_CALENDAR
+		 WHERE YYYYMMDD = CONVERT(VARCHAR(8), dbo.UFN_GETDATE(), 112)
+	</select>
+	
+	<!-- User COMPANY 조회  -->
+	<select id="userCompanySelect" parameterType="map" resultType="map">
+	    /****** [ common.userCompanySelect ] ******/
+	    SELECT DISTINCT C.CODE_CD
+	         , C.CODE_NM
+	         , C.SORT
+	    FROM TB_MAP_USER_ROLE A WITH(NOLOCK)
+	    INNER JOIN TB_MAP_ROLE_MENU_ACTION B WITH(NOLOCK)
+	      ON B.BU_CD                = A.BU_CD
+	     AND B.ROLE_CD              = A.ROLE_CD
+	     AND ISNULL(B.USE_FLAG,'Y') = 'Y'
+	    INNER JOIN TB_MST_CODE C WITH(NOLOCK)
+	      ON C.GROUP_CD = 'COMPANY_CD'
+	    WHERE A.USER_ID = @{GV_USER_ID}
+	    ORDER BY C.SORT
+	</select>
+
+	<!-- User BU 조회  -->
+	<select id="userBuSelect" parameterType="map" resultType="map">
+		/****** [ common.userBuSelect ] ******/
+		SELECT DISTINCT C.CODE_CD
+		, C.CODE_NM
+		, C.SORT
+		FROM TB_MAP_USER_ROLE A WITH(NOLOCK)
+		INNER JOIN TB_MAP_ROLE_MENU_ACTION B WITH(NOLOCK)
+		ON B.BU_CD = A.BU_CD
+		AND B.ROLE_CD = A.ROLE_CD
+		AND ISNULL(B.USE_FLAG,'Y') = 'Y'
+		INNER JOIN TB_MST_CODE C WITH(NOLOCK)
+		ON C.GROUP_CD = 'BU_CD'
+		AND C.CODE_CD = A.BU_CD
+		WHERE A.USER_ID = @{GV_USER_ID}
+		ORDER BY C.SORT
+	</select>
+
+	<!-- Role Master 조회  -->
+	<select id="comUserRoleSelect" parameterType="map" resultType="map">
+	    /****** [ common.comUserRoleSelect ] ******/
+	    SELECT A.BU_CD
+	         , A.ROLE_CD
+	         , A.ROLE_NM
+	         , B.USER_ID
+	    FROM TB_MST_ROLE A WITH(NOLOCK)
+	    INNER JOIN TB_MAP_USER_ROLE B WITH(NOLOCK)
+	    	ON B.BU_CD    = A.BU_CD
+	       AND B.ROLE_CD  = A.ROLE_CD
+	       AND B.USE_FLAG = 'Y'
+	       AND B.USER_ID  = @{GV_USER_ID}
+	    WHERE A.USE_FLAG = 'Y'
+	      AND A.BU_CD    = @{GV_BU_CD}
+	    GROUP BY A.BU_CD, A.ROLE_CD, A.ROLE_NM, B.USER_ID
+	</select>
+
+	<!-- UI Master 조회  -->
+	<select id="uiMasterSelect" parameterType="map" resultType="wi.com.wisnop.dto.common.MenuVO">
+	    /****** [ common.uiMasterSelect ] ******/
+	    WITH W_ACTION AS 
+	    (
+			#set($_parameter.chkUserYn = "Y")
+	        <include refid="include.includeMenuAction"/>
+	    )
+	    SELECT A.MENU_CD
+	         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A.MENU_NM_KR != '' THEN ISNULL(A.MENU_NM_KR,A.MENU_NM)
+	                WHEN UPPER(@{GV_LANG}) = 'CN' AND A.MENU_NM_CN != '' THEN ISNULL(A.MENU_NM_CN,A.MENU_NM)
+	                ELSE A.MENU_NM
+	           END AS MENU_NM
+	         , A.URL
+	         , A.USE_DIM_FLAG                 AS DIMENSION_YN
+	         , A.USE_MEAS_FLAG                AS MEASURE_YN
+	         , A.USE_DECIMAL_FLAG	          AS DECIMAL_YN
+	         , A.USE_ITEM_HIER_FLAG           AS PRODUCTHRCY_YN
+	         , A.USE_CUSTOMER_HIER_FLAG       AS CUSTOMERHRCY_YN
+	         , A.USE_SALES_ORG_HIER_FLAG      AS SALES_ORG_HRCY_YN
+	         , A.USE_DIM_FIX_FLAG             AS DIM_FIX_YN
+	         , A.MENU_TYPE
+	         , A.MENU_PARAM
+	         , B.SEARCH_ACTION                AS SEARCH_YN
+	         , B.SAVE_ACTION                  AS SAVE_YN
+	         , B.SQL_ACTION                   AS SQL_YN
+	         , B.EXCEL_ACTION                 AS EXCEL_YN
+	         , A.MENU_CD                      AS LEVEL3_CD
+	         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A.MENU_NM_KR != '' THEN ISNULL(A.MENU_NM_KR,A.MENU_NM)
+	                WHEN UPPER(@{GV_LANG}) = 'CN' AND A.MENU_NM_KR != '' THEN ISNULL(A.MENU_NM_CN,A.MENU_NM)
+	                ELSE A.MENU_NM
+	           END                            AS LEVEL3_NM
+	         , C.MENU_CD                      AS LEVEL2_CD
+	         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A.MENU_NM_KR != '' THEN ISNULL(C.MENU_NM_KR,C.MENU_NM)
+	                WHEN UPPER(@{GV_LANG}) = 'CN' AND A.MENU_NM_CN != '' THEN ISNULL(C.MENU_NM_CN,C.MENU_NM)
+	                ELSE C.MENU_NM
+	           END                            AS LEVEL2_NM
+	         , D.MENU_CD                      AS LEVEL1_CD
+	         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A.MENU_NM_KR != '' THEN ISNULL(D.MENU_NM_KR,D.MENU_NM)
+	                WHEN UPPER(@{GV_LANG}) = 'CN' AND A.MENU_NM_CN != '' THEN ISNULL(D.MENU_NM_CN,D.MENU_NM)
+	                ELSE D.MENU_NM
+	           END                            AS LEVEL1_NM
+	         , (SELECT COUNT(MENU_CD) AS SUB_MENU_CNT
+	            FROM TB_MST_MENU WITH(NOLOCK)
+	            WHERE USE_FLAG      = 'Y'
+	              AND COMPANY_CD    = @{GV_COMPANY_CD}
+	              AND BU_CD         = @{GV_BU_CD}
+	              AND UPPER_MENU_CD = @{menuCd}) AS SUB_MENU_CNT
+	         , ISNULL(CASE WHEN A.USE_DECIMAL_FLAG = 'Y' THEN E.ATTB_1_VAL END, '#,#'+'#0') AS COM_BUCKET_MASK
+	    FROM TB_MST_MENU A WITH(NOLOCK)
+	    LEFT JOIN W_ACTION B WITH(NOLOCK)
+	      ON B.MENU_CD_ACTION = A.MENU_CD
+	    LEFT JOIN TB_MST_MENU C WITH(NOLOCK)
+	      ON C.COMPANY_CD = A.COMPANY_CD
+	     AND C.BU_CD      = A.BU_CD
+	     AND C.MENU_CD    = A.UPPER_MENU_CD
+	     AND C.MENU_LVL   = 2
+	    LEFT JOIN TB_MST_MENU D WITH(NOLOCK)
+	      ON D.COMPANY_CD = C.COMPANY_CD
+	     AND D.BU_CD      = C.BU_CD
+	     AND D.MENU_CD    = C.UPPER_MENU_CD
+	     AND D.MENU_LVL   = 1
+	    LEFT JOIN TB_MST_USER_ATTB E WITH(NOLOCK)
+	      ON E.COMPANY_CD = A.COMPANY_CD
+	     AND E.BU_CD      = A.BU_CD
+	     AND E.MENU_CD    = A.MENU_CD
+	     AND E.USER_ID    = @{GV_USER_ID}
+	    WHERE A.USE_FLAG   = 'Y'
+	      AND A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.MENU_CD    = @{menuCd}
+	</select>
+
+	<!-- UI Sub Master 조회  -->
+	<select id="uiSubMasterSelect" parameterType="map" resultType="map">
+	    /****** [ common.uiSubMasterSelect ] ******/
+	    WITH W_USER_ROLE AS 
+	    (
+			SELECT A.USER_ID
+		        , A.BU_CD
+		        , A.ROLE_CD
+		        , B.ROLE_NM
+		    FROM TB_MAP_USER_ROLE A WITH(NOLOCK)
+		    INNER JOIN TB_MST_ROLE B WITH(NOLOCK)
+		       ON B.BU_CD    = A.BU_CD
+		      AND B.ROLE_CD  = A.ROLE_CD
+		      AND B.USE_FLAG = 'Y'
+		    WHERE A.USER_ID  = @{GV_USER_ID}
+		      AND A.USE_FLAG = 'Y'
+		), 
+		W_ROLE_MENU_ACTION AS 
+		(
+			SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , B.ROLE_CD
+		         , A.MENU_CD
+		         , A.MENU_LVL
+		         , MAX(CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A.MENU_NM_KR != '' THEN ISNULL(A.MENU_NM_KR,A.MENU_NM)
+	                        WHEN UPPER(@{GV_LANG}) = 'CN' AND A.MENU_NM_CN != '' THEN ISNULL(A.MENU_NM_CN,A.MENU_NM)
+	                        ELSE A.MENU_NM
+	                   END) AS MENU_NM
+		         , A.SORT
+		         , A.MENU_TYPE
+	             , A.MENU_PARAM
+		         , MAX(CASE WHEN C.CODE_CD = 'SEARCH' THEN 'Y' END) AS SEARCH_ACTION
+		         , MAX(CASE WHEN C.CODE_CD = 'SAVE'   THEN 'Y' END) AS SAVE_ACTION
+		         , MAX(CASE WHEN C.CODE_CD = 'EXCEL'  THEN 'Y' END) AS EXCEL_ACTION
+		         , MAX(CASE WHEN C.CODE_CD = 'SQL'    THEN 'Y' END) AS SQL_ACTION
+			FROM TB_MST_MENU A WITH(NOLOCK)
+		    INNER JOIN TB_MAP_ROLE_MENU_ACTION B WITH(NOLOCK)
+		      ON B.COMPANY_CD = A.COMPANY_CD
+		     AND B.BU_CD      = A.BU_CD
+		     AND B.MENU_CD    = A.MENU_CD
+		     AND B.USE_FLAG   = 'Y'
+		    INNER JOIN 
+		    (
+		      #set($_parameter.groupCd = "ACTION_CD")
+	          <include refid="include.mstCode"/>
+		    ) C
+			ON C.CODE_CD = B.ACTION_CD
+		    WHERE A.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND A.BU_CD         = @{GV_BU_CD}
+			#if($_parameter.UPPER_MENU_FLAG == "N")
+		      AND A.MENU_CD       = @{menuCd}
+			#else
+		      AND A.UPPER_MENU_CD = @{menuCd}
+			#end
+		      AND A.USE_FLAG      = 'Y'
+		    GROUP BY A.COMPANY_CD, A.BU_CD, B.ROLE_CD, A.MENU_CD, A.MENU_LVL, A.SORT, A.MENU_TYPE, A.MENU_PARAM
+		)
+		SELECT A.USER_ID
+		     , B.COMPANY_CD
+		     , A.BU_CD
+		     , B.MENU_CD
+		     , B.MENU_NM
+		     , B.SORT
+		     , B.MENU_TYPE
+		     , B.MENU_PARAM
+		     , MAX(B.SEARCH_ACTION) AS SEARCH_ACTION
+		     , MAX(B.SAVE_ACTION  ) AS SAVE_ACTION
+		     , MAX(B.EXCEL_ACTION ) AS EXCEL_ACTION
+		     , MAX(B.SQL_ACTION   ) AS SQL_ACTION
+		FROM W_USER_ROLE A WITH(NOLOCK)
+		INNER JOIN W_ROLE_MENU_ACTION B WITH(NOLOCK)
+		   ON B.BU_CD   = A.BU_CD
+		  AND B.ROLE_CD = A.ROLE_CD
+		GROUP BY A.USER_ID, B.COMPANY_CD, A.BU_CD, B.MENU_CD, B.MENU_NM, B.SORT, B.MENU_TYPE, B.MENU_PARAM
+		ORDER BY B.SORT, B.MENU_CD, B.MENU_NM
+	</select>
+
+	<!-- 사용되는 공통코드 조회  -->
+	<select id="comCodeSelect" parameterType="map" resultType="map">
+		/****** [ common.comCodeSelect ] ******/
+		SELECT *
+		FROM 
+		(
+		    SELECT BU_CD
+		         , GROUP_CD
+		         , GROUP_DESC
+		         , CODE_CD
+		         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND CODE_NM_KR != '' THEN ISNULL(CODE_NM_KR,CODE_NM)
+		                WHEN UPPER(@{GV_LANG}) = 'CN' AND CODE_NM_CN != '' THEN ISNULL(CODE_NM_CN,CODE_NM)
+		                ELSE CODE_NM
+		           END AS CODE_NM
+		         , USE_FLAG
+		         , SORT
+		         , GROUP_CD + CODE_CD AS ROW_KEY
+		         , DENSE_RANK() OVER(PARTITION BY BU_CD ORDER BY BU_CD DESC) AS RNUM
+		         , ATTB_1_CD
+		         , ATTB_2_CD
+		         , ATTB_3_CD
+		         , ATTB_4_CD
+		         , ATTB_5_CD
+			FROM TB_MST_CODE WITH (NOLOCK)
+		    WHERE USE_FLAG != 'N'
+			#if($_parameter.buAllYn != "Y")
+	  			#if($_parameter.buCd and $_parameter.buCd != "")
+		      	  AND BU_CD     = @{buCd}
+	  			#else
+		      	  AND BU_CD IN ('ALL',@{GV_BU_CD})
+	  			#end
+			#end
+			#if($_parameter.codeNm and $_parameter.codeNm != "")
+		      AND (CODE_CD  LIKE '%' + REPLACE(@{codeNm},'_','[_]') + '%'
+		        OR CODE_NM  LIKE '%' + REPLACE(@{codeNm},'_','[_]') + '%')
+			#end
+			#if($_parameter.codeCd and $_parameter.codeCd != "")
+		      AND CODE_CD = @{codeCd}
+			#end
+			#if($_parameter.grpCd and $_parameter.grpCd != "")
+		      AND GROUP_CD IN ('$_parameter.grpCd.replace(",","','")')
+			#end
+			#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		      AND GROUP_CD+CODE_CD NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+			#end
+		) A
+		WHERE RNUM = 1
+		ORDER BY RNUM
+		#if($_parameter.INIT_DATA and $_parameter.INIT_DATA != "")
+		 , CASE WHEN GROUP_CD+CODE_CD IN ('$_parameter.INIT_DATA.replace(",","','")') THEN 0 ELSE 1 END
+		#end
+		 , BU_CD, GROUP_CD, SORT
+	</select>
+
+	<sql id="wFromToDate">
+         , (SELECT MIN(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK  = A.YEARWEEK ) AS SW_START_DATE
+         , (SELECT MAX(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK  = A.YEARWEEK ) AS SW_END_DATE
+         , (SELECT MIN(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARPWEEK = A.YEARPWEEK) AS PW_START_DATE
+         , (SELECT MAX(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARPWEEK = A.YEARPWEEK) AS PW_END_DATE
+	</sql>
+
+	<!-- 달력 조회  -->
+	<select id="calendarInfoSelect" parameterType="map" resultType="map">
+	    /****** [ common.calendarInfoSelect ] ******/
+	    SELECT A.*
+			<include refid="common.wFromToDate"/>
+	    FROM TB_MST_CALENDAR A WITH(NOLOCK)
+	    WHERE YYYYMMDD = @{YYYYMMDD}
+	</select>
+
+	<!-- 현재 일자 조회  -->
+	<select id="currentDateSelect" parameterType="map" resultType="map">
+	    /****** [ common.currentDateSelect ] ******/
+	    SELECT A.*
+			<include refid="common.wFromToDate"/>
+	    FROM TB_MST_CALENDAR A WITH(NOLOCK)
+	    WHERE YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112)
+	</select>
+
+	<!-- 일자 추가  -->
+	<select id="addDateSelect" parameterType="map" resultType="map">
+	    /****** [ common.addDateSelect ] ******/
+		#if($_parameter.ADD_TYPE == "M")
+		SELECT A.*
+			<include refid="common.wFromToDate"/>
+		FROM TB_MST_CALENDAR A WITH(NOLOCK)
+		WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(MONTH,CONVERT(INTEGER, @{ADD_DAY}), CONVERT(DATETIME, @{YYYYMMDD})),112)
+		#else
+		SELECT A.*
+			<include refid="common.wFromToDate"/>
+		FROM TB_MST_CALENDAR A WITH(NOLOCK)
+		WHERE YYYYMMDD = CONVERT(VARCHAR, CONVERT(DATETIME, @{YYYYMMDD}) + CONVERT(INTEGER, @{ADD_DAY}), 112)
+		#end
+	</select>
+
+	<select id="tableInfoListSelect" parameterType="map" resultType="map">
+	/****** [ common.tableColumnSelect ] ******/
+		SELECT A.COLUMN_NAME
+		     , A.ORDINAL_POSITION
+		     , MAX(CASE WHEN B.COLUMN_NAME IS NOT NULL THEN 'Y'
+		                ELSE 'N'
+		           END) AS KEY_YN
+		FROM INFORMATION_SCHEMA.COLUMNS A WITH(NOLOCK)
+		LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE B WITH(NOLOCK)
+		  ON B.TABLE_NAME = A.TABLE_NAME
+		 AND B.COLUMN_NAME = A.COLUMN_NAME
+		WHERE A.TABLE_NAME = @{dupChkTbNm}
+		GROUP BY A.COLUMN_NAME, A.ORDINAL_POSITION
+		ORDER BY A.ORDINAL_POSITION
+	</select>
+
+	<select id="pkCheckSelect" parameterType="map" resultType="int">
+		/****** [ common.pkCheckSelect ] ******/
+		SELECT COUNT(*)
+		FROM $_parameter.dupChkTbNm WITH(NOLOCK)
+		WHERE 1 = 1
+		#foreach( $arrMap in $_parameter.tableInfoList )
+		#if($arrMap.KEY_YN == "Y")
+			#if($_parameter.get("$arrMap.COLUMN_NAME"))
+	      	  AND $arrMap.COLUMN_NAME = '$_parameter.get("$arrMap.COLUMN_NAME")'
+			#else
+				#if($arrMap.COLUMN_NAME == "COMPANY_CD")
+	      		  AND $arrMap.COLUMN_NAME = @{GV_COMPANY_CD}
+				#elseif($arrMap.COLUMN_NAME == "BU_CD")
+	      		  AND $arrMap.COLUMN_NAME = @{GV_BU_CD}
+				#end
+			#end
+		#end
+		#if($arrMap.COLUMN_NAME == "DEL_FLAG")
+	      AND DEL_FLAG = 'N'
+		#end
+		#end
+	</select>
+
+	<!-- Menu Info 조회  -->
+	<select id="menuInfoSelect" parameterType="map" resultType="map">
+	    /****** [ common.menuInfoSelect ] ******/
+		SELECT *
+		FROM TB_MST_MENU WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		AND BU_CD = @{GV_BU_CD}
+		AND MENU_CD = @{MENU_CD}
+	</select>
+
+	<!-- FACTORY Plant 조회  -->
+	<select id="factoryPlantSelect" parameterType="map" resultType="map">
+	    /****** [ common.factoryPlantSelect ] ******/
+	    SELECT PLANT_CD CODE_CD
+	         , PLANT_CD CODE_NM
+	    FROM TB_MST_PLANT WITH(NOLOCK)
+	    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	      AND BU_CD = @{GV_BU_CD}
+	      AND USE_FLAG = 'Y'
+	      AND DEL_FLAG = 'N'
+	      AND PLANT_TYPE = 'FACTORY'
+	    ORDER  BY PLANT_CD
+	</select>
+
+	<!-- Role code 로 user 리스트 조회 -->
+	<select id="roleUserListSelect"  parameterType="map" resultType="map">
+		/****** [ common.roleUserListSelect ] ******/
+		#if($_parameter.TOP_ALL_YN and $_parameter.TOP_ALL_YN == "Y")
+		SELECT '' AS USER_ID, '' AS USER_NM, '' AS CODE_CD, 'All' AS CODE_NM, P_CODE_CD
+	    UNION ALL
+		#end
+		SELECT A.USER_ID
+		     , A.USER_NM
+		     , A.USER_ID  AS CODE_CD
+		     , '(' + USER_ID  + ') ' + A.USER_NM AS CODE_NM
+		     , B.AP2_EMP_ID AS P_CODE_CD
+		FROM TB_MST_USER A WITH(NOLOCK)
+		LEFT JOIN TB_MAP_SALES_EMP_AP1_AP2 B WITH(NOLOCK)
+	      ON A.USER_ID    = B.AP1_EMP_ID
+	     AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		WHERE 1 = 1
+		  AND EXISTS (
+						SELECT 1
+		                FROM TB_MAP_USER_ROLE SQ1 WITH(NOLOCK)
+		               	WHERE 1 = 1
+		                  AND SQ1.BU_CD    = @{GV_BU_CD}
+		                  AND SQ1.USE_FLAG = 'Y'
+		                  AND A.USER_ID    = SQ1.USER_ID
+		                  AND SQ1.ROLE_CD IN (
+		                                       SELECT CODE_CD
+		                                       FROM (#set($_parameter.groupCd = "SALES_AUTH")
+		                                       <include refid="include.mstCode"/>)
+		                                       WHERE ATTB_1_CD = @{ROLE_CD}
+		                                     )
+		              )
+		#if($_parameter.ALL_YN and $_parameter.ALL_YN == "Y")
+	      AND 1 = 1
+		#else
+	       AND (
+	           	USER_ID LIKE CASE WHEN (
+	                                  	SELECT COUNT(*)
+	                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+	                                   	WHERE 1 = 1
+	                                      AND BU_CD   = @{GV_BU_CD}
+	                                      AND USER_ID = @{GV_USER_ID}
+	                                      AND ROLE_CD IN (
+		                                                	SELECT CODE_CD
+		                                                  	FROM (#set($_parameter.groupCd = "SALES_AUTH")
+		                                                    <include refid="include.mstCode"/>)
+		                                                 	WHERE ATTB_1_CD = 'SNOP'
+		                                                 )
+	                                  ) > 0
+	                              THEN '%'
+	                              WHEN (
+	                                  	SELECT COUNT(*)
+	                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+	                                   	WHERE 1 = 1
+	                                      AND BU_CD   = @{GV_BU_CD}
+	                                      AND USER_ID = @{GV_USER_ID}
+	                                      AND ROLE_CD IN (
+		                                                	SELECT CODE_CD
+		                                                  	FROM (#set($_parameter.groupCd = "SALES_AUTH")
+		                                                    <include refid="include.mstCode"/>)
+		                                                 	WHERE 1 = 1
+		                                                   	  AND BU_CD     = @{GV_BU_CD}
+		                                                      AND GROUP_CD  = 'SALES_AUTH'
+		                                                      AND ATTB_1_CD = @{ROLE_CD}
+		                                                )
+	                                  ) > 0
+	                             THEN @{GV_USER_ID}
+	                             ELSE ''
+	                        END
+	           OR USER_ID IN (
+	                         SELECT AP1_EMP_ID
+	                           FROM TB_MAP_SALES_EMP_AP1_AP2 WITH(NOLOCK)
+	                          WHERE 1=1
+	                            AND COMPANY_CD = @{GV_COMPANY_CD}
+	                            AND AP2_EMP_ID = @{GV_USER_ID}
+	                            AND (
+	                                SELECT COUNT(*)
+	                                  FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+	                                 WHERE 1=1
+	                                   AND BU_CD   =  @{GV_BU_CD}
+	                                   AND USER_ID = @{GV_USER_ID}
+	                                   AND ROLE_CD IN (
+		                                              	SELECT CODE_CD
+		                                                FROM (#set($_parameter.groupCd = "SALES_AUTH")
+														<include refid="include.mstCode"/>)
+		                                               	WHERE 'AP1'     = @{ROLE_CD}
+		                                                 AND ATTB_1_CD = 'AP2'
+		                                              )
+	                                ) > 0
+	                         )
+	           )
+		#end
+	</select>
+
+	<insert id="userLogInsert" parameterType="map">
+	    /****** [ common.userLogInsert ] ******/
+	    INSERT INTO TB_COMM_ACCESS_LOG 
+	    (
+	    	USER_ID
+	      , COMPANY_CD
+	      , BU_CD
+	      , MENU_CD
+	      , URL
+	      , ACCESS_DTTM
+	      , ACCESS_TYPE_CD
+	      , ACCESS_ETC
+	      , CREATE_ID
+	      , CREATE_DTTM
+	      , UPDATE_ID
+	      , UPDATE_DTTM
+	    ) VALUES (
+	        @{GV_USER_ID}
+	      , @{GV_COMPANY_CD}
+	      , @{GV_BU_CD}
+	      , @{menuCd}
+	      , @{URL}
+	      , DBO.UFN_GETDATE()
+	      , @{ACCESS_TYPE_CD}
+	      , @{CLIENT_HOST} + ' || ' + @{CLIENT_ADDR}
+	      , @{GV_USER_ID}
+	      , DBO.UFN_GETDATE()
+	      , @{GV_USER_ID}
+	      , DBO.UFN_GETDATE()
+	    )
+	</insert>
+
+	<update id="userAttbUpdate" parameterType="map">
+		/****** [ common.userAttbUpdate ] ******/
+	    MERGE TB_MST_USER_ATTB AS A
+		USING (
+			SELECT @{GV_COMPANY_CD} AS COMPANY_CD
+		     	 , @{GV_BU_CD}      AS BU_CD
+		     	 , @{menuCd}        AS MENU_CD
+		     	 , @{GV_USER_ID}    AS USER_ID
+		     	 , @{comBucketMask} AS ATTB_1_VAL
+		     	 , @{ATTB_2_VAL}    AS ATTB_2_VAL
+		     	 , @{ATTB_3_VAL}    AS ATTB_3_VAL
+		     	 , @{ATTB_4_VAL}    AS ATTB_4_VAL
+		     	 , @{ATTB_5_VAL}    AS ATTB_5_VAL
+		) B
+		ON (
+			    A.COMPANY_CD = B.COMPANY_CD
+		   	AND A.BU_CD      = B.BU_CD
+			AND A.MENU_CD    = B.MENU_CD
+			AND A.USER_ID    = B.USER_ID
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+			    A.ATTB_1_VAL   = B.ATTB_1_VAL
+			  , A.ATTB_2_VAL   = B.ATTB_2_VAL
+			  , A.ATTB_3_VAL   = B.ATTB_3_VAL
+			  , A.ATTB_4_VAL   = B.ATTB_4_VAL
+			  , A.ATTB_5_VAL   = B.ATTB_5_VAL
+			  , A.UPDATE_DTTM  = DBO.UFN_GETDATE()
+			  , A.UPDATE_ID    = @{GV_USER_ID}
+		WHEN NOT MATCHED THEN
+			INSERT (
+			    COMPANY_CD
+			  , BU_CD
+			  , MENU_CD
+			  , USER_ID
+			  , ATTB_1_VAL
+			  , ATTB_2_VAL
+			  , ATTB_3_VAL
+			  , ATTB_4_VAL
+			  , ATTB_5_VAL
+			  , UPDATE_DTTM
+		      , UPDATE_ID
+			  , CREATE_DTTM
+			  , CREATE_ID
+			) VALUES (
+			    B.COMPANY_CD
+			  , B.BU_CD
+			  , B.MENU_CD
+			  , B.USER_ID
+			  , B.ATTB_1_VAL
+			  , B.ATTB_2_VAL
+			  , B.ATTB_3_VAL
+			  , B.ATTB_4_VAL
+			  , B.ATTB_5_VAL
+			  , DBO.UFN_GETDATE()
+			  , B.USER_ID
+			  , DBO.UFN_GETDATE()
+			  , B.USER_ID
+			);
+	</update>
+
+	<select id="userInfoSelect" parameterType="map" resultType="map">
+	    /****** [ common.userInfoSelect ] ******/
+		SELECT *
+		FROM TB_MST_USER WITH(NOLOCK)
+		WHERE USER_ID = @{USER_ID}
+	</select>
+	
+	<select id="userInfoListSelect" parameterType="map" resultType="map">
+		/****** [  common.userInfoListSelect ] ******/
+		SELECT USER_ID
+		     , USER_NM
+		     , USER_EN_NM
+		     , EMAIL
+		     , REPLACE(REPLACE(REPLACE(PHONE_1_NO,'+82-','0'),'ㅡ',''),'-','') AS PHONE_1_NO
+		     , 'FROM' AS MAIL_TYPE
+		FROM TB_MST_USER A WITH(NOLOCK)
+		WHERE USE_FLAG  = 'Y'
+		  AND ISNULL(DEL_FLAG,'N') != 'Y'
+		  AND USER_ID IN ('$_parameter.fromUser.replace(",","','")')
+		#if($_parameter.toUser and $_parameter.toUser != "")
+		UNION ALL
+		SELECT USER_ID
+		     , USER_NM
+		     , USER_EN_NM
+		     , EMAIL
+		     , REPLACE(REPLACE(REPLACE(PHONE_1_NO,'+82-','0'),'ㅡ',''),'-','') AS PHONE_1_NO
+		     , 'TO' AS MAIL_TYPE
+		FROM TB_MST_USER A WITH(NOLOCK)
+		WHERE USE_FLAG  = 'Y'
+		  AND ISNULL(DEL_FLAG,'N') != 'Y'
+		  AND USER_ID IN ('$_parameter.toUser.replace(",","','")')
+		#end
+	</select>
+	
+	<select id="repItemGroupSelect" parameterType="map" resultType="map">
+    	/****** [ common.repItemGroupSelect ] ******/
+		SELECT REP_ITEM_GROUP_CD AS CODE_CD
+		     , REP_ITEM_GROUP_NM AS CODE_NM
+		FROM TB_MST_REP_ITEM_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		#if($_parameter.REP_ITEM_GROUP_CD and $_parameter.REP_ITEM_GROUP_CD != "")
+		  AND REP_ITEM_GROUP_CD = @{REP_ITEM_GROUP_CD}
+		#end
+	</select>
+	
+	
+	<select id="routingSelect" parameterType="map" resultType="map">
+	    /****** [ common.routingSelect ] ******/
+		SELECT A.CODE_CD
+		     , A.CODE_NM
+		     , STRING_AGG(A.ITEM_TYPE,',') WITHIN GROUP ( ORDER BY A.ITEM_TYPE) AS ITEM_TYPE
+		     , STRING_AGG(A.ITEM_TYPE,',') WITHIN GROUP ( ORDER BY A.ITEM_TYPE) AS UPPER_CD
+		FROM 
+		(
+		    SELECT IP.ROUTING_ID CODE_CD
+		         , IP.ROUTING_ID CODE_NM
+		         , IT.ITEM_TYPE
+		    FROM TB_MST_ITEM IT WITH(NOLOCK)
+		    INNER JOIN TB_MST_ITEM_PLANT IP WITH(NOLOCK)
+		       ON IT.COMPANY_CD = IP.COMPANY_CD
+		      AND IT.BU_CD      = IP.BU_CD
+		      AND IT.ITEM_CD    = IP.ITEM_CD
+		      AND IP.ROUTING_ID IS NOT NULL
+		      AND IP.ROUTING_ID != ''
+		    WHERE IT.COMPANY_CD = ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD})
+	          AND IT.BU_CD      = ISNULL(@{BU_CD},@{GV_BU_CD})     
+	          AND IP.PLANT_CD   = 'WF01'     
+		      AND IT.USE_FLAG   = 'Y'
+	  		#if($_parameter.itemType and $_parameter.itemType != "")
+		      AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+	  		#end
+		    GROUP BY IT.ITEM_TYPE, IP.ROUTING_ID
+	    ) A
+		GROUP BY A.CODE_CD, A.CODE_NM
+		ORDER BY A.CODE_CD
+	</select>
+	
+	<select id="SubRoutingSelect" parameterType="map" resultType="map">
+
+		SELECT A.CODE_CD, A.CODE_NM
+       , '10,20' AS ITEM_TYPE
+       , '10,20' AS UPPER_CD
+		FROM TB_MST_CODE      A(NOLOCK)
+		WHERE A.GROUP_CD = 'SUB_PROD_L2'
+		ORDER BY A.CODE_CD
+		        
+    </select>
+    
+    
+	
+	
+	
+	
+	<select id="itemGroupSelect" parameterType="map" resultType="map">
+	    /****** [ common.itemGroupSelect ] ******/
+		SELECT 'ITEM_GROUP' AS GROUP_CD
+		     , IT.ITEM_GROUP_CD AS CODE_CD
+		     , IG.ITEM_GROUP_NM AS CODE_NM
+		     , MAX(IG.UPPER_ITEM_GROUP_CD) AS UPPER_CD
+		FROM TB_MST_ITEM IT WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+		   ON IT.COMPANY_CD    = IG.COMPANY_CD
+		  AND IT.BU_CD         = IG.BU_CD
+		  AND IT.ITEM_GROUP_CD = IG.ITEM_GROUP_CD
+		  AND IG.DEL_FLAG      = 'N'
+		  AND IG.UPPER_ITEM_GROUP_CD IS NOT NULL
+		#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+	      AND IG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+		#end
+		WHERE IT.COMPANY_CD = ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD})
+		  AND IT.BU_CD      = ISNULL(@{BU_CD},@{GV_BU_CD})
+		  AND IT.USE_FLAG   = 'Y'
+		#if($_parameter.itemType and $_parameter.itemType != "")
+	      AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+		#end
+		GROUP BY IT.ITEM_GROUP_CD, IG.ITEM_GROUP_NM
+		ORDER BY IT.ITEM_GROUP_CD
+	</select>
+
+	<select id="upperItemGroupSelect" parameterType="map" resultType="map">
+	    /****** [ common.upperItemGroupSelect ] ******/
+		SELECT A.GROUP_CD
+		     , A.CODE_CD
+		     , A.CODE_NM
+		     , STRING_AGG(A.ITEM_TYPE,',') WITHIN GROUP ( ORDER BY A.ITEM_TYPE) AS ITEM_TYPE
+		     , STRING_AGG(A.ITEM_TYPE,',') WITHIN GROUP ( ORDER BY A.ITEM_TYPE) AS UPPER_CD
+		FROM 
+		(
+		    SELECT 'ITEM_PARENT_GROUP'     AS GROUP_CD
+		          , IG.UPPER_ITEM_GROUP_CD AS CODE_CD
+		          , IG.UPPER_ITEM_GROUP_NM AS CODE_NM
+		          , IT.ITEM_TYPE           AS ITEM_TYPE
+		    FROM TB_MST_ITEM IT WITH(NOLOCK)
+		    INNER JOIN TB_MST_ITEM_GROUP IG WITH(NOLOCK)
+		       ON IT.COMPANY_CD    = IG.COMPANY_CD
+		      AND IT.BU_CD         = IG.BU_CD
+		      AND IT.ITEM_GROUP_CD = IG.ITEM_GROUP_CD
+		      AND IG.DEL_FLAG      = 'N'
+		      AND IG.UPPER_ITEM_GROUP_CD IS NOT NULL
+		    WHERE IT.COMPANY_CD = ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD})
+		      AND IT.BU_CD      = ISNULL(@{BU_CD},@{GV_BU_CD})
+		      AND IT.USE_FLAG   = 'Y'
+			#if($_parameter.itemType and $_parameter.itemType != "")
+	          AND IT.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+			#end
+		    GROUP BY IT.ITEM_TYPE, IG.UPPER_ITEM_GROUP_CD, IG.UPPER_ITEM_GROUP_NM
+		) A
+		GROUP BY A.GROUP_CD, A.CODE_CD, A.CODE_NM
+		ORDER BY A.CODE_CD
+	</select>
+	
+	<select id="salesOrgLvl4CdSelect" parameterType="map" resultType="map">
+	 	/****** [ common.salesOrgLvl4CdSelect] ******/
+		SELECT A2.SALES_ORG_LVL4_CD AS CODE_CD
+		     , A2.SALES_ORG_LVL4_NM AS CODE_NM
+		FROM TB_MAP_ITEM_CUST_GROUP A1 WITH(NOLOCK)
+		INNER JOIN UV_MAP_SALES_ORG A2 WITH(NOLOCK)
+		   ON A1.COMPANY_CD = A2.COMPANY_CD
+		  AND A1.BU_CD = A2.BU_CD
+		  AND A1.SALES_ORG_LVL4_CD = A2.SALES_ORG_LVL4_CD
+		ORDER BY A1.SALES_ORG_LVL4_CD
+	</select>
+	
+	<select id="salesOrgLvl5CdSelect" parameterType="map" resultType="map">
+	 	/****** [ common.salesOrgLvl5CdSelect] ******/
+		SELECT A2.SALES_ORG_LVL5_CD AS CODE_CD
+		     , A2.SALES_ORG_LVL5_NM AS CODE_NM
+		FROM TB_MAP_ITEM_CUST_GROUP A1 WITH(NOLOCK)
+		INNER JOIN UV_MAP_SALES_ORG A2 WITH(NOLOCK)
+		   ON A1.COMPANY_CD = A2.COMPANY_CD
+		  AND A1.BU_CD = A2.BU_CD
+		  AND A1.SALES_ORG_LVL5_CD = A2.SALES_ORG_LVL5_CD
+		ORDER BY A1.SALES_ORG_LVL5_CD
+	</select>
+	
+	<select id="custGroupSelect" parameterType="map" resultType="map">
+    	/****** [ common.custGroupSelect ] ******/
+        SELECT CUST_GROUP_CD CODE_CD
+             , CUST_GROUP_NM CODE_NM
+		FROM TB_MST_CUST_GROUP
+        WHERE COMPANY_CD = ISNULL(@{COMPANY_CD} ,@{GV_COMPANY_CD})
+          AND BU_CD      = ISNULL(@{BU_CD}      ,@{GV_BU_CD})
+          AND USE_FLAG   = 'Y'
+	</select>
+	
+	<select id="repCustGroupSelect" parameterType="map" resultType="map">
+    	/****** [ common.repCustGroupSelect ] ******/
+        SELECT REP_CUST_GROUP_CD CODE_CD
+             , REP_CUST_GROUP_NM CODE_NM
+        FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+        WHERE COMPANY_CD = ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+          AND BU_CD      = ISNULL(@{BU_CD}, @{GV_BU_CD})
+          AND USE_FLAG   = 'Y'
+	</select>
+	
+	
+	<select id="buCdSelect" parameterType="map" resultType="map">
+		/****** [ common.buCdSelect ] ******/
+		WITH W_CODE AS 
+   		(
+     		#set($_parameter.groupCd = "BU_CD")
+	      	#set($_parameter.buAllYn = "Y")
+	      	<include refid="include.mstCode"/>
+	    ) 
+	    SELECT A1.BU_CD AS CODE_CD
+		     , A2.CODE_NM AS CODE_NM
+		FROM UV_MST_ORG A1 WITH(NOLOCK)
+		LEFT OUTER JOIN W_CODE A2
+		  ON A2.CODE_CD  = A1.BU_CD
+		 AND A2.GROUP_CD = 'BU_CD'
+		GROUP BY A1.BU_CD, A2.CODE_NM
+		ORDER BY A1.BU_CD
+	</select>
+	
+	<select id="divCdSelect" parameterType="map" resultType="map">
+		/****** [ common.divCdSelect ] ******/
+		WITH W_CODE AS 
+   		(
+     		#set($_parameter.groupCd = "DIV_CD")
+	      	#set($_parameter.buAllYn = "Y")
+	      	<include refid="include.mstCode"/>
+	    ) 
+	    SELECT A1.DIV_CD AS CODE_CD
+		     , A2.CODE_NM AS CODE_NM
+		FROM UV_MST_ORG A1 WITH(NOLOCK)
+		LEFT OUTER JOIN W_CODE A2
+		  ON A2.CODE_CD  = A1.DIV_CD
+		 AND A2.GROUP_CD = 'DIV_CD'
+		#if($_parameter.buCd and $_parameter.buCd != "") 
+		WHERE A2.BU_CD = @{buCd}
+		#end
+		GROUP BY A1.DIV_CD, A2.CODE_NM
+		ORDER BY A1.DIV_CD
+	</select>
+	
+	<select id="teamCdSelect" parameterType="map" resultType="map">
+		/****** [ common.teamCdSelect ] ******/
+		WITH W_CODE AS 
+   		(
+     		#set($_parameter.groupCd = "TEAM_CD")
+	      	#set($_parameter.buAllYn = "Y")
+	      	<include refid="include.mstCode"/>
+	    ) 
+	    SELECT A1.TEAM_CD AS CODE_CD
+		     , A2.CODE_NM AS CODE_NM
+		     , A2.BU_CD   AS BU_CD
+		FROM UV_MST_ORG A1 WITH(NOLOCK)
+		LEFT OUTER JOIN W_CODE A2
+		  ON A2.CODE_CD  = A1.TEAM_CD
+		 AND A2.GROUP_CD = 'TEAM_CD'
+		WHERE 1 = 1
+		#if($_parameter.buCd and $_parameter.buCd != "") 
+		  AND A2.BU_CD = @{buCd}
+		#end
+		#if($_parameter.divCd and $_parameter.divCd != "") 
+		  AND A1.DIV_CD = @{divCd}
+		#end
+		GROUP BY A1.TEAM_CD, A2.CODE_NM, A2.BU_CD
+		ORDER BY A1.TEAM_CD
+	</select>
+	
+	<select id="fileSelect" parameterType="map" resultType="map">
+		/****** [ common.fileSelect ] ******/
+		SELECT FILE_NO
+		     , FILE_SEQ
+		     , FILE_NM
+		     , FILE_NM_ORG
+		     , FILE_SIZE
+		     , FILE_PATH
+		     , EXTENSION
+		     , CONVERT(NVARCHAR, CREATE_DTTM, 120) AS CREATE_DTTM
+		FROM TB_COMM_FILE
+		WHERE FILE_NO   = @{FILE_NO}
+		#repeat($_parameter.FILE_SEQ $fileSeq "," " AND FILE_SEQ IN (" ")" )
+		  $fileSeq
+		#end
+		  AND DEL_FLAG != 'Y'
+		ORDER BY FILE_SEQ
+	</select>
+
+	<select id="fileNoSelect" parameterType="map" resultType="String">
+		/****** [ common.fileNoSelect ] ******/
+		SELECT ISNULL(MAX(FILE_NO), 0) + 1 AS FILE_NO
+		FROM TB_COMM_FILE
+	</select>
+
+	<update id="fileUpdate" parameterType="map">
+		/****** [ common.fileUpdate ] ******/
+		INSERT INTO TB_COMM_FILE (
+		    FILE_NO
+		  , FILE_SEQ
+		  , FILE_NM
+		  , FILE_NM_ORG
+		  , FILE_SIZE
+		  , FILE_PATH
+		  , EXTENSION
+		  , DEL_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		  , UPDATE_ID
+		  , UPDATE_DTTM
+		) VALUES (
+		    @{FILE_NO}
+		  , (SELECT ISNULL(MAX(FILE_SEQ), 0) + 1 AS FILE_NO FROM TB_COMM_FILE WHERE FILE_NO = @{FILE_NO})
+		  , @{FILE_NM}
+		  , @{FILE_NM_ORG}
+		  , @{FILE_SIZE}
+		  , @{FILE_PATH}
+		  , @{EXTENSION}
+		  , @{DEL_FLAG}
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		)
+	</update>
+
+	<update id="fileDelete" parameterType="map">
+		/****** [ common.fileDelete ] ******/
+		UPDATE TB_COMM_FILE 
+		SET DEL_FLAG  = 'Y'
+		  , UPDATE_ID = @{GV_USER_ID}
+		WHERE FILE_NO  = @{FILE_NO}
+		  AND FILE_SEQ = @{FILE_SEQ}
+	</update>
+	
+	<select id="planIdSelect" parameterType="map" resultType="map">
+		/****** [ common.planIdSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd = "PLAN_ID_CNT")
+	        <include refid="include.mstCode"/>
+		), 
+		W_PLAN AS 
+		(
+			SELECT TOP (SELECT CONVERT(INT, CASE @{planTypeCd} WHEN 'DP_W' THEN ATTB_1_CD WHEN 'DP_M' THEN ATTB_2_CD ELSE ATTB_3_CD END) FROM W_CODE)
+		           A.COMPANY_CD
+		         , A.BU_CD
+		         , A.PLAN_TYPE_CD
+		         , A.PLAN_ID
+		         , CASE WHEN @{planTypeCd} IN ('DP_W', 'MP') THEN A.START_WEEK 
+		                ELSE (SELECT MIN(YEARWEEK) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARMONTH = A.START_MONTH) 
+		           END AS START_WEEK
+		         , CASE WHEN @{planTypeCd} IN ('DP_W', 'MP') THEN A.END_WEEK 
+		                ELSE (SELECT MAX(YEARWEEK) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARMONTH = A.END_MONTH) 
+		           END AS END_WEEK
+		         , CASE WHEN A.START_MONTH IS NOT NULL THEN A.START_MONTH
+		                ELSE (SELECT MIN(YEARMONTH) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A.START_WEEK) 
+		           END AS START_MONTH
+		         , CASE WHEN A.END_MONTH IS NOT NULL THEN A.END_MONTH
+		                ELSE (SELECT MAX(YEARMONTH) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A.END_WEEK) 
+		           END AS END_MONTH
+		         , A.CUT_OFF_FLAG
+		         , A.RELEASE_FLAG
+		         , A.PLAN_ID AS CODE_CD
+		         , A.PLAN_ID AS CODE_NM
+		         , A.APS_START_WEEK
+	             , A.APS_END_WEEK
+	             , A.APS_START_DATE AS FP_START_DATE
+	             , A.APS_END_DATE AS FP_END_DATE
+			FROM TB_MST_PLAN_VERSION A
+		    WHERE A.COMPANY_CD   = @{GV_COMPANY_CD}
+		      AND A.BU_CD        = @{GV_BU_CD}
+		      AND A.PLAN_TYPE_CD = @{planTypeCd}
+			#if($_parameter.cutOffFlag and $_parameter.cutOffFlag != "")
+		      AND A.CUT_OFF_FLAG = @{cutOffFlag}
+			#end
+			#if($_parameter.releaseFlag and $_parameter.releaseFlag != "")
+		      AND A.RELEASE_FLAG = @{releaseFlag}
+			#end
+		    ORDER BY A.PLAN_ID DESC
+		)
+		SELECT A.*
+		     , (SELECT MIN(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A.START_WEEK) AS SW_START_DATE
+	         , (SELECT MAX(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A.END_WEEK  ) AS SW_END_DATE
+	         , (SELECT MIN(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A.APS_START_WEEK) AS APS_START_DATE
+	         , (SELECT MAX(YYYYMMDD) FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A.APS_END_WEEK  ) AS APS_END_DATE
+	         , (SELECT YYYYMMDD FROM TB_MST_CALENDAR A1 WITH(NOLOCK) WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YYYYMMDD = A.FP_START_DATE) AND A1.DAY_NM = 'SUN') AS FP_SW_START_DATE
+		FROM W_PLAN A
+		ORDER BY START_WEEK DESC
+	</select>
+	
+	
+	<!-- ================================================================================================================ -->
+	<!-- APS 추가 -->
+	<!-- ================================================================================================================ -->
+	<select id="workPlacesCdSelect" parameterType="map" resultType="map">
+		/****** [ common.workPlacesCdSelect ] ******/
+		SELECT A1.WC_CD AS CODE_CD
+		     , A1.WC_NM AS CODE_NM
+		     , A2.ATTB_2_CD AS UPPER_CD
+		FROM TB_MST_WORK_CENTER A1 WITH(NOLOCK)
+		INNER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+		   ON A1.BU_CD = A2.BU_CD
+		  AND A1.ROUTING_ID = A2.CODE_CD
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A1.BU_CD = @{GV_BU_CD}
+		  AND A1.PLANT_CD = 'WF01'
+		  AND A2.GROUP_CD = 'PROD_L2'
+		  AND A2.USE_FLAG = 'Y'
+		#if($_parameter.commFlag and $_parameter.commFlag != "")
+		  AND A1.COMM_FLAG = @{commFlag}
+		#end
+		#if($_parameter.ovenFlag and $_parameter.ovenFlag != "")
+		  AND EXISTS (
+		                SELECT DISTINCT MR.WC_CD
+		                  FROM TB_MST_RESOURCE MR
+		                 WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+		                   AND MR.BU_CD = @{GV_BU_CD}
+		                   AND MR.PLANT_CD = 'WF01'
+		                   AND MR.OVEN_FLAG = @{ovenFlag}
+		                   AND MR.USE_FLAG = 'Y'
+		                   AND MR.WC_CD = A1.WC_CD
+		             )
+		#end
+	</select>
+	
+	<select id="workPlacesCdResoureSelect" parameterType="map" resultType="map">
+		/****** [ common.workPlacesCdResoureSelect ] ******/
+		SELECT CODE_CD
+		     , CODE_NM
+		     , UPPER_CD
+		FROM
+		(
+			SELECT A1.WC_CD AS CODE_CD
+			     , A1.WC_NM AS CODE_NM
+			     , A2.ATTB_2_CD AS UPPER_CD
+			FROM TB_MST_WORK_CENTER A1 WITH(NOLOCK)
+			INNER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+			   ON A1.BU_CD = A2.BU_CD
+			  AND A1.ROUTING_ID = A2.CODE_CD
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.PLANT_CD = 'WF01'
+			  AND A2.GROUP_CD = 'PROD_L2'
+			  AND A2.USE_FLAG = 'Y'
+		  	UNION ALL
+			SELECT MWC.WC_CD AS CODE_CD
+			     , MWC.WC_NM AS CODE_NM
+			     , MRP.PROD_PART AS UPPER_CD
+			  FROM TB_MST_RESOURCE_PORTION MRP WITH(NOLOCK)
+			 INNER JOIN TB_MST_RESOURCE MR WITH(NOLOCK)
+			    ON MR.COMPANY_CD = MRP.COMPANY_CD
+			   AND MR.BU_CD = MRP.BU_CD
+			   AND MR.PLANT_CD = MRP.PLANT_CD
+			   AND MR.RESOURCE_CD = MRP.RESOURCE_CD
+			 INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+			    ON MWC.COMPANY_CD = MR.COMPANY_CD
+			   AND MWC.BU_CD = MR.BU_CD
+			   AND MWC.PLANT_CD = MR.PLANT_CD
+			   AND MWC.WC_CD = MR.WC_CD
+			 WHERE MRP.COMPANY_CD = @{GV_COMPANY_CD}
+			   AND MRP.BU_CD = @{GV_BU_CD}
+			   AND MRP.PLANT_CD = 'WF01'
+			   AND ISNULL(MRP.PORTION, 0) <![CDATA[>]]> 0
+		) A1
+		GROUP BY CODE_CD, CODE_NM, UPPER_CD
+		ORDER BY UPPER_CD
+	</select>
+	
+	<select id="workPlacesQcCdSelect" parameterType="map" resultType="map">
+		/****** [ common.workPlacesQcCdSelect ] ******/
+		SELECT A1.WC_CD AS CODE_CD
+		     , A1.WC_NM AS CODE_NM
+		     , A2.ATTB_2_CD AS UPPER_CD
+		FROM TB_MST_WORK_CENTER A1 WITH(NOLOCK)
+		INNER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+		   ON A1.BU_CD = A2.BU_CD
+		  AND A1.ROUTING_ID = A2.CODE_CD
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A1.BU_CD = @{GV_BU_CD}
+		  AND A1.PLANT_CD = 'WF01'
+		  AND A2.GROUP_CD = 'PROD_L2'
+		  AND A2.USE_FLAG = 'Y'
+		  AND A1.PROD_OR_QC ='QC_PART'
+	</select>
+	
+	<select id="resourceCdSelect" parameterType="map" resultType="map">
+		/****** [ common.resourceCdSelect ] ******/
+	    SELECT RESOURCE_CD AS CODE_CD 
+	         , RESOURCE_NM AS CODE_NM 
+	         , WC_CD AS UPPER_CD
+		FROM TB_MST_RESOURCE WITH(NOLOCK)
+		WHERE RESOURCE_TYPE ='M'
+		  AND USE_FLAG ='Y'
+		  AND COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLANT_CD = 'WF01'
+	</select>
+	
+	<select id="resourceGroupCdSelect" parameterType="map" resultType="map">
+		/****** [ common.resourceGroupCdSelect ] ******/
+	    SELECT DISTINCT RESOURCE_GROUP_CD AS CODE_CD 
+	         , RESOURCE_GROUP_NM AS CODE_NM 
+		FROM TB_MST_RESOURCE WITH(NOLOCK)
+		WHERE RESOURCE_TYPE ='M'
+		  AND USE_FLAG ='Y'
+		  AND COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLANT_CD = 'WF01'
+		  AND RESOURCE_GROUP_CD != ''
+	</select>
+	
+	<select id="prodItemGroupMstSelect" parameterType="map" resultType="map">
+		/****** [ common.prodItemGroupMstSelect ] ******/
+		SELECT A1.CODE_CD
+		     , CASE WHEN @{GV_LANG} = 'ko' THEN A1.CODE_NM_KR
+		            WHEN @{GV_LANG} = 'cn' THEN A1.CODE_NM_CN
+		            ELSE A1.CODE_NM
+		       END AS CODE_NM
+		     , A1.ATTB_1_CD AS UPPER_CD
+		     , A1.ATTB_4_CD 
+		FROM TB_MST_CODE A1 WITH(NOLOCK)
+		WHERE A1.BU_CD = @{GV_BU_CD}
+		  AND A1.GROUP_CD = 'PROD_ITEM_GROUP_MST'
+		  AND A1.USE_FLAG = 'Y'
+		  AND A1.ATTB_2_CD = 'Y'
+	</select>
+	
+	<select id="prodItemGroupDetailSelect" parameterType="map" resultType="map">
+		/****** [ common.prodItemGroupDetailSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+		            WHEN @{GV_LANG} = 'ko' THEN CODE_NM_CN
+		            ELSE CODE_NM
+		       END AS CODE_NM
+		     , ATTB_2_CD AS UPPER_CD
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE BU_CD = @{GV_BU_CD}
+		  AND GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+		  AND USE_FLAG = 'Y'
+		ORDER BY SORT
+	</select>
+	
+	<select id="apsRoutingIdSelect" parameterType="map" resultType="map">
+		/****** [ common.apsRoutingIdSelect ] ******/
+		SELECT A1.CODE_CD
+		     , CASE WHEN @{GV_LANG} = 'ko' THEN A1.CODE_NM_KR
+		            WHEN @{GV_LANG} = 'cn' THEN A1.CODE_NM_CN
+		            ELSE A1.CODE_NM
+		       END AS CODE_NM
+		     , A1.ATTB_2_CD AS UPPER_CD
+		FROM TB_MST_CODE A1 WITH(NOLOCK)
+		WHERE A1.BU_CD = @{GV_BU_CD}
+		  AND A1.GROUP_CD = 'PROD_L2'
+		  AND A1.USE_FLAG = 'Y'
+		#if($_parameter.tableNm and $_parameter.tableNm == "TB_MST_RESOURCE")
+		  AND A1.CODE_CD IN (
+								SELECT DISTINCT ROUTING_ID 
+								  FROM TB_MST_RESOURCE
+								 WHERE PLANT_CD = 'WF01'
+								   #if($_parameter.resourceType and $_parameter.resourceType != "")
+								   AND RESOURCE_TYPE = @{resourceType}
+								   #end
+		                     )
+		#end
+	</select>
+	
+	<select id="orderRoutingIdSelect" parameterType="map" resultType="map">
+		/****** [ common.apsRoutingIdSelect ] ******/
+		SELECT A1.CODE_CD
+		     , CASE WHEN @{GV_LANG} = 'ko' THEN A1.CODE_NM_KR
+		            WHEN @{GV_LANG} = 'cn' THEN A1.CODE_NM_CN
+		            ELSE A1.CODE_NM
+		       END AS CODE_NM
+		     , A1.ATTB_2_CD AS UPPER_CD
+		FROM TB_MST_CODE A1 WITH(NOLOCK)
+		WHERE A1.BU_CD = @{GV_BU_CD}
+		  AND A1.GROUP_CD = 'PROD_L2'
+		  AND A1.USE_FLAG = 'Y'
+		  AND A1.CODE_CD IN (
+								SELECT DISTINCT ROUTING_ID 
+								  FROM TB_MST_ROUTING
+								 WHERE PLANT_CD = 'WF01'
+		                     )
+		   
+	</select>
+	
+	<select id="apsOvenRoutingIdSelect" parameterType="map" resultType="map">
+		/****** [ common.apsOvenRoutingIdSelect ] ******/
+		SELECT T.CODE_CD
+		     , T.CODE_NM
+		     , T.UPPER_CD
+		FROM 
+		(
+			SELECT A.CODE_CD
+	             , CASE WHEN @{GV_LANG} = 'ko' THEN A.CODE_NM_KR
+	                    WHEN @{GV_LANG} = 'cn' THEN A.CODE_NM_CN
+	                    ELSE A.CODE_NM
+	               END AS CODE_NM
+	             , A.ATTB_2_CD AS UPPER_CD
+	             , ROW_NUMBER() OVER(ORDER BY A.SORT) AS RN
+			FROM TB_MST_CODE A WITH(NOLOCK)
+	        INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	           ON A.BU_CD = B.BU_CD
+	          AND A.CODE_CD = B.ATTB_1_CD
+	          AND B.GROUP_CD = 'ANNEALING_ITEM_GROUP_MAPPING'
+	          AND B.USE_FLAG = 'Y'
+	        WHERE A.BU_CD = @{GV_BU_CD}
+	          AND A.GROUP_CD = 'PROD_L2'
+	          AND A.USE_FLAG = 'Y'
+		) T
+		GROUP BY T.CODE_CD, T.CODE_NM, T.UPPER_CD
+	</select>
+	
+	<select id="fqcRscMappingRouteSelect" parameterType="map" resultType="map">
+		/****** [ common.fqcRscMappingRouteSelect ] ******/
+		SELECT A.FQC_ROUTING_TYPE AS CODE_CD
+	   	     , A.PROD_PART AS CODE_NM
+	   		 , A.PROD_PART AS UPPER_CD
+	    FROM TB_MST_FQC_ROUTING_TYPE A WITH (NOLOCK)
+		INNER JOIN TB_MST_CODE B WITH (NOLOCK)
+		   ON A.PROD_PART = B.CODE_CD
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD = @{GV_BU_CD}
+	      AND B.GROUP_CD ='PROD_PART' 
+	      AND B.USE_FLAG ='Y'
+		ORDER BY B.SORT,A.FQC_ROUTING_TYPE
+	</select>
+	
+	<select id="prodItemGroupSelect" parameterType="map" resultType="map">
+		/****** [ common.prodItemGroupSelect ] ******/
+		SELECT CODE_CD
+      		 , CODE_NM
+      		 , ATTB_1_CD AS UPPER_CD 
+      	FROM TB_MST_CODE WITH (NOLOCK)
+      	WHERE GROUP_CD ='PROD_ITEM_GROUP_MST'
+      	  AND USE_FLAG ='Y'
+      	  AND ATTB_2_CD ='Y'
+      ORDER BY SORT,CODE_CD
+      ;
+	</select> 
+	
+    <select id="routingFacilitySelect" parameterType="map" resultType="map">
+		/****** [ common.routingFacilitySelect ] ******/
+		SELECT A1.CODE_CD
+		     , CASE WHEN @{GV_LANG} = 'ko' THEN A1.CODE_NM_KR
+		            WHEN @{GV_LANG} = 'cn' THEN A1.CODE_NM_CN
+		            ELSE A1.CODE_NM
+		       END AS CODE_NM
+		FROM TB_MST_CODE A1 WITH(NOLOCK)
+		WHERE A1.BU_CD = @{GV_BU_CD}
+		  AND A1.GROUP_CD = 'PROD_L2'
+		  AND A1.USE_FLAG = 'Y'
+		  AND A1.CODE_CD IN
+		  (
+		   	SELECT DISTINCT ROUTING_ID 
+			FROM TB_MST_RESOURCE
+			WHERE PLANT_CD = 'WF01'
+		  )
+	</select>
+	
+	<select id="planVersionSelect" parameterType="map" resultType="map">
+		/****** [ common.planVersionSelect ] ******/
+		SELECT X.* 
+		FROM 
+		( 
+			SELECT B.VERSION_ID AS CODE_CD
+	             , B.VERSION_ID AS CODE_NM
+	             , A.PLAN_ID AS UPPER_CD
+                 , MAX(B.SEQ) AS SEQ
+                 , MAX(B.CUT_OFF_FLAG) AS CUT_OFF_FLAG
+                 , MAX(B.VERSION_TYPE_CD) AS VERSION_TYPE_CD
+	  		FROM TB_MST_PLAN_VERSION A
+	        INNER JOIN TB_MST_PLAN_VERSION_SUB B
+	           ON A.COMPANY_CD = B.COMPANY_CD 
+	          AND A.BU_CD = B.BU_CD
+	          AND A.PLAN_TYPE_CD = B.PLAN_TYPE_CD
+	          AND A.PLAN_ID = B.PLAN_ID
+	 		WHERE A.PLAN_TYPE_CD = 'MP'
+			#if($_parameter.planId and $_parameter.planId != "")
+   			  AND A.PLAN_ID = @{planId}
+	 		#end
+	 		#if($_parameter.pPart and $_parameter.pPart != "")
+		  	  AND B.PROD_PART IN ('$_parameter.pPart.replace(",","','")')
+	 		#end
+	 		GROUP BY B.VERSION_ID, A.PLAN_ID
+	 	) X
+	 	ORDER BY X.SEQ DESC,X.CODE_CD DESC;
+	</select>
+	
+	<select id="planIdFpSelect" parameterType="map" resultType="map">
+		/****** [ common.planIdFpSelect ] ******/
+		SELECT TOP 1 PLAN_ID
+		FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_TYPE_CD = 'FP'
+		  AND RELEASE_FLAG = 'Y'
+		ORDER BY APS_START_DATE DESC
+	</select>
+	
+	<select id="slCdSelect" parameterType="map" resultType="map">
+		/****** [ common.slCdSelect ] ******/
+		SELECT DISTINCT SL_CD AS CODE_CD
+		     , SL_CD + ', ' + SL_NM AS CODE_NM
+		FROM TB_MST_SL WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLANT_CD = 'WF01'
+	</select>		
+
+</mapper>

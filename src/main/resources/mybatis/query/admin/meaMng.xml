@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	<select id="meaMngSelect" parameterType="map" resultType="map">
+		/****** [ common.meaMngSelect ] ******/
+		SELECT MEAS_CD
+	         , MEAS_NM
+	         , MEAS_NM_KR
+	         , MEAS_NM_CN
+	         , MEAS_DESC
+	         , USE_FLAG
+	         , CREATE_ID
+	         , CONVERT(VARCHAR(30), CREATE_DTTM, 120) AS CREATE_DTTM
+	         , UPDATE_ID
+	         , CONVERT(VARCHAR(30), UPDATE_DTTM, 120) AS UPDATE_DTTM
+		FROM TB_MST_MEAS WITH(NOLOCK)
+		WHERE 1 = 1
+		#if($_parameter.SEARCH_MEAS_CD and $_parameter.SEARCH_MEAS_CD != "")
+		  AND MEAS_CD LIKE '%' + REPLACE(@{SEARCH_MEAS_CD},'_','[_]') + '%'
+		#end
+		#if($_parameter.SEARCH_MEAS_NM and $_parameter.SEARCH_MEAS_NM != "")
+		  AND (MEAS_NM LIKE '%' + REPLACE(@{SEARCH_MEAS_NM},'_','[_]') + '%'
+		    OR MEAS_NM_KR LIKE '%' + REPLACE(@{SEARCH_MEAS_NM},'_','[_]') + '%'
+		    OR MEAS_NM_CN LIKE '%' + REPLACE(@{SEARCH_MEAS_NM},'_','[_]') + '%')
+		#end
+		ORDER BY MEAS_CD, MEAS_NM
+	</select>
+	
+	<insert id="meaMngInsert" parameterType="map">
+		/****** [ common.meaMngInsert ] ******/
+	    INSERT INTO TB_MST_MEAS 
+	    (
+            MEAS_CD
+          , MEAS_NM
+          , MEAS_NM_KR
+          , MEAS_NM_CN
+          , MEAS_DESC
+          , USE_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+	    ) VALUES (
+    	    @{MEAS_CD}                
+    	  , @{MEAS_NM}                     
+    	  , @{MEAS_NM_KR}                     
+    	  , @{MEAS_NM_CN}                     
+    	  , @{MEAS_DESC}                   
+    	  , @{USE_FLAG}                  
+    	  , @{GV_USER_ID}                     
+    	  , DBO.UFN_GETDATE()                    
+    	  , @{GV_USER_ID}                      
+    	  , DBO.UFN_GETDATE()                    
+	    )
+	</insert>
+	
+	<update id="meaMngUpdate" parameterType="map">
+		/****** [ common.meaMngUpdate ] ******/
+		UPDATE TB_MST_MEAS 
+		SET MEAS_NM     = @{MEAS_NM}
+		  , MEAS_NM_KR  = @{MEAS_NM_KR}
+		  , MEAS_NM_CN  = @{MEAS_NM_CN}
+		  , MEAS_DESC   = @{MEAS_DESC}
+		  , USE_FLAG    = @{USE_FLAG}
+		  , UPDATE_ID   = @{GV_USER_ID}
+		  , UPDATE_DTTM = DBO.UFN_GETDATE()    
+		WHERE MEAS_CD = @{MEAS_CD}
+	</update>
+	
+	<delete id="meaMngDelete" parameterType="map">
+		/****** [ common.meaMngDelete ] ******/
+		DELETE FROM TB_MST_MEAS 
+		WHERE MEAS_CD = @{MEAS_CD}
+	</delete>
+</mapper>

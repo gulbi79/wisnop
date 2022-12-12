@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+
+	<select id="fqcRscMappingSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.fqcRscMappingList ] ******/
+		SELECT X.PART_CD
+		     , X.PART_NM
+		     , X.WC_CD
+		     , X.WC_NM
+		     , X.RESOURCE_CD
+		     , X.RESOURCE_NM
+		     , X.CAMPUS_CD
+		     , X.CAMPUS_NM
+		    #foreach($bucketMap in $_parameter.bucketList)
+			#set($params = "$bucketMap.CD")
+		     , MAX(CASE WHEN X.FQC_ROUTING_TYPE = '$params' THEN X.VALID_FLAG ELSE NULL END) AS $params
+			#end  
+		     , X.SORT
+		FROM 
+		(
+			SELECT MR.COMPANY_CD
+			     , MR.BU_CD
+			     , MR.PLANT_CD
+			     , MC2.CODE_CD AS PART_CD
+			     , CASE WHEN 'KO' = UPPER(@{GV_LANG}) THEN MC2.CODE_NM_KR
+                        WHEN 'CN' = UPPER(@{GV_LANG}) THEN MC2.CODE_NM_CN
+                        ELSE MC2.CODE_NM
+					END AS PART_NM
+			     , MWC.WC_CD
+			     , MWC.WC_NM
+			     , MR.RESOURCE_CD
+			     , MR.RESOURCE_NM
+			     , MR.CAMPUS_CD
+			     , CASE WHEN 'KO' = UPPER(@{GV_LANG}) THEN MC3.CODE_NM_KR
+                        WHEN 'CN' = UPPER(@{GV_LANG}) THEN MC3.CODE_NM_CN
+                        ELSE MC3.CODE_NM
+					END AS CAMPUS_NM
+			     , MFR.FQC_ROUTING_TYPE
+			     , MRFR.VALID_FLAG
+			     , MC2.SORT
+			FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+			INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+			   ON MWC.COMPANY_CD = MR.COMPANY_CD
+			  AND MWC.BU_CD = MR.BU_CD
+			  AND MWC.PLANT_CD = MR.PLANT_CD
+			  AND MWC.WC_CD = MR.WC_CD
+			  AND MWC.PROD_OR_QC = 'QC_PART'
+			INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			   ON MC1.BU_CD = MWC.BU_CD
+			  AND MC1.GROUP_CD = 'PROD_L2'
+			  AND MC1.CODE_CD = MWC.ROUTING_ID
+			INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			   ON MC2.BU_CD = MC1.BU_CD
+			  AND MC2.GROUP_CD = 'PROD_PART'
+			  AND MC2.CODE_CD = MC1.ATTB_2_CD
+			INNER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+			   ON MC3.BU_CD = MR.BU_CD
+			  AND MC3.GROUP_CD = 'CAMPUS_CD'
+			  AND MC3.CODE_CD = MR.CAMPUS_CD
+			INNER JOIN TB_MST_FQC_ROUTING_TYPE MFR WITH(NOLOCK)
+			   ON MFR.COMPANY_CD = MR.COMPANY_CD
+			  AND MFR.BU_CD = MR.BU_CD
+			LEFT OUTER JOIN TB_MAP_RESOURCE_FQC_ROUTING MRFR WITH(NOLOCK)
+			  ON MRFR.COMPANY_CD = MR.COMPANY_CD
+			 AND MRFR.BU_CD = MR.BU_CD
+			 AND MRFR.RESOURCE_CD = MR.RESOURCE_CD
+			 AND MRFR.FQC_ROUTING_TYPE = MFR.FQC_ROUTING_TYPE
+			WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MR.BU_CD = @{GV_BU_CD}
+			  AND MR.PLANT_CD = 'WF01'
+			  AND MR.RESOURCE_TYPE = 'M'
+			  AND MR.USE_FLAG ='Y'
+		) X
+		WHERE 1 = 1
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+		  AND X.PART_CD IN ('$_parameter.prodPart.replace(",","','")')
+		#end  
+		#if($_parameter.workplaces and $_parameter.workplaces != "")
+		  AND X.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+		#end
+		#if($_parameter.campus and $_parameter.campus != "")
+		  AND X.CAMPUS_CD IN ('$_parameter.campus.replace(",","','")')
+		#end
+		#if($_parameter.facility and $_parameter.facility != "")
+		  AND ( X.RESOURCE_NM LIKE '%$_parameter.facility%' or RESOURCE_CD LIKE '%$_parameter.facility%' )
+		#end
+		GROUP BY X.PART_CD, X.PART_NM, X.WC_CD , X.WC_NM, X.RESOURCE_CD, X.RESOURCE_NM, X.CAMPUS_CD, X.CAMPUS_NM, X.SORT
+		ORDER BY X.SORT, X.WC_CD, X.RESOURCE_CD		   
+	</select>
+	
+	<select id="fqcRscMappingAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.prodStand.workCalendarAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS20001','APS20002','APS20003','APS20004' )
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<update id="fqcRscMappingUpdate" parameterType="map">
+		/****** [ aps.static.sworkCalendarUpdate ] ******/
+	    MERGE TB_MAP_RESOURCE_FQC_ROUTING WITH (HOLDLOCK) AS T 
+	    USING 
+	    (
+			SELECT '$_parameter.GV_COMPANY_CD' AS COMPANY_CD
+	             , '$_parameter.GV_BU_CD' AS BU_CD
+	             , '$_parameter.RESOURCE_CD' AS RESOURCE_CD
+				 , '$_parameter.FQC_ROUTING_TYPE' AS FQC_ROUTING_TYPE
+				 , '$_parameter.VALID_FLAG' AS VALID_FLAG
+				 , '$_parameter.GV_USER_ID' AS CREATE_ID
+				 , DBO.UFN_GETDATE() AS CREATE_DTTM
+				 , '$_parameter.GV_USER_ID' AS UPDATE_ID
+				 , DBO.UFN_GETDATE() AS UPDATE_DTTM
+		) AS S
+	    ON 
+	    (
+	      	T.COMPANY_CD = S.COMPANY_CD 
+	        AND T.BU_CD = S.BU_CD
+	        AND T.RESOURCE_CD = S.RESOURCE_CD
+	        AND T.FQC_ROUTING_TYPE = S.FQC_ROUTING_TYPE
+		)
+	    WHEN MATCHED THEN 
+	    UPDATE SET
+	    	UPDATE_ID = S.UPDATE_ID
+	      , UPDATE_DTTM = S.UPDATE_DTTM 
+		#if($_parameter.VALID_FLAG != "undefined")
+	      , VALID_FLAG = S.VALID_FLAG
+		#end
+		WHEN NOT MATCHED THEN
+	    INSERT 
+	    (
+	    	COMPANY_CD
+          , BU_CD
+          , RESOURCE_CD
+          , FQC_ROUTING_TYPE
+		#if($_parameter.VALID_FLAG != "undefined")
+          , VALID_FLAG
+        #end
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+		)VALUES( 
+			S.COMPANY_CD
+          , S.BU_CD
+          , S.RESOURCE_CD
+          , S.FQC_ROUTING_TYPE
+		#if($_parameter.VALID_FLAG != "undefined")
+          , S.VALID_FLAG
+        #end
+          , S.CREATE_ID
+          , S.CREATE_DTTM
+          , S.UPDATE_ID
+          , S.UPDATE_DTTM
+		);
+      </update>
+      	
+</mapper>

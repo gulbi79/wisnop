@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+	<sql id="workCnt">
+	, SUM(CASE WHEN DAY_NM NOT IN('SAT','SUN') THEN 1 ELSE 0 END) AS WORK_CNT
+	</sql>
+
+	<!-- 달력   -->
+	<sql id="comCal">
+	SELECT RTRIM(YYYYMMDD     ) AS YYYYMMDD   
+	     , RTRIM(DAY          ) AS DAY 
+	     , RTRIM(DAY_NM       ) AS DAY_NM     
+	     , RTRIM(YEAR         ) AS YEAR       
+	     , RTRIM(YEARWEEK     ) AS YEARWEEK   
+	     , RTRIM(YEARPWEEK    ) AS YEARPWEEK
+	     , RTRIM(YEARMONTH    ) AS YEARMONTH  
+	     , RTRIM(YEARMONTH_STD) AS YEARMONTH_STD  
+	     , RTRIM(YEARQUARTER  ) AS YEARQUARTER
+	     , RTRIM(YEARHALF     ) AS YEARHALF   
+	     , RTRIM(MONTH        ) AS MONTH      
+	     , RTRIM(WEEKOFYEAR   ) AS WEEKOFYEAR 
+	     , RTRIM(WEEKOFMONTH  ) AS WEEKOFMONTH
+	     , RTRIM(QUARTER      ) AS QUARTER    
+	     , RTRIM(HALF         ) AS HALF       
+	     --, RTRIM(DT         ) AS DT         
+	     , RTRIM(MONTH_NM     ) AS MONTH_NM   
+	FROM TB_MST_CALENDAR WITH(NOLOCK)
+	WHERE YYYYMMDD BETWEEN @{fromDate} AND @{toDate}
+	</sql>
+
+	<!-- subsum 처리  -->
+	<sql id="subSumYear">
+	    UNION ALL
+		SELECT 'MT' + YEAR    AS CD
+		     , 'Year. Total'  AS NM
+    	     , 'Y' + YEAR     AS ROOT_CD
+             , YEAR           AS BUCKET_VAL
+    	     , NULL           AS TYPE
+			 , 'MT'           AS TOT_TYPE
+			 <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEAR
+	</sql>
+
+	<!-- subsum 처리  -->
+	<sql id="subSumHalf">
+    	UNION ALL
+		SELECT 'MT' + YEAR + '_' + HALF  AS CD
+		     , 'Half. Total'             AS NM
+    	     , 'H' + YEAR + '_' + HALF   AS ROOT_CD
+             , YEAR + HALF               AS BUCKET_VAL
+    	     , NULL                      AS TYPE
+			 , 'MT'                      AS TOT_TYPE
+			 <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEAR, HALF
+	</sql>
+
+	<!-- subsum 처리  -->
+	<sql id="subSumQuarter">
+    	UNION ALL
+		SELECT 'MT' + YEAR + '_' + HALF + '_' + QUARTER AS CD
+		     , 'Quart. Total'                           AS NM
+    	     , 'Q' + YEAR + '_' + HALF + '_' + QUARTER  AS ROOT_CD
+             , YEAR + HALF + QUARTER                    AS BUCKET_VAL
+    	     , NULL                                     AS TYPE
+			 , 'MT'                                     AS TOT_TYPE
+			 <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEAR, HALF, QUARTER
+	</sql>
+
+	<!-- subsum 처리  -->
+	<sql id="subSumMonth">
+        UNION ALL
+    	SELECT 
+    	       'MT_' + YEARMONTH AS CD
+    		 , 'Month Total'      AS NM
+    		 , 'M' + YEARMONTH   AS ROOT_CD 
+    		 , YEARMONTH         AS BUCKET_VAL
+    		 , NULL              AS TYPE
+    		 , 'MT'              AS TOT_TYPE
+    		 <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEAR, HALF, QUARTER, YEARMONTH
+	</sql>
+	
+	<!-- subsum 처리  -->
+	<sql id="subSumFullMonth">
+        UNION ALL
+    	SELECT 'MT_' + YEARMONTH_STD AS CD
+    		 , 'Month Total'         AS NM
+    		 , 'M' + YEARMONTH_STD   AS ROOT_CD 
+    		 , YEARMONTH_STD         AS BUCKET_VAL
+    		 , NULL                  AS TYPE
+    		 , 'MT'                  AS TOT_TYPE
+    	FROM W_CAL A
+    	GROUP BY YEARMONTH_STD
+	</sql>
+
+	<!-- subsum 처리  -->
+	<sql id="subSumWeek">
+        UNION ALL
+    	SELECT 
+    	       'MT_' + YEARWEEK  AS CD
+    		 , 'Week Total'      AS NM
+    		 , NULL AS DAY_NM
+    		 , 'W' + YEARWEEK    AS ROOT_CD 
+    		 , YEARWEEK          AS BUCKET_VAL
+    		 , NULL              AS TYPE
+    		 , 'MT'              AS TOT_TYPE
+    		 <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEARWEEK
+	</sql>
+	
+	<!-- bucket year  -->
+	<select id="bucketYearSelect" parameterType="map" resultType="map">
+    /****** [ common.bucketYearSelect ] ******/
+    WITH W_CAL AS (<include refid="common.comCal"/>)
+    , W_MAIN AS (
+    	SELECT 'Y' + YEAR AS CD
+    	     , 'Y' + YEAR AS NM
+    	     , NULL       AS ROOT_CD
+             , YEAR       AS BUCKET_VAL
+#if($_parameter.year.isDown == "Y")
+    		 , 'group'    AS TYPE
+#else
+    		 , NULL       AS TYPE
+#end
+			 , NULL       AS TOT_TYPE
+    	FROM W_CAL A
+    	GROUP BY YEAR 
+#if($_parameter.yearTotal == "Y")
+    	UNION ALL
+		SELECT 'TOTAL'       AS CD
+		     , 'TOTAL'       AS NM
+    	     , NULL          AS ROOT_CD
+             , 'TOTAL'       AS BUCKET_VAL
+    	     , NULL          AS TYPE
+			 , 'MT'          AS TOT_TYPE
+#end
+    )
+    SELECT ROOT_CD
+         , CD
+    	 , NM
+    	 , CD AS BUCKET_ID
+    	 , BUCKET_VAL
+    	 , TYPE
+    	 , TOT_TYPE
+#if($_parameter.year.isExp == "Y")
+    	 , 'Y' AS EXPAND_YN
+    	 , CASE WHEN ROW_NUMBER() OVER(ORDER BY CD) <![CDATA[>]]> $_parameter.year.expCnt THEN 'Y'
+		        ELSE 'N'
+		   END AS FOLDING_FLAG
+#end
+		 , 'YEAR' AS BUCKET_TYPE
+    FROM W_MAIN
+    ORDER BY ROOT_CD, CD
+	</select>
+
+	<!-- bucket half  -->
+	<select id="bucketHalfSelect" parameterType="map" resultType="map">
+    /****** [ common.bucketHalfSelect ] ******/
+    WITH W_CAL AS (<include refid="common.comCal"/>)
+    , W_MAIN AS (
+    	SELECT 'H' + YEAR + '_' + HALF AS CD
+		     , 'H' + YEAR + '_' + HALF AS NM
+    	     , 'Y' + YEAR              AS ROOT_CD
+             , YEAR + HALF             AS BUCKET_VAL
+#if($_parameter.half.isDown == "Y")
+    		 , 'group'                 AS TYPE
+#else
+    		 , NULL                    AS TYPE
+#end
+			 , NULL                    AS TOT_TYPE
+			 <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEAR
+    	       , HALF
+#if($_parameter.half.isMt == "Y")
+  #if($_parameter.half.isUp == "Y")
+    #if($_parameter.half.upCal == "M")
+        <include refid="common.subSumMonth"/>
+    #elseif($_parameter.half.upCal == "Q")
+        <include refid="common.subSumQuarter"/>
+    #elseif($_parameter.half.upCal == "H")
+        <include refid="common.subSumHalf"/>
+    #elseif($_parameter.half.upCal == "Y")
+        <include refid="common.subSumYear"/>
+    #end
+  #end
+#end    	       
+    )
+    SELECT ROOT_CD
+         , CD
+    	 , NM
+    	 , CD AS BUCKET_ID
+    	 , BUCKET_VAL
+    	 , TYPE
+		 , TOT_TYPE
+#if($_parameter.half.isExp == "Y")
+    	 , 'Y' AS EXPAND_YN
+    	 , CASE WHEN ROW_NUMBER() OVER(ORDER BY ROOT_CD,TOT_TYPE DESC,CD) <![CDATA[>]]> $_parameter.half.expCnt THEN 'Y'
+		        ELSE 'N'
+		   END AS FOLDING_FLAG
+#end
+		 , 'HALF' AS BUCKET_TYPE
+    FROM W_MAIN
+	ORDER BY ROOT_CD, TOT_TYPE, CD
+	</select>
+
+	<!-- bucket quarter  -->
+	<select id="bucketQuarterSelect" parameterType="map" resultType="map">
+    /****** [ common.bucketQuarterSelect ] ******/
+    WITH W_CAL AS (<include refid="common.comCal"/>)
+    , W_MAIN AS (
+    	SELECT 'Q' + YEAR + '_' + HALF + '_' + QUARTER AS CD
+    	     , 'Q' + YEAR + '_' + HALF + '_' + QUARTER AS NM
+    	     , 'H' + YEAR + '_' + HALF                 AS ROOT_CD
+             , YEAR + HALF + QUARTER                   AS BUCKET_VAL
+#if($_parameter.quarter.isDown == "Y")
+    		 , 'group'                                 AS TYPE
+#else
+    		 , NULL                                    AS TYPE
+#end
+			 , NULL                                    AS TOT_TYPE
+			 <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEAR, HALF, QUARTER
+#if($_parameter.quarter.isMt == "Y")
+  #if($_parameter.quarter.isUp == "Y")
+    #if($_parameter.quarter.upCal == "M")
+        <include refid="common.subSumMonth"/>
+    #elseif($_parameter.quarter.upCal == "Q")
+        <include refid="common.subSumQuarter"/>
+    #elseif($_parameter.quarter.upCal == "H")
+        <include refid="common.subSumHalf"/>
+    #elseif($_parameter.quarter.upCal == "Y")
+        <include refid="common.subSumYear"/>
+    #end
+  #end
+#end
+    )
+    SELECT ROOT_CD
+         , CD
+    	 , NM
+    	 , CD AS BUCKET_ID
+    	 , BUCKET_VAL
+    	 , TYPE
+    	 , TOT_TYPE
+#if($_parameter.quarter.isExp == "Y")
+    	 , 'Y' AS EXPAND_YN
+    	 , CASE WHEN ROW_NUMBER() OVER(ORDER BY ROOT_CD,TOT_TYPE DESC,CD) <![CDATA[>]]> $_parameter.quarter.expCnt THEN 'Y'
+		        ELSE 'N'
+		   END AS FOLDING_FLAG
+#end
+		 , 'QUAR' AS BUCKET_TYPE
+    FROM W_MAIN
+    ORDER BY ROOT_CD, TOT_TYPE, CD
+	</select>
+
+	<!-- bucket month  -->
+	<select id="bucketMonthSelect" parameterType="map" resultType="map">
+    /****** [ common.bucketMonthSelect ] ******/
+    WITH W_CAL AS (<include refid="common.comCal"/>)
+    , W_MAIN AS (
+    	SELECT 'M' + YEARMONTH                         AS CD
+    	     , 'M' + YEARMONTH                         AS NM
+#if($_parameter.month.upCal == "H")
+    	     , @{month.upCal} + YEAR + '_' + HALF      AS ROOT_CD
+#elseif($_parameter.month.upCal == "Y")
+    	     , @{month.upCal} + YEAR                   AS ROOT_CD
+#else
+    	     , @{month.upCal} + YEAR + '_' + HALF + '_' + QUARTER AS ROOT_CD
+#end
+	         , YEARMONTH                               AS BUCKET_VAL
+#if($_parameter.month.isDown == "Y")
+	  		 , 'group'                                 AS TYPE
+#else
+    		 , NULL                                    AS TYPE
+#end
+             , NULL                                    AS TOT_TYPE
+             <include refid="workCnt"/>
+    	FROM W_CAL A
+    	GROUP BY YEAR
+    	       , HALF
+    	       , QUARTER
+    	       , YEARMONTH
+#if($_parameter.month.isMt == "Y")
+  #if($_parameter.month.isUp == "Y")
+    #if($_parameter.month.upCal == "M")
+        <include refid="common.subSumMonth"/>
+    #elseif($_parameter.month.upCal == "Q")
+        <include refid="common.subSumQuarter"/>
+    #elseif($_parameter.month.upCal == "H")
+        <include refid="common.subSumHalf"/>
+    #elseif($_parameter.month.upCal == "Y")
+        <include refid="common.subSumYear"/>
+    #end
+  #end
+#end
+    )
+    SELECT ROOT_CD
+         , CD
+    	 , NM
+    	 , CD AS BUCKET_ID
+    	 , BUCKET_VAL
+    	 , TYPE
+    	 , TOT_TYPE
+#if($_parameter.month.isExp == "Y")
+    	 , 'Y' AS EXPAND_YN
+    	 , CASE WHEN ROW_NUMBER() OVER(ORDER BY ROOT_CD,TOT_TYPE DESC,CD) <![CDATA[>]]> $_parameter.month.expCnt THEN 'Y'
+		        ELSE 'N'
+		   END AS FOLDING_FLAG
+#end
+		 , 'MONTH' AS BUCKET_TYPE
+		 , WORK_CNT
+    FROM W_MAIN
+    ORDER BY ROOT_CD, TOT_TYPE, CD
+	</select>
+
+	<!-- bucket week  -->
+	<select id="bucketWeekSelect" parameterType="map" resultType="map">
+    /****** [ common.bucketWeekSelect ] ******/
+    WITH W_CAL AS (<include refid="common.comCal"/>)
+    , W_MAIN AS (
+    	SELECT 'PW' + YEARPWEEK    AS CD
+    		 , YEARPWEEK AS NM
+#if($_parameter.week.upCal == "M")
+    		 , 'M' + YEARMONTH AS ROOT_CD
+#elseif($_parameter.week.upCal == "Q")
+             , 'Q' + YEAR + '_' + HALF + '_' + QUARTER AS ROOT_CD
+#elseif($_parameter.week.upCal == "H")
+             , 'H' + YEAR + '_' + HALF AS ROOT_CD
+#elseif($_parameter.week.upCal == "Y")
+             , 'Y' + YEAR AS ROOT_CD
+#end
+    		 , YEARPWEEK AS BUCKET_VAL
+#if($_parameter.week.isDown == "Y")
+    		 , 'group' AS TYPE
+#else
+    		 , NULL AS TYPE
+#end
+    		 , NULL AS TOT_TYPE
+    		 , SUM(CASE WHEN DAY_NM NOT IN('SAT','SUN') THEN 1 ELSE 0 END) AS WORK_CNT
+    	FROM W_CAL A
+    	GROUP BY YEAR, HALF, QUARTER, YEARMONTH, YEARPWEEK
+#if($_parameter.week.isMt == "Y")
+  #if($_parameter.week.isUp == "Y")
+    #if($_parameter.week.upCal == "M")
+        <include refid="common.subSumMonth"/>
+    #elseif($_parameter.week.upCal == "Q")
+        <include refid="common.subSumQuarter"/>
+    #elseif($_parameter.week.upCal == "H")
+        <include refid="common.subSumHalf"/>
+    #elseif($_parameter.week.upCal == "Y")
+        <include refid="common.subSumYear"/>
+    #end
+  #end
+#end  
+    )
+    SELECT ROOT_CD
+         , CD
+    	 , NM
+    	 , CD AS BUCKET_ID
+    	 , BUCKET_VAL
+    	 , TYPE
+    	 , TOT_TYPE
+#if($_parameter.week.isExp == "Y")
+    	 , 'Y' AS EXPAND_YN
+    	 , CASE WHEN ROW_NUMBER() OVER(ORDER BY ROOT_CD,TOT_TYPE DESC,CD) <![CDATA[>]]> $_parameter.week.expCnt THEN 'Y'
+		        ELSE 'N'
+		   END AS FOLDING_FLAG
+#end
+		 , 'PWEEK' AS BUCKET_TYPE
+		 , WORK_CNT
+    FROM W_MAIN
+    ORDER BY ROOT_CD, TOT_TYPE, CD
+	</select>
+
+	<!-- bucket full week  -->
+	<select id="bucketFullWeekSelect" parameterType="map" resultType="map">
+    /****** [ common.selectBucketFullWeek ] ******/
+    WITH W_CAL AS (<include refid="common.comCal"/>)
+    , W_MAIN AS (
+    	SELECT 'W' + YEARWEEK                AS CD
+    		 , YEARWEEK AS NM
+#if($_parameter.week.upCal == "M")
+    		 , 'M' + YEARMONTH_STD           AS ROOT_CD
+#elseif($_parameter.week.upCal == "Q")
+             , 'Q' + YEAR + '_' + HALF + '_' + QUARTER AS ROOT_CD
+#elseif($_parameter.week.upCal == "H")
+             , 'H' + YEAR + '_' + HALF       AS ROOT_CD
+#elseif($_parameter.week.upCal == "Y")
+             , 'Y' + YEAR                    AS ROOT_CD
+#end
+    		 , YEARWEEK                      AS BUCKET_VAL
+#if($_parameter.week.isDown == "Y")
+    		 , 'group'                       AS TYPE
+#else
+    		 , NULL                          AS TYPE
+#end
+    		 , NULL                          AS TOT_TYPE
+    	FROM W_CAL A
+    	GROUP BY YEARMONTH_STD, YEARWEEK
+#if($_parameter.week.isMt == "Y")
+  #if($_parameter.week.isUp == "Y")
+    #if($_parameter.week.upCal == "M")
+        <include refid="common.subSumFullMonth"/>
+    #elseif($_parameter.week.upCal == "Q")
+        <include refid="common.subSumQuarter"/>
+    #elseif($_parameter.week.upCal == "H")
+        <include refid="common.subSumHalf"/>
+    #elseif($_parameter.week.upCal == "Y")
+        <include refid="common.subSumYear"/>
+    #end
+  #end 
+#end  
+    )
+    SELECT ROOT_CD
+         , CD
+    	 , NM
+    	 , CD AS BUCKET_ID
+    	 , BUCKET_VAL
+    	 , TYPE
+    	 , TOT_TYPE
+#if($_parameter.week.isExp == "Y")
+    	 , 'Y' AS EXPAND_YN
+    	 , CASE WHEN ROW_NUMBER() OVER(ORDER BY ROOT_CD,TOT_TYPE DESC,CD) <![CDATA[>]]> $_parameter.week.expCnt THEN 'Y'
+		        ELSE 'N'
+		   END AS FOLDING_FLAG
+#end
+    	 , 'FWEEK' AS BUCKET_TYPE
+    FROM W_MAIN
+    #if($_parameter.week.isUpDown == "UP")
+    ORDER BY BUCKET_VAL DESC
+    #else
+    ORDER BY ROOT_CD, TOT_TYPE, CD
+    #end
+	</select>
+
+	<!-- bucket week  -->
+	<select id="bucketDaySelect" parameterType="map" resultType="map">
+	/****** [ common.selectBucketDay ] ******/
+	WITH W_CAL AS (<include refid="common.comCal"/>)
+    , W_MAIN AS (
+    	SELECT 'D' + YYYYMMDD                AS CD
+    		 , SUBSTRING(YYYYMMDD,5,2) + '/' + SUBSTRING(YYYYMMDD,7,2) AS NM
+    		 , ISNULL(
+	    		   (
+	                SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+	                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+	                            ELSE CODE_NM
+	                       END AS CODE_NM
+	                  FROM TB_MST_CODE WITH(NOLOCK)
+	                 WHERE BU_CD = @{GV_BU_CD}
+	                   AND GROUP_CD = 'DAY_INDEX'
+	                   AND CODE_CD = A.DAY_NM
+	                   AND USE_FLAG = 'Y'
+	    		   ), A.DAY_NM
+    		   ) AS DAY_NM
+    		 ,'W' + YEARWEEK                 AS ROOT_CD
+    		 , YYYYMMDD                      AS BUCKET_VAL
+    		 , NULL                          AS TYPE
+    		 , NULL                          AS TOT_TYPE
+    		 , CASE WHEN DAY_NM NOT IN('SAT','SUN') THEN 1 ELSE 0 END AS WORK_CNT
+    	FROM W_CAL A
+#if($_parameter.day.isMt == "Y")
+  #if($_parameter.day.isUp == "Y")
+    #if($_parameter.day.upCal == "W")
+        <include refid="common.subSumWeek"/>
+    #elseif($_parameter.day.upCal == "M")
+        <include refid="common.subSumMonth"/>
+    #elseif($_parameter.day.upCal == "Q")
+        <include refid="common.subSumQuarter"/>
+    #elseif($_parameter.day.upCal == "H")
+        <include refid="common.subSumHalf"/>
+    #elseif($_parameter.day.upCal == "Y")
+        <include refid="common.subSumYear"/>
+    #end
+  #end
+#end 
+    )
+    SELECT ROOT_CD
+         , CD
+    	 , CASE WHEN DAY_NM IS NOT NULL THEN NM + ' (' + DAY_NM + ')'
+    	 		ELSE NM
+    	   END AS NM
+    	 , CD AS BUCKET_ID
+    	 , BUCKET_VAL
+#if($_parameter.day.isDown == "Y")
+         , 'group'                       AS TYPE
+#else
+    	 , NULL                          AS TYPE
+#end
+    	 , TOT_TYPE
+    	 , 'DAY' AS BUCKET_TYPE
+    FROM W_MAIN
+    ORDER BY ROOT_CD, TOT_TYPE, CD
+	</select>
+</mapper>

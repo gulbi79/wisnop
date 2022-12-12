@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	<!-- Dimension Master 조회  -->
+	<select id="dimMngSelect" parameterType="map" resultType="map">
+		/****** [ admin.dimMngSelect ] ******/
+		SELECT DIM_CD
+	         , DIM_NM
+	         , DIM_NM_KR
+	         , DIM_NM_CN
+	         , ISNULL(DIM_ALIGN_CD,'L') AS DIM_ALIGN_CD
+	         , DIM_DESC
+	         , USE_FLAG
+	         , CREATE_ID
+	         , CONVERT(VARCHAR(30), CREATE_DTTM, 120) AS CREATE_DTTM
+	         , UPDATE_ID
+	         , CONVERT(VARCHAR(30), UPDATE_DTTM, 120) AS UPDATE_DTTM
+		FROM TB_MST_DIM WITH(NOLOCK)
+		WHERE 1 = 1
+		#if($_parameter.SEARCH_DIM_CD and $_parameter.SEARCH_DIM_CD != "")
+		  AND DIM_CD LIKE '%' + REPLACE(@{SEARCH_DIM_CD},'_','[_]') + '%'
+		#end
+		#if($_parameter.SEARCH_DIM_NM and $_parameter.SEARCH_DIM_NM != "")
+		  AND (DIM_NM LIKE '%' + REPLACE(@{SEARCH_DIM_NM},'_','[_]') + '%'
+		    OR DIM_NM_KR LIKE '%' + REPLACE(@{SEARCH_DIM_NM},'_','[_]') + '%'
+		    OR DIM_NM_CN LIKE '%' + REPLACE(@{SEARCH_DIM_NM},'_','[_]') + '%')
+		#end
+		ORDER BY DIM_CD, DIM_NM
+	</select>
+	
+	<insert id="dimMngInsert" parameterType="map">
+		/****** [ admin.dimMngInsert ] ******/
+	    INSERT INTO TB_MST_DIM 
+	    (
+			DIM_CD
+          , DIM_NM
+          , DIM_NM_KR
+          , DIM_NM_CN
+          , DIM_ALIGN_CD
+          , DIM_DESC
+          , USE_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+	    ) VALUES (
+    	    @{DIM_CD}                
+    	  , @{DIM_NM}                     
+    	  , @{DIM_NM_KR}                     
+    	  , @{DIM_NM_CN}                     
+    	  , @{DIM_ALIGN_CD}                     
+    	  , @{DIM_DESC}                   
+    	  , @{USE_FLAG}                  
+    	  , @{GV_USER_ID}                     
+    	  , DBO.UFN_GETDATE()                    
+    	  , @{GV_USER_ID}                      
+    	  , DBO.UFN_GETDATE()                    
+	    )
+	</insert>
+	
+	<update id="dimMngUpdate" parameterType="map">
+		/****** [ admin.dimMngUpdate ] ******/
+		UPDATE TB_MST_DIM 
+		SET DIM_NM       = @{DIM_NM}
+		  , DIM_NM_KR    = @{DIM_NM_KR}
+		  , DIM_NM_CN    = @{DIM_NM_CN}
+		  , DIM_ALIGN_CD = @{DIM_ALIGN_CD}
+		  , DIM_DESC     = @{DIM_DESC}
+		  , USE_FLAG     = @{USE_FLAG}
+		  , UPDATE_ID    = @{GV_USER_ID}
+		  , UPDATE_DTTM  = DBO.UFN_GETDATE()    
+		WHERE DIM_CD = @{DIM_CD}
+	</update>
+	
+	<delete id="dimMngDelete" parameterType="map">
+		/****** [ admin.dimMngDelete ] ******/
+		DELETE FROM TB_MST_DIM 
+		WHERE DIM_CD = @{DIM_CD}
+	</delete>
+	
+</mapper>

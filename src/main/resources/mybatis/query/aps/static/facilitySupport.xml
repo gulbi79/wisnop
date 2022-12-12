@@ -1,0 +1,493 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	
+	<select id="faciltySupportCalSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.faciltySupportCalSelect ] ******/
+		SELECT TOP 1 CONVERT(VARCHAR, CONVERT(DATETIME, (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.APS_START_WEEK  AND DAY_NM = 'SUN')), 23) AS MIN_DATE
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.APS_END_WEEK  AND DAY_NM = 'SAT')), 23) AS MAX_DATE
+		     , CONVERT(VARCHAR, DBO.UFN_GETDATE(), 23) AS TODAY
+		FROM TB_MST_PLAN_VERSION A1 WITH(NOLOCK)
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A1.BU_CD = @{GV_BU_CD}
+		  AND A1.PLAN_TYPE_CD = 'MP'
+		  AND A1.RELEASE_FLAG = 'N'
+		ORDER BY A1.APS_START_WEEK DESC
+	</select>
+	
+	<select id="facilitySupportAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.facilitySupportAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS11501', 'APS11502', 'APS11503', 'APS11504')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+
+	<select id="facilitySupportPopSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.facilitySupportPopSelect ] ******/
+		SELECT DPOH.ITEM_CD
+		     , MI.ITEM_NM
+		     , MI.SPEC
+		     , MI.ITEM_GROUP_CD
+		     , MIP.ROUTING_ID
+		     , MC2.CODE_CD AS PROD_PART
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+	                ELSE MC2.CODE_NM
+	           END PROD_PART_NM
+		     , MC.CUST_CD
+		     , MC.CUST_NM
+		     , MC3.CODE_CD AS WORKER_GROUP 
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+	                ELSE MC3.CODE_NM
+	           END WORKER_GROUP_NM
+		     
+		     , DPOH.PROD_ORDER_NO
+		     , MC4.CODE_CD AS ORDER_STATUS
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+	                ELSE MC4.CODE_NM
+	           END ORDER_STATUS_NM
+		     , DPOH.PROD_ORDER_QTY
+		     , ISNULL(DPOH.PROD_ORDER_QTY, 0) - ISNULL(DRP.RESULT_QTY, 0) AS REMAIN_QTY
+		     , MI.ITEM_TYPE
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+	                ELSE MC5.CODE_NM
+	           END ITEM_TYPE_NM
+		     , MIP.ROUTING_NO
+		FROM TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+		INNER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+		   ON DPOD.COMPANY_CD = DPOH.COMPANY_CD
+		  AND DPOD.BU_CD = DPOH.BU_CD
+		  AND DPOD.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+		  AND DPOD.ROUTE_ORDER IN ('L', 'S')
+		LEFT OUTER JOIN TB_DYN_ROUTING_PERFORMANCE DRP WITH(NOLOCK)
+		  ON DRP.COMPANY_CD = DPOD.COMPANY_CD
+		 AND DRP.BU_CD = DPOD.BU_CD
+		 AND DRP.PROD_ORDER_NO = DPOD.PROD_ORDER_NO
+		 AND DRP.OPERATION_NO = DPOD.OPERATION_NO
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = DPOH.COMPANY_CD
+		  AND MI.BU_CD = DPOH.BU_CD
+		  AND MI.ITEM_CD = DPOH.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = DPOH.COMPANY_CD
+		  AND MIP.BU_CD = DPOH.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = DPOH.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MI.COMPANY_CD
+		 AND MC.BU_CD = MI.BU_CD
+		 AND MC.CUST_CD = MI.REP_CUST_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = MIP.BU_CD
+		 AND MC1.GROUP_CD = 'PROD_L2'
+		 AND MC1.CODE_CD = MIP.ROUTING_ID
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = MC1.BU_CD
+		 AND MC2.GROUP_CD = 'PROD_PART'
+		 AND MC2.CODE_CD = MC1.ATTB_2_CD
+		 AND MC2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		  ON MC3.BU_CD = DPOH.BU_CD
+		 AND MC3.GROUP_CD = 'WORKER_GROUP'
+		 AND MC3.CODE_CD = DPOH.WORKER_GROUP
+		 AND MC3.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+		  ON MC4.BU_CD = DPOH.BU_CD
+		 AND MC4.GROUP_CD = 'ORDER_STATUS'
+		 AND MC4.CODE_CD = DPOH.ORDER_STATUS
+		 AND MC4.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+		  ON MC5.BU_CD = 'ALL'
+		 AND MC5.GROUP_CD = 'ITEM_TYPE'
+		 AND MC5.CODE_CD = MI.ITEM_TYPE
+		 AND MC5.USE_FLAG = 'Y'
+		WHERE DPOH.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND DPOH.BU_CD = @{GV_BU_CD}
+		  AND NOT EXISTS (
+							SELECT 1
+		                    FROM TB_DYN_RESOURCE_SUPPORT DRS WITH(NOLOCK)
+		                    WHERE DRS.COMPANY_CD = DPOH.COMPANY_CD
+		                      AND DRS.BU_CD = DPOH.BU_CD
+		                      AND DRS.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+		                      AND DRS.DEL_FLAG = 'N'
+		                      AND DPOH.ORDER_STATUS <![CDATA[<>]]> 'CL'
+        					  AND DPOH.DEL_FLAG = 'N'
+		                 )
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+          AND MC2.CODE_CD IN ('$_parameter.prodPart.replace(",","','")')
+  	    #end
+		                 
+		#if($_parameter.ITEM_NM and $_parameter.ITEM_NM != "")
+		  AND (DPOH.ITEM_CD LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%'
+		    OR MI.ITEM_NM LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%')
+		#end
+		#if($_parameter.ordrStatus and $_parameter.ordrStatus != "")
+          AND MC4.CODE_CD IN ('$_parameter.ordrStatus.replace(",","','")')
+  	    #end
+		#if($_parameter.prodOrder and $_parameter.prodOrder != "")
+          AND DPOH.PROD_ORDER_NO = @{prodOrder}
+  	    #end
+	</select>
+	
+	<select id="facilitySupportPop2Select" parameterType="map" resultType="map">
+		/****** [ aps.static.facilitySupportPop2Select ] ******/
+		BEGIN
+			DECLARE @V_PLAN_ID NVARCHAR(8), @V_VERSION_ID NVARCHAR(20), @V_W0 NVARCHAR(6), @V_W1 NVARCHAR(6), @V_W2 NVARCHAR(6)
+			
+			SELECT TOP 1 @V_PLAN_ID = PLAN_ID
+			     , @V_VERSION_ID = VERSION_ID
+			FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND PLAN_TYPE_CD = 'MP'
+			  AND PROD_PART = @{supProdPart}
+			  AND VERSION_TYPE_CD = 'F'
+			  AND RELEASE_FLAG = 'Y'
+			ORDER BY APS_START_DATE DESC
+			 
+			SELECT @V_W0 = START_WEEK
+			FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND PLAN_TYPE_CD = 'MP'
+			  AND PLAN_ID = @V_PLAN_ID
+			   
+			SELECT TOP 1 @V_W1 = YEARWEEK
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YEARWEEK <![CDATA[>]]> @V_W0
+			ORDER BY YYYYMMDD
+			   
+			SELECT TOP 1 @V_W2 = YEARWEEK
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YEARWEEK <![CDATA[>]]> @V_W1
+			ORDER BY YYYYMMDD
+			
+			SELECT MWC.WC_NM
+			     , MR.RESOURCE_CD
+			     , MR.RESOURCE_NM
+			     , HACU.W0_RATE
+			     , HACU.W1_RATE
+			     , HACU.W2_RATE
+			FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+			INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+			   ON MWC.COMPANY_CD = MR.COMPANY_CD
+			  AND MWC.BU_CD = MR.BU_CD
+			  AND MWC.WC_CD = MR.WC_CD
+			LEFT OUTER JOIN 
+			(
+			 	SELECT HACU.COMPANY_CD
+                     , HACU.BU_CD
+                     , HACU.RESOURCE_CD
+                     , ROUND(SUM(CASE WHEN MC.YEARWEEK = @V_W0 AND HACU.MEAS_CD = 'PLAN_TIME' THEN HACU.[VALUE] ELSE 0.0 END) / SUM(CASE WHEN MC.YEARWEEK = @V_W0 AND HACU.MEAS_CD = 'PLAN_TIME' THEN HACU.[VALUE] ELSE 0.0 END) * 100.0, 0) AS W0_RATE
+                     , ROUND(SUM(CASE WHEN MC.YEARWEEK = @V_W1 AND HACU.MEAS_CD = 'PLAN_TIME' THEN HACU.[VALUE] ELSE 0.0 END) / SUM(CASE WHEN MC.YEARWEEK = @V_W1 AND HACU.MEAS_CD = 'PLAN_TIME' THEN HACU.[VALUE] ELSE 0.0 END) * 100.0, 0) AS W1_RATE
+                     , ROUND(SUM(CASE WHEN MC.YEARWEEK = @V_W2 AND HACU.MEAS_CD = 'PLAN_TIME' THEN HACU.[VALUE] ELSE 0.0 END) / SUM(CASE WHEN MC.YEARWEEK = @V_W2 AND HACU.MEAS_CD = 'PLAN_TIME' THEN HACU.[VALUE] ELSE 0.0 END) * 100.0, 0) AS W2_RATE
+				FROM TB_HIS_APS_CAPA_UTIL HACU WITH(NOLOCK)
+				INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+			       ON MC.YYYYMMDD = HACU.YYYYMMDD
+			      AND MC.YEARWEEK BETWEEN @V_W0 AND @V_W2 
+			    WHERE HACU.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND HACU.BU_CD = @{GV_BU_CD}   
+			      AND HACU.PLAN_ID = @V_PLAN_ID
+			      AND HACU.VERSION_ID = @V_VERSION_ID
+			      AND HACU.PROD_PART = @{supProdPart}
+				GROUP BY HACU.COMPANY_CD, HACU.BU_CD, HACU.RESOURCE_CD
+			) HACU
+			ON HACU.COMPANY_CD = MR.COMPANY_CD
+			AND HACU.BU_CD = MR.BU_CD
+			AND HACU.RESOURCE_CD = MR.RESOURCE_CD
+			INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+			   ON MC.BU_CD = MWC.BU_CD
+			  AND MC.GROUP_CD = 'PROD_L2'
+			  AND MC.CODE_CD = MWC.ROUTING_ID
+			  AND MC.ATTB_2_CD = @{supProdPart}
+			WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MR.BU_CD = @{GV_BU_CD} 
+			  AND MR.RESOURCE_TYPE = 'M'
+			#if($_parameter.wcNm and $_parameter.wcNm != "")
+			  AND (MWC.WC_CD LIKE '%'+@{wcNm}+'%' OR MWC.WC_NM LIKE '%'+@{wcNm}+'%')
+			#end 
+			#if($_parameter.resourceCd and $_parameter.resourceCd != "")
+			  AND (MR.RESOURCE_CD LIKE '%'+@{resourceCd}+'%' OR MR.RESOURCE_NM LIKE '%'+@{resourceCd}+'%')
+			#end  
+	   END
+	</select>
+	
+	<select id="facilitySupportPop3Select" parameterType="map" resultType="map">
+		/****** [ aps.static.facilitySupportPop3Select ] ******/
+		
+		SELECT DPOD.OPERATION_NO
+           	 , DPOD.JOB_CD
+             , MC.CODE_NM AS JOB_NM
+             , DPOD.WC_CD
+             , MWC.WC_NM
+             , (ISNULL(DPOD.FIRST_TIME, 0) + ISNULL(DPOD.RUN_TIME, 0) + ISNULL(DPOD.AFTER_TIME, 0)) / 3600 AS PROCESS_TIME
+      	FROM TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+      	LEFT OUTER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+          ON MWC.COMPANY_CD = DPOD.COMPANY_CD
+         AND MWC.BU_CD = DPOD.BU_CD
+         AND MWC.WC_CD = DPOD.WC_CD
+      	LEFT OUTER JOIN 
+      	(
+        	SELECT MC.BU_CD
+                 , MC.CODE_CD
+                 , MC.CODE_NM
+			FROM TB_MST_CODE MC WITH(NOLOCK)
+            WHERE GROUP_CD = 'ROUTE_CD'
+            UNION ALL
+           	SELECT MC.BU_CD
+                 , MC.CODE_CD
+                 , MC.CODE_NM
+            FROM TB_MST_CODE MC WITH(NOLOCK)
+            WHERE GROUP_CD = 'FQC_ROUTE_CD'
+		) MC
+        ON MC.BU_CD = DPOD.BU_CD
+       	AND MC.CODE_CD = DPOD.JOB_CD
+      	WHERE DPOD.COMPANY_CD = @{GV_COMPANY_CD}
+          AND DPOD.BU_CD = @{GV_BU_CD} 
+          AND DPOD.PROD_ORDER_NO = @{prodOrderNo}
+      	ORDER BY DPOD.OPERATION_SEQ
+		
+	</select>			
+
+	<select id="faciltySupportListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.faciltySupportListSelect ] ******/
+		SELECT DRS.COMPANY_CD
+		     , DRS.BU_CD
+		     , DRS.SEQ 
+			 , DRS.REQ_PROD_PART
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+	                ELSE MC1.CODE_NM
+	           END REQ_PROD_PART_NM
+		     , DRS.PROD_ORDER_NO
+		     , MI.ITEM_TYPE
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+	                ELSE MC2.CODE_NM
+	           END ITEM_TYPE_NM
+		     , DPOH.ITEM_CD
+		     , MI.ITEM_NM
+		     , MIP.ROUTING_ID
+		     , MI.SPEC
+		     , DPOH.ROUTING_NO
+		     , DPOH.PROD_ORDER_QTY
+		     , ISNULL(DPOH.PROD_ORDER_QTY, 0) - ISNULL(DRP.RESULT_QTY, 0) AS REMAIN_QTY
+		     , ROUND(DPOD1.PROCESS_TIME / 3600.0, 1) AS PROCESS_TIME
+		     , DRS.JOB_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+	                ELSE MC3.CODE_NM
+	           END JOB_NM
+		     , DRS.SUP_PROD_PART
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+	                ELSE MC4.CODE_NM
+	           END SUP_PROD_PART_DROP
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, DRS.REQ_START_DATE), 23) AS REQ_START_DATE
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, DRS.REQ_END_DATE), 23) AS REQ_END_DATE
+		     , DRS.REQ_QTY
+		     , DRS.REQ_REASON
+		     , dbo.UFN_GET_USER_NAME(DRS.CREATE_ID) AS CREATE_ID
+		     , CONVERT(NVARCHAR, ISNULL(DRS.UPDATE_DTTM, DRS.CREATE_DTTM), 23) AS CREATE_DTTM
+		     , DRS.APPLY_YN
+		     , MWC.WC_NM
+		     , MR.RESOURCE_CD
+		     , MR.RESOURCE_NM
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, DRS.SUP_START_DATE), 23) AS SUP_START_DATE
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, DRS.SUP_END_DATE), 23) AS SUP_END_DATE
+		     , DRS.REMARK
+		     , dbo.UFN_GET_USER_NAME(DRS.ACCEPT_USER_ID) AS ACCEPT_USER_ID
+		     , CONVERT(NVARCHAR, DRS.ACCEPT_DTTM, 120) AS ACCEPT_DTTM
+		     , CASE WHEN DRS.CREATE_ID = @{GV_USER_ID} THEN 'Y' ELSE 'N' END USER_AUTH_YN
+		     , DPOD.OPERATION_NO 
+		FROM TB_DYN_RESOURCE_SUPPORT DRS WITH(NOLOCK)
+		INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+		   ON DPOH.COMPANY_CD = DRS.COMPANY_CD
+		  AND DPOH.BU_CD = DRS.BU_CD
+		  AND DPOH.PROD_ORDER_NO = DRS.PROD_ORDER_NO
+		INNER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+		   ON DPOD.COMPANY_CD = DPOH.COMPANY_CD
+		  AND DPOD.BU_CD = DPOH.BU_CD
+		  AND DPOD.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+		  AND DPOD.ROUTE_ORDER IN ('L', 'S')
+		LEFT OUTER JOIN TB_DYN_ROUTING_PERFORMANCE DRP WITH(NOLOCK)
+		  ON DRP.COMPANY_CD = DPOD.COMPANY_CD
+		 AND DRP.BU_CD = DPOD.BU_CD
+		 AND DRP.PROD_ORDER_NO = DPOD.PROD_ORDER_NO
+		 AND DRP.OPERATION_NO = DPOD.OPERATION_NO
+		OUTER APPLY 
+		(
+			SELECT SUM(ISNULL(DPOD.FIRST_TIME, 0) + ISNULL(DPOD.RUN_TIME, 0) + ISNULL(DPOD.AFTER_TIME, 0)) AS PROCESS_TIME
+		    FROM TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+		    WHERE DPOD.COMPANY_CD = DRS.COMPANY_CD
+		      AND DPOD.BU_CD = DRS.BU_CD
+		      AND DPOD.PROD_ORDER_NO = DRS.PROD_ORDER_NO
+		      AND DPOD.JOB_CD = DRS.JOB_CD
+		) DPOD1
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = DPOH.COMPANY_CD
+		  AND MI.BU_CD = DPOH.BU_CD
+		  AND MI.ITEM_CD = DPOH.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = DPOH.COMPANY_CD
+		  AND MIP.BU_CD = DPOH.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = DPOH.ITEM_CD
+		LEFT OUTER JOIN TB_MST_RESOURCE MR WITH(NOLOCK)
+		  ON MR.COMPANY_CD = DRS.COMPANY_CD
+		 AND MR.BU_CD = DRS.BU_CD
+		 AND MR.PLANT_CD = 'WF01'
+		 AND MR.RESOURCE_CD = DRS.RESOURCE_CD
+		LEFT OUTER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+		  ON MWC.COMPANY_CD = MR.COMPANY_CD
+		 AND MWC.BU_CD = MR.BU_CD
+		 AND MWC.PLANT_CD = MR.PLANT_CD
+		 AND MWC.WC_CD = MR.WC_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = DRS.BU_CD
+		 AND MC1.GROUP_CD = 'PROD_PART'
+		 AND MC1.CODE_CD = DRS.REQ_PROD_PART
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = 'ALL'
+		 AND MC2.GROUP_CD = 'ITEM_TYPE'
+		 AND MC2.CODE_CD = MI.ITEM_TYPE
+		LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		  ON MC3.BU_CD = DRS.BU_CD
+		 AND MC3.GROUP_CD = 'ROUTE_CD'
+		 AND MC3.CODE_CD = DRS.JOB_CD
+		LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+		  ON MC4.BU_CD = DRS.BU_CD
+		 AND MC4.GROUP_CD = 'PROD_PART'
+		 AND MC4.CODE_CD = DRS.SUP_PROD_PART
+		LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+		  ON MC5.BU_CD = 'ALL'
+		 AND MC5.GROUP_CD = 'APPLY_YN'
+		 AND MC5.CODE_CD = DRS.APPLY_YN
+		WHERE DRS.COMPANY_CD = @{GV_COMPANY_CD}   
+		  AND DRS.BU_CD = @{GV_BU_CD}
+		  AND DRS.DEL_FLAG = 'Y'
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+          AND DRS.REQ_PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+  	    #end
+		#if($_parameter.supProdPart and $_parameter.supProdPart != "")
+          AND DRS.SUP_PROD_PART IN ('$_parameter.supProdPart.replace(",","','")')
+  	    #end
+		#if($_parameter.itemType and $_parameter.itemType != "")
+          AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+  	    #end
+  	    #if($_parameter.item_cd and $_parameter.item_cd != "")
+		  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		#end
+		  AND DRS.REQ_END_DATE BETWEEN @{fromCal} AND @{toCal} 
+	</select>
+	
+	<insert id="faciltySupportListInsert" parameterType="map">
+		/****** [ aps.static.faciltySupportListInsert ] ******/
+		INSERT INTO TB_DYN_RESOURCE_SUPPORT 
+		(
+			COMPANY_CD
+		  , BU_CD
+		  , PROD_ORDER_NO
+		  , REQ_PROD_PART
+		  , JOB_CD
+		  , SUP_PROD_PART
+		  , REQ_START_DATE
+		  , REQ_END_DATE
+		  , REQ_QTY
+		  , REQ_REASON
+		  , DEL_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		  , UPDATE_ID
+		  , UPDATE_DTTM
+		) VALUES (
+			@{GV_COMPANY_CD}
+		  , @{GV_BU_CD}
+		  , @{PROD_ORDER_NO}
+		  , @{REQ_PROD_PART}
+		  , @{JOB_CD}
+		  , @{SUP_PROD_PART}
+		  , REPLACE(@{REQ_START_DATE}, '-', '')
+		  , REPLACE(@{REQ_END_DATE}, '-', '')
+		  , @{REQ_QTY} 
+		  , @{REQ_REASON}
+		  , 'Y'
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		);
+	</insert>
+	
+	<update id="faciltySupportListUpdate" parameterType="map">
+		/****** [ aps.static.faciltySupportListUpdate ] ******/
+		UPDATE TB_DYN_RESOURCE_SUPPORT
+		   SET JOB_CD         = @{JOB_CD}
+		     , SUP_PROD_PART  = @{SUP_PROD_PART}
+			 , REQ_START_DATE = REPLACE(@{REQ_START_DATE}, '-', '')
+			 , REQ_END_DATE   = REPLACE(@{REQ_END_DATE}, '-', '')
+			 , REQ_QTY  	  = @{REQ_QTY} 
+			 , REQ_REASON  	  = @{REQ_REASON}
+			 , APPLY_YN  	  = @{APPLY_YN}
+			 , RESOURCE_CD    = @{RESOURCE_CD} 
+			 , SUP_START_DATE = REPLACE(@{SUP_START_DATE}, '-', '') 
+			 , SUP_END_DATE   = REPLACE(@{SUP_END_DATE}, '-', '')
+			 , REMARK  		  = @{REMARK}
+			 , ACCEPT_USER_ID = @{GV_USER_ID} 
+			 , ACCEPT_DTTM    = DBO.UFN_GETDATE()
+			 , DEL_FLAG 	  = 'Y'
+			 , UPDATE_DTTM    = DBO.UFN_GETDATE()
+			 , UPDATE_ID      = @{GV_USER_ID}
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}   
+		  AND BU_CD = @{GV_BU_CD}   
+		  AND SEQ = @{SEQ}     
+		 
+	</update>
+	<update id="faciltySupportListDelUpdate" parameterType="map">
+		/****** [ aps.static.faciltySupportListDelUpdate ] ******/
+		UPDATE TB_DYN_RESOURCE_SUPPORT
+		   SET DEL_FLAG 	  = 'N'
+			 , UPDATE_DTTM    = DBO.UFN_GETDATE()
+			 , UPDATE_ID      = @{GV_USER_ID}
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}   
+		  AND BU_CD = @{GV_BU_CD}   
+		  AND SEQ = @{SEQ}    
+	</update>
+	
+	
+	
+	
+	
+	
+	
+</mapper>

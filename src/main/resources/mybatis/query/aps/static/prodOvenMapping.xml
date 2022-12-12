@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	<select id="prodOvenMappingBucketSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.prodOvenMappingBucketSelect ] ******/
+		SELECT DISTINCT NULL AS ROOT_CD
+		     , 'B' + B.RESOURCE_NM AS CD
+		     , B.RESOURCE_NM AS NM
+		     , 'B' + B.RESOURCE_NM AS BUCKET_ID
+		     , B.RESOURCE_NM AS BUCKET_VAL
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+		FROM TB_MST_WORK_CENTER A WITH(NOLOCK)
+		INNER JOIN TB_MST_RESOURCE B WITH(NOLOCK)
+		   ON A.COMPANY_CD  = B.COMPANY_CD
+		  AND A.BU_CD       = B.BU_CD
+		  AND A.PLANT_CD    = B.PLANT_CD
+		  AND A.WC_CD       = B.WC_CD
+		INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		   ON A.BU_CD = MC1.BU_CD
+		  AND A.ROUTING_ID  = MC1.CODE_CD
+		  AND MC1.GROUP_CD  = 'PROD_L2'
+		WHERE A.COMPANY_CD  = @{GV_COMPANY_CD}
+		  AND A.BU_CD       = @{GV_BU_CD}
+		  AND B.OVEN_FLAG   = 'Y'
+		  AND B.USE_FLAG    = 'Y'
+		  AND MC1.ATTB_2_CD = @{prodPartCd}
+		ORDER BY B.RESOURCE_NM
+	</select>
+	
+	<select id="prodOvenMappingBucket2Select" parameterType="map" resultType="map">
+		/****** [ aps.static.prodOvenMappingBucket2Select ] ******/
+		SELECT 'B' + B.RESOURCE_NM AS ROOT_CD
+		     , 'B' + B.RESOURCE_CD AS CD
+		     , B.RESOURCE_CD AS NM
+		     , 'B' + B.RESOURCE_CD AS BUCKET_ID
+		     , B.RESOURCE_CD AS BUCKET_VAL
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		FROM TB_MST_WORK_CENTER A WITH(NOLOCK)
+		INNER JOIN TB_MST_RESOURCE B WITH(NOLOCK)
+		   ON A.COMPANY_CD  = B.COMPANY_CD
+		  AND A.BU_CD       = B.BU_CD
+		  AND A.PLANT_CD    = B.PLANT_CD
+		  AND A.WC_CD       = B.WC_CD
+		INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		   ON A.BU_CD = MC1.BU_CD
+		  AND A.ROUTING_ID  = MC1.CODE_CD
+		  AND MC1.GROUP_CD  = 'PROD_L2'
+		WHERE A.COMPANY_CD  = @{GV_COMPANY_CD}
+		  AND A.BU_CD       = @{GV_BU_CD}
+		  AND B.OVEN_FLAG   = 'Y'
+		  AND B.USE_FLAG    = 'Y'
+		  AND MC1.ATTB_2_CD = @{prodPartCd}
+		ORDER BY B.RESOURCE_NM
+	</select>
+	
+	<select id="prodOvenMappingSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.prodOvenMappingSelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT DISTINCT MC3.CODE_CD AS PROD_PART_CD
+			     , MC3.CODE_NM AS PROD_PART_NM
+			     , MC1.ATTB_1_CD AS ROUTING_ID
+			     , MC2.CODE_CD AS ANNEALING_ITEM_GROUP_CD
+			     , MC2.CODE_NM AS ANNEALING_ITEM_GROUP_NM
+			     , MC4.CODE_CD AS ANNEALING_REPT_ROUTE
+			     , MC4.CODE_NM AS ANNEALING_REPT_ROUTE_NM
+			     , MAR.RESOURCE_CD
+			     , MAR.VALID_FLAG
+			     , ISNULL(MAR.COMPANY_CD, @{GV_COMPANY_CD}) AS COMPANY_CD
+			     , ISNULL(MAR.BU_CD, @{GV_BU_CD}) AS BU_CD
+			     , MC2.SORT AS MC2_SORT
+			FROM TB_MST_CODE MC1 WITH(NOLOCK)
+			INNER JOIN 
+			(
+				SELECT BU_CD
+				     , CODE_CD
+				     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+				            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+				            ELSE CODE_NM
+				       END AS CODE_NM
+				     , GROUP_CD
+				     , SORT
+				     , ATTB_1_CD
+				FROM TB_MST_CODE WITH(NOLOCK)
+			) MC2
+			ON MC2.BU_CD = MC1.BU_CD
+			AND MC2.GROUP_CD = 'ANNEALING_ITEM_GROUP_CD'
+			AND MC2.CODE_CD = MC1.ATTB_3_CD
+			INNER JOIN 
+			(
+				SELECT BU_CD
+				     , CODE_CD
+				     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+				            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+				            ELSE CODE_NM
+				       END AS CODE_NM
+				     , GROUP_CD
+				     , SORT
+				FROM TB_MST_CODE WITH(NOLOCK)
+			) MC3
+			ON MC3.BU_CD = MC2.BU_CD
+			AND MC3.GROUP_CD = 'PROD_PART'
+			AND MC3.CODE_CD = MC2.ATTB_1_CD
+			INNER JOIN 
+			(
+				SELECT BU_CD
+				     , CODE_CD
+				     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+				            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+				            ELSE CODE_NM
+				       END AS CODE_NM
+				     , GROUP_CD
+				     , SORT
+				FROM TB_MST_CODE WITH(NOLOCK)
+			) MC4
+			ON MC4.BU_CD = MC1.BU_CD
+			AND MC4.GROUP_CD = 'ANNEALING_REPT_ROUTE'
+			LEFT OUTER JOIN TB_MAP_ANNEALING_RESOURCE MAR WITH(NOLOCK)
+			  ON MAR.COMPANY_CD = @{GV_COMPANY_CD}
+			 AND MAR.BU_CD = MC1.BU_CD
+			 AND MAR.PROD_PART = MC3.CODE_CD
+			 AND MAR.ROUTING_ID = MC1.ATTB_1_CD
+			 AND MAR.ANNEALING_ITEM_GROUP = MC2.CODE_CD
+			 AND MAR.ANNEALING_REPT_ROUTE = MC4.CODE_CD
+			WHERE MC1.BU_CD = @{GV_BU_CD}
+			  AND MC1.GROUP_CD = 'ANNEALING_ITEM_GROUP_MAPPING'
+			  AND MC1.USE_FLAG = 'Y'
+		)
+		SELECT T.COMPANY_CD
+		     , T.BU_CD
+		     , T.PROD_PART_CD
+		     , T.ANNEALING_ITEM_GROUP_CD
+		     , T.ANNEALING_REPT_ROUTE
+		     , T.PROD_PART_NM
+		     , T.PROD_PART_NM_NM
+		     , T.ROUTING_ID
+		     , T.ROUTING_ID_NM
+		     , T.ANNEALING_ITEM_GROUP_NM
+		     , T.ANNEALING_ITEM_GROUP_NM_NM
+		     , T.ANNEALING_REPT_ROUTE_NM
+		     , T.ANNEALING_REPT_ROUTE_NM_NM
+			#foreach($bucketMap in $_parameter.bucketList)
+		     , MAX(CASE WHEN T.RESOURCE_CD = '$bucketMap.BUCKET_VAL' THEN T.VALID_FLAG ELSE NULL END) AS $bucketMap.CD
+		    #end
+		FROM 
+		(
+			SELECT A.COMPANY_CD
+	             , A.BU_CD
+	             , A.PROD_PART_CD
+	             , A.ANNEALING_ITEM_GROUP_CD
+	             , A.ANNEALING_REPT_ROUTE
+	             , A.ROUTING_ID
+	             , ISNULL(A.ROUTING_ID, ' ') AS ROUTING_ID_NM
+	             , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+	             , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+	             , ISNULL(A.ANNEALING_ITEM_GROUP_NM, ' ') AS ANNEALING_ITEM_GROUP_NM
+	             , ISNULL(A.ANNEALING_ITEM_GROUP_NM, ' ') AS ANNEALING_ITEM_GROUP_NM_NM
+	             , ISNULL(A.ANNEALING_REPT_ROUTE_NM, ' ') AS ANNEALING_REPT_ROUTE_NM
+	             , ISNULL(A.ANNEALING_REPT_ROUTE_NM, ' ') AS ANNEALING_REPT_ROUTE_NM_NM
+	             , A.RESOURCE_CD
+	             , A.VALID_FLAG
+	             , A.MC2_SORT
+			FROM W_MAIN A
+		    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD = @{GV_BU_CD}
+		      AND A.PROD_PART_CD = @{prodPart}
+			#if($_parameter.routingId and $_parameter.routingId != "")
+		      AND A.ROUTING_ID IN ('$_parameter.routingId.replace(",","','")')
+		    #end
+		    #if($_parameter.annealingItemGroupCd and $_parameter.annealingItemGroupCd != "")
+		      AND A.ANNEALING_ITEM_GROUP_CD IN ('$_parameter.annealingItemGroupCd.replace(",","','")')
+		    #end
+		    #if($_parameter.annealingReptRoute and $_parameter.annealingReptRoute != "")
+		      AND A.ANNEALING_REPT_ROUTE IN ('$_parameter.annealingReptRoute.replace(",","','")')
+			#end
+		) T
+		GROUP BY T.COMPANY_CD, T.BU_CD, T.PROD_PART_CD, T.ANNEALING_ITEM_GROUP_CD, T.ROUTING_ID, T.ROUTING_ID_NM, T.ANNEALING_REPT_ROUTE, T.PROD_PART_NM, T.PROD_PART_NM_NM
+		       , T.ANNEALING_ITEM_GROUP_NM, T.ANNEALING_ITEM_GROUP_NM_NM, T.ANNEALING_REPT_ROUTE_NM, T.ANNEALING_REPT_ROUTE_NM_NM, T.MC2_SORT
+		ORDER BY T.COMPANY_CD, T.BU_CD, T.PROD_PART_NM, T.ROUTING_ID_NM, T.MC2_SORT, T.ANNEALING_REPT_ROUTE_NM
+	</select>
+	
+	<select id="prodOvenMappingAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.prodOvenMappingAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS11101', 'APS11102', 'APS11103','APS11104')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<insert id="prodOvenMappingMerge" parameterType="map">
+		/****** [ aps.static.prodOvenMappingMerge ] ******/
+		MERGE TB_MAP_ANNEALING_RESOURCE A
+		USING 
+		(
+			SELECT @{COMPANY_CD} AS COMPANY_CD
+		         , @{BU_CD} AS BU_CD
+		         , @{PROD_PART} AS PROD_PART
+		         , @{ROUTING_ID} AS ROUTING_ID
+		         , @{ANNEALING_ITEM_GROUP_CD} AS ANNEALING_ITEM_GROUP
+		         , @{ANNEALING_REPT_ROUTE} AS ANNEALING_REPT_ROUTE
+		         , @{RESOURCE_CD} AS RESOURCE_CD
+		) B
+		ON 
+		(
+			A.COMPANY_CD           = B.COMPANY_CD
+		    AND A.BU_CD                = B.BU_CD
+		    AND A.PROD_PART            = B.PROD_PART
+		    AND A.ROUTING_ID           = B.ROUTING_ID
+		    AND A.ANNEALING_ITEM_GROUP = B.ANNEALING_ITEM_GROUP
+		    AND A.ANNEALING_REPT_ROUTE = B.ANNEALING_REPT_ROUTE
+		    AND A.RESOURCE_CD          = B.RESOURCE_CD
+		)
+		WHEN MATCHED THEN
+		UPDATE SET UPDATE_ID   = @{GV_USER_ID}
+		         , UPDATE_DTTM = dbo.UFN_GETDATE()
+				#if($_parameter.VALID_FLAG and $_parameter.VALID_FLAG != "")
+		         , VALID_FLAG  = @{VALID_FLAG}
+		        #else
+		         , VALID_FLAG  = NULL
+		        #end
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+			COMPANY_CD
+		  , BU_CD
+		  , PROD_PART
+		  , ROUTING_ID
+		  , ANNEALING_ITEM_GROUP
+		  , ANNEALING_REPT_ROUTE
+		  , RESOURCE_CD
+		  , VALID_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		)VALUES(
+			B.COMPANY_CD
+		  , B.BU_CD
+		  , B.PROD_PART
+		  , B.ROUTING_ID
+		  , B.ANNEALING_ITEM_GROUP
+		  , B.ANNEALING_REPT_ROUTE
+		  , B.RESOURCE_CD
+		#if($_parameter.VALID_FLAG and $_parameter.VALID_FLAG != "")
+		  , @{VALID_FLAG}
+		#else
+		  , NULL
+		#end
+		  , @{GV_USER_ID}
+		  , dbo.UFN_GETDATE()
+		);
+	</insert>
+</mapper>

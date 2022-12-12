@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+	<select id="itemCustGroupMappingUserRoleSelect" parameterType="map" resultType="map">
+		/****** [ master.master.itemCustGroupMappingUserRoleSelect ] ******/
+		SELECT A.BU_CD
+		     , A.ROLE_CD
+		     , A.ROLE_NM
+		FROM TB_MST_ROLE A, TB_MAP_USER_ROLE B
+		WHERE A.BU_CD = B.BU_CD
+		  AND A.ROLE_CD = B.ROLE_CD
+		  AND A.USE_FLAG = 'Y'
+		  AND B.USE_FLAG = 'Y'
+		  AND B.USER_ID = @{GV_USER_ID}
+	</select>
+	
+	
+	<select id="itemCustGroupMappingAuthAp1Select" parameterType="map" resultType="map">
+		/****** [ master.master.itemCustGroupMappingAuthAp1Select ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd="DP_AUTH_CTRL")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT U.USER_ID AS CODE_CD
+		     , U.USER_NM + CASE WHEN D.DEPT_NM IS NULL THEN '' ELSE ' (' + D.DEPT_NM + ')' END AS CODE_NM
+		     , M.AP2_USER_ID
+		FROM TB_MST_USER U WITH(NOLOCK)
+		INNER JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+		   ON (U.USER_ID = R.USER_ID AND R.BU_CD = @{GV_BU_CD} AND R.USE_FLAG = 'Y')
+		INNER JOIN W_CODE C
+		   ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_1_CD = 'Y')
+		LEFT OUTER JOIN TB_MST_DEPT D WITH(NOLOCK)
+		   ON (U.DEPT_CD = D.DEPT_CD AND D.COMPANY_CD = @{GV_COMPANY_CD})
+		LEFT OUTER JOIN TB_MAP_AP1_AP2 M WITH(NOLOCK)
+		  ON (U.USER_ID = M.AP1_USER_ID AND M.COMPANY_CD = @{GV_COMPANY_CD})
+		WHERE U.DEL_FLAG = 'N'
+		  AND U.USE_FLAG = 'Y'
+		#if($_parameter.CHECK_ROLE == 'AP2')
+		  AND M.AP2_USER_ID = @{GV_USER_ID}
+		#end
+		GROUP BY U.USER_ID, U.USER_NM, D.DEPT_NM, M.AP2_USER_ID
+	</select>
+	
+	<select id="itemCustGroupMappingAuthAp2Select" parameterType="map" resultType="map">
+		/****** [ master.master.itemCustGroupMappingAuthAp2Select ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd="DP_AUTH_CTRL")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT U.USER_ID AS CODE_CD
+		     , U.USER_NM + CASE WHEN D.DEPT_NM IS NULL THEN '' ELSE ' (' + D.DEPT_NM + ')' END AS CODE_NM
+		FROM TB_MST_USER U WITH(NOLOCK)
+		INNER JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+		   ON (U.USER_ID = R.USER_ID AND R.BU_CD = @{GV_BU_CD} AND R.USE_FLAG = 'Y')
+		INNER JOIN W_CODE C
+		   ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_2_CD = 'Y')
+		LEFT OUTER JOIN TB_MST_DEPT D WITH(NOLOCK)
+		  ON (U.DEPT_CD = D.DEPT_CD AND D.COMPANY_CD = @{GV_COMPANY_CD})
+		WHERE U.DEL_FLAG = 'N'
+		  AND U.USE_FLAG = 'Y'
+		GROUP BY U.USER_ID, U.USER_NM, D.DEPT_NM
+	</select>
+	
+	<select id="itemCustGroupMappingSalesOrgSelect" parameterType="map" resultType="map">
+		/****** [ master.master.itemCustGroupMappingSalesOrgSelect ] ******/
+		SELECT SALES_ORG_LVL4_CD+'_'+SALES_ORG_LVL5_CD AS CODE_CD
+		     , ISNULL(SALES_ORG_LVL4_NM, SALES_ORG_LVL4_CD)+'_'+ISNULL(SALES_ORG_LVL5_NM, SALES_ORG_LVL5_CD) AS CODE_NM
+		FROM UV_MAP_SALES_ORG WITH(NOLOCK)
+		WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		  AND BU_CD             = @{GV_BU_CD}
+		  AND SALES_ORG_LVL1_CD IS NOT NULL
+		  AND SALES_ORG_LVL2_CD IS NOT NULL
+		  AND SALES_ORG_LVL3_CD IS NOT NULL
+		  AND SALES_ORG_LVL4_CD IS NOT NULL
+		  AND SALES_ORG_LVL5_CD IS NOT NULL
+		GROUP BY SALES_ORG_LVL4_CD, SALES_ORG_LVL4_NM, SALES_ORG_LVL5_CD, SALES_ORG_LVL5_NM
+	</select>
+	
+	<select id="itemCustGroupMappingSelect" parameterType="map" resultType="map">
+		/****** [ master.master.itemCustGroupMappingSelect ] ******/
+		<include refid="include.macros"/>
+		#getProductTree()
+		#getCustomerTree()
+		#getSalesOrgTree()
+		
+		WITH MAP_ITEM_CUST_GROUP AS 
+		(
+			SELECT C.COMPANY_CD
+		         , C.BU_CD
+		         , C.ITEM_CD
+		         , I.ITEM_NM
+		         , I.SPEC
+		         , I.DRAW_NO
+		         , C.CUST_GROUP_CD
+		         , G.CUST_GROUP_NM
+		         , CASE WHEN C.SALES_ORG_LVL4_CD IS NULL OR C.SALES_ORG_LVL5_CD IS NULL THEN NULL
+		                ELSE C.SALES_ORG_LVL4_CD+'_'+C.SALES_ORG_LVL5_CD
+		            END AS SALES_ORG_CD
+		         , C.SALES_PLAN_YN
+		         , C.REMARK
+		         , 'KRW' AS SALES_PRICE_CURRENCY
+		         , C.SALES_PRICE_KRW AS SALES_PRICE
+		         , C.VALID_FLAG
+		         , CONVERT(VARCHAR(19), C.CREATE_DTTM, 120) AS CREATE_DTTM
+		         , C.CREATE_ID
+		         , CONVERT(VARCHAR(19), C.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		         , C.UPDATE_ID
+			FROM TB_MAP_ITEM_CUST_GROUP C WITH(NOLOCK)
+		    INNER JOIN TB_MST_ITEM I WITH(NOLOCK)
+		       ON C.COMPANY_CD = I.COMPANY_CD
+		      AND C.BU_CD      = I.BU_CD
+		      AND C.ITEM_CD    = I.ITEM_CD
+		      AND I.USE_FLAG   = 'Y'
+		      AND I.VALID_FLAG = 'Y'
+			#set($treeAlias = "I")
+		    <include refid="include.productTree"/>
+			INNER JOIN TB_MST_CUSTOMER M WITH(NOLOCK)
+		       ON C.COMPANY_CD    = M.COMPANY_CD
+		      AND C.BU_CD         = M.BU_CD
+		      AND C.CUST_GROUP_CD = M.CUST_CD
+		      AND M.VALID_FLAG    = 'Y'
+			LEFT OUTER JOIN TB_MST_CUST_GROUP G WITH(NOLOCK)
+		      ON C.COMPANY_CD    = G.COMPANY_CD
+		     AND C.BU_CD         = G.BU_CD
+		     AND C.CUST_GROUP_CD = G.CUST_GROUP_CD
+		     AND G.USE_FLAG      = 'Y'
+			LEFT OUTER JOIN UV_MAP_SALES_ORG SO WITH(NOLOCK)
+	          ON C.COMPANY_CD        = SO.COMPANY_CD
+		     AND C.BU_CD             = SO.BU_CD
+	         AND C.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+	         AND ((C.SALES_ORG_LVL5_CD IS NULL)
+	          OR (C.SALES_ORG_LVL5_CD IS NOT NULL AND C.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD))
+			WHERE C.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND C.BU_CD         = @{GV_BU_CD}
+			#if($_parameter.customerList and $_parameter.customerList.size() > 0)
+			  AND EXISTS (
+		         			SELECT 1
+		           			FROM TB_MST_CUSTOMER TT
+		          			WHERE TT.COMPANY_CD    = C.COMPANY_CD
+		            		  AND TT.BU_CD         = C.BU_CD
+		            		  AND TT.CUST_GROUP_CD = C.CUST_GROUP_CD
+		            		  AND TT.VALID_FLAG    = 'Y'
+		            		#set($treeAlias = "TT")
+		            		<include refid="include.customerTree"/>
+		       			 )
+			#end
+			#if($_parameter.salesOrgList and $_parameter.salesOrgList.size() > 0)
+			#set($treeAlias = "SO")
+			<include refid="include.salesOrgTree"/>
+			#end
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+		      AND C.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		      AND (C.ITEM_CD LIKE '%' + @{item_nm} + '%' OR I.ITEM_NM LIKE '%' + @{item_nm} + '%')
+			#end
+			#if(($_parameter.ap1Pic and $_parameter.ap1Pic != "") or ($_parameter.ap2Pic and $_parameter.ap2Pic != ""))
+		      AND EXISTS ( 
+		         			SELECT 1
+		           			FROM TB_MAP_ITEM_CUST_GROUP_AP1 AP1 WITH(NOLOCK)
+							#if($_parameter.ap2Pic and $_parameter.ap2Pic != "")
+	               			INNER JOIN TB_MAP_AP1_AP2 AP2 WITH(NOLOCK)
+	                 		   ON AP1.COMPANY_CD  = AP2.COMPANY_CD
+		               		  AND AP1.AP1_USER_ID = AP2.AP1_USER_ID
+		               		  AND AP2.AP2_USER_ID IN ('$_parameter.ap2Pic.replace(",","','")')
+							#end
+		          			WHERE AP1.COMPANY_CD    = C.COMPANY_CD
+		            		  AND AP1.BU_CD         = C.BU_CD
+		            		  AND AP1.ITEM_CD       = C.ITEM_CD
+		            		  AND AP1.CUST_GROUP_CD = C.CUST_GROUP_CD
+		            		  AND AP1.USE_FLAG      = 'Y'
+							#if($_parameter.ap1Pic and $_parameter.ap1Pic != "")
+		            		  AND AP1.AP1_USER_ID   IN ('$_parameter.ap1Pic.replace(",","','")')
+							#end
+		       			 )
+			#end
+			#if($_parameter.salesPlanYn and $_parameter.salesPlanYn != "")
+		      AND C.SALES_PLAN_YN = @{salesPlanYn}
+			#end
+			#if($_parameter.remark and $_parameter.remark != "")
+		      AND C.REMARK LIKE '%'+@{remark}+'%'
+			#end
+			#if($_parameter.drawNo and $_parameter.drawNo != "")
+		      AND I.DRAW_NO LIKE '%'+@{drawNo}+'%'
+			#end
+			#if($_parameter.salesPriceYn and $_parameter.salesPriceYn == "Y")
+		      AND C.SALES_PRICE_KRW > 0
+			#elseif($_parameter.salesPriceYn and $_parameter.salesPriceYn == "N")
+		      AND (C.SALES_PRICE_KRW IS NULL OR C.SALES_PRICE_KRW <![CDATA[<=]]> 0)
+			#end
+			#if($_parameter.validYnErp and $_parameter.validYnErp != "")
+		      AND C.VALID_FLAG = @{validYnErp}
+			#end
+		),
+	 	W_CODE AS 
+	 	(
+		    #set($_parameter.groupCd="DP_AUTH_CTRL")
+		    <include refid="include.mstCode"/>
+		),
+		AP1_LIST AS 
+		(
+			SELECT GR.COMPANY_CD, GR.BU_CD, GR.ITEM_CD, GR.CUST_GROUP_CD, M1.AP1_USER_ID
+		    FROM MAP_ITEM_CUST_GROUP GR
+		    INNER JOIN TB_MAP_ITEM_CUST_GROUP_AP1 M1 WITH(NOLOCK)
+		       ON (GR.COMPANY_CD = M1.COMPANY_CD AND GR.BU_CD = M1.BU_CD AND GR.ITEM_CD = M1.ITEM_CD AND GR.CUST_GROUP_CD = M1.CUST_GROUP_CD AND M1.USE_FLAG = 'Y')
+			INNER JOIN TB_MST_USER US WITH(NOLOCK)
+		       ON (M1.AP1_USER_ID = US.USER_ID AND US.DEL_FLAG = 'N' AND US.USE_FLAG = 'Y')
+			INNER JOIN TB_MAP_USER_ROLE RL WITH(NOLOCK)
+		       ON (M1.AP1_USER_ID = RL.USER_ID AND M1.BU_CD = RL.BU_CD AND RL.USE_FLAG = 'Y')
+			INNER JOIN W_CODE CD
+		       ON (RL.ROLE_CD = CD.CODE_CD AND CD.ATTB_1_CD = 'Y')
+			GROUP BY GR.COMPANY_CD, GR.BU_CD, GR.ITEM_CD, GR.CUST_GROUP_CD, M1.AP1_USER_ID
+		),
+		AP2_LIST AS 
+		(
+		    SELECT M1.COMPANY_CD, M1.BU_CD, M1.ITEM_CD, M1.CUST_GROUP_CD, M2.AP2_USER_ID
+			FROM AP1_LIST M1
+		    INNER JOIN TB_MAP_AP1_AP2 M2 WITH(NOLOCK)
+		       ON (M1.COMPANY_CD = M2.COMPANY_CD and M1.AP1_USER_ID = M2.AP1_USER_ID)
+			INNER JOIN TB_MST_USER US WITH(NOLOCK)
+		       ON (M2.AP2_USER_ID = US.USER_ID AND US.DEL_FLAG = 'N' AND US.USE_FLAG = 'Y')
+			INNER JOIN TB_MAP_USER_ROLE RL WITH(NOLOCK)
+		       ON (M2.AP2_USER_ID = RL.USER_ID AND M1.BU_CD = RL.BU_CD AND RL.USE_FLAG = 'Y')
+			INNER JOIN W_CODE CD
+		       ON (RL.ROLE_CD = CD.CODE_CD AND CD.ATTB_2_CD = 'Y')
+		    GROUP BY M1.COMPANY_CD, M1.BU_CD, M1.ITEM_CD, M1.CUST_GROUP_CD, M2.AP2_USER_ID
+		)
+		SELECT M.* 
+		     , (SELECT COUNT(1) FROM AP1_LIST M1
+		         WHERE M1.COMPANY_CD = M.COMPANY_CD AND M1.BU_CD = M.BU_CD AND M1.ITEM_CD = M.ITEM_CD AND M1.CUST_GROUP_CD = M.CUST_GROUP_CD) AS AP1_PIC_CNT
+		     , STUFF((SELECT ',' + M1.AP1_USER_ID FROM AP1_LIST M1
+		               WHERE M1.COMPANY_CD = M.COMPANY_CD AND M1.BU_CD = M.BU_CD AND M1.ITEM_CD = M.ITEM_CD AND M1.CUST_GROUP_CD = M.CUST_GROUP_CD
+		                 FOR XML PATH ('')), 1, 1, '') AS AP1_PIC
+		     , STUFF((SELECT ',' + M1.AP1_USER_ID FROM AP1_LIST M1
+		               WHERE M1.COMPANY_CD = M.COMPANY_CD AND M1.BU_CD = M.BU_CD AND M1.ITEM_CD = M.ITEM_CD AND M1.CUST_GROUP_CD = M.CUST_GROUP_CD
+		                 FOR XML PATH ('')), 1, 1, '') AS AP1_PIC_BAK
+		     , STUFF((SELECT ',' + M2.AP2_USER_ID FROM AP2_LIST M2
+		               WHERE M2.COMPANY_CD = M.COMPANY_CD AND M2.BU_CD = M.BU_CD AND M2.ITEM_CD = M.ITEM_CD AND M2.CUST_GROUP_CD = M.CUST_GROUP_CD
+		               GROUP BY M2.AP2_USER_ID
+		                 FOR XML PATH ('')), 1, 1, '') AS AP2_PIC
+		FROM MAP_ITEM_CUST_GROUP M
+	</select>
+	
+	<update id="itemCustGroupMappingUpdate" parameterType="map">
+		/****** [ master.master.itemCustGroupMappingUpdate ] ******/
+		BEGIN
+		
+		    DECLARE @SALES_ORG_LVL4_CD  nvarchar(20)
+		    DECLARE @SALES_ORG_LVL5_CD  nvarchar(20)
+		    DECLARE @SALES_ORG_CD       nvarchar(40) = @{SALES_ORG_CD}
+		    
+		    IF (NULLIF(@SALES_ORG_CD, '') IS NOT NULL)
+		        BEGIN
+		            SET @SALES_ORG_LVL4_CD = LEFT (@SALES_ORG_CD, CHARINDEX('_', @SALES_ORG_CD         )-1);
+		            SET @SALES_ORG_LVL5_CD = RIGHT(@SALES_ORG_CD, CHARINDEX('_', REVERSE(@SALES_ORG_CD))-1);
+		        END
+		    ELSE
+		        BEGIN
+		            SET @SALES_ORG_LVL4_CD = NULL;
+		            SET @SALES_ORG_LVL5_CD = NULL;
+		        END
+		    
+		    UPDATE TB_MAP_ITEM_CUST_GROUP
+		       SET SALES_ORG_LVL4_CD = @SALES_ORG_LVL4_CD
+		         , SALES_ORG_LVL5_CD = @SALES_ORG_LVL5_CD
+		         , SALES_PLAN_YN     = @{SALES_PLAN_YN}
+		         , REMARK            = @{REMARK}
+		         , UPDATE_ID         = @{GV_USER_ID}
+		         , UPDATE_DTTM       = DBO.UFN_GETDATE()
+		     WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		       AND BU_CD             = @{GV_BU_CD}
+		       AND ITEM_CD           = @{ITEM_CD}
+		       AND CUST_GROUP_CD     = @{CUST_GROUP_CD}
+		       ;
+		
+		END
+	</update>
+	
+	
+	<update id="itemCustGroupMappingSalesOrgCdUpdate" parameterType="map">
+	/****** [  master.master.itemCustGroupMappingSalesOrgCdUpdate ] ******/
+	BEGIN
+		DECLARE @COMPANY_CD		   NVARCHAR(5);
+		DECLARE @BU_CD 			   NVARCHAR(3);
+		DECLARE @ITEM_CD	   	   NVARCHAR(18);	
+		DECLARE @CUST_GROUP_CD 	   NVARCHAR(10);
+		DECLARE @SALES_ORG_LVL4_CD NVARCHAR(20);
+		DECLARE @SALES_ORG_LVL5_CD NVARCHAR(20);
+		
+		--1.커서 사용 산업
+		DECLARE TB_MAP_ITEM_CUST_GROUP_LIST CURSOR FOR
+		SELECT C.COMPANY_CD 
+		, C.BU_CD
+		, C.ITEM_CD
+		, C.CUST_GROUP_CD
+		FROM TB_MAP_ITEM_CUST_GROUP C WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM I WITH(NOLOCK)
+		       ON C.COMPANY_CD = I.COMPANY_CD
+		      AND C.BU_CD      = I.BU_CD
+		      AND C.ITEM_CD    = I.ITEM_CD
+		      AND I.USE_FLAG   = 'Y'
+		      AND I.VALID_FLAG = 'Y'
+		WHERE C.COMPANY_CD    = @{GV_COMPANY_CD}
+		      AND C.BU_CD         = @{GV_BU_CD}
+ 			  AND C.SALES_PLAN_YN = 'Y'
+			  AND C.VALID_FLAG = 'Y'
+	
+		
+		--2.커서 
+		OPEN TB_MAP_ITEM_CUST_GROUP_LIST
+		FETCH NEXT FROM TB_MAP_ITEM_CUST_GROUP_LIST INTO @COMPANY_CD,@BU_CD,@ITEM_CD,@CUST_GROUP_CD 
+		
+			--커서를 이용해 한개 행씩 읽음
+			WHILE(@@FETCH_STATUS = 0)
+				BEGIN
+					SELECT @SALES_ORG_LVL4_CD = SALES_ORG_LVL4_CD
+					, @SALES_ORG_LVL5_CD = SALES_ORG_LVL5_CD
+					FROM TB_MST_CUST_GROUP C WITH(NOLOCK)
+					WHERE C.COMPANY_CD = @{GV_COMPANY_CD}
+					AND C.BU_CD = 		 @{GV_BU_CD}
+					AND C.CUST_GROUP_CD = @CUST_GROUP_CD
+					
+					UPDATE TB_MAP_ITEM_CUST_GROUP
+					SET SALES_ORG_LVL4_CD = @SALES_ORG_LVL4_CD
+					  , SALES_ORG_LVL5_CD = @SALES_ORG_LVL5_CD
+					  , UPDATE_ID         = @{GV_USER_ID}
+		         	  , UPDATE_DTTM       = DBO.UFN_GETDATE()
+					WHERE COMPANY_CD = @COMPANY_CD
+					AND BU_CD 		 = @BU_CD
+					AND ITEM_CD      = @ITEM_CD
+					AND CUST_GROUP_CD= @CUST_GROUP_CD 
+					FETCH NEXT FROM TB_MAP_ITEM_CUST_GROUP_LIST INTO @COMPANY_CD,@BU_CD,@ITEM_CD,@CUST_GROUP_CD
+				END
+		
+		--3.커서 닫고 초기화
+		CLOSE TB_MAP_ITEM_CUST_GROUP_LIST
+		DEALLOCATE TB_MAP_ITEM_CUST_GROUP_LIST
+	
+	
+	END;
+	
+	</update>
+	
+	<update id="itemCustGroupMappingAp1Update" parameterType="map">
+		/****** [ master.master.itemCustGroupMappingAp1Update ] ******/
+		MERGE TB_MAP_ITEM_CUST_GROUP_AP1 AS A
+		USING (SELECT 'X' AS DUAL) AS B 
+		   ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+		     AND BU_CD         = @{GV_BU_CD}
+		     AND ITEM_CD       = @{ITEM_CD}
+		     AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+		     AND AP1_USER_ID   = @{AP1_USER_ID}
+		   )
+		 WHEN MATCHED THEN
+		   UPDATE
+		      SET USE_FLAG    = 'Y'
+		        , UPDATE_ID   = CASE WHEN USE_FLAG = 'Y' THEN UPDATE_ID   ELSE @{GV_USER_ID} END
+		        , UPDATE_DTTM = CASE WHEN USE_FLAG = 'Y' THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+		 WHEN NOT MATCHED THEN
+		   INSERT (
+		      COMPANY_CD, BU_CD, ITEM_CD, CUST_GROUP_CD, AP1_USER_ID, USE_FLAG, CREATE_ID, CREATE_DTTM, UPDATE_ID, UPDATE_DTTM
+		   ) VALUES (
+		      @{GV_COMPANY_CD}, @{GV_BU_CD}, @{ITEM_CD}, @{CUST_GROUP_CD}, @{AP1_USER_ID}, 'Y', @{GV_USER_ID}, DBO.UFN_GETDATE(), @{GV_USER_ID}, DBO.UFN_GETDATE()
+		   );
+	</update>
+	
+	<update id="itemCustGroupMappingAp1Delete" parameterType="map">
+		/****** [ master.master.itemCustGroupMappingAp1Delete ] ******/
+		UPDATE TB_MAP_ITEM_CUST_GROUP_AP1
+		   SET USE_FLAG      = 'N'
+		     , UPDATE_ID     = @{GV_USER_ID}
+		     , UPDATE_DTTM   = DBO.UFN_GETDATE()
+		 WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+		   AND BU_CD         = @{GV_BU_CD}
+		   AND ITEM_CD       = @{ITEM_CD}
+		   AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+		   AND AP1_USER_ID   = @{AP1_USER_ID}
+	</update>
+    
+    <select id="executeACallSelect"  parameterType="map" resultType="String" statementType="CALLABLE">
+        BEGIN
+            exec dbo.USP_TB_DYN_SALES_PLAN_AP2_SP_QTY_RESET @{GV_COMPANY_CD}, @{GV_BU_CD}, @{USER_ID};
+        END
+    </select>
+
+
+</mapper>

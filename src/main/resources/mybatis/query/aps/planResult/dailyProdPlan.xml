@@ -1,0 +1,591 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="weekListSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.weekListSelect ] ******/
+		SELECT YEARWEEK
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(DAY, 7, CONVERT(DATETIME, @{fromCal})), 112)
+	</select>
+	
+	<select id="commonDaySelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.commonDaySelect ] ******/
+		SELECT GROUP_CD
+		     , CODE_CD
+		     , ATTB_1_CD
+	  	FROM TB_MST_CODE WITH(NOLOCK)
+	 	WHERE BU_CD = @{GV_BU_CD}
+	      AND GROUP_CD = 'RESULT_PERIOD'
+	      AND USE_FLAG = 'Y'
+	</select>
+	
+	<select id="dailyProdPlanSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.dailyProdPlanSelect ] ******/
+		BEGIN
+		
+			DECLARE @P_CUR_DATE NVARCHAR(8) = CONVERT(VARCHAR(8), dbo.UFN_GETDATE(), 112);
+			DECLARE @P_REQ_STRT NVARCHAR(8) = CONVERT (NVARCHAR (30), DATEADD (DAY, -3, CAST (@{swFromDate} AS DATE)), 112);
+			DECLARE @P_REQ_END  NVARCHAR(8) = CONVERT (NVARCHAR (30), DATEADD (DAY, -1, CAST (@{swFromDate} AS DATE)), 112);
+		
+			WITH W_ITEM AS 
+			(
+			    <include refid="snop.common.t_itemCust" />
+			),
+			W_PREPRODUCTION AS
+			(
+				/*W-1 선행 생산*/
+				SELECT A1.COMPANY_CD
+			         , A1.BU_CD
+			         , A1.ITEM_CD
+			         , CASE WHEN ISNULL(A1.QTY, 0) - ISNULL(A2.QTY, 0) > 0 THEN ISNULL(A1.QTY, 0) - ISNULL(A2.QTY, 0)
+			                ELSE NULL
+			            END W1_PREPRODUCTION_QTY
+				FROM
+			    (
+					SELECT ISP.COMPANY_CD
+					     , ISP.BU_CD
+					     , ISP.ITEM_CD
+					     , SUM(ISP.GOODS_QTY) AS QTY
+					FROM TB_DYN_INSPECTION ISP WITH (NOLOCK)
+					WHERE ISP.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND ISP.BU_CD      = @{GV_BU_CD}
+					  AND ISP.PLANT_CD   = 'WF01'
+					  AND DEL_FLAG       = 'N'
+					  AND RELEASE_DATE BETWEEN @P_REQ_STRT AND @P_REQ_END
+					GROUP BY ISP.COMPANY_CD, ISP.BU_CD, ISP.ITEM_CD
+					UNION ALL
+					SELECT DGP.COMPANY_CD
+					     , DGP.BU_CD
+					     , DGP.ITEM_CD
+					     , SUM(DGP.GR_QTY) AS QTY
+					FROM TB_DYN_GR_PROD DGP WITH(NOLOCK)
+					WHERE DGP.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND DGP.BU_CD = @{GV_BU_CD}
+					  AND DGP.PLANT_CD = 'WF01'
+					  AND DGP.GR_DATE BETWEEN @P_REQ_STRT AND @P_REQ_END
+					  AND EXISTS (
+					               	SELECT 1
+					                FROM TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+					                WHERE MIP.COMPANY_CD = DGP.COMPANY_CD
+					                  AND MIP.BU_CD = DGP.BU_CD
+					                  AND MIP.PLANT_CD = DGP.PLANT_CD
+					                  AND MIP.ITEM_CD = DGP.ITEM_CD
+					                  AND MIP.ITEM_TYPE = '20'
+					                  AND MIP.PROCUR_TYPE IN ('MG', 'MH')
+					             )
+					GROUP BY DGP.COMPANY_CD, DGP.BU_CD, DGP.ITEM_CD
+				) A1
+			    LEFT OUTER JOIN
+			    (
+				    SELECT PP.COMPANY_CD
+						 , PP.BU_CD
+						 , PP.ITEM_CD
+						 , SUM(PP.QTY) AS QTY
+					FROM TB_HIS_APS_PROD_PLAN_DAILY PP WITH(NOLOCK)
+					WHERE PP.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND PP.BU_CD      = @{GV_BU_CD}
+					  AND PP.PLAN_ID = @P_REQ_STRT
+					  AND PP.YYYYMMDD BETWEEN @P_REQ_STRT AND @P_REQ_END
+					GROUP BY PP.COMPANY_CD, PP.BU_CD, PP.ITEM_CD
+				) A2
+			    ON A1.COMPANY_CD = A2.COMPANY_CD
+			    AND A1.BU_CD = A2.BU_CD
+			    AND A1.ITEM_CD = A2.ITEM_CD
+			),
+			W_INVENTORY_MAIN AS
+			(
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+				     , SUM(CASE WHEN FLAG = 'PROD_INV' THEN QTY END) AS PROD_INV_QTY
+				     , SUM(CASE WHEN FLAG = 'QC_INV' THEN QTY END) AS QC_INV_QTY
+				     , SUM(CASE WHEN FLAG = 'INV' THEN QTY END) AS INV_QTY
+				FROM
+				(	
+					/*생산 재공 수량*/
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A2.ITEM_CD
+					     , A1.REMAIN_QTY AS QTY
+					     , 'PROD_INV' AS FLAG
+	                FROM TB_DYN_WIP_ROUTING A1 WITH(NOLOCK)
+	                INNER JOIN TB_DYN_PROD_ORDER_HDR A2 WITH(NOLOCK)
+	                   ON A1.COMPANY_CD = A2.COMPANY_CD
+	                  AND A1.BU_CD = A2.BU_CD
+	                  AND A1.PROD_ORDER_NO = A2.PROD_ORDER_NO
+	                WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+	                  AND A1.BU_CD = @{GV_BU_CD}
+	                  AND A1.WIP_DATE = @{swFromDate}
+	                  AND A1.PROD_OR_QC = 'PROD_PART'
+	                UNION ALL
+	                 
+	                /*QC 재공 수량*/
+	                SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A2.ITEM_CD
+					     , A1.REMAIN_QTY AS QTY
+					     , 'QC_INV' AS FLAG 
+	                FROM TB_DYN_WIP_ROUTING A1 WITH(NOLOCK)
+	                INNER JOIN TB_DYN_PROD_ORDER_HDR A2 WITH(NOLOCK)
+	                   ON A1.COMPANY_CD = A2.COMPANY_CD
+	                  AND A1.BU_CD = A2.BU_CD
+	                  AND A1.PROD_ORDER_NO = A2.PROD_ORDER_NO
+	                WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+	                  AND A1.BU_CD = @{GV_BU_CD}
+	                  AND A1.WIP_DATE = @{swFromDate}
+	                  AND A1.PROD_OR_QC = 'QC_PART'
+					UNION ALL
+					
+					/*재고 수량 */
+					SELECT COMPANY_CD
+					     , BU_CD
+					     , ITEM_CD
+					     , INV_QTY AS QTY
+					     , 'INV' AS FLAG
+					FROM UV_DYN_INVENTORY WITH(NOLOCK)
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			       	  AND BU_CD = @{GV_BU_CD}
+			       	  AND PLANT_CD = 'WF01'
+			       	  AND INV_DATE = @{swFromDate}
+				) B1
+				GROUP BY B1.COMPANY_CD, B1.BU_CD, B1.ITEM_CD
+			),
+			W_SALES_MAIN AS 
+			(
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+				    -- 20211006 김수호 수정: 출하실적 데이터의 거래처기준 데이터 생성으로 인해 품목기준으로 거래처기준 삭제
+				    -- , B1.CUST_GROUP_CD
+				    #foreach($bucketMap in $_parameter.bucketList)
+					#set($paramData = "$bucketMap.BUCKET_VAL")
+				     	#if($bucketMap.CD.indexOf("S_QTY") > -1)
+				     		, SUM(CASE WHEN SALES_FLAG = 'SALES_PLAN' THEN SALES_QTY END) AS SALES_PL_QTY
+				     	#elseif($bucketMap.CD.indexOf("S_AMT") > -1)
+				     	#elseif($bucketMap.CD.indexOf("S_TOT_QTY") > -1)
+				     		, SUM(CASE WHEN SALES_FLAG = 'SALES_RES' THEN SALES_QTY END) AS SALES_QTY_TOTAL
+				     	#elseif($bucketMap.CD.indexOf("S_TOT_AMT") > -1)
+				     		, SUM(CASE WHEN SALES_FLAG = 'SALES_RES' THEN SALES_AMT END) AS SALES_AMT_TOTAL
+				     	#elseif($bucketMap.CD.indexOf("S_JIN") > -1)
+							, CASE WHEN ISNULL(SUM(CASE WHEN SALES_FLAG = 'SALES_RES' THEN SALES_QTY END), 0) = 0
+							            AND ISNULL(SUM(CASE WHEN SALES_FLAG = 'SALES_PLAN' THEN SALES_QTY END), 0) = 0 
+							       THEN NULL
+							       ELSE ISNULL(SUM(CASE WHEN SALES_FLAG = 'SALES_RES' THEN SALES_QTY END)
+				     		  		  / NULLIF(SUM(CASE WHEN SALES_FLAG = 'SALES_PLAN' THEN SALES_QTY END), 0) * 100, 0)
+				     		   END SALES_JIN
+				     	#elseif($bucketMap.CD.indexOf("S_DIV") > -1)
+				     		, ISNULL(SUM(CASE WHEN SALES_FLAG = 'SALES_RES' THEN SALES_QTY END), 0) -
+				     		  ISNULL(SUM(CASE WHEN SALES_FLAG = 'SALES_PLAN' THEN SALES_QTY END), 0) AS SALES_OVER
+				     	#else
+				     		, SUM(CASE WHEN SALES_DATE = '$paramData' AND SALES_FLAG = 'SALES_RES' THEN SALES_QTY END) AS $bucketMap.CD_SUB1
+				     	#end
+				    #end
+				FROM
+				(
+					SELECT COMPANY_CD
+					     , BU_CD
+					     , ITEM_CD
+					     -- 20211006 김수호 수정: 출하실적 데이터의 거래처기준 데이터 생성으로 인해 품목기준으로 거래처기준 삭제
+					     --, CUST_GROUP_CD
+					     , YEARWEEK
+					     , '' AS SALES_DATE
+					     , AMT AS SALES_AMT
+					     , QTY AS SALES_QTY
+					     , 'SALES_PLAN' AS SALES_FLAG
+					FROM TB_KPI_SALES_PLAN WITH(NOLOCK)
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		       		  AND BU_CD = @{GV_BU_CD}
+		       		  AND YEARWEEK = @{fromWeek}
+					  AND MEAS_CD  = 'CFM_SP'
+					UNION ALL
+					SELECT A1.COMPANY_CD
+				         , A1.BU_CD
+				         , A1.ITEM_CD
+				         -- 20211006 김수호 수정: 출하실적 데이터의 거래처기준 데이터 생성으로 인해 품목기준으로 거래처기준 삭제
+				         --, A2.CUST_GROUP_CD
+				         , A3.YEARWEEK
+				         , A1.SALES_DATE
+				         , SUM(A1.AMT_KRW) AS SALES_AMT
+				         , SUM(A1.QTY) AS SALES_QTY
+				         , 'SALES_RES' AS SALES_FLAG
+				    FROM TB_DYN_SALES_RESULT A1 WITH(NOLOCK)
+				    INNER JOIN TB_MST_CUSTOMER A2 WITH(NOLOCK)
+				      ON A1.COMPANY_CD = A2.COMPANY_CD
+					  AND A1.BU_CD = A2.BU_CD
+					  AND A1.CUST_CD = A2.CUST_CD
+					INNER JOIN TB_MST_CALENDAR A3 WITH(NOLOCK)
+		               ON A1.SALES_DATE = A3.YYYYMMDD
+				    WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		       		  AND A1.BU_CD = @{GV_BU_CD}
+		       		  AND A1.PLANT_CD = 'WF01'
+		       		  AND A1.DEL_FLAG = 'N'
+				      AND A1.SALES_DATE <![CDATA[>=]]> @{swFromDate}
+				      AND A1.SALES_DATE <![CDATA[<=]]> @{swToDate}
+				    GROUP BY A1.COMPANY_CD
+				    , A1.BU_CD
+				    , A1.ITEM_CD
+				    -- 20211006 김수호 수정: 출하실적 데이터의 거래처기준 데이터 생성으로 인해 품목기준으로 거래처기준 삭제
+				    --, A2.CUST_GROUP_CD
+				    , A1.SALES_DATE
+				    , A3.YEARWEEK
+				) B1
+				GROUP BY B1.COMPANY_CD
+				, B1.BU_CD, B1.ITEM_CD 
+				-- 20211006 김수호 수정: 출하실적 데이터의 거래처기준 데이터 생성으로 인해 품목기준으로 거래처기준 삭제
+				--, B1.CUST_GROUP_CD 
+			),
+			W_PROD_MAIN AS
+			(
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+					#foreach($bucketMap in $_parameter.bucketList2)
+				    #set($paramData = "$bucketMap.BUCKET_VAL")
+				     	#if($bucketMap.CD.indexOf("S_QTY") > -1)
+				     		, SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END) AS PROD_PL_QTY
+				     	#elseif($bucketMap.CD.indexOf("S_AMT") > -1)
+				     	#elseif($bucketMap.CD.indexOf("S_TOT_QTY") > -1)
+				     		, SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END) AS PROD_QTY_TOTAL
+				     	#elseif($bucketMap.CD.indexOf("S_TOT_AMT") > -1)
+				     		, SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{fromWeek} THEN PROD_AMT END) AS PROD_AMT_TOTAL
+				     	#elseif($bucketMap.CD.indexOf("S_JIN") > -1)
+				     		, CASE WHEN ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END), 0) = 0
+							            AND ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END), 0) = 0 
+							       THEN NULL
+							       ELSE ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END)
+				     		  		  / NULLIF(SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END), 0) * 100, 0)
+				     		   END PROD_JIN
+				     	#elseif($bucketMap.CD.indexOf("S_DIV") > -1)
+				     		, ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END), 0) -
+				     		  ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{fromWeek} THEN PROD_QTY END), 0) AS PROD_OVER
+				     	#else
+				     		, SUM(CASE WHEN PROD_DATE = '$paramData' AND PROD_FLAG = 'PROD_RES' THEN PROD_QTY END) AS $bucketMap.CD_SUB1
+				     	#end
+				    #end
+				    #foreach($bucketMap in $_parameter.bucketList3)
+				    #set($paramData = "$bucketMap.BUCKET_VAL")
+				     	#if($bucketMap.CD.indexOf("S_QTY") > -1)
+				     		, SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{toWeek} THEN PROD_QTY END) AS NEXT_PROD_PL_QTY
+				     	#elseif($bucketMap.CD.indexOf("S_AMT") > -1)
+				     	#elseif($bucketMap.CD.indexOf("S_TOT_QTY") > -1)
+				     		, SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{toWeek} THEN PROD_QTY END) AS NEXT_PROD_QTY_TOTAL
+				     	#elseif($bucketMap.CD.indexOf("S_TOT_AMT") > -1)
+				     		, SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{toWeek} THEN PROD_AMT END) AS NEXT_PROD_AMT_TOTAL
+				     	#elseif($bucketMap.CD.indexOf("S_JIN") > -1)
+				     		, CASE WHEN ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{toWeek} THEN PROD_QTY END), 0) = 0
+							            AND ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{toWeek} THEN PROD_QTY END), 0) = 0 
+							       THEN NULL
+							       ELSE ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{toWeek} THEN PROD_QTY END)
+				     		  		  / NULLIF(SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{toWeek} THEN PROD_QTY END), 0) * 100, 0)
+				     		   END NEXT_PROD_JIN
+				     	#elseif($bucketMap.CD.indexOf("S_DIV") > -1)
+				     		, ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_RES' AND YEARWEEK = @{toWeek} THEN PROD_QTY END), 0) -
+				     		  ISNULL(SUM(CASE WHEN PROD_FLAG = 'PROD_PLAN' AND YEARWEEK = @{toWeek} THEN PROD_QTY END), 0) AS NEXT_PROD_OVER
+				     	#else
+				     		, SUM(CASE WHEN PROD_DATE = '$paramData' AND PROD_FLAG = 'PROD_RES' THEN PROD_QTY END) AS $bucketMap.CD_SUB1
+				     	#end
+				    #end
+				FROM
+				(
+					SELECT KAPPW.COMPANY_CD
+                         , KAPPW.BU_CD
+                         , KAPPW.ITEM_CD
+                         , KAPPW.YEARWEEK
+                         , '' AS PROD_DATE
+                         , KAPPW.QTY AS PROD_QTY
+                         , KAPPW.AMT AS PROD_AMT
+                         , 'PROD_PLAN' AS PROD_FLAG
+					FROM TB_DYN_PROD_PLAN KAPPW WITH(NOLOCK)
+                   	WHERE KAPPW.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND KAPPW.BU_CD = @{GV_BU_CD}
+                      AND KAPPW.YEARWEEK IN (@{fromWeek}, @{toWeek})  
+					<!-- UNION ALL
+            		SELECT KAPPW.COMPANY_CD
+		                 , KAPPW.BU_CD
+		                 , KAPPW.ITEM_CD
+		                 , MC.YEARWEEK
+		                 , '' AS PROD_DATE
+		                 , KAPPW.QTY
+		                 , KAPPW.AMT
+		                 , 'PROD_PLAN' AS PROD_FLAG
+					FROM TB_KPI_APS_PROD_PLAN_WEEKLY KAPPW WITH(NOLOCK)
+		            INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+		               ON MC.YYYYMMDD = KAPPW.YYYYMMDD
+		              AND MC.YEARWEEK IN (@{fromWeek}, @{toWeek})
+		            WHERE KAPPW.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND KAPPW.BU_CD = @{GV_BU_CD}
+		              AND EXISTS (
+		                           SELECT 1
+		                             FROM TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		                            WHERE MIP.COMPANY_CD = KAPPW.COMPANY_CD
+		                              AND MIP.BU_CD = KAPPW.BU_CD
+		                              AND MIP.PLANT_CD = 'WF01'
+		                              AND MIP.ITEM_CD = KAPPW.ITEM_CD
+		                              AND MIP.ITEM_TYPE = '20'
+		                              AND MIP.PROCUR_TYPE IN ('MG', 'MH')
+		                         ) -->
+				    UNION ALL
+				    SELECT A1.COMPANY_CD
+				         , A1.BU_CD
+				         , A1.ITEM_CD
+				         , A2.YEARWEEK
+				         , A1.RELEASE_DATE  AS PROD_DATE
+				         , SUM(A1.GOODS_QTY) AS PROD_QTY
+				         , SUM(A1.GOODS_QTY * A1.PRICE_KRW) AS PROD_AMT
+				         , 'PROD_RES' AS PROD_FLAG
+				    FROM TB_DYN_INSPECTION A1 WITH(NOLOCK)
+				    INNER JOIN TB_MST_CALENDAR A2 WITH(NOLOCK)
+		               ON A1.RELEASE_DATE  = A2.YYYYMMDD
+				    WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		       		  AND A1.BU_CD = @{GV_BU_CD}
+		       		  AND A1.PLANT_CD = 'WF01'
+				      AND A1.RELEASE_DATE <![CDATA[>=]]> @{prodFromDate}
+				      AND A1.RELEASE_DATE <![CDATA[<=]]> @{prodToDate2}
+				      AND A1.DEL_FLAG = 'N'
+				   	GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.RELEASE_DATE, A2.YEARWEEK
+					UNION ALL
+		            SELECT DGP.COMPANY_CD
+		                 , DGP.BU_CD
+		                 , DGP.ITEM_CD
+		                 , MC.YEARWEEK
+		                 , DGP.GR_DATE AS PROD_DATE
+		                 , DGP.GR_QTY AS PROD_QTY
+		                 , DGP.GR_QTY * MI.ITEM_COST_KRW AS PROD_AMT
+						 , 'PROD_RES' AS PROD_FLAG
+					FROM TB_DYN_GR_PROD DGP WITH(NOLOCK)
+		            INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+		               ON MC.YYYYMMDD = DGP.GR_DATE
+		            INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		               ON MI.COMPANY_CD = DGP.COMPANY_CD
+		              AND MI.BU_CD = DGP.BU_CD
+		              AND MI.ITEM_CD = DGP.ITEM_CD
+		            WHERE DGP.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND DGP.BU_CD = @{GV_BU_CD}
+		              AND DGP.PLANT_CD = 'WF01'
+		              AND DGP.GR_DATE <![CDATA[>=]]> @{prodFromDate}
+		              AND DGP.GR_DATE <![CDATA[<=]]> @{prodToDate2}
+		              AND EXISTS (
+		                           	SELECT 1
+		                            FROM TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		                            WHERE MIP.COMPANY_CD = DGP.COMPANY_CD
+		                              AND MIP.BU_CD = DGP.BU_CD
+		                              AND MIP.PLANT_CD = DGP.PLANT_CD
+		                              AND MIP.ITEM_CD = DGP.ITEM_CD
+		                              AND MIP.ITEM_TYPE = '20'
+		                              AND MIP.PROCUR_TYPE IN ('MG', 'MH')
+		                          )
+				   	UNION ALL
+				   	SELECT KAPPD.COMPANY_CD
+				         , KAPPD.BU_CD
+				         , KAPPD.ITEM_CD
+				         , MC.YEARWEEK
+				         , KAPPD.YYYYMMDD
+				         , KAPPD.QTY
+				         , KAPPD.AMT
+				         , 'PROD_RES' AS PROD_FLAG
+					FROM TB_KPI_APS_PROD_PLAN_DAILY KAPPD WITH(NOLOCK)
+				    INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+				       ON MC.YYYYMMDD = KAPPD.YYYYMMDD
+				    WHERE KAPPD.COMPANY_CD = @{GV_COMPANY_CD}
+				      AND KAPPD.BU_CD = @{GV_BU_CD}
+				      AND KAPPD.YYYYMMDD <![CDATA[>=]]> @P_CUR_DATE
+				      AND KAPPD.YYYYMMDD <![CDATA[<=]]> @{prodToDate2}
+				) B1
+				GROUP BY B1.COMPANY_CD, B1.BU_CD, B1.ITEM_CD
+			)
+			SELECT NULL AS TMP_COL
+				<include refid="include.getCdDimTotal"/>
+		    	<include refid="include.getGrpLvlId"/>
+		         , SUM(SALES_PRICE_KRW) AS SALES_PRICE_KRW
+	             , SUM(PROD_INV_QTY) AS PROD_INV_QTY
+	             , SUM(QC_INV_QTY) AS QC_INV_QTY
+	             , SUM(INV_QTY) AS INV_QTY
+	             , SUM(INV_AMT) AS INV_AMT
+	             , SUM(SALES_PL_QTY) AS SALES_PL_QTY
+	             , SUM(SALES_PL_QTY_AMT) AS SALES_PL_QTY_AMT
+				 , SUM(SALES_DAY0) AS SALES_DAY0 
+				 , SUM(SALES_DAY1) AS SALES_DAY1 
+				 , SUM(SALES_DAY2) AS SALES_DAY2 
+				 , SUM(SALES_DAY3) AS SALES_DAY3  
+				 , SUM(SALES_DAY4) AS SALES_DAY4 
+				 , SUM(SALES_DAY5) AS SALES_DAY5 
+				 , SUM(SALES_DAY6) AS SALES_DAY6
+				 , SUM(SALES_QTY_TOTAL) AS SALES_QTY_TOTAL  
+				 , SUM(SALES_AMT_TOTAL) AS SALES_AMT_TOTAL 
+				 , SUM(SALES_QTY_TOTAL) / NULLIF(SUM(SALES_PL_QTY), 0) * 100 AS SALES_JIN
+				 , SUM(SALES_OVER) AS SALES_OVER 
+				 , SUM(PROD_PL_QTY) AS PROD_PL_QTY
+				 , SUM(PROD_PL_QTY_AMT) AS PROD_PL_QTY_AMT
+				 , SUM(W1_PREPRODUCTION_QTY) AS W1_PREPRODUCTION_QTY
+				 , SUM(PROD_DAY0) AS PROD_DAY0 
+				 , SUM(PROD_DAY1) AS PROD_DAY1 
+				 , SUM(PROD_DAY2) AS PROD_DAY2 
+				 , SUM(PROD_DAY3) AS PROD_DAY3 
+				 , SUM(PROD_DAY4) AS PROD_DAY4 
+				 , SUM(PROD_DAY5) AS PROD_DAY5 
+				 , SUM(PROD_DAY6) AS PROD_DAY6
+				 , ISNULL(SUM(PROD_QTY_TOTAL), 0) + ISNULL(SUM(W1_PREPRODUCTION_QTY), 0) AS PROD_QTY_TOTAL  
+				 , ISNULL(SUM(PROD_AMT_TOTAL), 0) + ISNULL(SUM(W1_PREPRODUCTION_AMT), 0) AS PROD_AMT_TOTAL
+				 , (ISNULL(SUM(PROD_QTY_TOTAL), 0) + ISNULL(SUM(W1_PREPRODUCTION_QTY), 0)) / NULLIF(SUM(PROD_PL_QTY), 0) * 100 AS  PROD_JIN
+				 , ISNULL(SUM(PROD_OVER), 0) + ISNULL(SUM(W1_PREPRODUCTION_QTY), 0) AS PROD_OVER   
+				 , SUM(NEXT_PROD_PL_QTY) AS NEXT_PROD_PL_QTY
+				 , SUM(NEXT_PROD_PL_QTY_AMT) AS NEXT_PROD_PL_QTY_AMT
+				 , SUM(NEXT_PROD_DAY0) AS NEXT_PROD_DAY0 
+				 , SUM(NEXT_PROD_DAY1) AS NEXT_PROD_DAY1 
+				 , SUM(NEXT_PROD_DAY2) AS NEXT_PROD_DAY2 
+				 , SUM(NEXT_PROD_DAY3) AS NEXT_PROD_DAY3 
+				 , SUM(NEXT_PROD_DAY4) AS NEXT_PROD_DAY4 
+				 , SUM(NEXT_PROD_DAY5) AS NEXT_PROD_DAY5 
+				 , SUM(NEXT_PROD_DAY6) AS NEXT_PROD_DAY6
+				 , SUM(NEXT_PROD_QTY_TOTAL) AS NEXT_PROD_QTY_TOTAL  
+				 , SUM(NEXT_PROD_AMT_TOTAL) AS NEXT_PROD_AMT_TOTAL
+				 , SUM(NEXT_PROD_QTY_TOTAL) / NULLIF(SUM(NEXT_PROD_PL_QTY), 0) * 100 AS NEXT_PROD_JIN
+				 , SUM(NEXT_PROD_OVER) AS NEXT_PROD_OVER 
+				 , ISNULL(ABS(SUM(INV_QTY)), 0)
+				 + ISNULL(ABS(SUM(PROD_INV_QTY)), 0)
+				 + ISNULL(ABS(SUM(QC_INV_QTY)), 0)
+				 + ISNULL(ABS(SUM(INV_QTY)), 0)
+				 + ISNULL(ABS(SUM(INV_AMT)), 0)
+				 + ISNULL(ABS(SUM(SALES_PL_QTY)), 0)
+				 + ISNULL(ABS(SUM(SALES_PL_QTY_AMT)), 0)
+				 + ISNULL(ABS(SUM(SALES_QTY_TOTAL)), 0)
+				 + ISNULL(ABS(SUM(SALES_AMT_TOTAL)), 0)
+				 + ISNULL(ABS(SUM(SALES_OVER)), 0)
+				 + ISNULL(ABS(SUM(SALES_DAY0)), 0)
+				 + ISNULL(ABS(SUM(SALES_DAY1)), 0)
+				 + ISNULL(ABS(SUM(SALES_DAY2)), 0)
+				 + ISNULL(ABS(SUM(SALES_DAY3)), 0)
+				 + ISNULL(ABS(SUM(SALES_DAY4)), 0)
+				 + ISNULL(ABS(SUM(SALES_DAY5)), 0)
+				 + ISNULL(ABS(SUM(SALES_DAY6)), 0)
+				 + ISNULL(ABS(SUM(PROD_PL_QTY)), 0)
+				 + ISNULL(ABS(SUM(PROD_PL_QTY_AMT)), 0)
+				 + ISNULL(ABS(SUM(PROD_QTY_TOTAL)), 0)
+				 + ISNULL(ABS(SUM(PROD_AMT_TOTAL)), 0)
+				 + ISNULL(ABS(SUM(PROD_OVER)), 0)
+				 + ISNULL(ABS(SUM(PROD_DAY0)), 0)
+				 + ISNULL(ABS(SUM(PROD_DAY1)), 0)
+				 + ISNULL(ABS(SUM(PROD_DAY2)), 0)
+				 + ISNULL(ABS(SUM(PROD_DAY3)), 0)
+				 + ISNULL(ABS(SUM(PROD_DAY4)), 0)
+				 + ISNULL(ABS(SUM(PROD_DAY5)), 0)
+				 + ISNULL(ABS(SUM(PROD_DAY6)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_PL_QTY)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_PL_QTY_AMT)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_QTY_TOTAL)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_AMT_TOTAL)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_OVER)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_DAY0)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_DAY1)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_DAY2)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_DAY3)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_DAY4)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_DAY5)), 0)
+				 + ISNULL(ABS(SUM(NEXT_PROD_DAY6)), 0)
+				 AS OMIT_FLAG
+			FROM
+			(
+				SELECT ISNULL(T1.ITEM_CD, ' ') AS ITEM_CD
+				     , ISNULL(T1.ITEM_CD, ' ') AS ITEM_CD_NM
+				     , ISNULL(T1.ITEM_NM, ' ') AS ITEM_NM
+				     , ISNULL(T1.ITEM_NM, ' ') AS ITEM_NM_NM
+				     , ISNULL(T1.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+				     , ISNULL(T1.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+				     , ISNULL(T1.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+				     , ISNULL(T1.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+				     , ISNULL(T1.SPEC, ' ') AS SPEC
+				     , ISNULL(T1.SPEC, ' ') AS SPEC_NM
+				     , ISNULL(T1.DRAW_NO, ' ') AS DRAW_NO
+				     , ISNULL(T1.DRAW_NO, ' ') AS DRAW_NO_NM
+				     , ISNULL(T1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+				     , ISNULL(T1.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+				     , ISNULL(T1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+				     , ISNULL(T1.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+				     , ISNULL(T1.ROUTING_ID, ' ') AS ROUTING_ID
+				     , ISNULL(T1.ROUTING_ID, ' ') AS ROUTING_ID_NM
+				     , ISNULL(T1.CLEANING_YN, ' ') AS CLEANING_YN
+				     , ISNULL(T1.CLEANING_YN, ' ') AS CLEANING_YN_NM
+					 , ISNULL(T1.SALES_PRICE_KRW, T1.ITEM_COST_KRW) AS SALES_PRICE_KRW
+					 , T4.PROD_INV_QTY
+				     , T4.QC_INV_QTY
+				     , T4.INV_QTY
+				     , ISNULL(T1.SALES_PRICE_KRW, T1.ITEM_COST_KRW) * T4.INV_QTY AS INV_AMT
+					 , T2.SALES_PL_QTY
+					 , ISNULL(T1.SALES_PRICE_KRW, T1.ITEM_COST_KRW) * T2.SALES_PL_QTY AS SALES_PL_QTY_AMT
+					 , T2.SALES_QTY_TOTAL 
+					 , T2.SALES_AMT_TOTAL 
+					 , T2.SALES_JIN 
+					 , T2.SALES_OVER 
+					 , T2.SALES_DAY0 
+					 , T2.SALES_DAY1 
+					 , T2.SALES_DAY2 
+					 , T2.SALES_DAY3 
+					 , T2.SALES_DAY4 
+					 , T2.SALES_DAY5 
+					 , T2.SALES_DAY6
+					 , T3.PROD_PL_QTY
+					 , ISNULL(T1.SALES_PRICE_KRW, T1.ITEM_COST_KRW) * T3.PROD_PL_QTY AS PROD_PL_QTY_AMT
+					 , T3.PROD_QTY_TOTAL 
+					 , T3.PROD_AMT_TOTAL 
+					 , T3.PROD_JIN 
+					 , T3.PROD_OVER 
+					 , T3.PROD_DAY0 
+					 , T3.PROD_DAY1 
+					 , T3.PROD_DAY2 
+					 , T3.PROD_DAY3 
+					 , T3.PROD_DAY4 
+					 , T3.PROD_DAY5 
+					 , T3.PROD_DAY6
+					 , T3.NEXT_PROD_PL_QTY
+					 , ISNULL(T1.SALES_PRICE_KRW, T1.ITEM_COST_KRW) * T3.NEXT_PROD_PL_QTY AS NEXT_PROD_PL_QTY_AMT
+					 , T3.NEXT_PROD_QTY_TOTAL 
+					 , T3.NEXT_PROD_AMT_TOTAL 
+					 , T3.NEXT_PROD_JIN 
+					 , T3.NEXT_PROD_OVER 
+					 , T3.NEXT_PROD_DAY0 
+					 , T3.NEXT_PROD_DAY1 
+					 , T3.NEXT_PROD_DAY2 
+					 , T3.NEXT_PROD_DAY3 
+					 , T3.NEXT_PROD_DAY4 
+					 , T3.NEXT_PROD_DAY5 
+					 , T3.NEXT_PROD_DAY6 
+					 , T5.W1_PREPRODUCTION_QTY
+					 , T5.W1_PREPRODUCTION_QTY * ISNULL(T1.SALES_PRICE_KRW, T1.ITEM_COST_KRW) AS W1_PREPRODUCTION_AMT
+				FROM W_ITEM T1
+				LEFT OUTER JOIN W_SALES_MAIN T2
+				  ON T1.COMPANY_CD = T2.COMPANY_CD
+				 AND T1.BU_CD = T2.BU_CD
+				 -- 20211006 김수호 수정: 출하실적 데이터의 거래처기준 데이터 생성으로 인해 품목기준으로 거래처기준 삭제
+				 -- AND T1.CUST_GROUP_CD = T2.CUST_GROUP_CD
+				 AND T1.ITEM_CD = T2.ITEM_CD
+		    	LEFT OUTER JOIN W_PROD_MAIN T3
+				  ON T1.COMPANY_CD = T3.COMPANY_CD
+				 AND T1.BU_CD = T3.BU_CD
+				 AND T1.ITEM_CD = T3.ITEM_CD
+				LEFT OUTER JOIN W_INVENTORY_MAIN T4
+				  ON T1.COMPANY_CD = T4.COMPANY_CD
+				 AND T1.BU_CD = T4.BU_CD
+				 AND T1.ITEM_CD = T4.ITEM_CD
+				LEFT OUTER JOIN W_PREPRODUCTION T5
+				  ON T1.COMPANY_CD = T5.COMPANY_CD
+				 AND T1.BU_CD = T5.BU_CD
+				 AND T1.ITEM_CD = T5.ITEM_CD
+			   WHERE T1.ITEM_TYPE IN ('10', '20') 
+			     AND T1.PROCUR_TYPE_CD IN ('MG', 'MH')
+			) U1
+			WHERE 1 = 1
+			#if($_parameter.dailyCdSales and $_parameter.dailyCdSales != "")
+			  AND U1.SALES_JIN <![CDATA[<]]> @{dailyCdSales}
+			#end
+			#if($_parameter.dailyCdProd and $_parameter.dailyCdProd != "")
+			  AND U1.PROD_JIN <![CDATA[<]]> @{dailyCdProd}
+			#end
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+		    ORDER BY TMP_COL
+			#foreach($dimMap in $_parameter.dimList)
+		    	, U1.$dimMap.DIM_CD
+			#end
+		END;
+	</select>
+</mapper>

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+	<update id="bookMarkUpdate" parameterType="map">
+		/****** [ common.bookMarkUpdate ] ******/
+	    MERGE TB_MST_MENU_FAVORITES AS A
+		USING 
+		(
+			SELECT @{GV_COMPANY_CD} AS COMPANY_CD
+		     	 , @{GV_BU_CD}      AS BU_CD
+		     	 , @{menuCd}        AS MENU_CD
+		     	 , @{GV_USER_ID}    AS USER_ID
+		) B
+		ON 
+		(
+			A.COMPANY_CD  = B.COMPANY_CD
+		   	AND A.BU_CD   = B.BU_CD
+			AND A.MENU_CD = B.MENU_CD
+			AND A.USER_ID = B.USER_ID
+		)
+		WHEN MATCHED THEN
+		UPDATE SET
+			A.UPDATE_DTTM  = DBO.UFN_GETDATE()
+		  , A.UPDATE_ID    = @{GV_USER_ID}
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+		    COMPANY_CD
+		  , BU_CD
+		  , MENU_CD
+		  , USER_ID
+ 		  , UPDATE_DTTM
+	      , UPDATE_ID
+		  , CREATE_DTTM
+		  , CREATE_ID
+		) VALUES (
+		    B.COMPANY_CD
+		  , B.BU_CD
+		  , B.MENU_CD
+		  , B.USER_ID
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		  , DBO.UFN_GETDATE()
+		  , @{GV_USER_ID}
+		);
+	</update>
+
+	<select id="bookMarkSelect"  parameterType="map" resultType="map">
+		/****** [ common.bookMarkSelect ] ******/
+		WITH W_USER_ROLE AS 
+		(
+		    SELECT A.USER_ID
+		       , A.BU_CD
+		       , A.ROLE_CD
+		       , B.ROLE_NM
+		    FROM TB_MAP_USER_ROLE A WITH(NOLOCK)
+		    INNER JOIN TB_MST_ROLE B WITH(NOLOCK)
+		      ON B.BU_CD    = A.BU_CD
+		     AND B.ROLE_CD  = A.ROLE_CD
+		     AND B.USE_FLAG = 'Y'
+		    WHERE A.USER_ID  = @{GV_USER_ID}
+		      AND A.USE_FLAG = 'Y'
+		), 
+		W_ROLE_MENU_ACTION AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , B.ROLE_CD
+		         , A.MENU_CD
+		         , A.MENU_LVL
+		         , MAX(CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A.MENU_NM_KR != '' THEN ISNULL(A.MENU_NM_KR, A.MENU_NM)
+		                    WHEN UPPER(@{GV_LANG}) = 'CN' AND A.MENU_NM_CN != '' THEN ISNULL(A.MENU_NM_CN, A.MENU_NM)
+		                    ELSE A.MENU_NM
+		               END) AS MENU_NM
+		         , A.SORT
+		         , MAX(CASE WHEN C.CODE_CD = 'SEARCH' THEN 'Y' END) AS SEARCH_ACTION
+		         , MAX(CASE WHEN C.CODE_CD = 'SAVE'   THEN 'Y' END) AS SAVE_ACTION
+		         , MAX(CASE WHEN C.CODE_CD = 'EXCEL'  THEN 'Y' END) AS EXCEL_ACTION
+		         , MAX(CASE WHEN C.CODE_CD = 'SQL'    THEN 'Y' END) AS SQL_ACTION
+		    FROM TB_MST_MENU A WITH(NOLOCK)
+		    INNER JOIN TB_MAP_ROLE_MENU_ACTION B WITH(NOLOCK)
+		      ON B.COMPANY_CD = A.COMPANY_CD
+		     AND B.BU_CD      = A.BU_CD
+		     AND B.MENU_CD    = A.MENU_CD
+		     AND B.USE_FLAG   = 'Y'
+		    INNER JOIN 
+		    (
+		      #set($_parameter.groupCd = "ACTION_CD")
+		      <include refid="include.mstCode"/>
+		    ) C
+		       ON C.CODE_CD = B.ACTION_CD 
+		    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD      = @{GV_BU_CD}
+		      AND A.USE_FLAG   = 'Y'
+		    GROUP BY A.COMPANY_CD, A.BU_CD, B.ROLE_CD, A.MENU_CD, A.MENU_LVL, A.SORT
+		)
+		SELECT A.USER_ID
+		     , B.COMPANY_CD
+		     , A.BU_CD
+		     , B.MENU_CD
+		     , B.MENU_NM
+		FROM W_USER_ROLE A WITH(NOLOCK)
+		INNER JOIN W_ROLE_MENU_ACTION B WITH(NOLOCK)
+		  ON B.BU_CD   = A.BU_CD
+		 AND B.ROLE_CD = A.ROLE_CD
+		INNER JOIN TB_MST_MENU_FAVORITES C WITH(NOLOCK)
+		  ON C.COMPANY_CD = B.COMPANY_CD
+		 AND C.BU_CD      = B.BU_CD
+		 AND C.MENU_CD    = B.MENU_CD
+		 AND C.USER_ID    = @{GV_USER_ID}
+		GROUP BY A.USER_ID, B.COMPANY_CD, A.BU_CD
+		       , B.MENU_CD
+		       , B.MENU_NM
+		ORDER BY B.MENU_CD, B.MENU_NM
+	</select>
+
+	<delete id="bookMarkDelUpdate" parameterType="map">
+	/****** [ common.bookMarkDelUpdate ] ******/
+	DELETE FROM TB_MST_MENU_FAVORITES
+	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	  AND BU_CD      = @{GV_BU_CD}
+	  AND MENU_CD    = @{P_MENU_CD}
+	  AND USER_ID    = @{GV_USER_ID}
+	</delete>
+
+	<select id="recentSelect"  parameterType="map" resultType="map">
+	/****** [ common.recentSelect ] ******/
+	SELECT TOP 5 A.*
+	FROM 
+	(
+	    SELECT A.USER_ID
+	         , dbo.UFN_GET_USER_NAME(A.USER_ID) AS USER_NM
+             , A.COMPANY_CD
+             , A.BU_CD
+             , B.MENU_CD    
+             , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.MENU_NM_KR != '' THEN ISNULL(B.MENU_NM_KR,B.MENU_NM)
+	                WHEN UPPER(@{GV_LANG}) = 'CN' AND B.MENU_NM_CN != '' THEN ISNULL(B.MENU_NM_CN,B.MENU_NM)
+	                ELSE B.MENU_NM
+	           END AS MENU_NM    
+             , B.URL  
+             , A.ACCESS_DTTM
+             , RANK() OVER(PARTITION BY A.MENU_CD ORDER BY A.ACCESS_DTTM DESC) AS RNUM
+	    FROM TB_COMM_ACCESS_LOG A WITH(NOLOCK)
+	    LEFT JOIN TB_MST_MENU B WITH(NOLOCK)
+	        ON B.COMPANY_CD = A.COMPANY_CD
+	       AND B.BU_CD      = A.BU_CD
+	       AND B.MENU_CD    = A.MENU_CD
+	    WHERE A.USER_ID         = @{GV_USER_ID}
+          AND A.ACCESS_TYPE_CD != 'PORTAL'
+	) A
+	WHERE RNUM = 1
+	ORDER BY A.ACCESS_DTTM DESC
+	</select>
+
+</mapper>

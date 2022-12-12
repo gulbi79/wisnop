@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.targetMgmt">
+	<select id="bizPlanListSelect" parameterType="map" resultType="map">
+		/****** [ snop.bizPlanListSelect ] ******/
+		SELECT BU_CD
+		     , BU_NM
+			 , MEAS_CD
+		     , MEAS_NM
+		     , YYYY
+			 , ISNULL(SUM(M01), 0) AS M01
+			 , ISNULL(SUM(M02), 0) AS M02
+			 , ISNULL(SUM(M03), 0) AS M03
+			 , ISNULL(SUM(M04), 0) AS M04
+			 , ISNULL(SUM(M05), 0) AS M05
+			 , ISNULL(SUM(M06), 0) AS M06
+			 , ISNULL(SUM(M07), 0) AS M07
+			 , ISNULL(SUM(M08), 0) AS M08
+			 , ISNULL(SUM(M09), 0) AS M09
+			 , ISNULL(SUM(M10), 0) AS M10
+			 , ISNULL(SUM(M11), 0) AS M11
+			 , ISNULL(SUM(M12), 0) AS M12
+		FROM
+		(
+			SELECT B1.BU_CD
+		    	 , B1.BU_NM
+			     , B1.MEAS_CD
+			     , B1.MEAS_NM
+			     , 'M' + B2.YEARMONTH AS YEARMONTH
+			     , B2.AMT
+			     , @{year} AS YYYY			     
+			     , B2.YY
+			     , B2.MM
+			FROM
+		  	(
+				SELECT A2.CODE_CD AS BU_CD
+			         , A2.CODE_NM AS BU_NM
+			         , A1.CODE_CD AS MEAS_CD
+			         , A1.CODE_NM AS MEAS_NM
+			    FROM
+			    (
+					SELECT GROUP_CD
+				         , CODE_CD
+				         , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND CODE_NM_KR != '' THEN ISNULL(CODE_NM_KR, CODE_NM)
+		                    	WHEN UPPER(@{GV_LANG}) = 'CN' AND CODE_NM_CN != '' THEN ISNULL(CODE_NM_CN, CODE_NM)
+		                    	ELSE CODE_NM
+		               	    END AS CODE_NM
+				         , ATTB_1_CD
+					FROM TB_MST_CODE WITH (NOLOCK)
+				    WHERE USE_FLAG != 'N'
+				      AND BU_CD = 'ALL'
+				      AND GROUP_CD = 'BIZ_PLAN'
+			    ) A1
+			    INNER JOIN
+			    (
+					SELECT GROUP_CD
+			             , CODE_CD
+			             , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND CODE_NM_KR != '' THEN ISNULL(CODE_NM_KR, CODE_NM)
+	                    		WHEN UPPER(@{GV_LANG}) = 'CN' AND CODE_NM_CN != '' THEN ISNULL(CODE_NM_CN, CODE_NM)
+	                    		ELSE CODE_NM
+	               	    	END AS CODE_NM
+			      	FROM TB_MST_CODE WITH (NOLOCK)
+			      	WHERE USE_FLAG != 'N'
+			      	  AND BU_CD = 'ALL'
+			      	  AND GROUP_CD = 'BU_CD'
+			          AND ATTB_1_CD = 'BIZ_PLAN'
+			    ) A2
+			    ON A1.ATTB_1_CD = A2.GROUP_CD
+			) B1
+			LEFT OUTER JOIN
+		  	(
+				SELECT BU_CD
+		  	    	 , MEAS_CD
+		  	     	 , YEARMONTH
+			  	     , AMT
+			  	     , 'Y' + SUBSTRING(YEARMONTH, 1, 4) AS YY
+			  	     , 'M' + SUBSTRING(YEARMONTH, 5, 6) AS MM
+		  		FROM TB_KPI_BIZ_PLAN_OTHERS WITH (NOLOCK)
+		  		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  		  AND SUBSTRING(YEARMONTH, 1, 4) = @{year} 
+		  	) B2
+		  	ON B1.BU_CD = B2.BU_CD
+		  	AND B1.MEAS_CD = B2.MEAS_CD
+		) C1
+		PIVOT
+		(
+			SUM(C1.AMT) FOR C1.MM IN ([M01], [M02], [M03], [M04], [M05], [M06], [M07], [M08], [M09], [M10], [M11], [M12])
+		) AS C2
+		GROUP BY BU_CD, BU_NM, MEAS_CD, MEAS_NM, YYYY
+		ORDER BY BU_CD, MEAS_CD
+	</select>
+	
+	<update id="bizPlanListMerge" parameterType="map">
+		/****** [ snop.bizPlanListUpdate ] ******/
+		MERGE INTO TB_KPI_BIZ_PLAN_OTHERS A
+		USING
+		(
+			#foreach($bucketMap in $_parameter.bucketList)
+				#if($bucketMap.INSERT_YN == 'YY') 
+					SELECT '$bucketMap.BUCKET_VAL' AS YEARMONTH 
+					      , $_parameter.get("$bucketMap.CD_SUB") AS AMT
+			  	#elseif($bucketMap.INSERT_YN == 'Y')
+			        UNION ALL 
+			        SELECT '$bucketMap.BUCKET_VAL'
+			              , $_parameter.get("$bucketMap.CD_SUB")
+			  	#end
+			#end
+		) B
+		ON
+		(
+			A.COMPANY_CD = @{GV_COMPANY_CD}
+		    AND A.BU_CD = @{BU_CD}
+		    AND A.MEAS_CD = @{MEAS_CD}
+		    AND A.YEARMONTH = B.YEARMONTH
+		)
+		WHEN MATCHED THEN
+		UPDATE SET 
+		   AMT = B.AMT
+		 , UPDATE_ID = @{GV_USER_ID}
+		 , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+			COMPANY_CD
+		  , BU_CD
+		  , MEAS_CD
+		  , YEARMONTH
+		  , AMT
+		  , CREATE_ID
+		  , CREATE_DTTM
+		) VALUES (
+			@{GV_COMPANY_CD}
+	      , @{BU_CD}
+	      , @{MEAS_CD}
+	      , B.YEARMONTH
+	      , B.AMT
+	      , @{GV_USER_ID}
+	      , DBO.UFN_GETDATE()
+	    );	
+	</update>
+	
+	<delete id="bizPlanListDelete" parameterType="map">
+	</delete>
+	
+	
+	
+</mapper>

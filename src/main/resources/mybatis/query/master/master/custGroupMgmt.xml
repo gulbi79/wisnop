@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+
+	<select id="custGroupMgmtCustGroupSelect" parameterType="map" resultType="map">
+		/****** [ master.master.custGroupMgmtCustGroupSelect ] ******/
+		SELECT A.CUST_GROUP_CD AS CODE_CD
+		     , A.CUST_GROUP_NM AS CODE_NM
+		     , B.REP_CUST_GROUP_CD AS REPT_CD
+		     , B.REP_CUST_GROUP_NM AS REPT_NM
+		FROM TB_MST_CUST_GROUP A WITH (NOLOCK)
+		LEFT OUTER JOIN TB_MST_REP_CUST_GROUP B WITH (NOLOCK)
+		  ON A.COMPANY_CD        = B.COMPANY_CD
+		 AND A.BU_CD             = B.BU_CD
+		 AND A.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+		 AND B.USE_FLAG          = 'Y'
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD      = @{GV_BU_CD}
+		  AND A.USE_FLAG   = 'Y'
+		ORDER BY A.CUST_GROUP_NM ASC
+	</select>
+
+	<select id="custGroupMgmtSelect" parameterType="map" resultType="map">
+		/****** [ master.master.custGroupMgmtSelect ] ******/
+		<include refid="include.macros"/>
+		#getCustomerTree()
+		
+		SELECT A.REP_CUST_CD
+		     , D.CUST_NM AS REP_CUST_NM
+		     , B.CUST_GROUP_CD
+		     , B.CUST_GROUP_NM
+		     , C.REP_CUST_GROUP_CD
+		     , C.REP_CUST_GROUP_NM
+		     , A.VALID_FLAG
+		     , CONVERT(VARCHAR(19), A.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , A.CREATE_ID
+		     , CONVERT(VARCHAR(19), A.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , A.UPDATE_ID
+		FROM TB_MST_REP_CUST A WITH (NOLOCK)
+		INNER JOIN TB_MST_CUSTOMER D WITH (NOLOCK)
+		   ON A.COMPANY_CD  = D.COMPANY_CD
+		  AND A.BU_CD       = D.BU_CD
+		  AND A.REP_CUST_CD = D.CUST_CD
+		  AND D.VALID_FLAG  = 'Y'
+		  #set($treeAlias = "D")
+		  <include refid="include.customerTree"/>
+		LEFT OUTER JOIN TB_MST_CUST_GROUP B WITH (NOLOCK)
+		  ON A.COMPANY_CD    = B.COMPANY_CD
+		 AND A.BU_CD         = B.BU_CD
+		 AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+		 AND B.USE_FLAG      = 'Y'
+		LEFT OUTER JOIN TB_MST_REP_CUST_GROUP C WITH (NOLOCK)
+		  ON B.COMPANY_CD        = C.COMPANY_CD
+		 AND B.BU_CD             = C.BU_CD 
+		 AND B.REP_CUST_GROUP_CD = C.REP_CUST_GROUP_CD 
+		 AND C.USE_FLAG          = 'Y'
+		WHERE A.COMPANY_CD   = @{GV_COMPANY_CD}
+		  AND A.BU_CD        = @{GV_BU_CD}
+		#if($_parameter.validYnErp and $_parameter.validYnErp != "")
+		  AND A.VALID_FLAG   = @{validYnErp}
+		#end
+		#if($_parameter.reptCust and $_parameter.reptCust != "")
+		  AND (A.REP_CUST_CD LIKE '%' + @{reptCust} + '%'
+		     OR D.CUST_NM LIKE '%' + @{reptCust} + '%')
+		#end
+		ORDER BY A.REP_CUST_CD ASC
+	</select>
+	
+	<update id="custGroupMgmtUpdate" parameterType="map">
+		/****** [ master.master.custGroupMgmtUpdate ] ******/
+		BEGIN
+		
+		    DECLARE @REP_CUST_GROUP_CD    nvarchar(10) = NULL
+		    DECLARE @REP_CUST_GROUP_NM    nvarchar(50) = NULL
+		    
+		    IF (@{CUST_GROUP_CD} != '')
+		      BEGIN
+		      
+		        SELECT @REP_CUST_GROUP_CD = REP_CUST_GROUP_CD
+		          FROM TB_MST_CUST_GROUP
+		         WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+		           AND BU_CD         = @{GV_BU_CD}
+		           AND CUST_GROUP_CD = @{CUST_GROUP_CD};
+		
+		        SELECT @REP_CUST_GROUP_NM = REP_CUST_GROUP_NM
+		          FROM TB_MST_REP_CUST_GROUP
+		         WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		           AND BU_CD             = @{GV_BU_CD}
+		           AND REP_CUST_GROUP_CD = @REP_CUST_GROUP_CD;
+		      
+		      END
+		       
+		    UPDATE TB_MST_REP_CUST
+		       SET CUST_GROUP_CD = NULLIF(@{CUST_GROUP_CD}, '')
+		         , UPDATE_DTTM   = DBO.UFN_GETDATE()
+		         , UPDATE_ID     = @{GV_USER_ID}
+		     WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+		       AND BU_CD         = @{GV_BU_CD}
+		       AND REP_CUST_CD   = @{REP_CUST_CD}
+		       ;
+		       
+		    UPDATE TB_MST_CUSTOMER
+		       SET CUST_GROUP_CD     = NULLIF(@{CUST_GROUP_CD}, '')
+		         , CUST_GROUP_NM     = NULLIF(@{CUST_GROUP_NM}, '')
+		         , CUST_LVL2_CD      = @REP_CUST_GROUP_CD
+		         , CUST_LVL2_NM      = @REP_CUST_GROUP_NM
+		         , CUST_LVL3_CD      = NULLIF(@{CUST_GROUP_CD}, '')
+		         , CUST_LVL3_NM      = NULLIF(@{CUST_GROUP_NM}, '')
+		         , REP_CUST_GROUP_CD = @REP_CUST_GROUP_CD
+		         , REP_CUST_GROUP_NM = @REP_CUST_GROUP_NM
+		     WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		       AND BU_CD             = @{GV_BU_CD}
+		       AND REP_CUST_CD       = @{REP_CUST_CD}
+		       ;
+		END
+	</update>
+	
+	<update id="custGroupMgmtProUpdate" parameterType="map">
+		/****** [ master.master.custGroupMgmtProUpdate ] ******/
+		BEGIN
+		    exec USP_TB_MAP_ITEM_CUST_GROUP @{GV_COMPANY_CD}, @{GV_BU_CD};
+		END
+	</update>
+
+</mapper>

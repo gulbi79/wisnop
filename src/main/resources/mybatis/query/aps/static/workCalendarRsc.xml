@@ -1,0 +1,671 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+
+
+	<select id="workCalendarRscSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarRscSelect ] ******/
+		WITH W_CAL AS
+        (
+			SELECT RTRIM(YYYYMMDD ) AS YYYYMMDD
+                 , RTRIM(DAY )      AS DAY      
+                 , RTRIM(DAY_NM )   AS DAY_NM   
+                 , RTRIM(MONTH )    AS MONTH
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YYYYMMDD BETWEEN @{fromCal} AND @{toCal}
+        )
+		SELECT NULL                AS TMP_COL         
+		     , W.BU_CD             AS BU_CD         
+		     , W.PART_CD           AS PART_CD       
+		     , W.PART_CD_NM        AS PART_CD_NM
+		     , W.POQ_CD            AS POQ_CD
+		     , W.POQ_CD_NM         AS POQ_CD_NM
+		     , W.WC_MGR            AS WC_MGR_CD
+		     , W.WC_MGR_NM         AS WC_MGR_NM_CD     
+		     , W.WC_MGR_NM         AS WC_MGR_NM_NM
+		     , W.WC_CD             AS WC_CD         
+		     , W.WC_CD             AS WC_CD_NM
+		     , W.WC_NM             AS WC_NM   
+			 , W.WC_NM             AS WC_NM_NM		              
+		     , W.RESOURCE_CD       AS RESOURCE_CD   
+		     , W.RESOURCE_CD       AS RESOURCE_CD_NM
+		     , W.WORKER_GROUP      AS WORKER_GROUP
+		     , W.WORKER_GROUP_NM   AS WORKER_GROUP_NM
+		     , W.RESOURCE_NM       AS RESOURCE_NM
+		     , W.RESOURCE_NM       AS RESOURCE_NM_NM
+		     , W.ROUTING_ID        AS ROUTING_ID
+		     , W.ROUTING_ID        AS ROUTING_ID_NM
+			#foreach($hiddenMap in $_parameter.hiddenList)
+		    #set($paramDay = "$hiddenMap.BUCKET_VAL")
+		    #if($hiddenMap.CD.indexOf("_A") > -1)
+		     , ISNULL(MAX(CASE WHEN '$paramDay' BETWEEN Z.START_DATE AND Z.END_DATE THEN 'N' END), 'Y') AS $hiddenMap.CD
+		    #elseif($hiddenMap.CD.indexOf("_B") > -1)
+		     , ISNULL(MAX(CASE WHEN '$paramDay' BETWEEN Z.START_DATE AND Z.END_DATE THEN 'N' END), 'Y') AS $hiddenMap.CD 
+		    #end
+		    #end
+		    
+			#foreach($bucketMap in $_parameter.bucketList)
+			#set($paramDay = "$bucketMap.BUCKET_VAL")
+			#if($bucketMap.CD.indexOf("_A") > -1)
+				#if($bucketMap.CD.indexOf("_WORK") > -1)
+ 				, MAX(CASE WHEN W.YYYYMMDD = '$paramDay'
+	             		   THEN CASE WHEN X.WORKING_TIME = 0 THEN NULL ELSE ROUND(X.WORKING_TIME/3600,2) END 
+	             	   	   ELSE NULL
+	          		   END) AS $bucketMap.CD
+				#elseif($bucketMap.CD.indexOf("_OVERTIME") > -1)
+        		, MAX(CASE WHEN W.YYYYMMDD = '$paramDay'
+						   THEN CASE WHEN X.OVER_TIME = 0 THEN NULL ELSE ROUND(X.OVER_TIME/3600,2) END 
+						   ELSE NULL
+					   END) AS $bucketMap.CD
+				#end		
+			#elseif($bucketMap.CD.indexOf("_B") > -1)
+				#if($bucketMap.CD.indexOf("_WORK") > -1)
+        		, MAX(CASE WHEN W.YYYYMMDD = '$paramDay'
+						   THEN CASE WHEN Y.WORKING_TIME = 0 THEN NULL ELSE ROUND(Y.WORKING_TIME/3600,2) END
+						   ELSE NULL
+					   END) AS $bucketMap.CD
+				#elseif($bucketMap.CD.indexOf("_OVERTIME") > -1)
+        		, MAX(CASE WHEN W.YYYYMMDD = '$paramDay'
+						   THEN CASE WHEN Y.OVER_TIME = 0 THEN NULL ELSE ROUND(Y.OVER_TIME/3600,2) END
+						   ELSE NULL
+					   END) AS $bucketMap.CD	 
+				#end	
+			#end	 	
+			#end  
+		FROM
+		(
+			SELECT A.YYYYMMDD                                          
+                 , A.MONTH + '/' + A.DAY + ' (' + A.DAY_NM + ')' AS MD 
+                 , B.PART_CD        
+                 , B.PART_CD_NM 
+                 , B.POQ_CD
+                 , B.POQ_Cd_NM       
+                 , B.WC_MGR_NM     
+                 , B.WC_MGR 
+                 , B.WC_CD          
+                 , B.WC_NM          
+                 , B.RESOURCE_CD    
+                 , B.RESOURCE_NM    
+                 , B.COMPANY_CD 
+                 , B.BU_CD      
+                 , B.PLANT_CD
+                 , B.PART_SORT
+                 , B.WORKER_GROUP
+                 , B.WORKER_GROUP_NM
+                 , B.ROUTING_ID
+			FROM W_CAL AS A
+			CROSS JOIN
+		    (
+		    	SELECT MC2.CODE_CD AS PART_CD    
+                     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN MC2.CODE_NM_KR
+                    		WHEN UPPER(@{GV_LANG}) = 'CN' THEN MC2.CODE_NM_CN
+                    		ELSE MC2.CODE_NM
+                 		END AS PART_CD_NM  
+                     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN CD.CODE_NM_KR 
+                            WHEN UPPER(@{GV_LANG}) = 'CN' THEN CD.CODE_NM_CN 
+                            ELSE CD.CODE_NM 
+                        END AS WC_MGR_NM   
+                     , MR.WORKER_GROUP              
+                     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN MC3.CODE_NM_KR
+                    		WHEN UPPER(@{GV_LANG}) = 'CN' THEN MC3.CODE_NM_CN
+                    		ELSE MC3.CODE_NM
+                 		END AS WORKER_GROUP_NM                  
+                     , MWC.WC_MGR            
+                     , MWC.WC_CD                
+                     , MWC.WC_NM                
+                     , MR.RESOURCE_CD           
+                     , MR.RESOURCE_NM           
+                     , MR.COMPANY_CD
+                     , MR.BU_CD     
+                     , MR.PLANT_CD
+                     , S.POQ_CD
+                     , S.POQ_CD_NM
+                     , MWC.ROUTING_ID
+                     , MC2.SORT AS PART_SORT
+				FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+		        INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+		           ON MWC.COMPANY_CD = MR.COMPANY_CD
+                  AND MWC.BU_CD      = MR.BU_CD
+                  AND MWC.WC_CD      = MR.WC_CD
+                  AND MWC.WC_MGR     = MR.RESOURCE_TYPE
+                  AND MWC.PLANT_CD   = MR.PLANT_CD
+				INNER JOIN TB_MST_CODE CD WITH(NOLOCK)
+                   ON MWC.WC_MGR = CD.CODE_CD
+                  AND CD.GROUP_CD ='RESOURCE_TYPE'
+                  AND CD.USE_FLAG !='N'
+				LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+                  ON MC1.BU_CD    = MWC.BU_CD
+                 AND MC1.GROUP_CD = 'PROD_L2'
+                 AND MC1.CODE_CD  = MWC.ROUTING_ID
+				LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+                  ON MC2.BU_CD    = MC1.BU_CD
+                 AND MC2.GROUP_CD = 'PROD_PART'
+                 AND MC2.CODE_CD  = MC1.ATTB_2_CD 
+                LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+                  ON MC3.BU_CD    = MR.BU_CD
+                 AND MC3.GROUP_CD = 'WORKER_GROUP'
+                 AND MC3.CODE_CD  = MR.WORKER_GROUP 
+                INNER JOIN
+                (
+					SELECT CODE_CD AS POQ_CD
+					     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN CODE_NM_KR
+                         		WHEN UPPER(@{GV_LANG}) = 'CN' THEN CODE_NM_CN
+                         		ELSE CODE_NM
+                      		END AS POQ_CD_NM
+                 	FROM TB_MST_CODE WITH (NOLOCK)
+                	WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+                      AND USE_FLAG != 'N'
+                      AND GROUP_CD = 'PROD_OR_QC'
+				) S 
+				ON S.POQ_CD = MWC.PROD_OR_QC          
+                WHERE MC2.CODE_CD IS NOT NULL AND MWC.ROUTING_ID IS NOT NULL
+                  AND MR.USE_FLAG = 'Y'
+                  AND MR.PLANT_CD = 'WF01'
+                  AND (MR.RESOURCE_TYPE = 'M' OR (MR.RESOURCE_TYPE = 'L' AND MR.FIREWORK_YN = 'Y'))   
+			) AS B
+		) W
+		LEFT OUTER JOIN
+		(
+			SELECT COMPANY_CD
+			     , BU_CD
+			     , RESOURCE_CD
+			     , WORKING_TIME
+			     , OVER_TIME
+			     , YYYYMMDD
+		    FROM
+            #if($_parameter.cutOffFlag == "Y" )
+			TB_HIS_WORK_CALENDAR_RSC WITH(NOLOCK) 
+            #else
+            UV_MST_WORK_CALENDAR_RSC WITH(NOLOCK)
+            #end
+		    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD      = @{GV_BU_CD}
+		      AND WC_SHIFT   ='A' 
+		    #if($_parameter.cutOffFlag == "Y" and $_parameter.planId and $_parameter.planId != '' )
+			  AND PLAN_ID = '$_parameter.planId'
+			#end
+		) X
+		ON X.COMPANY_CD   = W.COMPANY_CD
+		AND X.BU_CD       = W.BU_CD
+		AND X.RESOURCE_CD = W.RESOURCE_CD
+		AND X.YYYYMMDD    = W.YYYYMMDD
+		LEFT OUTER JOIN
+		(
+			SELECT COMPANY_CD
+			     , BU_CD
+			     , RESOURCE_CD
+			     , WORKING_TIME
+			     , OVER_TIME
+			     , YYYYMMDD
+		    FROM
+		    #if($_parameter.cutOffFlag == "Y" )
+		    TB_HIS_WORK_CALENDAR_RSC WITH(NOLOCK) 
+		    #else
+		    UV_MST_WORK_CALENDAR_RSC WITH(NOLOCK)
+		    #end 
+		    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD      = @{GV_BU_CD}
+		      AND WC_SHIFT   = 'B'
+		    #if($_parameter.cutOffFlag == "Y" and $_parameter.planId and $_parameter.planId != '' )
+			  AND PLAN_ID = '$_parameter.planId'
+			#end
+		) Y
+		ON Y.COMPANY_CD   = W.COMPANY_CD
+		AND Y.BU_CD       = W.BU_CD
+		AND Y.RESOURCE_CD = W.RESOURCE_CD
+		AND Y.YYYYMMDD    = W.YYYYMMDD
+		LEFT OUTER JOIN
+		(
+	    	SELECT COMPANY_CD
+	              , BU_CD
+	              , RESOURCE_CD
+	              , MIN(YYYYMMDD) AS START_DATE
+	              , MAX(YYYYMMDD) AS END_DATE
+			FROM UV_MST_WORK_CALENDAR_RSC WITH(NOLOCK)
+	        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	          AND BU_CD      = @{GV_BU_CD}
+	          AND EDIT_FLAG  = 'N'
+			GROUP BY COMPANY_CD, BU_CD, RESOURCE_CD
+		) Z
+	    ON Z.COMPANY_CD   = W.COMPANY_CD
+	    AND Z.BU_CD       = W.BU_CD
+	    AND Z.RESOURCE_CD = W.RESOURCE_CD
+		WHERE 1 = 1
+        #if($_parameter.prodPart and $_parameter.prodPart != "")
+          AND W.PART_CD IN ('$_parameter.prodPart.replace(",","','")')
+        #end 
+        #if($_parameter.workplaces and $_parameter.workplaces != "")
+          AND W.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+        #end 
+        #if($_parameter.workType and $_parameter.workType != "")
+		  AND W.WC_MGR IN ('$_parameter.workType.replace(",","','")')
+        #end 
+        #if($_parameter.prodOrQc and $_parameter.prodOrQc != "")
+          AND W.POQ_CD IN ('$_parameter.prodOrQc.replace(",","','")')
+        #end
+        #if($_parameter.workerGroup and $_parameter.workerGroup != "")
+          AND W.WORKER_GROUP IN ('$_parameter.workerGroup.replace(",","','")')
+        #end
+		GROUP BY W.BU_CD, W.PART_CD, W.PART_CD_NM, W.WC_MGR, W.WC_MGR_NM, W.WC_CD, W.WC_NM, W.RESOURCE_CD, W.RESOURCE_NM, W.POQ_CD, W.POQ_CD_NM, W.PART_SORT, W.WORKER_GROUP, W.WORKER_GROUP_NM, W.ROUTING_ID
+		ORDER BY W.PART_SORT, W.POQ_CD, W.WC_MGR_NM DESC, W.WC_CD, W.WORKER_GROUP_NM, W.RESOURCE_CD
+	</select>
+	
+	<select id="workCalendarRscWeekSelect"  parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarRscWeekSelec ] ******/
+		SELECT SUBSTRING(YYYYMMDD, 5, 2) + '/' + SUBSTRING(YYYYMMDD, 7, 2) + ' ('+B.CODE_NM_KR+')' AS CD
+             , 'W' + YEARWEEK AS NM
+        FROM TB_MST_CALENDAR A WITH(NOLOCK)
+        LEFT OUTER JOIN TB_MST_CODE B WITH(NOLOCK)
+          ON A.DAY_NM = B.CODE_CD
+         AND B.BU_CD = @{GV_BU_CD}
+         AND B.GROUP_CD = 'DAY_INDEX'
+         AND B.USE_FLAG = 'Y'
+       	WHERE A.YYYYMMDD BETWEEN @{fromCal} AND @{toCal}
+	</select>
+	
+	<select id="workCalendarRsRoutingSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarRsRoutingSelect ] ******/
+		
+		DECLARE @DIFFUSION_LAM_TEL_COMMON_ROLE NVARCHAR(10);
+		DECLARE @COMMON_DETAIL_ROLE_CNT INT; -- 사용자가 가진 공통권한과 세부권한 개수를 세어 공통권한과 세부권한을 2개 이상가지고 있을 경우 권한 부여하지 않기 위한변수
+			
+		
+	    -- 공통권한인지 세부 권한 인부 구분하여 TB_MST_CODE테이블 GRP_CODE:PROD_L2, ATTB8_CD/ATTB9_CD 중 어느 CODE를 참조할지 분기 타기 위한 변수
+	    SELECT @DIFFUSION_LAM_TEL_COMMON_ROLE = ROLE_CD
+	    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+	    WHERE USER_ID = @{GV_USER_ID}
+	    AND BU_CD = @{GV_BU_CD}
+	    AND USE_FLAG = 'Y'
+		AND ROLE_CD IN ('PRO0009','PRO0010', 'PRO0011')
+		
+		
+        SELECT @COMMON_DETAIL_ROLE_CNT = COUNT(*)
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0006','PRO0007', 'PRO0008', 'PRO0009','PRO0010', 'PRO0011')
+        
+		
+        IF @COMMON_DETAIL_ROLE_CNT <![CDATA[>=]]> 1 AND @COMMON_DETAIL_ROLE_CNT <![CDATA[<]]> 2 
+        BEGIN
+		
+							
+							IF @DIFFUSION_LAM_TEL_COMMON_ROLE = 'PRO0009' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0010' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0011' 
+							BEGIN
+							
+										      
+								        SELECT MC.CODE_CD
+								        FROM(
+								        
+								        SELECT A2.ROLE_CD
+								                FROM
+								                (
+								                    SELECT BU_CD
+								                         , ROLE_CD
+								                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+								                    WHERE USER_ID = @{GV_USER_ID}
+								                      AND BU_CD = @{GV_BU_CD}
+								                      AND USE_FLAG = 'Y'
+								                ) A1
+								                INNER JOIN
+								                (
+								                    SELECT COMPANY_CD
+								                         , BU_CD
+								                         , ROLE_CD
+								                         , MENU_CD
+								                    FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+								                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+								                      AND BU_CD = @{GV_BU_CD}
+								                      AND MENU_CD IN ('APS10402', 'APS10403','APS10415','APS10416')
+								                      AND ACTION_CD = 'SAVE'
+								                      AND USE_FLAG = 'Y'
+								                ) A2
+								                ON A1.BU_CD = A2.BU_CD
+								                AND A1.ROLE_CD = A2.ROLE_CD
+								                GROUP BY A2.ROLE_CD
+								        ) R
+								        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+								        ON R.ROLE_CD = MC.ATTB_9_CD
+								        AND MC.BU_CD = 'QT'
+								        AND MC.GROUP_CD = 'PROD_L2'
+								                
+							  END
+							ELSE
+							BEGIN
+							          
+							                    
+					                    SELECT MC.CODE_CD
+					                    FROM(
+					                    
+					                    SELECT A2.ROLE_CD
+					                            FROM
+					                            (
+					                                SELECT BU_CD
+					                                     , ROLE_CD
+					                                FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+					                                WHERE USER_ID = @{GV_USER_ID}
+					                                  AND BU_CD = @{GV_BU_CD}
+					                                  AND USE_FLAG = 'Y'
+					                            ) A1
+					                            INNER JOIN
+					                            (
+					                                SELECT COMPANY_CD
+					                                     , BU_CD
+					                                     , ROLE_CD
+					                                     , MENU_CD
+					                                FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+					                                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					                                  AND BU_CD = @{GV_BU_CD}
+					                                  AND MENU_CD IN ('APS10402', 'APS10403','APS10415','APS10416')
+					                                  AND ACTION_CD = 'SAVE'
+					                                  AND USE_FLAG = 'Y'
+					                            ) A2
+					                            ON A1.BU_CD = A2.BU_CD
+					                            AND A1.ROLE_CD = A2.ROLE_CD
+					                            GROUP BY A2.ROLE_CD
+					                    ) R
+					                    INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+					                    ON R.ROLE_CD = MC.ATTB_8_CD
+					                    AND MC.BU_CD = 'QT'
+					                    AND MC.GROUP_CD = 'PROD_L2'
+							END
+				   
+		  END
+		
+		
+		IF @{GV_USER_ID} = '00602'
+        BEGIN
+        
+            IF @DIFFUSION_LAM_TEL_COMMON_ROLE = 'PRO0009' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0010' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0011' 
+                            BEGIN
+                            
+                                              
+                                        SELECT MC.CODE_CD
+                                        FROM(
+                                        
+                                        SELECT A2.ROLE_CD
+                                                FROM
+                                                (
+                                                    SELECT BU_CD
+                                                         , ROLE_CD
+                                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                                                    WHERE USER_ID = @{GV_USER_ID}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND USE_FLAG = 'Y'
+                                                ) A1
+                                                INNER JOIN
+                                                (
+                                                    SELECT COMPANY_CD
+                                                         , BU_CD
+                                                         , ROLE_CD
+                                                         , MENU_CD
+                                                    FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND MENU_CD IN ('APS10402', 'APS10403','APS10415','APS10416')
+                                                      AND ACTION_CD = 'SAVE'
+                                                      AND USE_FLAG = 'Y'
+                                                ) A2
+                                                ON A1.BU_CD = A2.BU_CD
+                                                AND A1.ROLE_CD = A2.ROLE_CD
+                                                GROUP BY A2.ROLE_CD
+                                        ) R
+                                        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                        ON R.ROLE_CD = MC.ATTB_9_CD
+                                        AND MC.BU_CD = 'QT'
+                                        AND MC.GROUP_CD = 'PROD_L2'
+                                                
+                              END
+                            ELSE
+                            BEGIN
+                                      
+                                                
+                                        SELECT MC.CODE_CD
+                                        FROM(
+                                        
+                                        SELECT A2.ROLE_CD
+                                                FROM
+                                                (
+                                                    SELECT BU_CD
+                                                         , ROLE_CD
+                                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                                                    WHERE USER_ID = @{GV_USER_ID}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND USE_FLAG = 'Y'
+                                                ) A1
+                                                INNER JOIN
+                                                (
+                                                    SELECT COMPANY_CD
+                                                         , BU_CD
+                                                         , ROLE_CD
+                                                         , MENU_CD
+                                                    FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND MENU_CD IN ('APS10402', 'APS10403','APS10415','APS10416')
+                                                      AND ACTION_CD = 'SAVE'
+                                                      AND USE_FLAG = 'Y'
+                                                ) A2
+                                                ON A1.BU_CD = A2.BU_CD
+                                                AND A1.ROLE_CD = A2.ROLE_CD
+                                                GROUP BY A2.ROLE_CD
+                                        ) R
+                                        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                        ON R.ROLE_CD = MC.ATTB_8_CD
+                                        AND MC.BU_CD = 'QT'
+                                        AND MC.GROUP_CD = 'PROD_L2'
+                            END
+        
+        
+        
+		END
+	</select>
+	
+	
+	<select id="workCalendarRscAuthoritySelect" parameterType="map" resultType="map">
+        /****** [ aps.static.workCalendarRscAuthoritySelect ] ******/
+       
+         
+         DECLARE @DIFFUSION_LAM_TEL_COMMON_ROLE NVARCHAR(10);
+        DECLARE @COMMON_DETAIL_ROLE_CNT INT; -- 사용자가 가진 공통권한과 세부권한 개수를 세어 공통권한과 세부권한을 2개 이상가지고 있을 경우 권한 부여하지 않기 위한변수
+            
+        
+        -- 공통권한인지 세부 권한 인부 구분하여 TB_MST_CODE테이블 GRP_CODE:PROD_L2, ATTB8_CD/ATTB9_CD 중 어느 CODE를 참조할지 분기 타기 위한 변수
+        SELECT @DIFFUSION_LAM_TEL_COMMON_ROLE = ROLE_CD
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0009','PRO0010', 'PRO0011')
+        
+        
+        SELECT @COMMON_DETAIL_ROLE_CNT = COUNT(*)
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0006','PRO0007', 'PRO0008', 'PRO0009','PRO0010', 'PRO0011')
+        
+        
+        IF @COMMON_DETAIL_ROLE_CNT <![CDATA[>=]]> 1 AND @COMMON_DETAIL_ROLE_CNT <![CDATA[<]]> 2 
+        BEGIN
+        
+                                                
+	        SELECT A2.ROLE_CD
+	        FROM
+	        (
+	             SELECT BU_CD
+	                  , ROLE_CD
+	             FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+	             WHERE USER_ID = @{GV_USER_ID}
+	               AND BU_CD = @{GV_BU_CD}
+	               AND USE_FLAG = 'Y'
+	        ) A1
+	       INNER JOIN
+	       (
+	           SELECT COMPANY_CD
+	                , BU_CD
+	                , ROLE_CD
+	                , MENU_CD
+	           FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+	           WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	             AND BU_CD = @{GV_BU_CD}
+	             AND MENU_CD IN ('APS10402', 'APS10403','APS10415','APS10416')
+	             AND ACTION_CD = 'SAVE'
+	             AND USE_FLAG = 'Y'
+	       ) A2
+	       ON A1.BU_CD = A2.BU_CD
+	       AND A1.ROLE_CD = A2.ROLE_CD
+	       GROUP BY A2.ROLE_CD      
+                             
+                    
+          END
+             
+        IF @{GV_USER_ID} = '00602'
+        BEGIN
+        
+            SELECT A2.ROLE_CD
+            FROM
+            (
+                 SELECT BU_CD
+                      , ROLE_CD
+                 FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                 WHERE USER_ID = @{GV_USER_ID}
+                   AND BU_CD = @{GV_BU_CD}
+                   AND USE_FLAG = 'Y'
+            ) A1
+           INNER JOIN
+           (
+               SELECT COMPANY_CD
+                    , BU_CD
+                    , ROLE_CD
+                    , MENU_CD
+               FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+               WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                 AND BU_CD = @{GV_BU_CD}
+                 AND MENU_CD IN ('APS10402', 'APS10403','APS10415','APS10416')
+                 AND ACTION_CD = 'SAVE'
+                 AND USE_FLAG = 'Y'
+           ) A2
+           ON A1.BU_CD = A2.BU_CD
+           AND A1.ROLE_CD = A2.ROLE_CD
+           GROUP BY A2.ROLE_CD
+        
+        
+        END
+             
+                        
+    </select>
+    
+    
+	
+	
+	<select id="workCalendarRscPopupSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workCalendarRscPopupSelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		       AND MENU_CD = 'APS10401'
+		      AND ACTION_CD IN ('SEARCH', 'SAVE')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<update id="workCalendarRscUpdate" parameterType="map">
+		/****** [ aps.static.sworkCalendarRscUpdate ] ******/
+	    MERGE TB_MST_WORK_CALENDAR_RSC WITH (HOLDLOCK) AS T 
+	    USING 
+	    (
+			SELECT '$_parameter.GV_COMPANY_CD' AS COMPANY_CD
+                 , '$_parameter.GV_BU_CD' AS BU_CD
+                 , '$_parameter.RESOURCE_CD' AS RESOURCE_CD
+				 , '$_parameter.WC_SHIFT' AS WC_SHIFT
+				 , '$_parameter.YYYYMMDD' AS YYYYMMDD
+				#if($_parameter.WORKING_TIME != "undefined")
+				 , '$_parameter.WORKING_TIME' AS WORKING_TIME
+				#end
+				#if($_parameter.OVER_TIME != "undefined")
+				 , '$_parameter.OVER_TIME' AS OVER_TIME
+				#end  	
+				 , '$_parameter.GV_USER_ID' AS CREATE_ID
+				 , DBO.UFN_GETDATE() AS CREATE_DTTM
+				 ,'$_parameter.GV_USER_ID' AS UPDATE_ID
+				 , DBO.UFN_GETDATE() AS UPDATE_DTTM
+		) AS S
+	    ON 
+	    (
+	    	T.COMPANY_CD = S.COMPANY_CD 
+			AND T.BU_CD = S.BU_CD
+	        AND T.RESOURCE_CD = S.RESOURCE_CD
+	        AND T.WC_SHIFT = S.WC_SHIFT
+	        AND T.YYYYMMDD = S.YYYYMMDD
+		)
+	    WHEN MATCHED THEN 
+	    UPDATE SET
+	    	UPDATE_ID = S.UPDATE_ID
+	      , UPDATE_DTTM = S.UPDATE_DTTM
+		#if($_parameter.WORKING_TIME != "undefined")
+	      , WORKING_TIME = CASE WHEN S.WORKING_TIME = '' THEN NULL ELSE ROUND(CAST(S.WORKING_TIME AS decimal(6, 3)) * 3600, 2)  END
+		#end                                      
+	    #if($_parameter.OVER_TIME != "undefined")
+	      , OVER_TIME = CASE WHEN S.OVER_TIME = '' THEN NULL ELSE ROUND(CAST(S.OVER_TIME AS decimal(6, 3)) * 3600, 2)  END
+		#end                                       
+		WHEN NOT MATCHED THEN
+	    INSERT 
+	    (
+			COMPANY_CD
+          , BU_CD
+          , RESOURCE_CD
+          , WC_SHIFT
+          , YYYYMMDD
+		#if($_parameter.WORKING_TIME != "undefined" )
+          , WORKING_TIME
+        #end
+        #if($_parameter.OVER_TIME != "undefined")
+          , OVER_TIME
+        #end
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+		)VALUES( 
+			S.COMPANY_CD
+          , S.BU_CD
+          , S.RESOURCE_CD
+          , S.WC_SHIFT
+          , S.YYYYMMDD
+		#if($_parameter.WORKING_TIME != "undefined")
+          , CASE WHEN S.WORKING_TIME = '' THEN NULL ELSE ROUND(CAST(S.WORKING_TIME AS decimal(6,3))*3600,2) END
+        #end
+        #if($_parameter.OVER_TIME != "undefined")
+          , CASE WHEN S.OVER_TIME = '' THEN NULL ELSE ROUND(CAST(S.OVER_TIME AS decimal(6,3))*3600,2) END
+        #end
+          , S.CREATE_ID
+          , S.CREATE_DTTM
+          , S.UPDATE_ID
+          , S.UPDATE_DTTM
+		);
+      	</update>
+	
+</mapper>

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="test1">
+
+	<select id="test1ListSelect" parameterType="map" resultType="map">
+		/****** [ nbalive21.test1ListSelect ] ******/
+		WITH TEMP AS
+		(
+			SELECT HAV.COMPANY_CD AS COMPANY_CD
+				 , HAV.BU_CD AS BU_CD
+				 , ISNULL(HAV.PLAN_ID, ' ') AS PLAN_ID
+				 , ISNULL(HAV.PLAN_ID, ' ') AS PLAN_ID_NM
+				 , ISNULL(MC2.CODE_NM, ' ') AS PROD_PART
+			     , ISNULL(MC2.CODE_NM, ' ') AS PROD_PART_NM
+			     , ISNULL(HAV.ITEM_CD, ' ') AS ITEM_CD
+			     , ISNULL(HAV.ITEM_CD, ' ') AS ITEM_CD_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+			     , ISNULL(MIP.PROCUR_TYPE, ' ') AS PROCUR_TYPE_NM
+			     , ISNULL(MIP.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+			     , HAV.INVALID_CNT AS INVALID_CNT
+			     , HAV.SALES_PLAN_YN AS SALES_PLAN_YN
+			     , HAV.SP_QTY AS SP_QTY
+			     , HAV.WIP_QTY AS WIP_QTY
+			     , HAV.PROD_ORDER_YN AS PROD_ORDER_YN
+			     , AE.YEARMONTH AS YEARMONTH
+				 , AE.AMT AS AMT
+				 , AE.QTY AS QTY
+			FROM TB_HIS_APS_VALIDATION HAV WITH(NOLOCK)
+		 	INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		       ON MI.COMPANY_CD = HAV.COMPANY_CD
+		      AND MI.BU_CD = HAV.BU_CD
+		      AND MI.ITEM_CD = HAV.ITEM_CD
+		    INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		       ON MIP.COMPANY_CD = MI.COMPANY_CD
+		   	  AND MIP.BU_CD = MI.BU_CD
+		   	  AND MIP.PLANT_CD = 'WF01'
+		   	  AND MIP.ITEM_CD = MI.ITEM_CD
+		  	LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+		      ON MRC.COMPANY_CD = MI.COMPANY_CD
+		   	 AND MRC.BU_CD = MI.BU_CD
+		   	 AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+		  	LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		      ON MC.COMPANY_CD = MRC.COMPANY_CD
+		   	 AND MC.BU_CD = MRC.BU_CD
+		   	 AND MC.CUST_CD = MRC.REP_CUST_CD
+		  	LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+		      ON MICG.COMPANY_CD = MI.COMPANY_CD
+		   	 AND MICG.BU_CD = MI.BU_CD
+		   	 AND MICG.ITEM_CD = MI.ITEM_CD
+		     AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+		  	LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		      ON MIG.COMPANY_CD = MI.COMPANY_CD
+		   	 AND MIG.BU_CD = MI.BU_CD
+		   	 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		  	LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		      ON MC1.BU_CD = MIP.BU_CD
+		   	 AND MC1.GROUP_CD = 'CL_SL_CD'
+		     AND MC1.CODE_CD = MIP.RCPT_SL_CD
+		   	  AND MC1.USE_FLAG = 'Y'
+		  	LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		      ON MC2.BU_CD = HAV.BU_CD
+		     AND MC2.GROUP_CD = 'PROD_PART'
+		   	 AND MC2.CODE_CD = HAV.PROD_PART
+		     AND MC2.USE_FLAG = 'Y'
+		  	LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		      ON MC3.BU_CD = 'ALL'
+		     AND MC3.GROUP_CD = 'PROCUR_TYPE'
+		     AND MC3.CODE_CD = MIP.PROCUR_TYPE
+		     AND MC3.USE_FLAG = 'Y'
+		  	LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+		      ON MC4.BU_CD = 'ALL'
+		     AND MC4.GROUP_CD = 'ITEM_GRADE'
+		     AND MC4.CODE_CD = MI.ITEM_GRADE
+		     AND MC4.USE_FLAG = 'Y'
+		  	LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+		      ON MC5.BU_CD = 'ALL'
+		     AND MC5.GROUP_CD = 'ITEM_TYPE'
+		     AND MC5.CODE_CD = MI.ITEM_TYPE
+		   	 AND MC5.USE_FLAG = 'Y'
+		 	LEFT OUTER JOIN 
+		  	(
+			    SELECT COMPANY_CD
+				     , BU_CD
+				     , ITEM_CD
+				     , CUST_GROUP_CD
+				     , YEARMONTH
+				     , SUM(AMT) AS AMT
+				     , SUM(QTY) AS QTY
+				FROM TB_KPI_ACTION_PLAN WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	       		  AND BU_CD = @{GV_BU_CD}
+				  AND YEARMONTH <![CDATA[>=]]> @{fromMon}
+				  AND YEARMONTH <![CDATA[<=]]> @{toMon}
+				  AND MEAS_CD = 'M0' --하드 코팅
+				GROUP BY COMPANY_CD, BU_CD, ITEM_CD, CUST_GROUP_CD, YEARMONTH
+		  	) AE
+		    ON MI.COMPANY_CD = AE.COMPANY_CD
+		   	AND MI.BU_CD = AE.BU_CD
+		   	AND MI.ITEM_CD = AE.ITEM_CD
+		   	AND MICG.CUST_GROUP_CD = AE.CUST_GROUP_CD
+		 	WHERE HAV.COMPANY_CD = @{GV_COMPANY_CD}
+		 	  AND HAV.BU_CD = @{GV_BU_CD}
+		 	  AND HAV.PLAN_ID = @{planId}	
+		      AND HAV.PROD_PART = 'Diffusion'
+		      AND MI.ITEM_cD LIKE '%AA01000%'
+		)
+		SELECT NULL AS TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+			 , $dimMap.DIM_CD  
+			 , ${dimMap.DIM_CD}_NM
+			#end
+			#foreach( $hiddenMap in $_parameter.hiddenList )
+		     , $hiddenMap.CD
+			#end
+			 , GRP_LVL_ID
+			 , INVALID_CNT
+			 , CASE WHEN GRP_LVL_ID = 0 THEN SALES_PLAN_YN ELSE NULL END SALES_PLAN_YN
+			 , SP_QTY
+			 , WIP_QTY
+			 , CASE WHEN GRP_LVL_ID = 0 THEN PROD_ORDER_YN ELSE NULL END PROD_ORDER_YN
+			#foreach($bucketMap in $_parameter.bucketList)
+			 , $bucketMap.CD
+			#end
+		FROM
+		(
+			SELECT NULL AS TMP_COL 
+				<include refid="include.getCdDimTotal"/>
+				<include refid="include.getGrpLvlId"/>
+				#foreach( $hiddenMap in $_parameter.hiddenList )
+			     , MAX(A1.$hiddenMap.CD) AS $hiddenMap.CD
+				#end
+				 , MAX(INVALID_CNT) AS INVALID_CNT
+		     	 , MAX(SALES_PLAN_YN) AS SALES_PLAN_YN
+		     	 , MAX(SP_QTY) AS SP_QTY
+		     	 , MAX(WIP_QTY) AS WIP_QTY
+		     	 , MAX(PROD_ORDER_YN) AS PROD_ORDER_YN
+				#foreach($bucketMap in $_parameter.bucketList)
+		     	#set($paramMonth = "$bucketMap.BUCKET_VAL")
+		     		#if($bucketMap.CD.indexOf("_AMT_TEST_SUHOKIM") > -1)
+			  		, SUM(CASE WHEN YEARMONTH = '$paramMonth' THEN AMT END) AS $bucketMap.CD
+					#elseif($bucketMap.CD.indexOf("_QTY_TEST_SUHOKIM") > -1)
+			  		, SUM(CASE WHEN YEARMONTH = '$paramMonth' THEN QTY END) AS $bucketMap.CD
+			  		#end
+		   		#end
+			FROM TEMP A1
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+		) B1
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		 , B1.$dimMap.DIM_CD 
+		#end
+	</select>
+	
+	<update id="test1ListUpdate" parameterType="map">
+		/****** [ nbalive21.criteriaValidationListUpdate ] ******/
+		UPDATE TB_HIS_APS_VALIDATION
+		   SET INVALID_CNT   = @{INVALID_CNT}     
+		     , SALES_PLAN_YN = CASE WHEN @{SALES_PLAN_YN} = 'Y' THEN 'Y' ELSE 'N' END
+		     , UPDATE_ID   = @{GV_USER_ID}
+	         , UPDATE_DTTM = DBO.UFN_GETDATE()
+		 WHERE COMPANY_CD    = @{COMPANY_CD}
+		   AND BU_CD         = @{BU_CD}
+		   AND PLAN_ID       = @{PLAN_ID}
+		   AND PROD_PART     = @{PROD_PART}
+		   AND ITEM_CD       = @{ITEM_CD}
+	</update>
+	
+	
+	
+</mapper>

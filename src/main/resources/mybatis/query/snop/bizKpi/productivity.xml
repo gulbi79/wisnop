@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.bizKpi">
+	<select id="productivityYearSelect" parameterType="map" resultType="map">
+		/****** [ snop.bizKpi.productivityYearSelect ] ******/
+		WITH W_YEAR AS 
+		(
+			SELECT DISTINCT LEFT(B.PROD_DATE, 4) AS YEAR
+			FROM UV_PROD_RESULT B
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD      = @{GV_BU_CD}
+			  AND PLANT_CD   = 'WF01'
+		)
+		SELECT YEAR AS CODE_CD
+		     , YEAR AS CODE_NM
+		FROM 
+		(
+		    SELECT YEAR FROM W_YEAR
+		    UNION
+		    SELECT CONVERT(VARCHAR(4), DBO.UFN_GETDATE(), 112)
+		    UNION
+		    SELECT CONVERT(VARCHAR(4), DBO.UFN_GETDATE(), 112) - 1
+		) T
+		ORDER BY YEAR DESC
+	</select>
+	
+	<select id="productivitySelect" parameterType="map" resultType="map">
+		/****** [ snop.bizKpi.productivitySelect ] ******/
+		#set( $monthArr = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'] )
+		
+		WITH W_ITEM AS
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.DIV_CD
+		         , A.TEAM_CD
+		         , A.PART_CD
+		         , C.ROUTING_ID
+		         , C.ITEM_CD
+			FROM UV_MST_ORG A  WITH(NOLOCK)
+		    INNER JOIN TB_MST_ORG_SCOPE B WITH(NOLOCK)
+		       ON A.COMPANY_CD = B.COMPANY_CD
+		      AND A.BU_CD      = B.BU_CD
+		      AND A.PART_CD    = B.PART_CD
+		    INNER JOIN TB_MST_ITEM_PLANT C WITH(NOLOCK)
+		       ON B.COMPANY_CD = C.COMPANY_CD
+		      AND B.BU_CD      = C.BU_CD
+		      AND B.DATA_SCOPE_ID = C.ROUTING_ID
+		    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD      = @{GV_BU_CD}
+		      AND C.PLANT_CD   = 'WF01'
+		      AND B.USE_FLAG   = 'Y'
+		      AND B.DEL_FLAG   = 'N'
+			  AND EXISTS (
+                      		SELECT 1
+                        	FROM TB_MST_CODE MC WITH(NOLOCK)
+                       		WHERE MC.BU_CD = A.BU_CD
+                         	  AND MC.GROUP_CD = 'TEAM_CD'
+	                          AND MC.CODE_CD = A.TEAM_CD
+	                          AND MC.USE_FLAG = 'Y'
+	                          AND MC.ATTB_6_CD = 'Y'
+                     	 )
+		),
+		W_PART AS 
+		(
+		    SELECT A.COMPANY_CD
+		         , A.BU_CD
+		         , A.DIV_CD
+		         , A.TEAM_CD
+		         , A.PART_CD
+			FROM UV_MST_ORG A  WITH(NOLOCK)
+		    INNER JOIN TB_MST_ORG_SCOPE B WITH(NOLOCK)
+		       ON A.COMPANY_CD = B.COMPANY_CD
+		      AND A.BU_CD      = B.BU_CD
+		      AND A.PART_CD    = B.PART_CD
+		    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD      = @{GV_BU_CD}
+		      AND B.USE_FLAG   = 'Y'
+		      AND B.DEL_FLAG   = 'N'
+			  AND EXISTS (
+                      		SELECT 1
+                        	FROM TB_MST_CODE MC WITH(NOLOCK)
+                       		WHERE MC.BU_CD = A.BU_CD
+                         	  AND MC.GROUP_CD = 'TEAM_CD'
+                         	  AND MC.CODE_CD = A.TEAM_CD
+                         	  AND MC.USE_FLAG = 'Y'
+                         	  AND MC.ATTB_6_CD = 'Y'
+                         )
+			GROUP BY A.COMPANY_CD, A.BU_CD, A.DIV_CD, A.TEAM_CD, A.PART_CD
+		),
+		W_PROD_R AS 
+		(
+		    SELECT @{year} AS YEAR
+		         , A.COMPANY_CD
+		         , A.BU_CD
+		         , A.DIV_CD
+		         , A.TEAM_CD
+		         , A.PART_CD
+		         , 'AMT_PROD' AS MEAS_CD
+		         #foreach( $mon in $monthArr )
+		         , SUM(CASE LEFT(B.PROD_DATE, 6) WHEN @{year} + '$mon' THEN B.AMT_KRW ELSE NULL END) AS M$mon
+		         #end
+			FROM W_ITEM A
+		    INNER JOIN UV_PROD_RESULT B
+		       ON A.COMPANY_CD = B.COMPANY_CD
+		      AND A.BU_CD = B.BU_CD
+		      AND A.ITEM_CD = B.ITEM_CD
+		    WHERE B.PLANT_CD = 'WF01'
+		      AND B.PROD_DATE BETWEEN @{year} + '0101' AND @{year} + '1231'
+		    GROUP BY A.COMPANY_CD, A.BU_CD, A.DIV_CD, A.TEAM_CD, A.PART_CD
+		),
+		W_QTY_PROD AS 
+		(
+		    SELECT @{year} AS YEAR
+		         , A.COMPANY_CD
+		         , A.BU_CD
+		         , A.DIV_CD
+		         , A.TEAM_CD
+		         , A.PART_CD
+		         , 'QTY_PERFORM' AS MEAS_CD
+		         #foreach( $mon in $monthArr )
+		         , SUM(CASE LEFT(B.PROD_DATE, 6) WHEN @{year} + '$mon' THEN B.QTY ELSE NULL END) AS M$mon
+		         #end
+			FROM W_ITEM A
+		    INNER JOIN UV_PROD_RESULT B
+		       ON A.COMPANY_CD = B.COMPANY_CD
+		      AND A.BU_CD = B.BU_CD
+		      AND A.ITEM_CD = B.ITEM_CD
+		    WHERE B.PLANT_CD = 'WF01'
+		      AND B.PROD_DATE BETWEEN @{year} + '0101' AND @{year} + '1231'
+		    GROUP BY A.COMPANY_CD, A.BU_CD, A.DIV_CD, A.TEAM_CD, A.PART_CD
+		),
+		W_WORK_PEOPLE AS 
+		(
+		    SELECT A.YEAR
+		         , A.COMPANY_CD
+		         , A.BU_CD
+		         , A.PART_CD
+		         , A.MEAS_CD
+		         , A.M1_VAL  AS M01
+		         , A.M2_VAL  AS M02
+		         , A.M3_VAL  AS M03
+		         , A.M4_VAL  AS M04
+		         , A.M5_VAL  AS M05
+		         , A.M6_VAL  AS M06
+		         , A.M7_VAL  AS M07
+		         , A.M8_VAL  AS M08
+		         , A.M9_VAL  AS M09
+		         , A.M10_VAL AS M10
+		         , A.M11_VAL AS M11
+		         , A.M12_VAL AS M12
+			FROM TB_DYN_WORKING_FACTOR A WITH(NOLOCK)
+		    WHERE A.YEAR       = @{year}
+		      AND A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD      = @{GV_BU_CD}
+		      AND A.MEAS_CD    = 'WORK_PEOPLE'
+		),
+		W_WORK_TIME AS 
+		(
+		    SELECT A.YEAR
+		         , A.COMPANY_CD
+		         , A.BU_CD
+		         , A.PART_CD
+		         , A.MEAS_CD
+		         , A.M1_VAL  AS M01
+		         , A.M2_VAL  AS M02
+		         , A.M3_VAL  AS M03
+		         , A.M4_VAL  AS M04
+		         , A.M5_VAL  AS M05
+		         , A.M6_VAL  AS M06
+		         , A.M7_VAL  AS M07
+		         , A.M8_VAL  AS M08
+		         , A.M9_VAL  AS M09
+		         , A.M10_VAL AS M10
+		         , A.M11_VAL AS M11
+		         , A.M12_VAL AS M12
+			FROM TB_DYN_WORKING_FACTOR A WITH(NOLOCK)
+		    WHERE A.YEAR       = @{year}
+		      AND A.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND A.BU_CD      = @{GV_BU_CD}
+		      AND A.MEAS_CD    = 'WORK_TIME'
+		),
+		W_CODE AS 
+		(
+		    #set($_parameter.groupCd = "BU_CD,DIV_CD,TEAM_CD,PART_CD")
+		    #set($_parameter.buAllYn = "Y")
+		    <include refid="include.mstCode"/>
+		),
+		W_RES AS 
+		(
+		    SELECT T.COMPANY_CD
+		         , T.BU_CD
+		         , T.DIV_CD
+		         , T.TEAM_CD
+		         , T.PART_CD
+		         , T.YEAR
+		         , T.MEAS_CD
+		         #foreach( $mon in $monthArr )
+		         , T.M$mon
+		         #end
+			FROM 
+			(
+				SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.DIV_CD
+	                 , A.TEAM_CD
+	                 , A.PART_CD
+	                 , ISNULL(B.YEAR, @{year}) AS YEAR
+	                 , ISNULL(B.MEAS_CD, 'WORK_PEOPLE') AS MEAS_CD
+	                 #foreach( $mon in $monthArr )
+	                 , M$mon
+	                 #end
+				FROM W_PART A
+	            LEFT OUTER JOIN W_WORK_PEOPLE B
+	              ON A.COMPANY_CD = B.COMPANY_CD
+	             AND A.BU_CD      = B.BU_CD
+	             AND A.PART_CD    = B.PART_CD
+	            UNION ALL
+	            SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.DIV_CD
+	                 , A.TEAM_CD
+	                 , A.PART_CD
+	                 , ISNULL(B.YEAR, @{year}) AS YEAR
+	                 , ISNULL(B.MEAS_CD, 'WORK_TIME') AS MEAS_CD
+	                 #foreach( $mon in $monthArr )
+	                 , M$mon
+	                 #end
+				FROM W_PART A
+	            LEFT OUTER JOIN W_WORK_TIME B
+	              ON A.COMPANY_CD = B.COMPANY_CD
+	             AND A.BU_CD      = B.BU_CD
+	             AND A.PART_CD    = B.PART_CD
+	            UNION ALL
+	            SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.DIV_CD
+	                 , A.TEAM_CD
+	                 , A.PART_CD
+	                 , ISNULL(B.YEAR, @{year}) AS YEAR
+	                 , ISNULL(B.MEAS_CD, 'AMT_PROD') AS MEAS_CD
+	                 #foreach( $mon in $monthArr )
+	                 , M$mon
+	                 #end
+				FROM W_PART A
+	            LEFT OUTER JOIN W_PROD_R B
+	              ON A.COMPANY_CD = B.COMPANY_CD
+	             AND A.BU_CD      = B.BU_CD
+	             AND A.DIV_CD     = B.DIV_CD
+	             AND A.TEAM_CD    = B.TEAM_CD
+	             AND A.PART_CD    = B.PART_CD
+	            UNION ALL
+	            SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.DIV_CD
+	                 , A.TEAM_CD
+	                 , A.PART_CD
+	                 , ISNULL(B.YEAR, @{year}) AS YEAR
+	                 , ISNULL(B.MEAS_CD, 'QTY_PERFORM') AS MEAS_CD
+	                 #foreach( $mon in $monthArr )
+	                 , M$mon
+	                 #end
+				FROM W_PART A
+	            LEFT OUTER JOIN W_QTY_PROD B
+	              ON A.COMPANY_CD = B.COMPANY_CD
+	             AND A.BU_CD      = B.BU_CD
+	             AND A.DIV_CD     = B.DIV_CD
+	             AND A.TEAM_CD    = B.TEAM_CD
+	             AND A.PART_CD    = B.PART_CD
+	            UNION ALL
+	            SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.DIV_CD
+	                 , A.TEAM_CD
+	                 , A.PART_CD
+	                 , @{year} AS YEAR
+	                 , 'PEOPLE_PROD' AS MEAS_CD
+	                 #foreach( $mon in $monthArr )
+	                 , CASE WHEN C.M$mon <![CDATA[<>]]> 0 THEN ROUND(B.M$mon / C.M$mon, 1) ELSE NULL END AS M$mon
+	                 #end
+				FROM W_PART A
+	            LEFT OUTER JOIN W_PROD_R B
+	              ON A.COMPANY_CD = B.COMPANY_CD
+	             AND A.BU_CD      = B.BU_CD
+	             AND A.DIV_CD     = B.DIV_CD
+	             AND A.TEAM_CD    = B.TEAM_CD
+	             AND A.PART_CD    = B.PART_CD
+	            LEFT OUTER JOIN W_WORK_PEOPLE C
+	              ON A.COMPANY_CD = C.COMPANY_CD
+	             AND A.BU_CD      = C.BU_CD
+	             AND A.PART_CD    = C.PART_CD
+	            UNION ALL
+	            SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.DIV_CD
+	                 , A.TEAM_CD
+	                 , A.PART_CD
+	                 , @{year} AS YEAR
+	                 , 'TIME_PROD' AS MEAS_CD
+	                 #foreach( $mon in $monthArr )
+	                 , CASE WHEN C.M$mon <![CDATA[<>]]> 0 THEN ROUND(B.M$mon / C.M$mon, 1) ELSE NULL END AS M$mon
+	                 #end
+				FROM W_PART A
+	            LEFT OUTER JOIN W_PROD_R B
+	              ON A.COMPANY_CD = B.COMPANY_CD
+	             AND A.BU_CD      = B.BU_CD
+	             AND A.DIV_CD     = B.DIV_CD
+	             AND A.TEAM_CD    = B.TEAM_CD
+	             AND A.PART_CD    = B.PART_CD
+	            LEFT OUTER JOIN W_WORK_TIME C
+	              ON A.COMPANY_CD = C.COMPANY_CD
+	             AND A.BU_CD      = C.BU_CD
+	             AND A.PART_CD    = C.PART_CD
+			) T
+		)
+		SELECT M.COMPANY_CD
+		     , M.BU_CD
+		     , (SELECT CODE_NM FROM W_CODE A WHERE A.CODE_CD = M.BU_CD AND A.GROUP_CD = 'BU_CD') AS BU_NM
+		     , M.DIV_CD
+		     , CASE WHEN M.DIV_CD IS NULL THEN 'Sub Total' ELSE (SELECT CODE_NM FROM W_CODE A WHERE A.CODE_CD = M.DIV_CD AND A.GROUP_CD = 'DIV_CD') END AS DIV_NM
+		     , M.TEAM_CD
+		     , (SELECT CODE_NM FROM W_CODE A WHERE A.CODE_CD = M.TEAM_CD AND A.GROUP_CD = 'TEAM_CD') AS TEAM_NM
+		     , M.PART_CD
+		     , CASE WHEN M.PART_CD IS NULL AND M.DIV_CD IS NOT NULL THEN 'Sub Total' ELSE (SELECT CODE_NM FROM W_CODE A WHERE A.CODE_CD = M.PART_CD AND A.GROUP_CD = 'PART_CD') END AS PART_NM
+		     , C.CATEGORY_CD AS MEAS_CD
+		     , C.CATEGORY_NM AS MEAS_NM
+		     , C.CATEGORY_IDX
+		     #foreach( $mon in $monthArr )
+		     , CASE C.CATEGORY_CD
+		            WHEN 'AMT_PROD'    THEN SUM(QP_M$mon)
+		            WHEN 'WORK_PEOPLE' THEN SUM(WP_M$mon)
+		            WHEN 'WORK_TIME'   THEN SUM(WT_M$mon)
+		            WHEN 'PEOPLE_PROD' THEN SUM(QP_M$mon) / SUM(WP_M$mon)
+		            WHEN 'TIME_PROD'   THEN SUM(QP_M$mon) / SUM(WT_M$mon)
+		            WHEN 'QTY_PERFORM' THEN SUM(QTP_M$mon)
+		       END M$mon
+		     #end
+		FROM 
+		(
+			SELECT A.COMPANY_CD
+	             , A.BU_CD
+	             , A.DIV_CD
+	             , A.TEAM_CD
+	             , A.PART_CD
+	             , A.YEAR
+	             #foreach( $mon in $monthArr )
+	             , SUM(CASE WHEN A.MEAS_CD = 'AMT_PROD'    THEN A.M$mon ELSE NULL END) AS QP_M$mon
+	             , SUM(CASE WHEN A.MEAS_CD = 'WORK_PEOPLE' THEN A.M$mon ELSE NULL END) AS WP_M$mon
+	             , SUM(CASE WHEN A.MEAS_CD = 'WORK_TIME'   THEN A.M$mon ELSE NULL END) AS WT_M$mon
+	             , SUM(CASE WHEN A.MEAS_CD = 'PEOPLE_PROD' THEN A.M$mon ELSE NULL END) AS PP_M$mon
+	             , SUM(CASE WHEN A.MEAS_CD = 'TIME_PROD'   THEN A.M$mon ELSE NULL END) AS TP_M$mon
+	             , SUM(CASE WHEN A.MEAS_CD = 'QTY_PERFORM'   THEN A.M$mon ELSE NULL END) AS QTP_M$mon
+	             #end
+			FROM W_RES A
+	        GROUP BY A.COMPANY_CD, A.BU_CD, A.DIV_CD, A.TEAM_CD, A.PART_CD, A.YEAR
+		) M
+		CROSS JOIN 
+		(
+			SELECT CATEGORY_CD, CATEGORY_NM, CATEGORY_IDX 
+        	FROM 
+        	(
+            	SELECT NULL AS CATEGORY_CD, NULL AS CATEGORY_NM, NULL AS CATEGORY_IDX
+				#foreach($meaMap in $_parameter.meaList)
+				UNION ALL SELECT '$meaMap.CD', '$meaMap.NM', $velocityCount 
+				#end 
+			) SS
+          	WHERE CATEGORY_CD IS NOT NULL
+		) C
+		GROUP BY M.COMPANY_CD, M.BU_CD, ROLLUP ((M.DIV_CD, M.TEAM_CD, M.YEAR), (M.PART_CD) ), C.CATEGORY_CD, C.CATEGORY_NM, C.CATEGORY_IDX
+		ORDER BY M.COMPANY_CD, M.BU_CD, M.DIV_CD, M.TEAM_CD, M.PART_CD, C.CATEGORY_IDX
+	</select>
+	
+	<insert id="productivityMerge" parameterType="map">
+		/****** [ snop.bizKpi.productivityMerge ] ******/
+		MERGE TB_DYN_WORKING_FACTOR A
+		USING (
+		      SELECT @{year      } AS YEAR
+		           , @{COMPANY_CD} AS COMPANY_CD
+		           , @{BU_CD     } AS BU_CD
+		           , @{PART_CD   } AS PART_CD
+		           , @{MEAS_CD   } AS MEAS_CD
+		           , @{M01       } AS M1_VAL
+		           , @{M02       } AS M2_VAL
+		           , @{M03       } AS M3_VAL
+		           , @{M04       } AS M4_VAL
+		           , @{M05       } AS M5_VAL
+		           , @{M06       } AS M6_VAL
+		           , @{M07       } AS M7_VAL
+		           , @{M08       } AS M8_VAL
+		           , @{M09       } AS M9_VAL
+		           , @{M10       } AS M10_VAL
+		           , @{M11       } AS M11_VAL
+		           , @{M12       } AS M12_VAL
+		           , @{GV_USER_ID} AS USER_ID
+		           , DBO.UFN_GETDATE() AS DTTM
+		) B
+		ON (
+		          A.YEAR       = B.YEAR
+		      AND A.COMPANY_CD = B.COMPANY_CD
+		      AND B.BU_CD      = B.BU_CD
+		      AND A.PART_CD    = B.PART_CD
+		      AND A.MEAS_CD    = B.MEAS_CD
+		)
+		WHEN MATCHED THEN
+		      UPDATE 
+		         SET A.M1_VAL = B.M1_VAL
+		           , A.M2_VAL = B.M2_VAL
+		           , A.M3_VAL = B.M3_VAL
+		           , A.M4_VAL = B.M4_VAL
+		           , A.M5_VAL = B.M5_VAL
+		           , A.M6_VAL = B.M6_VAL
+		           , A.M7_VAL = B.M7_VAL
+		           , A.M8_VAL = B.M8_VAL
+		           , A.M9_VAL = B.M9_VAL
+		           , A.M10_VAL = B.M10_VAL
+		           , A.M11_VAL = B.M11_VAL
+		           , A.M12_VAL = B.M12_VAL
+		           , A.UPDATE_ID = B.USER_ID
+		           , A.UPDATE_DTTM = B.DTTM
+		WHEN NOT MATCHED THEN
+		      INSERT (
+		           YEAR
+		         , COMPANY_CD
+		         , BU_CD
+		         , PART_CD
+		         , MEAS_CD
+		         , M1_VAL
+		         , M2_VAL
+		         , M3_VAL
+		         , M4_VAL
+		         , M5_VAL
+		         , M6_VAL
+		         , M7_VAL
+		         , M8_VAL
+		         , M9_VAL
+		         , M10_VAL
+		         , M11_VAL
+		         , M12_VAL
+		         , CREATE_ID
+		         , CREATE_DTTM
+		      ) VALUES (
+		           B.YEAR
+		         , B.COMPANY_CD
+		         , B.BU_CD
+		         , B.PART_CD
+		         , B.MEAS_CD
+		         , B.M1_VAL
+		         , B.M2_VAL
+		         , B.M3_VAL
+		         , B.M4_VAL
+		         , B.M5_VAL
+		         , B.M6_VAL
+		         , B.M7_VAL
+		         , B.M8_VAL
+		         , B.M9_VAL
+		         , B.M10_VAL
+		         , B.M11_VAL
+		         , B.M12_VAL
+		         , B.USER_ID
+		         , B.DTTM
+		      );
+	</insert>
+	
+</mapper>

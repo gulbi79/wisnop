@@ -1,0 +1,961 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="resourceUtilRateVersionSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.resourceUtilRateVersionSelect ] ******/
+		SELECT DISTINCT VERSION_ID AS CODE_CD
+		     , VERSION_ID AS CODE_NM
+		     , CUT_OFF_FLAG
+		     , VERSION_TYPE_CD
+			#if($_parameter.selectYn == "Y")
+		     , PROD_PART AS UPPER_CD
+		    #end
+		FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND PLAN_ID    = @{planId}
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+		  AND PROD_PART = @{prodPart}
+		#end
+		ORDER BY VERSION_ID
+	</select>
+	
+	<select id="resourceUtilRateSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.resourceUtilRateSelect ] ******/
+		
+		#foreach($dimMap in $_parameter.dimList)
+			#if($dimMap.DIM_CD == "MAPPING_ITEM_CNT") 
+				#set($dim_MAPPING_ITEM_CNT = "Y")
+			#end
+		#end
+              
+        #if($dim_MAPPING_ITEM_CNT == "Y")
+         WITH W_MAPPING_ITEM_CNT AS
+        (
+            SELECT MR.COMPANY_CD
+                 , MR.BU_CD
+                 , MR.PLANT_CD
+                 , MR.RESOURCE_CD
+                 , MC4.CODE_CD AS PROD_GROUP
+                 , MRPG.PROD_GROUP_DET
+                 , MC2.CODE_CD AS PROD_PART_CD
+                 , MC2.CODE_NM AS PROD_PART_NM
+                 , MWC.WC_CD
+                 , MWC.WC_NM
+                 , MWC.WC_MGR
+                 , (
+                      SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                  WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                  ELSE CODE_NM
+                             END AS CODE_NM
+                        FROM TB_MST_CODE WITH(NOLOCK)
+                       WHERE BU_CD    = @{GV_BU_CD}
+                         AND GROUP_CD = 'RESOURCE_TYPE'
+                         AND CODE_CD  = MWC.WC_MGR
+                         AND USE_FLAG = 'Y'
+                   ) AS WC_MGR_NM                
+                 , MR.RESOURCE_NM
+                 , MR.CAMPUS_CD
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN MC3.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN MC3.CODE_NM_CN
+                        ELSE MC3.CODE_NM
+                   END AS CAMPUS_NM
+                 , MRPG.JOB_CD
+                 , MRPG.PRIORITY
+            FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+            INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+               ON MWC.COMPANY_CD = MR.COMPANY_CD
+              AND MWC.BU_CD = MR.BU_CD
+              AND MWC.PLANT_CD = MR.PLANT_CD
+              AND MWC.WC_CD = MR.WC_CD
+            LEFT OUTER JOIN 
+		    (
+				SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , GROUP_DESC
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE GROUP_CD = 'PROD_OR_QC'
+				
+			) MC1
+		    ON MC1.BU_CD = MWC.BU_CD
+		    AND MC1.GROUP_CD = 'PROD_OR_QC'
+		    AND MC1.CODE_CD = MWC.PROD_OR_QC
+		    AND MC1.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+              ON MC3.BU_CD = MR.BU_CD
+             AND MC3.GROUP_CD = 'CAMPUS_CD'
+             AND MC3.CODE_CD = MR.CAMPUS_CD
+             AND MC3.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+              ON MC4.BU_CD = MWC.BU_CD
+             AND MC4.GROUP_CD = 'PROD_ITEM_GROUP_MST'
+             AND MC4.ATTB_3_CD = MWC.WC_CD
+             AND MC4.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+              ON MC2.BU_CD = MC4.BU_CD
+             AND MC2.GROUP_CD = 'PROD_PART'
+             AND MC2.CODE_CD = MC4.ATTB_1_CD
+             AND MC2.USE_FLAG = 'Y'
+            LEFT OUTER JOIN 
+		    (
+		    	SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , GROUP_DESC
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE GROUP_CD = 'WORKER_GROUP'
+			) MC5
+		    ON MC5.BU_CD = MR.BU_CD
+		    AND MC5.GROUP_CD = 'WORKER_GROUP'
+		    AND MC5.CODE_CD = MR.WORKER_GROUP
+		    AND MC5.USE_FLAG = 'Y'
+            LEFT OUTER JOIN TB_MST_RESOURCE_PROD_GROUP MRPG WITH(NOLOCK)
+              ON MRPG.COMPANY_CD = MR.COMPANY_CD
+             AND MRPG.BU_CD = MR.BU_CD
+             AND MRPG.PLANT_CD = MR.PLANT_CD
+             AND MRPG.RESOURCE_CD = MR.RESOURCE_CD
+             AND MRPG.PROD_GROUP = MC4.CODE_CD
+            WHERE MR.RESOURCE_TYPE = 'M'
+              AND MR.VALID_FROM_DATE <![CDATA[<=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+              AND MR.VALID_TO_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+            #if($_parameter.prodOrQc and $_parameter.prodOrQc != "")
+		   	  AND MC1.CODE_CD IN ('$_parameter.prodOrQc.replace(",","','")')
+		   	#end
+		   	#if($_parameter.workplaces and $_parameter.workplaces != "")
+		   	  AND MWC.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+		   	#end
+		   	#if($_parameter.workerGroup and $_parameter.workerGroup != "")
+		   	  AND MC5.CODE_CD IN ('$_parameter.workerGroup.replace(",","','")')
+		   	#end
+		   	#if($_parameter.resource and $_parameter.resource != "")
+		      AND (MR.RESOURCE_CD LIKE '%' + @{resource} + '%' OR MR.RESOURCE_NM LIKE '%' + @{resource} + '%')
+		   	#end
+        )
+        
+        , W_MAPPING_ITEM_CNT_TOTAL AS
+        (
+        
+			         SELECT NULL AS TMP_COL
+			             , COMPANY_CD
+			             , BU_CD
+			             , PLANT_CD
+			             , PROD_GROUP
+			             , PROD_PART_CD
+			             , WC_CD
+			             , RESOURCE_CD
+			             , 0
+			            #foreach($bucketMap in $_parameter.bucketGroupDetailList)
+			             + CASE WHEN $bucketMap.CD <![CDATA[>=]]> 1 THEN 1 ELSE 0 END 
+			            #end    
+			            AS MAPPING_ITEM_CNT
+			        FROM 
+			        (
+				            SELECT NULL AS TMP_COL
+				                 , T.COMPANY_CD
+				                 , T.BU_CD
+				                 , T.PLANT_CD
+				                 , T.PROD_GROUP
+				                 , T.PROD_PART_CD
+				                 , T.WC_CD
+				                 , T.RESOURCE_CD
+				                #foreach($bucketMap in $_parameter.bucketGroupDetailList)
+				                 , SUM(CASE WHEN 'G' + T.PROD_GROUP_DET + '_' + T.JOB_CD = '$bucketMap.CD' THEN T.PRIORITY ELSE NULL END) AS $bucketMap.CD
+				                #end
+				            FROM 
+				            (
+				                SELECT A.COMPANY_CD
+				                     , A.BU_CD
+				                     , A.PLANT_CD
+				                     , A.PROD_GROUP
+				                     , A.PROD_GROUP_DET
+
+				                     , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD
+				                     , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD_NM
+				                     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+				                     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+				                     , ISNULL(A.WC_CD, ' ')        AS WC_CD
+				                     , ISNULL(A.WC_CD, ' ')        AS WC_CD_NM
+				                     , ISNULL(A.WC_NM, ' ')        AS WC_NM
+				                     , ISNULL(A.WC_NM, ' ')        AS WC_NM_NM
+				                     , ISNULL(A.WC_MGR_NM, ' ')    AS WC_MGR_NM
+				                     , ISNULL(A.WC_MGR_NM, ' ')    AS WC_MGR_NM_NM
+				                     , ISNULL(A.RESOURCE_CD, ' ')  AS RESOURCE_CD
+				                     , ISNULL(A.RESOURCE_CD, ' ')  AS RESOURCE_CD_NM
+				                     , ISNULL(A.RESOURCE_NM, ' ')  AS RESOURCE_NM
+				                     , ISNULL(A.RESOURCE_NM, ' ')  AS RESOURCE_NM_NM
+				                     , ISNULL(A.CAMPUS_CD, ' ')    AS CAMPUS_CD
+				                     , ISNULL(A.CAMPUS_CD, ' ')    AS CAMPUS_CD_NM
+				                     , ISNULL(A.CAMPUS_NM, ' ')    AS CAMPUS_NM
+				                     , ISNULL(A.CAMPUS_NM, ' ')    AS CAMPUS_NM_NM
+				                     , A.JOB_CD
+				                     , A.PRIORITY
+				                FROM W_MAPPING_ITEM_CNT A
+				                WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+				                  AND A.BU_CD = @{GV_BU_CD}
+				                  AND A.PROD_PART_CD = @{prodPart}
+				                  AND A.PROD_GROUP LIKE '%'+@{prodPartShort}+'%'
+				              
+				            ) T
+						    GROUP BY T.COMPANY_CD
+						    , T.BU_CD
+						    , T.PLANT_CD
+						    , T.PROD_GROUP
+						    , T.PROD_PART_CD
+						    , T.PROD_PART_NM
+						    , T.WC_CD
+						    , T.WC_NM
+						    , T.RESOURCE_CD
+						    , T.RESOURCE_NM
+			        
+			        ) T1
+			        
+		)
+        #end
+              
+       #if($dim_MAPPING_ITEM_CNT == "Y")  
+		, W_DATA AS 
+	   #else
+	   WITH W_DATA AS
+	   #end
+	   (
+		    SELECT MC1.CODE_NM AS PROD_PART
+		         , MC2.CODE_NM AS POQ_NM
+		         , MWC.WC_CD AS WC_CD_PE
+		         , MWC.WC_NM AS WC_NM_PE
+		         , MC3.CODE_NM AS WC_MGR
+		         , MR.RESOURCE_CD
+		         , MR.RESOURCE_NM
+		         , MC4.CODE_NM AS WORKER_GROUP
+		         , MC5.CODE_NM AS CAMPUS_NM
+		         , HACU.MEAS_CD
+		         #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+		         	 , HACU.YYYYMMDD
+			     #else
+			         , (
+						SELECT CAL2.YEARMONTH_STD
+						FROM TB_MST_CALENDAR CAL2
+						WHERE CAL2.YYYYMMDD = HACU.YYYYMMDD
+						GROUP BY CAL2.YEARMONTH_STD			         
+			         )AS  YEARMONTH_STD
+			         				         	
+		         #end
+		         , HACU.VALUE
+		         , (
+		            SELECT CAL.DAY_OFF_FLAG
+		              FROM TB_MST_CALENDAR CAL
+		             WHERE CAL.YYYYMMDD = HACU.YYYYMMDD
+		           ) AS DAY_OFF_FLAG
+		         
+		         
+		         , CASE WHEN HACU.MEAS_CD = 'WAIT_DAYS' THEN 
+		                                          CASE WHEN HACU.VALUE > 0  THEN 1 
+		                                          ELSE 0 END
+		           END
+		          AS WAIT_DAYS_FLAG
+		         
+		         , CASE WHEN HACU.MEAS_CD = 'WAIT_DAYS_AVG' THEN 
+                                                  CASE WHEN HACU.VALUE > 0  THEN 1 
+                                                  ELSE 0 END
+                   END
+                  AS WAIT_DAYS_AVG_FLAG
+                 
+		         , CASE WHEN HACU.MEAS_CD = 'JC_CNT' THEN
+		                                          CASE WHEN HACU.VALUE > 0 THEN 1
+		                                          ELSE 0 END
+		           END
+		           AS JC_CNT_FLAG
+		           
+		          , CASE WHEN HACU.MEAS_CD = 'JC_TIME' THEN
+		                                          CASE WHEN HACU.VALUE > 0 THEN 1
+		                                          ELSE 0 END
+		           END
+		           AS JC_TIME_FLAG
+			FROM TB_HIS_APS_CAPA_UTIL HACU WITH(NOLOCK)
+		    INNER JOIN TB_MST_RESOURCE MR WITH(NOLOCK)
+		       ON MR.COMPANY_CD = HACU.COMPANY_CD
+		      AND MR.BU_CD = HACU.BU_CD
+		      AND MR.RESOURCE_CD = HACU.RESOURCE_CD
+		    INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+		       ON MWC.COMPANY_CD = MR.COMPANY_CD
+		      AND MWC.BU_CD = MR.BU_CD
+		      AND MWC.WC_CD = MR.WC_CD
+		
+		    LEFT OUTER JOIN 
+		    (
+				SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , GROUP_DESC
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE GROUP_CD = 'PROD_PART'
+				
+			) MC1
+		    ON MC1.BU_CD = HACU.BU_CD
+		    AND MC1.GROUP_CD = 'PROD_PART'
+		    AND MC1.CODE_CD = HACU.PROD_PART
+		    AND MC1.USE_FLAG = 'Y'
+		    LEFT OUTER JOIN 
+		    (
+				SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , GROUP_DESC
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE GROUP_CD = 'PROD_OR_QC'
+			) MC2
+		    ON MC2.BU_CD = MWC.BU_CD
+		    AND MC2.GROUP_CD = 'PROD_OR_QC'
+		    AND MC2.CODE_CD = MWC.PROD_OR_QC
+		    AND MC2.USE_FLAG = 'Y'
+		    LEFT OUTER JOIN 
+		    (
+		    	SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , GROUP_DESC
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE GROUP_CD = 'RESOURCE_TYPE'
+			) MC3
+		    ON MC3.BU_CD = MWC.BU_CD
+		    AND MC3.GROUP_CD = 'RESOURCE_TYPE'
+		    AND MC3.CODE_CD = MWC.WC_MGR
+		    AND MC3.USE_FLAG = 'Y'
+		    LEFT OUTER JOIN 
+		    (
+		    	SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , GROUP_DESC
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE GROUP_CD = 'WORKER_GROUP'
+			) MC4
+		    ON MC4.BU_CD = MR.BU_CD
+		    AND MC4.GROUP_CD = 'WORKER_GROUP'
+		    AND MC4.CODE_CD = MR.WORKER_GROUP
+		    AND MC4.USE_FLAG = 'Y'
+		    LEFT OUTER JOIN 
+		    (
+		    	SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , GROUP_DESC
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE GROUP_CD = 'CAMPUS_CD'
+			) MC5
+		    ON MC5.BU_CD = MR.BU_CD
+		    AND MC5.GROUP_CD = 'CAMPUS_CD'
+		    AND MC5.CODE_CD = MR.CAMPUS_CD
+		    AND MC5.USE_FLAG = 'Y'
+		    
+			WHERE HACU.COMPANY_CD = @{GV_COMPANY_CD}
+		   	  AND HACU.BU_CD = @{GV_BU_CD}
+		   	  AND HACU.PLAN_ID = @{planId}
+		   	#if($_parameter.versionId and $_parameter.versionId != "")
+		   	  AND HACU.VERSION_ID = @{versionId}
+		   	#end
+		   	#if($_parameter.prodPart and $_parameter.prodPart != "")
+		   	  AND HACU.PROD_PART = @{prodPart}
+		   	#end
+		   	#if($_parameter.prodOrQc and $_parameter.prodOrQc != "")
+		   	  AND MC2.CODE_CD IN ('$_parameter.prodOrQc.replace(",","','")')
+		   	#end
+		   	#if($_parameter.workplaces and $_parameter.workplaces != "")
+		   	  AND MWC.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+		   	#end
+		    #if($_parameter.workerGroup and $_parameter.workerGroup != "")
+		   	  AND MC4.CODE_CD IN ('$_parameter.workerGroup.replace(",","','")')
+		   	#end
+		   	#if($_parameter.resource and $_parameter.resource != "")
+		      AND (MR.RESOURCE_CD LIKE '%' + @{resource} + '%' OR MR.RESOURCE_NM LIKE '%' + @{resource} + '%')
+		   	#end
+		),
+		W_MEASURE AS 
+		(
+	    	SELECT CATEGORY_CD
+	    	     , CATEGORY_NM
+	    	     , CATEGORY_IDX 
+	        FROM 
+	        (
+	        	SELECT NULL AS CATEGORY_CD
+	        	     , NULL AS CATEGORY_NM
+	        	     , NULL AS CATEGORY_IDX
+				#foreach( $meaMap in $_parameter.meaList )
+	            UNION ALL 
+	            SELECT '$meaMap.CD'
+	                 , '$meaMap.NM'
+	                 , $velocityCount 
+				#end
+			) A
+	        WHERE CATEGORY_CD IS NOT NULL
+		),
+		W_COL AS 
+		(
+		    SELECT A.PROD_PART
+		         , A.POQ_NM
+		         , A.WC_CD_PE
+		         , A.WC_NM_PE
+		         , A.WC_MGR
+		         , A.RESOURCE_CD
+		         , A.RESOURCE_NM
+		         , A.WORKER_GROUP
+		         , A.CAMPUS_NM
+		         #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+		         	, A.YYYYMMDD
+		         #else 
+		            , A.YEARMONTH_STD
+		         #end
+		         
+		         #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+		         	, A.DAY_OFF_FLAG
+		         #else
+		         	, SUM(CASE WHEN A.MEAS_CD = 'PLAN_TIME' AND A.DAY_OFF_FLAG = '0' THEN NULL
+                        WHEN A.MEAS_CD = 'PLAN_TIME' AND A.DAY_OFF_FLAG = '0.5' THEN 12
+                        WHEN A.MEAS_CD = 'PLAN_TIME' AND A.DAY_OFF_FLAG = '1' THEN 24
+                   END) AS DAY_OFF_FLAG
+		         	
+		         #end
+		         
+		         , SUM(CASE WHEN A.MEAS_CD = 'AVAIL_TIME' THEN A.VALUE ELSE NULL END) AS AVAIL_TIME
+		         , SUM(CASE WHEN A.MEAS_CD = 'PLAN_TIME' THEN A.VALUE ELSE NULL END) AS PLAN_TIME
+		         
+		         , SUM(CASE WHEN A.MEAS_CD = 'WAIT_DAYS' THEN A.VALUE ELSE NULL END) AS WAIT_DAYS
+		         , SUM(CASE WHEN A.MEAS_CD = 'WAIT_DAYS' THEN A.WAIT_DAYS_FLAG ELSE NULL END) AS WAIT_DAYS_FLAG
+		         
+		         
+		         ,SUM(CASE WHEN A.MEAS_CD = 'WAIT_DAYS_AVG' THEN A.VALUE ELSE NULL END) AS WAIT_DAYS_AVG
+                 ,SUM(CASE WHEN A.MEAS_CD = 'WAIT_DAYS_AVG' THEN A.WAIT_DAYS_AVG_FLAG ELSE NULL END) AS WAIT_DAYS_AVG_FLAG
+		         
+		         
+                 
+                 
+		         , SUM(CASE WHEN A.MEAS_CD = 'JC_CNT' THEN A.VALUE ELSE NULL END) AS JC_CNT
+		         -------------------------------------------
+		        , SUM(CASE 
+		                WHEN A.MEAS_CD = 'JC_CNT'
+		                    THEN A.JC_CNT_FLAG
+		                ELSE NULL
+		                END) AS JC_CNT_FLAG
+		        -------------------------------------------
+                 , SUM(CASE WHEN A.MEAS_CD = 'JC_TIME' THEN A.VALUE ELSE NULL END) AS JC_TIME
+                 -------------------------------------------
+		        , SUM(CASE 
+		                WHEN A.MEAS_CD = 'JC_TIME'
+		                    THEN A.JC_TIME_FLAG
+		                ELSE NULL
+		                END) AS JC_TIME_FLAG
+		        -------------------------------------------
+                 
+		         /* 210211 이큰산K 추가*/
+		         , SUM(CASE WHEN A.MEAS_CD = 'JOB_CNT' THEN A.VALUE ELSE NULL END) AS JOB_CNT
+                 , SUM(CASE WHEN A.MEAS_CD = 'OFFSET_TIME' THEN A.VALUE ELSE NULL END) AS OFFSET_TIME
+                 -----------------------
+		         
+			FROM W_DATA A
+		    GROUP BY A.PROD_PART, A.POQ_NM, A.WC_CD_PE, A.WC_NM_PE, A.WC_MGR, A.RESOURCE_CD, A.RESOURCE_NM, A.WORKER_GROUP, A.CAMPUS_NM, 
+		#if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")  
+		      A.YYYYMMDD, 
+		#else
+			  A.YEARMONTH_STD
+		#end 
+		#if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+		      A.DAY_OFF_FLAG
+		#else
+		
+		#end    
+		      
+		),
+		W_CAL AS 
+		(
+		    SELECT A.*
+		    
+		    #if($dim_MAPPING_ITEM_CNT == "Y")
+		         , CAST(B.MAPPING_ITEM_CNT AS NVARCHAR) AS MAPPING_ITEM_CNT
+		    #end
+		         , ISNULL(ROUND((A.PLAN_TIME / NULLIF(A.AVAIL_TIME, 0)) * 100, 1),0) AS UTIL
+		         
+		        
+		    #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")      
+		         , ISNULL(ROUND((A.PLAN_TIME / NULLIF(CASE A.DAY_OFF_FLAG WHEN '0' THEN NULL
+		                                                          		  WHEN '0.5' THEN 12
+		                                                          		  WHEN '1' THEN 24
+		                                     		   END, 0)) * 100, 1), 0) AS UTIL_24
+		                                     		                            		   
+		                                     		   
+		    #else
+		    
+		    	, ISNULL(ROUND((A.PLAN_TIME / NULLIF(A.DAY_OFF_FLAG, 0)) * 100, 1), 0) AS UTIL_24
+		    	
+		    #end  	  
+			
+			
+		    
+		        
+			FROM W_COL A
+			-- 20221028 김수호 추가, ITSM 158, 자원별 가동계획 Column 추가요청 건 FROM 김지혜
+		    #if($dim_MAPPING_ITEM_CNT == "Y")
+			LEFT OUTER JOIN W_MAPPING_ITEM_CNT_TOTAL B
+			ON A.PROD_PART = B.PROD_PART_CD
+			AND A.WC_CD_PE = B.WC_CD
+			AND A.RESOURCE_CD = B.RESOURCE_CD
+			#end
+		    
+		    --------------------------------------------------------------------
+		),
+		W_MAIN AS 
+		(
+			SELECT T1.PROD_PART
+			     , T1.POQ_NM
+			     , T1.WC_CD_PE
+			     , T1.WC_NM_PE
+			     , T1.WC_MGR
+			     , T1.RESOURCE_CD
+			     , T1.RESOURCE_NM
+			     , T1.WORKER_GROUP
+			     , T1.CAMPUS_NM
+			     #if($dim_MAPPING_ITEM_CNT == "Y")
+			     , T1.MAPPING_ITEM_CNT
+			     #end
+			     , T2.CATEGORY_CD
+			     , T2.CATEGORY_NM
+			     , T2.CATEGORY_IDX
+			     #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+			     	, T1.YYYYMMDD
+			     #else
+			        , T1.YEARMONTH_STD
+			     #end 
+			     #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+			     , SUM(CASE T1.DAY_OFF_FLAG WHEN '0' THEN NULL
+		                                   WHEN '0.5' THEN 12
+		                                   WHEN '1' THEN 24
+		               END) AS DAY_OFF_FLAG
+     			 #else
+     			 
+     			 	 , SUM(T1.DAY_OFF_FLAG) AS DAY_OFF_FLAG
+     			 
+     			 #end
+     			 
+     			 , SUM(T1.AVAIL_TIME) AS AVAIL_TIME
+     			 , SUM(T1.PLAN_TIME) AS PLAN_TIME
+     			 
+     			 , SUM(T1.WAIT_DAYS) AS WAIT_DAYS
+     			 , SUM(T1.WAIT_DAYS_FLAG) AS WAIT_DAYS_FLAG
+     			 
+     			 , SUM(T1.WAIT_DAYS_AVG) AS WAIT_DAYS_AVG
+                 , SUM(T1.WAIT_DAYS_AVG_FLAG) AS WAIT_DAYS_AVG_FLAG
+     			 
+     			 , SUM(T1.JC_CNT)    AS JC_CNT
+                 , SUM(T1.JC_TIME)   AS JC_TIME
+                 
+     			 , SUM(T1.JC_CNT_FLAG)    AS JC_CNT_FLAG
+                 , SUM(T1.JC_TIME_FLAG)   AS JC_TIME_FLAG
+     			 
+		         /* 210211 이큰산K 추가*/
+		         , SUM(T1.JOB_CNT) AS JOB_CNT
+		         , SUM(T1.OFFSET_TIME) AS OFFSET_TIME
+     			 ------------------------------------
+     			 
+     			 , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+                                    WHEN
+                                    	#if(${meaMap.CD} !='WAIT_DAYS_AVG') 
+                                    		'${meaMap.CD}' THEN SUM(T1.${meaMap.CD})
+                                    	#else
+                                    		'${meaMap.CD}' THEN NULLIF(SUM(T1.${meaMap.CD}),0)
+                                    	#end
+                                    #end
+                   END AS VALUE
+			FROM W_CAL T1
+			CROSS JOIN W_MEASURE T2
+			GROUP BY T1.PROD_PART, T1.POQ_NM, T1.WC_CD_PE, T1.WC_NM_PE, T1.WC_MGR, T1.RESOURCE_CD, T1.RESOURCE_NM, T1.WORKER_GROUP, T1.CAMPUS_NM, T2.CATEGORY_CD
+			     , T2.CATEGORY_NM, T2.CATEGORY_IDX, 
+			     #if($dim_MAPPING_ITEM_CNT == "Y")
+			      T1.MAPPING_ITEM_CNT,
+			     #end
+			#if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")     
+				T1.YYYYMMDD
+			#else
+				T1.YEARMONTH_STD
+			#end
+		)
+		SELECT NULL AS TMP_COL
+		     <include refid="include.getDimTotal"/>
+		     , TTT.GRP_LVL_ID
+		     , TTT.CATEGORY_CD
+		     , TTT.CATEGORY_NM
+		     , TTT.CATEGORY_IDX
+			#set($strInBucket = "")
+		    #set($strPlanBucket = "")
+		    #set($strAvailBucket = "")
+		    #set($strDayOffFlag = "")
+		    #set($strWaitDaysFlag = "")
+		    #set($strWaitDays = "")
+		    
+		    
+		    #set($strJcCntFlag = "")
+            #set($strJcCnt = "")
+            
+		    #set($strJcTimeFlag = "")
+            #set($strJcTime = "")
+            
+		    #foreach( $bucketMap in $_parameter.bucketList )
+			#if($bucketMap.TOT_TYPE != "MT")
+		     , CASE WHEN TTT.CATEGORY_CD = 'AVAIL_TIME' OR TTT.CATEGORY_CD = 'PLAN_TIME' OR TTT.CATEGORY_CD = 'WAIT_DAYS'  OR TTT.CATEGORY_CD = 'JOB_CNT' OR TTT.CATEGORY_CD = 'OFFSET_TIME'
+		            THEN $bucketMap.CD
+		        
+		            WHEN TTT.CATEGORY_CD = 'UTIL'
+		            THEN ISNULL(ROUND((${bucketMap.CD}_PLAN_TIME / NULLIF(${bucketMap.CD}_AVAIL_TIME,0)) * 100, 1), 0)
+		        
+		            WHEN TTT.CATEGORY_CD = 'UTIL_24'
+		            THEN ISNULL(ROUND((${bucketMap.CD}_PLAN_TIME / NULLIF(${bucketMap.CD}_DAY_OFF_FLAG,0)) * 100, 1), 0)
+		            
+		            WHEN TTT.CATEGORY_CD = 'WAIT_DAYS_AVG'
+		            THEN NULLIF(ROUND((${bucketMap.CD}_WAIT_DAYS_AVG / NULLIF(${bucketMap.CD}_WAIT_DAYS_AVG_FLAG,0)),2),NULL)
+				
+				    WHEN TTT.CATEGORY_CD = 'JC_CNT'
+				    THEN NULLIF(ROUND((${bucketMap.CD}_JC_CNT / NULLIF(${bucketMap.CD}_JC_CNT_FLAG,0)),2),NULL)
+				
+                    WHEN TTT.CATEGORY_CD = 'JC_TIME'
+                    THEN NULLIF(ROUND((${bucketMap.CD}_JC_TIME / NULLIF(${bucketMap.CD}_JC_TIME_FLAG,0)),2),NULL)
+                        				    
+				    
+				END AS $bucketMap.CD
+				#set($strInBucket = $strInBucket + "," + $bucketMap.CD)
+		    	#set($strPlanBucket = $strPlanBucket + "," + $bucketMap.CD + "_PLAN_TIME")
+		    	#set($strAvailBucket = $strAvailBucket + "," + $bucketMap.CD + "_AVAIL_TIME")
+		    	#set($strDayOffFlag = $strDayOffFlag + "," + $bucketMap.CD + "_DAY_OFF_FLAG")
+		    	
+		    	#set($strWaitDaysFlag = $strWaitDaysFlag + "," + $bucketMap.CD + "_WAIT_DAYS_AVG_FLAG")
+		    	#set($strWaitDays = $strWaitDays + "," + $bucketMap.CD + "_WAIT_DAYS_AVG")
+		    	
+		    	#set($strJcCntFlag = $strJcCntFlag + "," + $bucketMap.CD + "_JC_CNT_FLAG")
+                #set($strJcCnt = $strJcCnt + "," + $bucketMap.CD + "_JC_CNT")
+		    	
+		    	#set($strJcTimeFlag = $strJcTimeFlag + "," + $bucketMap.CD + "_JC_TIME_FLAG")
+                #set($strJcTime = $strJcTime + "," + $bucketMap.CD + "_JC_TIME")
+		    	
+		    #else
+		     , CASE WHEN TTT.CATEGORY_CD = 'AVAIL_TIME' OR TTT.CATEGORY_CD = 'PLAN_TIME' OR TTT.CATEGORY_CD = 'WAIT_DAYS' OR TTT.CATEGORY_CD = 'JOB_CNT' OR TTT.CATEGORY_CD = 'OFFSET_TIME'
+		            THEN ISNULL($strInBucket.substring(1).replace(",",",0)+ISNULL("),0)
+		        
+		            WHEN TTT.CATEGORY_CD = 'UTIL' 
+		            THEN ROUND(((0 + ISNULL($strPlanBucket.substring(1).replace(",",",0)+ISNULL("),0)) / NULLIF((0 + ISNULL($strAvailBucket.substring(1).replace(",",",0)+ISNULL("),0)), 0)) * 100, 1)
+		        
+		            WHEN TTT.CATEGORY_CD = 'UTIL_24'
+		            THEN ISNULL(ROUND(((0 + ISNULL($strPlanBucket.substring(1).replace(",",",0)+ISNULL("),0)) / NULLIF((0 + ISNULL($strDayOffFlag.substring(1).replace(",",",0)+ISNULL("),0)),0)) * 100, 1), 0)
+		       	
+		       		WHEN TTT.CATEGORY_CD = 'WAIT_DAYS_AVG'
+		       		THEN ROUND(((0 + ISNULL($strWaitDays.substring(1).replace(",",",0)+ISNULL("),0)) / NULLIF((0 + ISNULL($strWaitDaysFlag.substring(1).replace(",",",0)+ISNULL("),0)), 0)) , 2)
+		       	
+		       	    WHEN TTT.CATEGORY_CD = 'JC_CNT'
+                    THEN ROUND(((0 + ISNULL($strJcCnt.substring(1).replace(",",",0)+ISNULL("),0)) / NULLIF((0 + ISNULL($strJcCntFlag.substring(1).replace(",",",0)+ISNULL("),0)), 0)) , 2)
+                
+		       	    WHEN TTT.CATEGORY_CD = 'JC_TIME'
+                    THEN ROUND(((0 + ISNULL($strJcTime.substring(1).replace(",",",0)+ISNULL("),0)) / NULLIF((0 + ISNULL($strJcTimeFlag.substring(1).replace(",",",0)+ISNULL("),0)), 0)) , 2)
+                
+		       	
+		       END AS $bucketMap.CD
+		    	#set($strInBucket = "")
+		    	#set($strPlanBucket = "")
+		    	#set($strAvailBucket = "")
+		    	#set($strDayOffFlag = "")
+				#set($strWaitDaysFlag = "")
+				#set($strWaitDays = "")
+				
+				#set($strJcCntFlag = "")
+                #set($strJcCnt = "")
+            
+	            #set($strJcTimeFlag = "")
+	            #set($strJcTime = "")
+	            
+			#end
+		    #end
+		FROM 
+		(
+			SELECT NULL AS TMP_COL
+				#foreach( $dimMap in $_parameter.dimList )
+		     	 , TT.$dimMap.DIM_CD 
+		     	 , MAX(TT.${dimMap.DIM_CD}_NM) AS ${dimMap.DIM_CD}_NM
+		     	#end
+		     	 , TT.CATEGORY_CD
+			     , TT.CATEGORY_NM
+			     , TT.CATEGORY_IDX
+		     	<include refid="include.getGrpLvlId"/>
+		     	#foreach( $bucketMap in $_parameter.bucketList )
+		     	#if($bucketMap.TOT_TYPE != "MT")
+		     	 , SUM($bucketMap.CD) AS $bucketMap.CD
+		     	 , SUM(${bucketMap.CD}_AVAIL_TIME) AS ${bucketMap.CD}_AVAIL_TIME
+		     	 , SUM(${bucketMap.CD}_PLAN_TIME) AS ${bucketMap.CD}_PLAN_TIME
+		     	 , SUM(${bucketMap.CD}_DAY_OFF_FLAG) AS ${bucketMap.CD}_DAY_OFF_FLAG
+				 
+				 , SUM(${bucketMap.CD}_WAIT_DAYS_FLAG) AS ${bucketMap.CD}_WAIT_DAYS_FLAG
+				 , SUM(${bucketMap.CD}_WAIT_DAYS) AS ${bucketMap.CD}_WAIT_DAYS	
+				 
+				 , SUM(${bucketMap.CD}_WAIT_DAYS_AVG_FLAG) AS ${bucketMap.CD}_WAIT_DAYS_AVG_FLAG
+                 , SUM(${bucketMap.CD}_WAIT_DAYS_AVG) AS ${bucketMap.CD}_WAIT_DAYS_AVG  
+                 
+				 
+				 , SUM(${bucketMap.CD}_JC_CNT_FLAG) AS ${bucketMap.CD}_JC_CNT_FLAG
+                 , SUM(${bucketMap.CD}_JC_CNT) AS ${bucketMap.CD}_JC_CNT  
+                 
+                 , SUM(${bucketMap.CD}_JC_TIME_FLAG) AS ${bucketMap.CD}_JC_TIME_FLAG
+                 , SUM(${bucketMap.CD}_JC_TIME) AS ${bucketMap.CD}_JC_TIME  
+                 
+				 
+				 , SUM(${bucketMap.CD}_JOB_CNT) AS ${bucketMap.CD}_JOB_CNT
+                 , SUM(${bucketMap.CD}_OFFSET_TIME) AS ${bucketMap.CD}_OFFSET_TIME
+				 
+				#end
+		     	#end
+			FROM 
+			(
+				SELECT NULL AS TMP_COL
+			     	#foreach( $dimMap in $_parameter.dimList )
+			     	 , ISNULL(T1.$dimMap.DIM_CD, ' ') AS $dimMap.DIM_CD
+			     	 , ISNULL(T1.$dimMap.DIM_CD, ' ') AS ${dimMap.DIM_CD}_NM
+			     	#end
+			     	 , T1.CATEGORY_CD
+			     	 , T1.CATEGORY_NM
+			     	 , T1.CATEGORY_IDX
+			     	#foreach( $bucketMap in $_parameter.bucketList )
+			     	#if($bucketMap.TOT_TYPE != "MT")
+			     	 , SUM(CASE WHEN 
+			     		#if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+			     	 		T1.YYYYMMDD
+			     	    #else
+			     	        T1.YEARMONTH_STD
+			     	    #end
+			     	  = '$bucketMap.BUCKET_VAL' THEN T1.VALUE ELSE NULL END) AS $bucketMap.CD
+			     	 
+			     	 
+			     	 , SUM(CASE WHEN 
+			     	 	#if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+			     	 		T1.YYYYMMDD 
+			     	    #else
+			     	    	T1.YEARMONTH_STD
+			     	    #end 
+			     	  = '$bucketMap.BUCKET_VAL' THEN T1.AVAIL_TIME ELSE NULL END) AS ${bucketMap.CD}_AVAIL_TIME
+			     	 
+			     	 
+			     	 , SUM(CASE WHEN 
+			     	    #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+			     	       T1.YYYYMMDD 
+			     	    #else
+			     	       T1.YEARMONTH_STD
+			     	    #end
+			     	    
+			     	  = '$bucketMap.BUCKET_VAL' THEN T1.PLAN_TIME ELSE NULL END) AS ${bucketMap.CD}_PLAN_TIME
+			     	 
+			     	 
+			     	 , SUM(CASE WHEN 
+			     	 	#if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+			     	 	  T1.YYYYMMDD
+			     	    #else
+			     	      T1.YEARMONTH_STD
+			     	    #end
+			     	  = '$bucketMap.BUCKET_VAL' THEN T1.DAY_OFF_FLAG ELSE NULL END) AS ${bucketMap.CD}_DAY_OFF_FLAG
+			     	
+			     	 
+			     	 , SUM(CASE WHEN 
+			     	 	#if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+			     	 	  T1.YYYYMMDD
+			     	    #else
+			     	      T1.YEARMONTH_STD
+			     	    #end
+			     	  = '$bucketMap.BUCKET_VAL' THEN T1.WAIT_DAYS_FLAG ELSE NULL END) AS ${bucketMap.CD}_WAIT_DAYS_FLAG
+			     	  
+			     	  , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.WAIT_DAYS ELSE NULL END) AS ${bucketMap.CD}_WAIT_DAYS
+                                     
+                   
+                    , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.WAIT_DAYS_AVG_FLAG ELSE NULL END) AS ${bucketMap.CD}_WAIT_DAYS_AVG_FLAG
+                      
+                      , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.WAIT_DAYS_AVG ELSE NULL END) AS ${bucketMap.CD}_WAIT_DAYS_AVG
+                                     
+                   
+                   
+			     	----------------------------------------------------------------------------------------------------
+			     	
+			     	
+			     	, SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.JC_CNT ELSE NULL END) AS ${bucketMap.CD}_JC_CNT
+                            
+			         , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.JC_CNT_FLAG ELSE NULL END) AS ${bucketMap.CD}_JC_CNT_FLAG
+                    
+                    
+                    , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.JC_TIME ELSE NULL END) AS ${bucketMap.CD}_JC_TIME
+                            
+                     , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.JC_TIME_FLAG ELSE NULL END) AS ${bucketMap.CD}_JC_TIME_FLAG
+                            
+                                    
+			     	
+			     	
+			     	----------------------------------------------------------------------------------------------------
+			     	
+			  	    , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.JOB_CNT ELSE NULL END) AS ${bucketMap.CD}_JOB_CNT
+                    
+                    , SUM(CASE WHEN 
+                        #if($_parameter.monthlyWeeklyDaily == "WEEK" || $_parameter.monthlyWeeklyDaily == "DAY")
+                          T1.YYYYMMDD
+                        #else
+                          T1.YEARMONTH_STD
+                        #end
+                      = '$bucketMap.BUCKET_VAL' THEN T1.OFFSET_TIME ELSE NULL END) AS ${bucketMap.CD}_OFFSET_TIME
+                    
+			  	   					 
+			  	    	
+			     	#end
+			     	#end
+				FROM W_MAIN T1
+				GROUP BY T1.PROD_PART, T1.POQ_NM, T1.WC_CD_PE, T1.WC_NM_PE, T1.WC_MGR, T1.RESOURCE_CD, T1.RESOURCE_NM, T1.WORKER_GROUP, T1.CAMPUS_NM, T1.CATEGORY_CD, T1.CATEGORY_NM, T1.CATEGORY_IDX
+				#if($dim_MAPPING_ITEM_CNT == "Y")
+				, T1.MAPPING_ITEM_CNT
+				#end
+			) TT
+			WHERE 1 = 1
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), TT.CATEGORY_CD, TT.CATEGORY_NM, TT.CATEGORY_IDX
+		) TTT
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		 , TTT.$dimMap.DIM_CD
+		#end
+		 , TTT.CATEGORY_IDX
+	</select>
+	 <select id="bucketGroupDetailSelect" parameterType="map" resultType="map">
+        /****** [ aps.planResult.bucketGroupDetailSelect ] ******/
+        SELECT *
+        FROM 
+        (
+            SELECT 'G' + PROD_GROUP_DET AS ROOT_CD
+                 , 'G' + MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD AS CD
+                 , MAX(CASE WHEN 'ko' = @{GV_LANG} THEN MC.CODE_NM_KR
+                        WHEN 'cn' = @{GV_LANG} THEN MC.CODE_NM_CN
+                        ELSE MC.CODE_NM
+                   END) AS NM
+                 , 'G' + MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD AS BUCKET_ID
+                 , PROD_GROUP_DET AS BUCKET_VAL
+                 , MAX(CASE WHEN MR.JOB_CD IS NOT NULL THEN 'Y'
+                        ELSE 'N'
+                   END) AS EDIT_YN
+            FROM TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+            INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+               ON MC.BU_CD = MIPG.BU_CD
+              AND MC.GROUP_CD = 'ROUTE_CD'
+              AND MIPG.DEL_FLAG = 'N' 
+           	#if ($_parameter.prodPart == "TEL")
+           	  AND MC.ATTB_5_CD = MIPG.PROD_GROUP
+           	#end
+           	#if ($_parameter.prodPart == "LAM")
+              AND MC.ATTB_6_CD = MIPG.PROD_GROUP
+           	#end
+           	#if ($_parameter.prodPart == "DIFFUSION")
+              AND MC.ATTB_7_CD = MIPG.PROD_GROUP
+           	#end
+           	#if ($_parameter.prodPart == "MATERIAL")
+              AND MC.ATTB_8_CD = MIPG.PROD_GROUP
+           	#end
+          	LEFT OUTER JOIN TB_MST_ROUTING MR WITH(NOLOCK)
+              ON MR.COMPANY_CD = MIPG.COMPANY_CD
+             AND MR.BU_CD = MIPG.BU_CD
+             AND MR.ITEM_CD = MIPG.ITEM_CD
+             AND MR.JOB_CD = MC.CODE_CD
+         	WHERE MIPG.COMPANY_CD = @{GV_COMPANY_CD}
+              AND MIPG.BU_CD = @{GV_BU_CD}
+              AND MIPG.PROD_GROUP LIKE '%'+@{prodPartShort}+'%'
+            
+            GROUP BY MIPG.COMPANY_CD, MIPG.BU_CD, MIPG.PROD_GROUP_DET + '_' + MC.CODE_CD, MIPG.PROD_GROUP_DET, MC.CODE_CD
+        ) A
+        WHERE A.EDIT_YN = 'Y'
+          AND A.ROOT_CD IS NOT NULL
+    </select>
+	
+	
+</mapper>

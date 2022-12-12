@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.bizKpi">
+    <select id="scmScoreboardSelect" parameterType="map" resultType="map">
+		/****** [ snop.bizKpi.scmScoreboardSelect ] ******/
+		#set($PLAN   = 'SCM01,SCM02,SCM03')
+		#set($ACTION = 'SCM04,SCM05,SCM06,SCM07,SCM08')
+		#set($INV    = 'SCM09,SCM10,SCM11')
+		#set($FUTURE = 'SCM12,SCM13,SCM14,SCM15')
+		#set($SCM = [{"CD" : "PLAN", "VAL" : $PLAN }, {"CD" : "ACTION", "VAL" : $ACTION }, {"CD" : "INV", "VAL" : $INV }, {"CD" : "FUTURE", "VAL" : $FUTURE }])
+		
+		#set($SCM_NO   = [1..15])
+		
+		BEGIN
+    
+	    	DECLARE @P_YEARMONTH NVARCHAR(6) = @{fromMon};
+	    	DECLARE @AUTH NVARCHAR(1);
+	    	
+	    	WITH USER_ROLE AS
+	    	(
+				SELECT ROLE_CD
+				FROM TB_MAP_USER_ROLE
+				WHERE USER_ID = @{GV_USER_ID}
+				  AND USE_FLAG = 'Y'
+			)
+			SELECT @AUTH = CASE WHEN COUNT(*) <![CDATA[>]]> 0 THEN 'Y' ELSE 'N' END 
+			FROM USER_ROLE
+			WHERE ROLE_CD IN ('ADMINDP0001', 'GOCQT0001');
+	    	
+	    	SELECT  C1.COMPANY_CD
+   			      , C1.BU_CD
+   			      , C1.BU_NM
+   			      , C1.DIV_CD
+   			      , CASE WHEN C1.LVL = 7 THEN ISNULL(C1.DIV_NM, 'Sub Total') ELSE C1.DIV_NM END DIV_NM
+   			      , C1.TEAM_CD
+   			      , CASE WHEN C1.LVL = 3 THEN ISNULL(C1.TEAM_NM, 'Sub Total') ELSE C1.TEAM_NM END TEAM_NM
+   			      , C1.PART_CD
+   			      , CASE WHEN C1.LVL = 1 THEN ISNULL(C1.PART_NM, 'Sub Total') ELSE C1.PART_NM END PART_NM
+                  , C1.LVL
+                  , C1.GRP_LVL_ID
+                  , @P_YEARMONTH AS YEARMONTH
+                  
+                
+                  , ROUND((ISNULL(SCM01_SCORE, 0) + ISNULL(SCM02_SCORE, 0) + ISNULL(SCM03_SCORE, 0) + ISNULL(SCM04_SCORE, 0) + ISNULL(SCM05_SCORE, 0) + ISNULL(SCM06_SCORE, 0) + ISNULL(SCM07_SCORE, 0) + ISNULL(SCM08_SCORE, 0) + ISNULL(SCM09_SCORE, 0) + ISNULL(SCM10_SCORE, 0) + ISNULL(SCM11_SCORE, 0) + ISNULL(SCM12_SCORE, 0) + ISNULL(SCM13_SCORE, 0) + ISNULL(SCM14_SCORE, 0) + ISNULL(SCM15_SCORE, 0)) / NULLIF((CASE WHEN SCM01_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM02_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM03_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM04_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM05_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM06_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM07_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM08_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM09_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM10_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM11_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM12_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM13_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM14_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM15_SCORE IS NULL THEN 0 ELSE 1 END), 0), 0) AS TOT_SCORE
+                  , ROUND((ISNULL(SCM01_SCORE, 0) + ISNULL(SCM02_SCORE, 0) + ISNULL(SCM03_SCORE, 0)) / NULLIF((CASE WHEN SCM01_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM02_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM03_SCORE IS NULL THEN 0 ELSE 1 END), 0), 0) AS PLAN_SCORE
+                  , ROUND((ISNULL(SCM04_SCORE, 0) + ISNULL(SCM05_SCORE, 0) + ISNULL(SCM06_SCORE, 0) + ISNULL(SCM07_SCORE, 0) + ISNULL(SCM08_SCORE, 0)) / NULLIF((CASE WHEN SCM04_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM05_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM06_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM07_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM08_SCORE IS NULL THEN 0 ELSE 1 END), 0), 0) AS ACTION_SCORE
+                  , ROUND((ISNULL(SCM09_SCORE, 0) + ISNULL(SCM10_SCORE, 0) + ISNULL(SCM11_SCORE, 0)) / NULLIF((CASE WHEN SCM09_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM10_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM11_SCORE IS NULL THEN 0 ELSE 1 END), 0), 0) AS INV_SCORE
+                  , ROUND((ISNULL(SCM12_SCORE, 0) + ISNULL(SCM13_SCORE, 0) + ISNULL(SCM14_SCORE, 0) + ISNULL(SCM15_SCORE, 0)) / NULLIF((CASE WHEN SCM12_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM13_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM14_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM15_SCORE IS NULL THEN 0 ELSE 1 END), 0), 0) AS FUTURE_SCORE
+                
+				#foreach($a in $SCM_NO)
+					#if($velocityCount <![CDATA[<]]> 10)
+					#set($a = "0" + $a)
+					#end
+				 , SCM${a}_TARGET
+				 , SCM${a}_RESULT
+				 , SCM${a}_SCORE
+				 , CASE WHEN GRP_LVL_ID = 0 THEN CASE WHEN @AUTH = 'Y' THEN SCM${a}_USE_FLAG ELSE 'N' END ELSE 'N' END SCM${a}_USE_FLAG 
+				#end
+	    	FROM
+	    	(
+		    	SELECT B1.COMPANY_CD
+	  			     , B1.BU_CD
+	  			     , B1.BU_NM
+	  			     , B1.DIV_CD
+	  			     , B1.DIV_NM
+	  			     , B1.TEAM_CD
+	  			     , B1.TEAM_NM
+	  			     , B1.PART_CD
+	  			     , B1.PART_NM
+					 , MIN(COMPANY_SORT) AS COMPANY_SORT
+		             , MIN(BU_SORT) AS BU_SORT
+		             , MIN(DIV_SORT) AS DIV_SORT
+		             , MIN(TEAM_SORT) AS TEAM_SORT
+		             , MIN(PART_SORT) AS PART_SORT
+	  			     , GROUPING_ID(B1.COMPANY_CD, B1.BU_CD, B1.BU_NM, B1.DIV_CD, B1.DIV_NM, B1.TEAM_CD, B1.TEAM_NM, B1.PART_CD, B1.PART_NM) AS GRP_LVL_ID
+					 , CASE WHEN B1.DIV_CD IS NULL THEN 7
+	                        WHEN B1.DIV_CD IS NOT NULL AND B1.TEAM_CD IS NULL THEN 3
+	                        WHEN B1.DIV_CD IS NOT NULL AND B1.TEAM_CD IS NOT NULL AND B1.PART_CD IS NULL THEN 1
+	                        WHEN B1.DIV_CD IS NOT NULL AND B1.TEAM_CD IS NOT NULL AND B1.PART_CD IS NOT NULL THEN 0
+						END LVL
+						
+					
+					#foreach($a in $SCM_NO)
+						#if($velocityCount <![CDATA[<]]> 10)
+						#set($a = "0" + $a)
+						#end
+					 , SUM(SCM${a}_TARGET) AS SCM${a}_TARGET
+					 , SUM(SCM${a}_RESULT) AS SCM${a}_RESULT
+					 
+					 #if($a == "01")
+					 	 -- , CASE WHEN ROUND(ISNULL(DBO.UFN_LEAST(SUM(SCM${a}_TARGET),SUM(SCM${a}_RESULT) ), 0) / NULLIF(DBO.UFN_GREATEST(SUM(SCM${a}_TARGET), SUM(SCM${a}_RESULT)), 0) * 100, 0) <![CDATA[>]]> 120 THEN 120
+	                        , CASE WHEN ROUND(ISNULL(SUM(SCM01_RESULT), 0) / NULLIF(SUM(SCM01_TARGET), 0) * 100, 0) <![CDATA[>]]> 120 THEN 120
+	                     -- ELSE ROUND(ISNULL(DBO.UFN_LEAST(SUM(SCM${a}_TARGET), SUM(SCM${a}_RESULT)), 0) / NULLIF(DBO.UFN_GREATEST(SUM(SCM${a}_TARGET), SUM(SCM${a}_RESULT)), 0) * 100, 0)
+	               		    ELSE ROUND(ISNULL(SUM(SCM01_RESULT), 0) / NULLIF(SUM(SCM01_TARGET), 0) * 100, 0)
+	               		   END AS SCM${a}_SCORE
+					 
+					 #elseif($a == "09" or $a == "10" or $a == "11" or $a == "11" or $a == "13")
+						  , CASE WHEN ROUND(ISNULL(SUM(SCM${a}_TARGET), 0) / NULLIF(SUM(SCM${a}_RESULT), 0) * 100, 0) <![CDATA[>]]> 120 THEN 120
+						  ELSE ROUND(ISNULL(SUM(SCM${a}_TARGET), 0) / NULLIF(SUM(SCM${a}_RESULT), 0) * 100, 0)
+						  END AS SCM${a}_SCORE
+					 #else
+					 	  , CASE WHEN ROUND(ISNULL(SUM(SCM${a}_RESULT), 0) / NULLIF(SUM(SCM${a}_TARGET), 0) * 100, 0) <![CDATA[>]]> 120 THEN 120
+					 	  ELSE ROUND(ISNULL(SUM(SCM${a}_RESULT), 0) / NULLIF(SUM(SCM${a}_TARGET), 0) * 100, 0) 
+					 	  END AS SCM${a}_SCORE
+					 #end
+					 , MAX(SCM${a}_USE_FLAG) AS SCM${a}_USE_FLAG
+					#end
+		    	FROM
+		    	(
+			    	SELECT A2.COMPANY_CD
+					     , A2.BU_CD
+					     , A2.DIV_CD
+					     , A2.TEAM_CD
+					     , A2.PART_CD
+			     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A2.BU_NM_KR
+				                WHEN 'cn' = @{GV_LANG} THEN A2.BU_NM_CN
+				                ELSE A2.BU_NM
+				           END BU_NM
+			     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A2.DIV_NM_KR
+				                WHEN 'cn' = @{GV_LANG} THEN A2.DIV_NM_CN
+				                ELSE A2.DIV_NM
+				           END DIV_NM
+			     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A2.TEAM_NM_KR
+				                WHEN 'cn' = @{GV_LANG} THEN A2.TEAM_NM_CN
+				                ELSE A2.TEAM_NM
+				           END TEAM_NM
+			     		 , CASE WHEN 'ko' = @{GV_LANG} THEN A2.PART_NM_KR
+				                WHEN 'cn' = @{GV_LANG} THEN A2.PART_NM_CN
+				                ELSE A2.PART_NM
+				           END PART_NM
+					     , A1.SCM_SCORE_ID
+					     , A2.COMPANY_SORT
+					     , A2.BU_SORT
+					     , A2.DIV_SORT
+					     , A2.TEAM_SORT
+					     , A2.PART_SORT
+					     
+					     
+					     
+						
+						#foreach($a in $SCM_NO)
+							#if($velocityCount <![CDATA[<]]> 10)
+							#set($a = "0" + $a)
+							#end
+							 , (CASE A3.SCM_SCORE_ID WHEN 'SCM${a}' THEN ISNULL(A3.USE_FLAG, 'N') ELSE 'N' END) AS SCM${a}_USE_FLAG
+			                 , (CASE A1.SCM_SCORE_ID WHEN 'SCM${a}' THEN A1.TARGET_VALUE ELSE NULL END) AS SCM${a}_TARGET
+			                 , (CASE A1.SCM_SCORE_ID WHEN 'SCM${a}' THEN A1.RESULT_VALUE ELSE NULL END) AS SCM${a}_RESULT
+			                 
+						#end
+					#if($_parameter.rdoAqType == "ACC")
+					FROM TB_KPI_SCM_SCORE_ACC A1 WITH(NOLOCK)
+					#else
+					FROM TB_KPI_SCM_SCORE A1 WITH(NOLOCK)
+					#end
+					INNER JOIN UV_MST_ORG A2 WITH(NOLOCK)
+					   ON A1.COMPANY_CD = A2.COMPANY_CD
+					  AND A1.BU_CD = A2.BU_CD
+					  AND A1.PART_CD = A2.PART_CD
+					LEFT OUTER JOIN TB_MST_ORG_SCM A3 WITH(NOLOCK)
+            		  ON A1.COMPANY_CD = A3.COMPANY_CD
+		             AND A1.BU_CD = A3.BU_CD
+		             AND A1.PART_CD = A3.PART_CD
+		             AND A1.SCM_SCORE_ID = A3.SCM_SCORE_ID
+					WHERE A1.YEARMONTH = @P_YEARMONTH
+		    	) B1
+		    	GROUP BY ROLLUP ((B1.COMPANY_CD), (B1.BU_CD, B1.BU_NM), (B1.DIV_CD, B1.DIV_NM), (B1.TEAM_CD, B1.TEAM_NM), (B1.PART_CD, B1.PART_NM))
+	    	 ) C1
+      		WHERE C1.COMPANY_CD IS NOT NULL
+        	  AND C1.BU_CD IS NOT NULL
+      		ORDER BY C1.COMPANY_SORT, COMPANY_CD, C1.BU_SORT, BU_CD, C1.DIV_SORT, DIV_CD, C1.TEAM_SORT, TEAM_CD, C1.PART_SORT, C1.PART_CD
+	
+		END;
+    </select>
+    
+    <update id="scmScoreboardUpdate" parameterType="map" >
+        /****** [ snop.bizKpi.scmScoreboardMerge ] ******/
+        #set($_parameter.scmList = ['SCM01', 'SCM02', 'SCM03', 'SCM04', 'SCM05', 'SCM06', 'SCM07', 'SCM08', 'SCM09', 'SCM10', 'SCM11', 'SCM12', 'SCM13', 'SCM14', 'SCM15' ])
+        
+       	#if ($_parameter.rowList.size() > 0)
+		BEGIN
+		    
+		    DECLARE @P_COMPANY_CD NVARCHAR(5) = @{GV_COMPANY_CD};
+		    DECLARE @P_BU_CD      NVARCHAR(3) = @{GV_BU_CD};
+		    DECLARE @FROM_MON     NVARCHAR(6) = @{fromMon};
+		
+		    MERGE TB_KPI_SCM_SCORE AS A
+		    USING 
+		    (
+				#foreach( $rowMap in $_parameter.rowList )
+				SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM01'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM01_TARGET"))  $rowMap.get("SCM01_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM02'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM02_TARGET"))  $rowMap.get("SCM02_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+				UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM03'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM03_TARGET"))  $rowMap.get("SCM03_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+				UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM04'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM04_TARGET"))  $rowMap.get("SCM04_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM05'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM05_TARGET"))  $rowMap.get("SCM05_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM06'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM06_TARGET"))  $rowMap.get("SCM06_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		             
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM07'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM07_TARGET"))  $rowMap.get("SCM07_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		             
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM08'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM08_TARGET"))  $rowMap.get("SCM08_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		             
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM09'                AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM09_TARGET"))  $rowMap.get("SCM09_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM10'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM10_TARGET"))  $rowMap.get("SCM10_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM11'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM11_TARGET"))  $rowMap.get("SCM11_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		             
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM12'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM12_TARGET"))  $rowMap.get("SCM12_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM13'                AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM13_TARGET"))  $rowMap.get("SCM13_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		             
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM14'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM14_TARGET"))  $rowMap.get("SCM14_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		        UNION ALL
+		        SELECT '$rowMap.YEARMONTH'       AS YEARMONTH
+		             , '$rowMap.BU_CD'           AS BU_CD
+		             , @P_COMPANY_CD             AS COMPANY_CD
+		             , '$rowMap.PART_CD'         AS PART_CD
+		             , 'SCM15'                   AS SCM_SCORE_ID
+		             , #if($rowMap.get("SCM15_TARGET"))  $rowMap.get("SCM15_TARGET") #else NULL #end  AS TARGET_VALUE
+		             , @{GV_USER_ID}             AS USER_ID
+		             
+				#if($_parameter.rowList.size() > $foreach.count) UNION ALL #end
+				#end
+			) B
+		    ON (
+		            A.YEARMONTH    = B.YEARMONTH
+		        AND A.COMPANY_CD   = B.COMPANY_CD
+		        AND A.BU_CD        = B.BU_CD
+		        AND A.PART_CD      = B.PART_CD
+		        AND A.SCM_SCORE_ID = B.SCM_SCORE_ID
+		    )
+		    WHEN MATCHED THEN
+		        UPDATE SET
+		            A.TARGET_VALUE    = B.TARGET_VALUE
+		          , A.UPDATE_DTTM     = DBO.UFN_GETDATE()
+		          , A.UPDATE_ID       = @{GV_USER_ID}
+		    WHEN NOT MATCHED THEN
+		        INSERT (
+		            YEARMONTH
+		          , COMPANY_CD
+		          , BU_CD
+		          , PART_CD
+		          , SCM_SCORE_ID
+		          , TARGET_VALUE
+		          , CREATE_ID
+		          , CREATE_DTTM
+		          , UPDATE_ID
+		          , UPDATE_DTTM 
+		        ) VALUES (
+		            B.YEARMONTH
+		          , B.COMPANY_CD
+		          , B.BU_CD
+		          , B.PART_CD
+		          , B.SCM_SCORE_ID
+		          , B.TARGET_VALUE
+		          , B.USER_ID
+		          , DBO.UFN_GETDATE()
+		          , B.USER_ID
+		          , DBO.UFN_GETDATE()
+		        );
+		        
+		END;
+		#end
+    </update>
+    
+</mapper>

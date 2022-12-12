@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.meetingMng">
+    
+    <select id="issueMngSelect" parameterType="map" resultType="map">
+    /****** [ snop.meetingMng.issueMngSelect ] ******/
+WITH W_ORG AS (
+	SELECT A.COMPANY_CD
+	     , A.BU_CD
+	     , A.DIV_CD
+	     , A.TEAM_CD
+	     , A.PART_CD
+	     , A.PART_NM
+	     , A.DEL_FLAG
+	FROM (SELECT COMPANY_CD
+	           , BU_CD
+	           , DIV_CD
+	           , TEAM_CD
+	           , PART_CD
+	           , PART_NM
+	           , COMPANY_CD+BU_CD+DIV_CD+TEAM_CD+PART_CD AS ROW_KEY
+	           , DEL_FLAG
+	        FROM TB_MST_ORG A WITH(NOLOCK)
+           UNION ALL 
+           SELECT @{GV_COMPANY_CD}
+                 , 'QT'
+                 , 'SCM'
+                 , 'SCM'
+                 , 'SCM'
+                 , 'SCM'
+                 , 'SCM'
+                 , 'N') A
+	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	  AND DEL_FLAG   = 'N'
+)
+    SELECT ISU.COMPANY_CD
+         , ISU.ISSUE_ID
+         , ISU.ISSUE_CD
+         , ISU.TITLE
+         , ISU.CONTENT
+         , (SELECT TOP 1 REMARK 
+            FROM TB_KPI_ISSUE_DTL WITH(NOLOCK) 
+            WHERE COMPANY_CD = ISU.COMPANY_CD
+              AND ISSUE_ID   = ISU.ISSUE_ID
+              AND DEL_FLAG  != 'Y'
+            ORDER BY REMARK_SEQ) AS REMARK
+         , ISU.USER_ID
+         , dbo.UFN_GET_USER_NAME(ISU.USER_ID) AS USER_NM
+         , DEPT.BU_CD
+         , DEPT.DIV_CD
+         , DEPT.TEAM_CD
+         , DEPT.PART_CD
+         , DEPT.PART_NM
+         , CONVERT(VARCHAR(30), CAST(ISU.DUE_DATE_1ST AS DATE), 23) DUE_DATE_1ST
+         , CONVERT(VARCHAR(30), CAST(ISU.DUE_DATE_2ND AS DATE), 23) DUE_DATE_2ND
+         , CONVERT(VARCHAR(30), CAST(ISU.DUE_DATE_3RD AS DATE), 23) DUE_DATE_3RD
+         , CONVERT(VARCHAR(30), CAST(ISU.CLOSE_DATE AS DATE), 23) CLOSE_DATE
+         , ISU.CLOSE_YN
+         , ISU.FILE_NO
+         , ISU.DEL_FLAG
+         , ISU.CREATE_ID
+         , CONVERT(VARCHAR(30), ISU.CREATE_DTTM, 120) CREATE_DTTM
+         , ISU.UPDATE_ID
+         , ISU.UPDATE_DTTM 
+         , (SELECT TOP 1 FILE_NM_ORG 
+            FROM TB_COMM_FILE 
+            WHERE FILE_NO   = ISU.FILE_NO
+              AND DEL_FLAG != 'Y' 
+            ORDER BY FILE_SEQ) AS FILE_NM_ORG
+          , (SELECT STUFF((SELECT ',' + FILE_NM_ORG FROM TB_COMM_FILE WHERE FILE_NO = ISU.FILE_NO AND DEL_FLAG != 'Y' FOR XML PATH('')), 1, 1, '')) AS FILE_NMEEEEEE  
+    FROM TB_KPI_ISSUE ISU WITH(NOLOCK)
+    LEFT JOIN W_ORG DEPT WITH(NOLOCK)
+       ON DEPT.COMPANY_CD = ISU.COMPANY_CD
+      AND DEPT.BU_CD      = ISU.BU_CD
+      AND DEPT.DIV_CD     = ISU.DIV_CD
+      AND DEPT.TEAM_CD    = ISU.TEAM_CD
+      AND DEPT.PART_CD    = ISU.PART_CD
+      AND DEPT.DEL_FLAG   = 'N'
+    WHERE ISU.DEL_FLAG   = 'N'
+#if($_parameter.ISSUE_CD and $_parameter.ISSUE_CD != "")
+      AND ISU.ISSUE_CD   = @{ISSUE_CD}
+#end
+#if($_parameter.CLOSE_YN and $_parameter.CLOSE_YN != "")
+      AND ISU.CLOSE_YN  = @{CLOSE_YN}
+#end
+#if($_parameter.TITLE and $_parameter.TITLE != "")
+      AND ISU.TITLE LIKE '%' + @{TITLE} + '%'
+#end
+#if($_parameter.CONTENT and $_parameter.CONTENT != "")
+      AND ISU.CONTENT LIKE '%' + @{CONTENT} + '%'
+#end
+#if($_parameter.PART and $_parameter.PART != "")
+      AND (DEPT.PART_CD LIKE '%' + @{PART} + '%'
+          OR DEPT.PART_NM LIKE '%' + @{PART} + '%')
+#end
+    ORDER BY ISU.CREATE_DTTM DESC
+    </select>
+    
+    <update id="issueMngInsert" parameterType="map">
+    /****** [ snop.meetingMng.issueMngInsert ] ******/
+    
+    BEGIN 
+    
+		DECLARE @P_ISSUE_ID  nvarchar(8)
+		DECLARE @P_REMARK    nvarchar(MAX)
+		
+		SET @P_ISSUE_ID = (SELECT dbo.UFN_GET_ISSUE_ID())
+		SET @P_REMARK   = @{REMARK}
+		
+	    INSERT INTO TB_KPI_ISSUE (
+	            COMPANY_CD
+	          , ISSUE_ID
+	          , ISSUE_CD
+	          , TITLE
+	          , CONTENT
+	          , USER_ID
+	          , BU_CD
+              , DIV_CD
+              , TEAM_CD
+              , PART_CD
+	          , DUE_DATE_1ST
+	          , DUE_DATE_2ND
+	          , DUE_DATE_3RD
+	          , CLOSE_DATE
+	          , CLOSE_YN
+	          , FILE_NO
+	          , DEL_FLAG
+	          , CREATE_ID
+	          , CREATE_DTTM
+	          , UPDATE_ID
+	          , UPDATE_DTTM 
+	    ) VALUES (
+	            ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+	          , @P_ISSUE_ID
+	          , @{ISSUE_CD}
+	          , @{TITLE}
+	          , @{CONTENT}
+	          , @{USER_ID}
+	          , @{BU_CD}
+              , @{DIV_CD}
+              , @{TEAM_CD}
+              , @{PART_CD}
+	          , REPLACE (@{DUE_DATE_1ST}, '-', '')
+	          , REPLACE (@{DUE_DATE_2ND}, '-', '')
+	          , REPLACE (@{DUE_DATE_3RD}, '-', '')
+	          , REPLACE (@{CLOSE_DATE}, '-', '')
+	          , @{CLOSE_YN}
+	          , @{FILE_NO}
+	          , ISNULL(@{DEL_FLAG}, 'N')
+	          , @{GV_USER_ID}
+	          , DBO.UFN_GETDATE()
+	          , @{GV_USER_ID}
+	          , DBO.UFN_GETDATE()
+	    );
+	    
+	    IF @P_REMARK IS NOT NULL
+	        INSERT INTO TB_KPI_ISSUE_DTL (
+                COMPANY_CD
+              , ISSUE_ID
+              , REMARK_SEQ
+              , REMARK
+              , DEL_FLAG
+              , CREATE_ID
+              , CREATE_DTTM
+              , UPDATE_ID
+              , UPDATE_DTTM
+        ) VALUES (
+               ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+              , @P_ISSUE_ID
+              , 1
+              , @P_REMARK
+              , 'N'
+              , @{GV_USER_ID}
+              , DBO.UFN_GETDATE()
+              , @{GV_USER_ID}
+              , DBO.UFN_GETDATE()
+         );
+    END;
+    </update>
+    
+    <update id="issueMngUpdate" parameterType="map">
+    /****** [ snop.meetingMng.issueMngUpdate ] ******/
+    UPDATE ISU1
+       SET ISU1.ISSUE_CD     = @{ISSUE_CD}
+         , ISU1.TITLE        = @{TITLE}
+         , ISU1.CONTENT      = @{CONTENT}
+         , ISU1.USER_ID      = @{USER_ID}
+         
+         , ISU1.BU_CD        = @{BU_CD}
+         , ISU1.DIV_CD       = @{DIV_CD}
+         , ISU1.TEAM_CD      = @{TEAM_CD}
+         , ISU1.PART_CD      = @{PART_CD}
+         
+         , ISU1.DUE_DATE_1ST = REPLACE (@{DUE_DATE_1ST}, '-', '')
+         , ISU1.DUE_DATE_2ND = CASE WHEN REPLACE (@{DUE_DATE_1ST}, '-', '') = ISU2.DUE_DATE_1ST THEN ISU1.DUE_DATE_2ND ELSE ISU2.DUE_DATE_1ST END
+         , ISU1.DUE_DATE_3RD = CASE WHEN REPLACE (@{DUE_DATE_1ST}, '-', '') = ISU2.DUE_DATE_1ST THEN ISU1.DUE_DATE_3RD ELSE ISU2.DUE_DATE_2ND END
+  #if($_parameter.CLOSE_YN == "Y")
+         , ISU1.CLOSE_DATE   = CONVERT(VARCHAR(30), DBO.UFN_GETDATE(), 112)
+         , ISU1.CLOSE_YN     = @{CLOSE_YN}
+  #end
+         , ISU1.FILE_NO      = @{FILE_NO}
+         , ISU1.UPDATE_ID    = @{GV_USER_ID}
+         , ISU1.UPDATE_DTTM  = DBO.UFN_GETDATE()
+      FROM TB_KPI_ISSUE ISU1
+      LEFT OUTER JOIN TB_KPI_ISSUE ISU2
+        ON ISU1.COMPANY_CD   = ISU2.COMPANY_CD
+       AND ISU1.ISSUE_ID     = ISU2.ISSUE_ID
+     WHERE ISU1.COMPANY_CD   = @{GV_COMPANY_CD}
+       AND ISU1.ISSUE_ID     = @{ISSUE_ID}
+    </update>
+    
+    <update id="issueMngDelete" parameterType="map">
+    /****** [ snop.meetingMng.issueMngDelete ] ******/
+    UPDATE TB_KPI_ISSUE 
+       SET DEL_FLAG     = 'Y'
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND ISSUE_ID     = @{ISSUE_ID}
+    </update>
+
+    <select id="issueMngExistPkInsert" parameterType="map" resultType="int">
+    /****** [ snop.meetingMng.issueMngExistPkInsert ] ******/
+    SELECT COUNT(*)
+      FROM TB_KPI_ISSUE WITH(NOLOCK)
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND ISSUE_ID     = @{ISSUE_ID}
+    </select>
+    
+    <update id="issueMngFileNoUpdate" parameterType="map">
+	/****** [ snop.meetingMng.issueMngFileNoUpdate ] ******/
+	UPDATE TB_KPI_ISSUE
+	SET FILE_NO = @{FILE_NO}
+	WHERE COMPANY_CD = @{COMPANY_CD}
+	  AND ISSUE_ID   = @{ISSUE_ID}
+	</update>
+	
+	<select id="remarkSelect" parameterType="map" resultType="map">
+    /****** [ snop.meetingMng.remarkSelect ] ******/
+    SELECT COMPANY_CD
+         , ISSUE_ID
+         , REMARK_SEQ
+         , REMARK
+         , CONVERT(NVARCHAR, CREATE_DTTM, 120) AS CREATE_DTTM
+    FROM TB_KPI_ISSUE_DTL
+    WHERE COMPANY_CD = @{COMPANY_CD}
+      AND ISSUE_ID   = @{ISSUE_ID}
+      AND DEL_FLAG  != 'Y'
+    ORDER BY REMARK_SEQ
+    </select>
+
+    <update id="remarkInsert" parameterType="map">
+	/****** [ snop.meetingMng.remarkInsert ] ******/
+	INSERT INTO TB_KPI_ISSUE_DTL (
+            COMPANY_CD
+          , ISSUE_ID
+          , REMARK_SEQ
+          , REMARK
+          , DEL_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+    ) VALUES (
+           ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+          , @{ISSUE_ID}
+          , (SELECT ISNULL(MAX(REMARK_SEQ), 0) + 1 AS REMARK_SEQ 
+             FROM TB_KPI_ISSUE_DTL 
+             WHERE COMPANY_CD = ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+               AND ISSUE_ID   = @{ISSUE_ID})
+          , @{REMARK}
+          , 'N'
+          , @{GV_USER_ID}
+          , DBO.UFN_GETDATE()
+          , @{GV_USER_ID}
+          , DBO.UFN_GETDATE()
+     );
+	</update>
+
+    <update id="remarkDelete" parameterType="map">
+	/****** [ snop.meetingMng.remarkDelete ] ******/
+	UPDATE TB_KPI_ISSUE_DTL
+	SET DEL_FLAG    = 'Y'
+	  , UPDATE_ID   = @{GV_USER_ID}
+	  , UPDATE_DTTM = DBO.UFN_GETDATE()
+	WHERE COMPANY_CD = ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+	  AND ISSUE_ID   = @{ISSUE_ID}
+	  AND REMARK_SEQ = @{REMARK_SEQ}
+	</update>
+	
+</mapper>

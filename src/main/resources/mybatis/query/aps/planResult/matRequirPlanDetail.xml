@@ -1,0 +1,1084 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="matRequirPlanDetailVersionIdSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.matRequirPlanDetailVersionIdSelect ] ******/
+		SELECT T.VERSION_ID AS CODE_CD
+		     , T.VERSION_ID AS CODE_NM
+		FROM 
+		(
+			SELECT VERSION_ID
+		         , SEQ
+		         , ROW_NUMBER() OVER(PARTITION BY COMPANY_CD, BU_CD, PLAN_TYPE_CD, PLAN_ID, VERSION_ID ORDER BY SEQ) AS RN
+			FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+		    WHERE COMPANY_CD = @{companyCd}
+		      AND BU_CD = @{buCd}
+		      AND PLAN_TYPE_CD = 'MP'
+		      AND PLAN_ID = @{planId}
+		      AND VERSION_TYPE_CD IN ('P', 'F')
+		) T
+		WHERE RN = 1
+		ORDER BY SEQ
+	</select>
+	
+	<select id="matRequirPlanDetailSelect" parameterType="map" resultType="map">
+	   /****** [ aps.planResult.matRequirPlanDetailSelect ] ******/
+        BEGIN
+            DECLARE @V_PLAN_ID_W0 NVARCHAR(8) = @{planId} 
+                  , @V_PLAN_ID_W1 NVARCHAR(8)
+                  , @V_PLAN_ID_W2 NVARCHAR(8)
+                  , @V_PLAN_ID_W3 NVARCHAR(8)
+                  , @V_PLAN_ID_W4 NVARCHAR(8)
+                  , @V_START_WEEK_W0 NVARCHAR(6)
+                  , @V_START_WEEK_W1 NVARCHAR(6)
+                  , @V_START_WEEK_W2 NVARCHAR(6)
+                  , @V_START_WEEK_W3 NVARCHAR(6)
+                  , @V_START_WEEK_W4 NVARCHAR(6)
+                  , @V_ITEM_CD NVARCHAR(18) = @{itemCd}
+                  
+            SELECT @V_START_WEEK_W0 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND PLAN_ID = @V_PLAN_ID_W0
+             
+            SELECT TOP 1 @V_PLAN_ID_W1 = PLAN_ID
+                 , @V_START_WEEK_W1 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[<]]> @V_START_WEEK_W0
+            ORDER BY START_WEEK DESC
+             
+            SELECT TOP 1 @V_PLAN_ID_W2 = PLAN_ID
+                 , @V_START_WEEK_W2 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[<]]> @V_START_WEEK_W1
+            ORDER BY START_WEEK DESC
+             
+            SELECT TOP 1 @V_PLAN_ID_W3 = PLAN_ID
+                 , @V_START_WEEK_W3 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[<]]> @V_START_WEEK_W2
+            ORDER BY START_WEEK DESC
+             
+            SELECT TOP 1 @V_PLAN_ID_W4 = PLAN_ID
+                 , @V_START_WEEK_W4 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[<]]> @V_START_WEEK_W3
+            ORDER BY START_WEEK DESC
+           
+            SELECT T.*
+            FROM 
+            (
+                SELECT HAMSD.VERSION_ID
+                     , HAMSD.CHILD_ITEM_CD
+                     , MI1.ITEM_NM
+                     , MI1.SPEC
+                     , HAMSD.REQ_WEEK
+                     , HAMSD.CHILD_ITEM_QTY
+                     , HAMSD.REQ_QTY
+                     , HAMSD.PARENT_ITEM_CD
+                     , MI2.ITEM_NM AS PARENT_ITEM_NM
+                     , MI2.SPEC AS PARENT_SPEC
+                     , MC.CUST_GROUP_NM
+                     , HAMSD.PLAN_WEEK
+                     , HAMSD.PLAN_QTY
+                     , W1.REQ_QTY_W1
+                     , W2.REQ_QTY_W2
+                     , W3.REQ_QTY_W3
+                     , W4.REQ_QTY_W4
+                     , 0 AS SORT
+                FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                   ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MPVS.BU_CD = HAMSD.BU_CD
+                  AND MPVS.PLAN_TYPE_CD = 'MP'
+                  AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                  AND MPVS.PROD_PART = HAMSD.PROD_PART
+                  AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                INNER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+                   ON MI1.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI1.BU_CD = HAMSD.BU_CD
+                  AND MI1.ITEM_CD = HAMSD.CHILD_ITEM_CD
+                INNER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+                   ON MI2.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI2.BU_CD = HAMSD.BU_CD
+                  AND MI2.ITEM_CD = HAMSD.PARENT_ITEM_CD
+                LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+                  ON MC.COMPANY_CD = MI2.COMPANY_CD
+                 AND MC.BU_CD = MI2.BU_CD
+                 AND MC.CUST_CD = MI2.REP_CUST_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W1
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W1
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W1
+                ON W1.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W1.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W1.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W2
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W2
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W2
+                ON W2.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W2.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W2.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W3
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W3
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W3
+                ON W3.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W3.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W3.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W4
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W4
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W4
+                ON W4.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W4.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W4.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                WHERE HAMSD.COMPANY_CD = @{companyCd}
+                  AND HAMSD.BU_CD = @{buCd}
+                  AND HAMSD.PLAN_ID = @V_PLAN_ID_W0
+                  AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                #if($_parameter.versionId and $_parameter.versionId != "")
+                  AND HAMSD.VERSION_ID IN ('$_parameter.versionId.replace(",","','")')
+                #end
+                UNION ALL
+                SELECT HAMSD.VERSION_ID
+                     , 'Sub Total'
+                     , NULL
+                     , NULL
+                     , NULL
+                     , NULL
+                     , SUM(HAMSD.REQ_QTY)
+                     , NULL
+                     , NULL
+                     , NULL
+                     , NULL
+                     , NULL
+                     , SUM(HAMSD.PLAN_QTY)
+                     , SUM(W1.REQ_QTY_W1)
+                     , SUM(W2.REQ_QTY_W2)
+                     , SUM(W3.REQ_QTY_W3)
+                     , SUM(W4.REQ_QTY_W4)
+                     , 1 AS SORT
+                FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                   ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MPVS.BU_CD = HAMSD.BU_CD
+                  AND MPVS.PLAN_TYPE_CD = 'MP'
+                  AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                  AND MPVS.PROD_PART = HAMSD.PROD_PART
+                  AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                INNER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+                   ON MI1.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI1.BU_CD = HAMSD.BU_CD
+                  AND MI1.ITEM_CD = HAMSD.CHILD_ITEM_CD
+                INNER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+                   ON MI2.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI2.BU_CD = HAMSD.BU_CD
+                  AND MI2.ITEM_CD = HAMSD.PARENT_ITEM_CD
+                LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+                  ON MC.COMPANY_CD = MI2.COMPANY_CD
+                 AND MC.BU_CD = MI2.BU_CD
+                 AND MC.CUST_CD = MI2.REP_CUST_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W1
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W1
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W1
+                ON W1.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W1.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W1.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W2
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W2
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W2
+                ON W2.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W2.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W2.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W3
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W3
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W3
+                ON W3.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W3.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W3.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W4
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W4
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W4
+                ON W4.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W4.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W4.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                WHERE HAMSD.COMPANY_CD = @{companyCd}
+                  AND HAMSD.BU_CD = @{buCd}
+                  AND HAMSD.PLAN_ID = @V_PLAN_ID_W0
+                  AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                #if($_parameter.versionId and $_parameter.versionId != "")
+                  AND HAMSD.VERSION_ID IN ('$_parameter.versionId.replace(",","','")')
+                #end
+                GROUP BY HAMSD.VERSION_ID
+            ) T
+            ORDER BY T.VERSION_ID DESC, SORT
+        
+        END;
+	
+	</select>
+	
+	<select id="matRequirPlanDetailItemAllSelect" parameterType="map" resultType="map">
+              /****** [ aps.planResult.matRequirPlanDetailItemAllSelect ] ******/
+
+#set( $TMP_TAB = "#TEMP" )
+
+BEGIN
+
+CREATE TABLE $TMP_TAB
+(
+    VERSION_ID NVARCHAR(50)
+    , CHILD_ITEM_CD NVARCHAR(50)
+    , ITEM_NM NVARCHAR(50)
+    , SPEC NVARCHAR(50)
+    , REQ_WEEK INT 
+    , CHILD_ITEM_QTY INT 
+    , REQ_QTY        INT 
+    , PARENT_ITEM_CD NVARCHAR(50)
+    , PARENT_ITEM_NM NVARCHAR(50)
+    , PARENT_SPEC NVARCHAR(50)
+    , CUSTOM_GROUP_NM NVARCHAR(50)
+    , PLAN_WEEK NVARCHAR(10)
+    , PLAN_QTY INT
+    , REQ_QTY_W1 INT
+    , REQ_QTY_W2 INT
+    , REQ_QTY_W3 INT
+    , REQ_QTY_W4 INT
+    , SORT        INT
+
+)
+
+
+
+DECLARE 
+@INDEX INT,
+@ITEM_CD VARCHAR(100)
+    
+    DECLARE @V_PLAN_ID_W0 NVARCHAR(8) = @{planId} 
+                  , @V_PLAN_ID_W1 NVARCHAR(8)
+                  , @V_PLAN_ID_W2 NVARCHAR(8)
+                  , @V_PLAN_ID_W3 NVARCHAR(8)
+                  , @V_PLAN_ID_W4 NVARCHAR(8)
+                  , @V_START_WEEK_W0 NVARCHAR(6)
+                  , @V_START_WEEK_W1 NVARCHAR(6)
+                  , @V_START_WEEK_W2 NVARCHAR(6)
+                  , @V_START_WEEK_W3 NVARCHAR(6)
+                  , @V_START_WEEK_W4 NVARCHAR(6)
+                  , @V_ITEM_CD NVARCHAR(18)
+
+
+            SELECT @V_START_WEEK_W0 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND PLAN_ID = @V_PLAN_ID_W0
+             
+            SELECT TOP 1 @V_PLAN_ID_W1 = PLAN_ID
+                 , @V_START_WEEK_W1 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[<]]> @V_START_WEEK_W0
+            ORDER BY START_WEEK DESC
+             
+            SELECT TOP 1 @V_PLAN_ID_W2 = PLAN_ID
+                 , @V_START_WEEK_W2 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[ < ]]>@V_START_WEEK_W1
+            ORDER BY START_WEEK DESC
+             
+            SELECT TOP 1 @V_PLAN_ID_W3 = PLAN_ID
+                 , @V_START_WEEK_W3 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[< ]]> @V_START_WEEK_W2
+            ORDER BY START_WEEK DESC
+             
+            SELECT TOP 1 @V_PLAN_ID_W4 = PLAN_ID
+                 , @V_START_WEEK_W4 = START_WEEK
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{companyCd}
+              AND BU_CD = @{buCd}
+              AND PLAN_TYPE_CD = 'MP'
+              AND START_WEEK <![CDATA[< ]]> @V_START_WEEK_W3
+            ORDER BY START_WEEK DESC
+
+
+
+SET @INDEX = 0; --INDEX초기화
+
+DECLARE CUR CURSOR FOR   --CUR라는 이름의 커서 선언
+
+
+
+      WITH W_DATA AS 
+        (
+            SELECT HAMSS.COMPANY_CD
+                 , HAMSS.BU_CD
+                 , HAMSS.PLAN_ID
+                 , HAMSS.ITEM_CD
+                 , MI.ITEM_NM
+                 , MI.SPEC
+                 , MI.ITEM_TYPE AS ITEM_TYPE_CD
+                 , MC1.CODE_NM AS ITEM_TYPE_NM
+                 , MIP.PROCUR_TYPE AS PROCUR_TYPE_CD
+                 , MC2.CODE_NM AS PROCUR_TYPE
+                 , MI.ITEM_GROUP_CD
+                 , MIG.ITEM_GROUP_NM
+                 , MIP.PUR_LT
+                 , MI.ITEM_COST_KRW
+                 , HAMSS.VENDOR_OUT_QTY
+                 , HAMSS.EX_PLANT_QTY
+                 , HAMSS.BL_QTY
+                 , HAMSS.CC_QTY
+                 , HAMSS.INSPECT_QTY
+                 , HAMSS.EXP_GR_QTY_W0
+                 , HAMSS.EXP_GR_QTY_W1
+                 , HAMSS.EXP_GR_QTY_W2
+                 , HAMSS.EXP_GR_QTY_W3
+                 , HAMSS.EXP_GR_QTY_W4
+                 , HAMSS.EXP_GR_QTY_W5
+                 , HAMSS.EXP_GR_QTY_W6
+                 , HAMSS.EXP_GR_QTY_M0
+                 , HAMSS.EXP_GR_QTY_M1
+                 , HAMSS.EXP_GR_QTY_M2
+                 , HAMSS.EXP_GR_QTY_M3
+                 , HAMSS.MOL_QTY_W1
+                 , HAMSS.MOL_QTY_W2
+                 , HAMSS.WI01_MOL_QTY
+                 , HAMSS.OUT_MOL_QTY
+                 , HAMSS.INV_QTY
+                 , HAMSS.NON_DEPLOY_QTY
+                 , HAMSS.NON_MOVING_QTY
+                 , ISNULL(HAMSS.MOL_QTY_W1, 0) + ISNULL(HAMSS.MOL_QTY_W2, 0) AS MOL_QTY_TOT
+                 , HAMSS.MEAS_CD
+                 , HAMS.MRP_QTY_W1
+                 , HAMS.MRP_QTY_W2
+                 , HAMS.MRP_QTY_W3
+                 , HAMS.MRP_QTY_W4
+                 , HAMS.MRP_QTY_W5
+                 , HAMS.MRP_QTY_W6
+                 , HAMS.MRP_QTY_M0
+                 , HAMS.MRP_QTY_M1
+                 , HAMS.MRP_QTY_M2
+                 , HAMS.MRP_QTY_M3
+                 , HAMS.MRP_QTY_M4
+                 , HAMS.MRP_QTY_M5
+                 , HAMS.MRP_QTY_M6
+                 , HAMS.MRP_QTY_M7
+                 , HAMS.MRP_QTY_M8
+                 , HAMS.MRP_QTY_M9
+                 , HAMS.MRP_QTY_M10
+                 , HAMS.MRP_QTY_M11
+            FROM
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , PLAN_ID
+                     , ITEM_CD
+                     , MEAS_CD
+                     , SUM(VENDOR_OUT_QTY) AS VENDOR_OUT_QTY
+                     , SUM(EX_PLANT_QTY) AS EX_PLANT_QTY
+                     , SUM(BL_QTY) AS BL_QTY
+                     , SUM(CC_QTY) AS CC_QTY
+                     , SUM(INSPECT_QTY) AS INSPECT_QTY
+                     , SUM(EXP_GR_QTY_W0) AS EXP_GR_QTY_W0
+                     , SUM(EXP_GR_QTY_W1) AS EXP_GR_QTY_W1
+                     , SUM(EXP_GR_QTY_W2) AS EXP_GR_QTY_W2
+                     , SUM(EXP_GR_QTY_W3) AS EXP_GR_QTY_W3
+                     , SUM(EXP_GR_QTY_W4) AS EXP_GR_QTY_W4
+                     , SUM(EXP_GR_QTY_W5) AS EXP_GR_QTY_W5
+                     , SUM(EXP_GR_QTY_W6) AS EXP_GR_QTY_W6
+                     , SUM(EXP_GR_QTY_M0) AS EXP_GR_QTY_M0
+                     , SUM(EXP_GR_QTY_M1) AS EXP_GR_QTY_M1
+                     , SUM(EXP_GR_QTY_M2) AS EXP_GR_QTY_M2
+                     , SUM(EXP_GR_QTY_M3) AS EXP_GR_QTY_M3
+                     
+                     , SUM(MOL_QTY_W1) AS MOL_QTY_W1
+                     , SUM(MOL_QTY_W2) AS MOL_QTY_W2
+                     , SUM(WI01_MOL_QTY) AS WI01_MOL_QTY
+                     , SUM(OUT_MOL_QTY) AS OUT_MOL_QTY
+                     , SUM(INV_QTY) AS INV_QTY
+                     , SUM(NON_DEPLOY_QTY) AS NON_DEPLOY_QTY
+                     , SUM(NON_MOVING_QTY) AS NON_MOVING_QTY
+                FROM TB_HIS_APS_MRP_SUM_SUB WITH(NOLOCK)
+                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                  AND PLAN_ID = @{planId}
+                GROUP BY COMPANY_CD, BU_CD, PLAN_ID, ITEM_CD, MEAS_CD
+            ) HAMSS
+            LEFT OUTER JOIN 
+            (
+                SELECT HAMS.COMPANY_CD
+                     , HAMS.BU_CD
+                     , HAMS.PLAN_ID
+                     , HAMS.ITEM_CD
+                     , HAMS.MEAS_CD
+                     , SUM(HAMS.MRP_QTY_W1) AS MRP_QTY_W1
+                     , SUM(HAMS.MRP_QTY_W2) AS MRP_QTY_W2
+                     , SUM(HAMS.MRP_QTY_W3) AS MRP_QTY_W3
+                     , SUM(HAMS.MRP_QTY_W4) AS MRP_QTY_W4
+                     , SUM(HAMS.MRP_QTY_W5) AS MRP_QTY_W5
+                     , SUM(HAMS.MRP_QTY_W6) AS MRP_QTY_W6
+                     , SUM(HAMS.MRP_QTY_M0) AS MRP_QTY_M0
+                     , SUM(HAMS.MRP_QTY_M1) AS MRP_QTY_M1
+                     , SUM(HAMS.MRP_QTY_M2) AS MRP_QTY_M2
+                     , SUM(HAMS.MRP_QTY_M3) AS MRP_QTY_M3
+                     , SUM(HAMS.MRP_QTY_M4) AS MRP_QTY_M4
+                     , SUM(HAMS.MRP_QTY_M5) AS MRP_QTY_M5
+                     , SUM(HAMS.MRP_QTY_M6) AS MRP_QTY_M6
+                     , SUM(HAMS.MRP_QTY_M7) AS MRP_QTY_M7
+                     , SUM(HAMS.MRP_QTY_M8) AS MRP_QTY_M8
+                     , SUM(HAMS.MRP_QTY_M9) AS MRP_QTY_M9
+                     , SUM(HAMS.MRP_QTY_M10) AS MRP_QTY_M10
+                     , SUM(HAMS.MRP_QTY_M11) AS MRP_QTY_M11
+                     
+                     
+                     
+                     
+                FROM TB_HIS_APS_MRP_SUM HAMS WITH(NOLOCK)
+                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                  AND PLAN_ID = @{planId}
+                GROUP BY HAMS.COMPANY_CD, HAMS.BU_CD, HAMS.PLAN_ID, HAMS.ITEM_CD, HAMS.MEAS_CD
+            ) HAMS
+            ON HAMS.COMPANY_CD = HAMSS.COMPANY_CD
+            AND HAMS.BU_CD = HAMSS.BU_CD
+            AND HAMS.PLAN_ID = HAMSS.PLAN_ID
+            AND HAMS.ITEM_CD = HAMSS.ITEM_CD 
+            AND HAMS.MEAS_CD = HAMSS.MEAS_CD 
+            INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+               ON MI.COMPANY_CD = HAMSS.COMPANY_CD
+              AND MI.BU_CD = HAMSS.BU_CD
+              AND MI.ITEM_CD = HAMSS.ITEM_CD
+            LEFT JOIN TB_MST_ITEM_GROUP MIG WITH (NOLOCK)
+              ON MI.COMPANY_CD    = MIG.COMPANY_CD
+             AND MI.BU_CD         = MIG.BU_CD
+             AND MI.ITEM_GROUP_CD = MIG.ITEM_GROUP_CD
+             AND MIG.DEL_FLAG      = 'N'
+            INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+               ON MIP.COMPANY_CD = MI.COMPANY_CD
+              AND MIP.BU_CD = MI.BU_CD
+              AND MIP.PLANT_CD = 'WF01'
+              AND MIP.ITEM_CD = MI.ITEM_CD
+            LEFT OUTER JOIN 
+            (
+                SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                        END AS CODE_NM
+                     , SORT
+                     , USE_FLAG
+                FROM TB_MST_CODE WITH(NOLOCK)
+            ) MC1
+            ON MC1.BU_CD = 'ALL' 
+            AND MC1.GROUP_CD = 'ITEM_TYPE'
+            AND MC1.CODE_CD = MI.ITEM_TYPE
+            AND MC1.USE_FLAG = 'Y'
+            LEFT OUTER JOIN 
+            (
+                SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , SORT
+                     , USE_FLAG
+                FROM TB_MST_CODE WITH(NOLOCK)
+            ) MC2
+            ON MC2.BU_CD = 'ALL'
+            AND MC2.GROUP_CD = 'PROCUR_TYPE'
+            AND MC2.CODE_CD = MIP.PROCUR_TYPE
+            AND MC2.USE_FLAG = 'Y'
+            WHERE MI.USE_FLAG = 'Y'
+              AND MI.ITEM_TYPE NOT IN ('10', '50')
+        )
+       
+
+
+
+SELECT --쿼리 조회
+       T1.ITEM_CD
+FROM W_DATA T1
+WHERE T1.COMPANY_CD = @{GV_COMPANY_CD}
+              AND T1.BU_CD = @{GV_BU_CD}
+              AND T1.PLAN_ID = @{planId}
+#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+              AND T1.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+            #end
+            #if($_parameter.itemType and $_parameter.itemType != "")
+              AND T1.ITEM_TYPE_CD IN ('$_parameter.itemType.replace(",","','")')
+            #end
+            #if($_parameter.procurType and $_parameter.procurType != "")
+              AND T1.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+            #end
+            #if($_parameter.item_cd and $_parameter.item_cd != "")
+              AND T1.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+            #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+              AND (T1.ITEM_CD LIKE '%' + @{item_nm} + '%' OR T1.ITEM_NM LIKE '%' + @{item_nm} + '%')
+            #end
+            #if($_parameter.parentItem_cd and $_parameter.parentItem_cd != "")
+            AND EXISTS (
+                            SELECT 1
+                            FROM TB_HIS_APS_MRP_SUM_DTL A1 WITH(NOLOCK)
+                            WHERE A1.COMPANY_CD = T1.COMPANY_CD
+                              AND A1.BU_CD = T1.BU_CD
+                              AND A1.PLAN_ID = T1.PLAN_ID
+                              AND A1.CHILD_ITEM_CD = T1.ITEM_CD
+                              AND A1.PARENT_ITEM_CD IN ('$_parameter.parentItem_cd.replace(",","','")')
+                  )
+            #elseif($_parameter.parentItem_nm and $_parameter.parentItem_nm != "")
+             AND EXISTS (
+                            SELECT 1
+                            FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                            INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                               ON MI.COMPANY_CD = HAMSD.COMPANY_CD
+                              AND MI.BU_CD = HAMSD.BU_CD
+                              AND MI.ITEM_CD = HAMSD.PARENT_ITEM_CD
+                            WHERE HAMSD.COMPANY_CD = T1.COMPANY_CD
+                              AND HAMSD.BU_CD = T1.BU_CD
+                              AND HAMSD.PLAN_ID = T1.PLAN_ID
+                              AND HAMSD.CHILD_ITEM_CD = T1.ITEM_CD
+                              AND (HAMSD.PARENT_ITEM_CD LIKE '%' + @{parentItem_nm} + '%' OR MI.ITEM_NM LIKE '%' + @{parentItem_nm} + '%')
+             )
+            #end
+            
+
+OPEN CUR      --커서 오픈
+FETCH NEXT FROM CUR INTO @V_ITEM_CD  --SELECT한 값을 @V_ITEM_CD 변수에 넣는다.
+
+--커서를이용해 한ROW씩 읽음 
+WHILE @@FETCH_STATUS = 0
+BEGIN
+SET @INDEX = @INDEX + 1; --INDEX증가
+
+--SELECT 한 데이터의 행집합을 가지고 수행할 작업
+
+
+    INSERT INTO $TMP_TAB(
+    
+    VERSION_ID
+    , CHILD_ITEM_CD 
+    , ITEM_NM 
+    , SPEC 
+    , REQ_WEEK  
+    , CHILD_ITEM_QTY  
+    , REQ_QTY         
+    , PARENT_ITEM_CD 
+    , PARENT_ITEM_NM 
+    , PARENT_SPEC 
+    , CUSTOM_GROUP_NM 
+    , PLAN_WEEK 
+    , PLAN_QTY 
+    , REQ_QTY_W1 
+    , REQ_QTY_W2 
+    , REQ_QTY_W3 
+    , REQ_QTY_W4 
+    , SORT       
+
+)
+
+
+          SELECT T.*
+            FROM 
+            (
+                SELECT HAMSD.VERSION_ID
+                     , HAMSD.CHILD_ITEM_CD
+                     , MI1.ITEM_NM
+                     , MI1.SPEC
+                     , HAMSD.REQ_WEEK
+                     , HAMSD.CHILD_ITEM_QTY
+                     , HAMSD.REQ_QTY
+                     , HAMSD.PARENT_ITEM_CD
+                     , MI2.ITEM_NM AS PARENT_ITEM_NM
+                     , MI2.SPEC AS PARENT_SPEC
+                     , MC.CUST_GROUP_NM
+                     , HAMSD.PLAN_WEEK
+                     , HAMSD.PLAN_QTY
+                     , W1.REQ_QTY_W1
+                     , W2.REQ_QTY_W2
+                     , W3.REQ_QTY_W3
+                     , W4.REQ_QTY_W4
+                     , 0 AS SORT
+                FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                   ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MPVS.BU_CD = HAMSD.BU_CD
+                  AND MPVS.PLAN_TYPE_CD = 'MP'
+                  AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                  AND MPVS.PROD_PART = HAMSD.PROD_PART
+                  AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                INNER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+                   ON MI1.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI1.BU_CD = HAMSD.BU_CD
+                  AND MI1.ITEM_CD = HAMSD.CHILD_ITEM_CD
+                INNER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+                   ON MI2.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI2.BU_CD = HAMSD.BU_CD
+                  AND MI2.ITEM_CD = HAMSD.PARENT_ITEM_CD
+                LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+                  ON MC.COMPANY_CD = MI2.COMPANY_CD
+                 AND MC.BU_CD = MI2.BU_CD
+                 AND MC.CUST_CD = MI2.REP_CUST_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W1
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W1
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W1
+                ON W1.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W1.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W1.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W2
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W2
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W2
+                ON W2.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W2.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W2.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W3
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W3
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W3
+                ON W3.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W3.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W3.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W4
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W4
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W4
+                ON W4.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W4.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W4.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                WHERE HAMSD.COMPANY_CD = @{companyCd}
+                  AND HAMSD.BU_CD = @{buCd}
+                  AND HAMSD.PLAN_ID = @V_PLAN_ID_W0
+                  AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                #if($_parameter.versionId and $_parameter.versionId != "")
+                  AND HAMSD.VERSION_ID IN ('$_parameter.versionId.replace(",","','")')
+                #end
+                UNION ALL
+                SELECT HAMSD.VERSION_ID
+                     , 'Sub Total'
+                     , NULL
+                     , NULL
+                     , NULL
+                     , NULL
+                     , SUM(HAMSD.REQ_QTY)
+                     , NULL
+                     , NULL
+                     , NULL
+                     , NULL
+                     , NULL
+                     , SUM(HAMSD.PLAN_QTY)
+                     , SUM(W1.REQ_QTY_W1)
+                     , SUM(W2.REQ_QTY_W2)
+                     , SUM(W3.REQ_QTY_W3)
+                     , SUM(W4.REQ_QTY_W4)
+                     , 1 AS SORT
+                FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                   ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MPVS.BU_CD = HAMSD.BU_CD
+                  AND MPVS.PLAN_TYPE_CD = 'MP'
+                  AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                  AND MPVS.PROD_PART = HAMSD.PROD_PART
+                  AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                INNER JOIN TB_MST_ITEM MI1 WITH(NOLOCK)
+                   ON MI1.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI1.BU_CD = HAMSD.BU_CD
+                  AND MI1.ITEM_CD = HAMSD.CHILD_ITEM_CD
+                INNER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+                   ON MI2.COMPANY_CD = HAMSD.COMPANY_CD
+                  AND MI2.BU_CD = HAMSD.BU_CD
+                  AND MI2.ITEM_CD = HAMSD.PARENT_ITEM_CD
+                LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+                  ON MC.COMPANY_CD = MI2.COMPANY_CD
+                 AND MC.BU_CD = MI2.BU_CD
+                 AND MC.CUST_CD = MI2.REP_CUST_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W1
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W1
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W1
+                ON W1.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W1.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W1.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W2
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W2
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W2
+                ON W2.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W2.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W2.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W3
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W3
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W3
+                ON W3.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W3.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W3.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                LEFT OUTER JOIN 
+                (
+                    SELECT HAMSD.REQ_WEEK
+                         , HAMSD.PARENT_ITEM_CD
+                         , MPVS.VERSION_TYPE_CD
+                         , HAMSD.REQ_QTY AS REQ_QTY_W4
+                    FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                    INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+                       ON MPVS.COMPANY_CD = HAMSD.COMPANY_CD
+                      AND MPVS.BU_CD = HAMSD.BU_CD
+                      AND MPVS.PLAN_TYPE_CD = 'MP'
+                      AND MPVS.PLAN_ID = HAMSD.PLAN_ID
+                      AND MPVS.PROD_PART = HAMSD.PROD_PART
+                      AND MPVS.VERSION_ID = HAMSD.VERSION_ID
+                      AND MPVS.VERSION_TYPE_CD IN ('P', 'F')
+                    WHERE HAMSD.COMPANY_CD = @{companyCd}
+                      AND HAMSD.BU_CD = @{buCd}
+                      AND HAMSD.PLAN_ID = @V_PLAN_ID_W4
+                      AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                ) W4
+                ON W4.REQ_WEEK = HAMSD.REQ_WEEK
+                AND W4.PARENT_ITEM_CD = HAMSD.PARENT_ITEM_CD
+                AND W4.VERSION_TYPE_CD = MPVS.VERSION_TYPE_CD
+                WHERE HAMSD.COMPANY_CD = @{companyCd}
+                  AND HAMSD.BU_CD = @{buCd}
+                  AND HAMSD.PLAN_ID = @V_PLAN_ID_W0
+                  AND HAMSD.CHILD_ITEM_CD = @V_ITEM_CD
+                #if($_parameter.versionId and $_parameter.versionId != "")
+                  AND HAMSD.VERSION_ID IN ('$_parameter.versionId.replace(",","','")')
+                #end
+                GROUP BY HAMSD.VERSION_ID
+            ) T
+            ORDER BY T.VERSION_ID DESC, SORT
+
+    
+FETCH NEXT FROM CUR INTO @V_ITEM_CD --다음ROW로 이동
+
+END
+
+--커서 닫고 초기화
+CLOSE CUR
+DEALLOCATE CUR
+
+
+SELECT *
+FROM $TMP_TAB
+
+
+DROP TABLE $TMP_TAB
+
+
+END
+	
+	
+	
+	
+	
+	
+	</select>
+	
+	<select id="matRequirPlanDetailExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ aps.planResult.matRequirPlanDetailExcelSql ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+	
+</mapper>

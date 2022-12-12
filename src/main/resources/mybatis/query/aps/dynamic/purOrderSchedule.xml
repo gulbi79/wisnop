@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+    
+    <select id="purOrderScheduleSelect" parameterType="map" resultType="map">
+	    /****** [ aps.dynamic.purOrderScheduleSelect ] ******/
+	    BEGIN
+		    DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+		
+			SELECT ISNULL(A.ITEM_CD, ' ') AS ITEM_CD
+			     , ISNULL(A.ITEM_CD, ' ') AS ITEM_CD_NM  
+			     , ISNULL(A.ITEM_NM, ' ') AS ITEM_NM
+			     , ISNULL(A.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(A.SPEC, ' ') AS SPEC
+			     , ISNULL(A.SPEC, ' ') AS SPEC_NM
+			     , ISNULL(A.ITEM_TYPE_CD, ' ') AS ITEM_TYPE_CD
+			     , ISNULL(A.ITEM_TYPE_CD, ' ') AS ITEM_TYPE_CD_NM
+			     , ISNULL(A.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+			     , ISNULL(A.PROCUR_TYPE, ' ') AS PROCUR_TYPE_NM
+			     , A.SALES_PRICE_KRW AS SALES_PRICE_KRW 
+			     , A.SALES_PRICE_KRW AS SALES_PRICE_KRW_NM 
+			     , A.PUR_LT AS PUR_LT
+			     , A.PUR_LT AS PUR_LT_NM
+			     , ISNULL(A.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(A.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(A.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			     , ISNULL(A.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			     , A.SS_QTY AS SS_QTY
+			     , A.SS_QTY AS SS_QTY_NM
+			     , ISNULL(A.MATERIAL_ARRIVAL_TYPE, ' ') AS MATERIAL_ARRIVAL_TYPE
+			     , ISNULL(A.MATERIAL_ARRIVAL_TYPE, ' ') AS MATERIAL_ARRIVAL_TYPE_NM
+			     , A.SEQ AS SEQ
+			     , A.SEQ AS SEQ_NM
+			     , ISNULL(A.PO_NO, ' ') AS PO_NO
+			     , ISNULL(A.PO_NO, ' ') AS PO_NO_NM
+			     , ISNULL( A.BP_CD, ' ') AS BP_CD
+			     , ISNULL( A.BP_CD, ' ') AS BP_CD_NM
+			     , ISNULL(A.BP_NM, ' ') AS BP_NM 
+			     , ISNULL(A.BP_NM, ' ') AS BP_NM_NM 
+			     , ISNULL(A.HANDOVER_DATE, ' ') AS HANDOVER_DATE
+			     , ISNULL(A.HANDOVER_DATE, ' ') AS HANDOVER_DATE_NM
+			     , A.REMAIN_QTY AS PO_REMAIN_QTY
+			     , A.REMAIN_QTY AS PO_REMAIN_QTY_NM
+			     , ISNULL(A.ORIGINAL_DATE, ' ') AS ORIGINAL_DATE
+			     , ISNULL(A.ORIGINAL_DATE, ' ') AS ORIGINAL_DATE_NM
+			     , ISNULL(A.SCHED_DATE_PRE_RECV, ' ') AS SCHED_DATE_PRE_RECV -- 입하 예정 일자
+			     , ISNULL(A.SCHED_DATE_PRE_RECV, ' ') AS SCHED_DATE_PRE_RECV_NM
+			     , ISNULL(A.SCHED_DATE_ORG, ' ') AS SCHED_DATE_ORG -- 입고 예정 일자
+			     , ISNULL(A.SCHED_DATE_ORG, ' ') AS SCHED_DATE_ORG_NM
+			     , ISNULL(A.SCHED_DATE, ' ') AS SCHED_DATE
+			     , ISNULL(A.SCHED_DATE, ' ') AS SCHED_DATE_NM
+			     , A.SCHED_QTY AS SCHED_QTY
+			     , A.SCHED_QTY AS SCHED_QTY_NM
+			     , ISNULL(A.REMARK, ' ') AS REMARK
+			     , ISNULL(A.REMARK, ' ') AS REMARK_NM
+			     , ISNULL(A.PO_DATE, ' ') AS PO_DATE
+			     , ISNULL(A.PO_DATE, ' ') AS PO_DATE_NM
+			FROM 
+			(
+				SELECT MI.ITEM_CD
+	                 , MI.ITEM_NM
+	                 , MI.SPEC
+	                 , CASE WHEN 'KO' = UPPER('ko') THEN MC2.CODE_NM_KR
+	                       WHEN 'CN' = UPPER('ko') THEN MC2.CODE_NM_CN
+	                       ELSE MC2.CODE_NM
+	                   END AS ITEM_TYPE_CD
+	                 , CASE WHEN 'KO' = UPPER('ko') THEN MC3.CODE_NM_KR
+	                       WHEN 'CN' = UPPER('ko') THEN MC3.CODE_NM_CN
+	                       ELSE MC3.CODE_NM
+	                   END AS PROCUR_TYPE
+	                 , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) AS SALES_PRICE_KRW
+	                 , MC2.CODE_CD AS ITEM_TYPE
+	                 , MIP.PUR_LT
+	                 , MI.ITEM_GROUP_CD
+	                 , MIG.UPPER_ITEM_GROUP_CD
+	                 , MIG.ITEM_GROUP_NM
+	                 , MIP.SS_QTY
+	                 , MGSD.MATERIAL_ARRIVAL_TYPE AS MATERIAL_ARRIVAL_TYPE_CD
+	                 , CASE WHEN 'KO' = UPPER('ko') THEN MC4.CODE_NM_KR
+	                       WHEN 'CN' = UPPER('ko') THEN MC4.CODE_NM_CN
+	                       ELSE MC4.CODE_NM
+	                   END AS MATERIAL_ARRIVAL_TYPE
+	                 , ROW_NUMBER() OVER(PARTITION BY MI.COMPANY_CD, MI.BU_CD, MI.ITEM_CD ORDER BY MGSD.SORT, MGSD.PO_NO, MGSD.PO_SEQ, MGSD.ORG_DATE, MGSD.SEQ) AS SEQ
+	                 , MGSD.PO_NO
+	                 , MGSD.BP_CD
+	                 , MGSD.BP_NM
+	                 , MGSD.HANDOVER_DATE
+	                 , MGSD.REMAIN_QTY
+	                 , MGSD.ORG_DATE AS ORIGINAL_DATE
+	                 , MGSD.SCHED_DATE_PRE_RECV
+	             	 , MGSD.SCHED_DATE_ORG
+	                 , MGSD.SCHED_DATE
+	                 , MGSD.SCHED_QTY
+	                 , MGSD.REMARK
+	                 , MIP.PROCUR_TYPE AS PROCUR_TYPE_CD
+	                 , MGSD.PO_DATE
+				FROM TB_MST_ITEM MI WITH(NOLOCK)
+			 	INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			       ON MIP.COMPANY_CD = MI.COMPANY_CD
+			      AND MIP.BU_CD = MI.BU_CD
+			      AND MIP.PLANT_CD = 'WF01'
+			      AND MIP.ITEM_CD = MI.ITEM_CD
+			  	LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+			      ON MRC.COMPANY_CD = MI.COMPANY_CD
+			     AND MRC.BU_CD = MI.BU_CD
+			     AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+			  	LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+			      ON MC.COMPANY_CD = MRC.COMPANY_CD
+			     AND MC.BU_CD = MRC.BU_CD
+			     AND MC.CUST_CD = MRC.REP_CUST_CD
+			  	LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+			      ON MICG.COMPANY_CD = MI.COMPANY_CD
+			     AND MICG.BU_CD = MI.BU_CD
+			     AND MICG.ITEM_CD = MI.ITEM_CD
+			     AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+			  	LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+			      ON MIG.COMPANY_CD = MI.COMPANY_CD
+			     AND MIG.BU_CD = MI.BU_CD
+			     AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+				INNER JOIN UV_MAT_GR_SCHED_DAILY MGSD WITH(NOLOCK)
+           		   ON MGSD.COMPANY_CD = MI.COMPANY_CD
+          		  AND MGSD.BU_CD = MI.BU_CD
+		          AND MGSD.YYYYMMDD = @{fromCal2}
+		          AND MGSD.ITEM_CD = MI.ITEM_CD	 
+			  	LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			      ON MC2.BU_CD = 'ALL'
+			   	 AND MC2.GROUP_CD = 'ITEM_TYPE'
+			   	 AND MC2.CODE_CD = MI.ITEM_TYPE
+			   	 AND MC2.USE_FLAG = 'Y'
+			  	LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+			      ON MC3.BU_CD = 'ALL'
+			   	 AND MC3.GROUP_CD = 'PROCUR_TYPE'
+			   	 AND MC3.CODE_CD = MIP.PROCUR_TYPE
+			   	 AND MC3.USE_FLAG = 'Y'
+			   	LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+			       ON MC4.BU_CD = MGSD.BU_CD
+                AND MC4.GROUP_CD = 'MATERIAL_ARRIVAL_TYPE'
+                AND MC4.CODE_CD = MGSD.MATERIAL_ARRIVAL_TYPE
+                AND MC4.USE_FLAG = 'Y'
+			) A
+			WHERE 1 = 1
+			#if($_parameter.item_nm and $_parameter.item_nm != ""  )
+			  AND (A.ITEM_CD  LIKE '%'+@{item_nm}+'%' OR A.ITEM_NM LIKE '%'+@{item_nm}+'%')
+			#end
+			#if($_parameter.customer and $_parameter.customer != ""  )
+			  AND (A.BP_NM  LIKE '%'+@{customer}+'%' OR A.BP_CD LIKE '%'+@{customer}+'%')
+			#end
+			#if($_parameter.poNo and $_parameter.poNo != ""  )
+			  AND A.PO_NO LIKE '%'+@{poNo}+'%' 
+			#end		
+			#if($_parameter.procurType and $_parameter.procurType != ""  )
+			  AND A.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+			#end
+			#if($_parameter.itemType and $_parameter.itemType != ""  )
+			  AND A.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+			#end
+			#if($_parameter.materialArrivalType and $_parameter.materialArrivalType != ""  )
+			  AND A.MATERIAL_ARRIVAL_TYPE_CD IN ('$_parameter.materialArrivalType.replace(",","','")')
+			#end
+			#if($_parameter.upItemGroup and $_parameter.upItemGroup != ""  )
+			  AND A.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+			#end
+			#if($_parameter.itemGroup and $_parameter.itemGroup != ""  )
+			  AND A.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			#end
+			#if($_parameter.fromCal and $_parameter.fromCal != "" and $_parameter.toCal and $_parameter.toCal != "")
+			  AND A.SCHED_DATE BETWEEN @{fromCal} AND @{toCal}
+			#end	
+	        ORDER BY A.ITEM_CD, A.PO_NO,A.SEQ
+		END;
+    </select>
+ 
+	
+</mapper>

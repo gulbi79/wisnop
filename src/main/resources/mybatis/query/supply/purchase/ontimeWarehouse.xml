@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.purchase">
+	<select id="itemTypeSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.itemTypeSelect ] ******/
+		SELECT BU_CD
+		     , GROUP_CD
+		     , GROUP_DESC
+		     , CODE_CD
+		     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND CODE_NM_KR != '' THEN ISNULL(CODE_NM_KR, CODE_NM)
+		            WHEN UPPER(@{GV_LANG}) = 'CN' AND CODE_NM_CN != '' THEN ISNULL(CODE_NM_CN, CODE_NM)
+		            ELSE CODE_NM
+		       END AS CODE_NM
+		     , USE_FLAG
+		     , SORT
+		     , GROUP_CD + CODE_CD AS ROW_KEY
+		     , DENSE_RANK() OVER(PARTITION BY BU_CD ORDER BY BU_CD DESC) AS RNUM
+		     , ATTB_1_CD
+		     , ATTB_2_CD
+		     , ATTB_3_CD
+		     , ATTB_4_CD
+		     , ATTB_5_CD
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+		  AND GROUP_CD  = 'ITEM_TYPE'
+		  AND ATTB_4_CD = 'Y'
+		  AND USE_FLAG  = 'Y'
+	</select>
+	
+	<select id="grCompRateSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.grCompRateSelect ] ******/
+		SELECT BU_CD
+		     , GROUP_CD
+		     , GROUP_DESC
+		     , CODE_CD
+		     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND CODE_NM_KR != '' THEN ISNULL(CODE_NM_KR,CODE_NM)
+		            WHEN UPPER(@{GV_LANG}) = 'CN' AND CODE_NM_CN != '' THEN ISNULL(CODE_NM_CN,CODE_NM)
+		            ELSE CODE_NM
+		       END AS CODE_NM
+		     , USE_FLAG
+		     , SORT
+		     , GROUP_CD + CODE_CD AS ROW_KEY
+		     , DENSE_RANK() OVER(PARTITION BY BU_CD ORDER BY BU_CD DESC) AS RNUM
+		     , ATTB_1_CD
+		     , ATTB_2_CD
+		     , ATTB_3_CD
+		     , ATTB_4_CD
+		     , ATTB_5_CD
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE BU_CD IN ('ALL', @{GV_BU_CD})
+		  AND GROUP_CD  = 'GR_COMP_RATE'
+		  AND USE_FLAG  = 'Y'
+	</select>
+	
+	<select id="warehouseSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.warehouseSelect ] ******/
+		WITH W_GR_BL AS 
+		(
+		    SELECT T.*
+			FROM 
+			(
+		    	SELECT COMPANY_CD
+	                 , BU_CD
+	                 , PO_NO
+	                 , PO_SEQ
+	                 , IMPORT_FLAG
+	                 , PO_DATE
+	                 , ITEM_CD
+	                 , PO_PRICE
+	                 , PO_QTY
+	                 , PO_QTY_SUB
+	                 , DLV_DATE AS DLV_GR_BL_DATE
+	                 , DLV_DATE_SUB AS DLV_GR_BL_DATE_SUB
+	                 , GR_DATE AS GR_BL_DATE
+	                 , GR_NO AS GR_BL_NO
+	                 , GR_SEQ AS GR_BL_SEQ
+	                 , GR_QTY AS GR_BL_QTY
+				FROM TB_DYN_GR WITH(NOLOCK)
+		        WHERE IMPORT_FLAG = 'N'
+		          AND DLV_DATE IS NOT NULL
+		          AND DEL_FLAG = 'N'
+				UNION ALL
+		        SELECT COMPANY_CD
+	                 , BU_CD
+	                 , PO_NO
+	                 , PO_SEQ
+	                 , 'Y' AS IMPORT_FLAG
+	                 , PO_DATE
+	                 , ITEM_CD
+	                 , PO_PRICE
+	                 , PO_QTY
+	                 , PO_QTY_SUB
+	                 , HAND_OVER_DATE     AS DLV_GR_BL_DATE
+	                 , HAND_OVER_DATE_SUB AS DLV_GR_BL_DATE_SUB
+	                 , BL_DATE AS GR_BL_DATE
+	                 , BL_NO AS GR_BL_NO
+	                 , BL_SEQ AS GR_BL_SEQ
+	                 , BL_QTY AS GR_BL_QTY
+				FROM TB_DYN_PO_BL WITH(NOLOCK)
+	            WHERE HAND_OVER_DATE IS NOT NULL
+	              AND DEL_FLAG = 'N'
+			) T
+		    WHERE T.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND T.BU_CD = @{GV_BU_CD}
+		),
+		W_MAIN AS 
+		(
+		    SELECT T.COMPANY_CD
+		         , T.BU_CD
+		         , T.PO_NO
+		         , T.PO_SEQ
+		         , T.PO_DATE
+		         , T.CUST_CD
+		         , T.PLANT_CD
+		         , T.PLANT_NM
+		         , T.PO_TYPE_CD
+		         , T.PO_TYPE_NM
+		         , T.PUR_GROUP_CD
+		         , T.PUR_GROUP_NM
+		         , T.ITEM_CD
+		         , T.ITEM_TYPE
+		         , T.PO_UOM_CD
+		         , T.PO_PRICE
+		         , T.PO_QTY
+		         , T.IMPORT_FLAG
+		         , T.DLV_GR_BL_DATE
+		         , T.DLV_GR_BL_DATE_SUB
+		         , T.GR_BL_DATE
+		         , T.GR_BL_QTY
+		         , T.PO_QTY - T.GR_BL_QTY AS QTY_DIFF
+		         , DATEDIFF(DD, T.DLV_GR_BL_DATE,T.GR_BL_DATE) AS DATE_DIFF
+		         , (T.GR_BL_QTY / T.PO_QTY) * 100 AS QTY_RT
+			FROM 
+			(
+		    	SELECT A.COMPANY_CD
+	                 , A.BU_CD
+	                 , A.PO_NO
+	                 , A.PO_SEQ
+	                 , MAX(A.PO_DATE) AS PO_DATE
+	                 , MAX(A.BP_CD) AS CUST_CD
+	                 , MAX(A.PLANT_CD) AS PLANT_CD
+	                 , MAX(A.PLANT_NM) AS PLANT_NM
+	                 , MAX(A.PO_TYPE_CD) AS PO_TYPE_CD
+	                 , MAX(A.PO_TYPE_NM) AS PO_TYPE_NM
+	                 , MAX(A.PUR_GROUP_CD) AS PUR_GROUP_CD
+	                 , MAX(A.PUR_GROUP_NM) AS PUR_GROUP_NM
+	                 , MAX(A.ITEM_CD) AS ITEM_CD
+	                 , MAX(A.ITEM_TYPE) AS ITEM_TYPE
+	                 , MAX(A.PO_UOM_CD) AS PO_UOM_CD
+	                 , MAX(A.PO_PRICE) AS PO_PRICE
+	                 , MAX(A.PO_QTY) AS PO_QTY
+	                 , B.IMPORT_FLAG
+	                 , MAX(B.DLV_GR_BL_DATE) AS DLV_GR_BL_DATE
+	                 , MAX(B.DLV_GR_BL_DATE_SUB) AS DLV_GR_BL_DATE_SUB
+	                 , MAX(B.GR_BL_DATE) AS GR_BL_DATE
+	                 , SUM(B.GR_BL_QTY) AS GR_BL_QTY
+				FROM TB_DYN_PUR_ORDER A WITH(NOLOCK)
+	            INNER JOIN W_GR_BL B
+	               ON A.COMPANY_CD = B.COMPANY_CD
+	              AND A.BU_CD      = B.BU_CD
+	              AND A.PO_NO      = B.PO_NO
+	              AND A.PO_SEQ     = B.PO_SEQ
+	            WHERE A.PLANT_CD = 'WF01'
+	              AND A.DEL_FLAG = 'N'
+	            GROUP BY A.COMPANY_CD, A.BU_CD, A.PO_NO, A.PO_SEQ, B.IMPORT_FLAG
+			) T
+		)
+		SELECT TMP_COL
+		     #foreach($dimMap in $_parameter.dimList)
+		  	 , ${dimMap.DIM_CD}_NM, $dimMap.DIM_CD 
+			 #end
+			 , GRP_LVL_ID
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE CONVERT(VARCHAR, CONVERT(DATETIME, PO_DATE), 102) END AS PO_DATE
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PO_TYPE_CD            END AS PO_TYPE_CD
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PO_TYPE_NM            END AS PO_TYPE_NM
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PUR_GROUP_CD          END AS PUR_GROUP_CD
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PUR_GROUP_NM          END AS PUR_GROUP_NM
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE ITEM_TYPE             END AS ITEM_TYPE
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE PO_UOM_CD             END AS PO_UOM_CD
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE IMPORT_FLAG           END AS IMPORT_FLAG
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE CONVERT(VARCHAR, CONVERT(DATETIME, DLV_GR_BL_DATE), 102) END AS DLV_GR_BL_DATE
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE DLV_GR_BL_DATE_SUB    END AS DLV_GR_BL_DATE_SUB
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE CONVERT(VARCHAR, CONVERT(DATETIME, GR_BL_DATE), 102)     END AS GR_BL_DATE
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE QTY_DIFF              END AS QTY_DIFF
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE DATE_DIFF             END AS DATE_DIFF
+		     , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE QTY_RT                END AS QTY_RT
+		     , PO_PRICE
+		     , PO_QTY
+		     , GR_BL_QTY
+		     , OBSERVE
+		     , UN_OBSERVE
+		     , CASE WHEN OBSERVE IS NULL THEN 0 ELSE CAST(OBSERVE AS NUMERIC(6,1)) / OB_TOTAL * 100 END AS RT
+		FROM 
+		(
+			SELECT NULL AS TMP_COL
+	             , PO_SEQ
+	             <include refid="include.getCdDimTotal"/>
+			     <include refid="include.getGrpLvlId"/>
+	             , MAX(PO_DATE) AS PO_DATE
+	             , MAX(PO_TYPE_CD) AS PO_TYPE_CD
+	             , MAX(PO_TYPE_NM) AS PO_TYPE_NM
+	             , MAX(PUR_GROUP_CD) AS PUR_GROUP_CD
+	             , MAX(PUR_GROUP_NM) AS PUR_GROUP_NM
+	             , MAX(ITEM_TYPE) AS ITEM_TYPE
+	             , MAX(PO_UOM_CD) AS PO_UOM_CD
+	             , SUM(PO_PRICE) AS PO_PRICE
+	             , SUM(PO_QTY) AS PO_QTY
+	             , MAX(IMPORT_FLAG) AS IMPORT_FLAG
+	             , MAX(DLV_GR_BL_DATE) AS DLV_GR_BL_DATE
+	             , MAX(DLV_GR_BL_DATE_SUB) AS DLV_GR_BL_DATE_SUB
+	             , MAX(GR_BL_DATE) AS GR_BL_DATE
+	             , SUM(GR_BL_QTY) AS GR_BL_QTY
+	             , MAX(QTY_DIFF) AS QTY_DIFF
+	             , MAX(DATE_DIFF) AS DATE_DIFF
+	             , MAX(QTY_RT) AS QTY_RT
+	             , SUM(OBSERVE) AS OBSERVE
+	             , SUM(UN_OBSERVE) AS UN_OBSERVE
+	             , ISNULL(SUM(OBSERVE),0) + ISNULL(SUM(UN_OBSERVE),0) AS OB_TOTAL
+			FROM 
+			(
+                SELECT A.COMPANY_CD
+                     , A.BU_CD
+                     , A.PO_SEQ
+                     , ISNULL(A.ITEM_CD, ' ') AS ITEM_CD
+                     , ISNULL(A.ITEM_CD, ' ') AS ITEM_CD_NM
+                     , ISNULL(B.ITEM_NM, ' ') AS ITEM_NM
+                     , ISNULL(B.ITEM_NM, ' ') AS ITEM_NM_NM
+                     , ISNULL(B.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+                     , ISNULL(B.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+                     , ISNULL(E.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+                     , ISNULL(E.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+                     , ISNULL(B.SPEC, ' ') AS SPEC
+                     , ISNULL(B.SPEC, ' ') AS SPEC_NM
+                     , ISNULL(C.ROUTING_ID, ' ') AS ROUTING_ID
+                     , ISNULL(C.ROUTING_ID, ' ') AS ROUTING_ID_NM
+                     , ISNULL(D.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+                     , ISNULL(D.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+                     , ISNULL(D.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+                     , ISNULL(D.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+                     , ISNULL(A.CUST_CD, ' ') AS CUST_CD
+                     , ISNULL(A.CUST_CD, ' ') AS CUST_CD_NM
+                     , ISNULL(D.CUST_NM, ' ') AS CUST_NM
+                     , ISNULL(D.CUST_NM, ' ') AS CUST_NM_NM
+                     , ISNULL(A.PO_NO, ' ') AS PO_NO
+                     , ISNULL(A.PO_NO, ' ') AS PO_NO_NM
+                     , ISNULL(A.PLANT_CD, ' ') AS PLANT_CD
+                     , ISNULL(A.PLANT_CD, ' ') AS PLANT_CD_NM
+                     , ISNULL(A.PLANT_NM, ' ') AS PLANT_NM
+                     , ISNULL(A.PLANT_NM, ' ') AS PLANT_NM_NM
+                     , A.PO_DATE
+                     , A.PO_TYPE_CD
+                     , A.PO_TYPE_NM
+                     , A.PUR_GROUP_CD
+                     , A.PUR_GROUP_NM
+                     , A.ITEM_TYPE
+                     , A.PO_UOM_CD
+                     , A.PO_PRICE
+                     , A.PO_QTY
+                     , A.IMPORT_FLAG
+                     , A.DLV_GR_BL_DATE
+                     , A.DLV_GR_BL_DATE_SUB
+                     , A.GR_BL_DATE
+                     , A.GR_BL_QTY
+                     , A.QTY_DIFF
+                     , A.DATE_DIFF
+                     , A.QTY_RT
+                     , CASE WHEN A.DATE_DIFF <![CDATA[<=]]> (SELECT ATTB_2_CD FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'GR_COMP_RATE') AND A.QTY_RT <![CDATA[>=]]> (SELECT ATTB_1_CD FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'GR_COMP_RATE') THEN 1 ELSE NULL END AS OBSERVE
+                     , CASE WHEN A.DATE_DIFF <![CDATA[<=]]> (SELECT ATTB_2_CD FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'GR_COMP_RATE') AND A.QTY_RT <![CDATA[>=]]> (SELECT ATTB_1_CD FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'GR_COMP_RATE') THEN NULL ELSE 1 END AS UN_OBSERVE
+				FROM W_MAIN A
+                LEFT OUTER JOIN TB_MST_ITEM B WITH(NOLOCK)
+                  ON A.COMPANY_CD = B.COMPANY_CD
+                 AND A.BU_CD      = B.BU_CD
+                 AND A.ITEM_CD    = B.ITEM_CD
+                LEFT OUTER JOIN TB_MST_ITEM_PLANT C WITH(NOLOCK)
+                  ON A.COMPANY_CD = C.COMPANY_CD
+                 AND A.BU_CD      = C.BU_CD
+                 AND A.ITEM_CD    = C.ITEM_CD
+                LEFT OUTER JOIN TB_MST_CUSTOMER D WITH(NOLOCK)
+                  ON A.COMPANY_CD = D.COMPANY_CD
+                 AND A.BU_CD      = D.BU_CD
+                 AND A.CUST_CD    = D.CUST_CD
+                LEFT OUTER JOIN TB_MST_ITEM_GROUP E WITH(NOLOCK)
+                  ON B.COMPANY_CD = E.COMPANY_CD
+                 AND B.BU_CD      = E.BU_CD
+                 AND B.ITEM_GROUP_CD = E.ITEM_GROUP_CD
+                WHERE C.PLANT_CD = 'WF01'
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+				  AND A.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+				#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+				  AND (A.ITEM_CD LIKE '%'+@{item_nm}+'%' OR B.ITEM_NM LIKE '%'+@{item_nm}+'%')
+				#end
+				#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+				  AND B.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+				#end
+				#if($_parameter.customer_cd and $_parameter.customer_cd != "")
+	              AND A.CUST_CD IN ('$_parameter.customer_cd.replace(",","','")')
+	            #elseif($_parameter.customer_nm and $_parameter.customer_nm != "")
+	              AND (A.CUST_CD LIKE '%'+@{customer_nm}+'%' OR D.CUST_NM LIKE '%'+@{customer_nm}+'%')
+	            #end
+	            #if($_parameter.itemType and $_parameter.itemType != "")
+	              AND A.ITEM_TYPE = @{itemType}
+	            #end
+	            #if($_parameter.importFlag and $_parameter.importFlag != "")
+	              AND A.IMPORT_FLAG = @{importFlag}
+	            #end
+            	#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+				  AND E.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+				#end
+            	  AND A.DLV_GR_BL_DATE BETWEEN @{fromCal} AND @{toCal}
+			) T
+			WHERE T.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND T.BU_CD = @{GV_BU_CD}
+           	#if($_parameter.obeyYn == "Y")
+              AND T.OBSERVE IS NOT NULL
+           	#elseif($_parameter.obeyYn == "N")
+              AND T.UN_OBSERVE IS NOT NULL
+           	#end
+			GROUP BY ROLLUP
+			(
+				#set($rollupDot = ".")
+				#if(!$rollupAlias or $rollupAlias == "")
+					#set($rollupAlias = "")
+					#set($rollupDot = "")
+				#end
+				#foreach( $dimMap in $_parameter.dimList )
+					#if($velocityCount == 1)
+						(T.PO_SEQ, ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+					#elseif($preLvl == $dimMap.LVL or $totalFlag != "Y")
+						, ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+					#elseif($preLvl != $dimMap.LVL and $totalFlag == "Y")
+						), (${rollupAlias}${rollupDot}$dimMap.DIM_CD
+					#end
+					#if($preLvl != $dimMap.LVL)
+					#set($totalFlag = $dimMap.SQL_TOTAL_FLAG)
+					#end
+					#set($preLvl = $dimMap.LVL)
+				#end
+				)        
+			)
+			) TT
+			ORDER BY TMP_COL
+		    #foreach($dimMap in $_parameter.dimList)
+	    	, TT.$dimMap.DIM_CD
+		    #end
+	</select>
+</mapper>

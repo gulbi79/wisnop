@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPlan">
+
+    <select id="prodCapaAllocMfgRoleSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPlan.prodCapaAllocMfgRoleSelect ] ******/
+	    WITH W_USER_ROLE AS 
+	    (
+			SELECT R.BU_CD
+	             , R.ROLE_CD
+	        FROM TB_MST_USER U WITH(NOLOCK)
+	        JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+	          ON (  U.USER_ID  = R.USER_ID
+	              AND R.BU_CD    = @{GV_BU_CD}
+	              AND R.USE_FLAG = 'Y'
+	             )
+			WHERE U.USER_ID  = @{GV_USER_ID}
+	          AND U.USE_FLAG = 'Y'
+	          AND U.DEL_FLAG = 'N'
+	    )
+	    ,W_CODE AS 
+	    (
+	        #set($_parameter.groupCd="DP_AUTH_CTRL")
+	        <include refid="include.mstCode"/>
+	    )
+	    SELECT (SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END
+	              FROM W_USER_ROLE R JOIN W_CODE C ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_4_CD = 'Y')) AS CONFIRM_ROLE_YN,
+	           (SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END
+	              FROM W_USER_ROLE R JOIN W_CODE C ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_5_CD = 'Y')) AS RELEASE_ROLE_YN
+    </select>
+    
+    <select id="prodCapaAllocMfgSelect" parameterType="map" resultType="map">
+    /****** [ dp.salesPlan.prodCapaAllocMfgSelect ] ******/
+BEGIN
+    <include refid="include.macros"/>
+    #getProductTree()
+    
+    DECLARE @CUT_OFF_FLAG    nvarchar(1)
+    DECLARE @RELEASE_FLAG    nvarchar(1)
+    
+    SELECT @CUT_OFF_FLAG = CUT_OFF_FLAG
+         , @RELEASE_FLAG = RELEASE_FLAG
+      FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+     WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+       AND BU_CD        = @{GV_BU_CD}
+       AND PLAN_TYPE_CD = 'DP_M'
+       AND PLAN_ID      = @{planId};
+       
+    WITH W_DIM AS (
+        SELECT CG.COMPANY_CD
+             , CG.BU_CD
+             , IT.PROD_LVL2_CD
+             , IT.PROD_LVL2_NM
+             , IP.ROUTING_ID
+             , IT.PROD_LVL3_CD
+             , IT.PROD_LVL3_NM
+          FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+          JOIN TB_MST_ITEM IT WITH(NOLOCK)
+            ON (  CG.COMPANY_CD = IT.COMPANY_CD
+              AND CG.BU_CD      = IT.BU_CD
+              AND CG.ITEM_CD    = IT.ITEM_CD
+              AND ((@CUT_OFF_FLAG = 'Y')
+                OR (@CUT_OFF_FLAG = 'N' AND IT.VALID_FLAG = 'Y' AND IT.USE_FLAG = 'Y')
+              )
+              #set($treeAlias = "IT")
+              <include refid="include.productTree"/>
+            )
+          JOIN TB_MST_ITEM_PLANT IP WITH(NOLOCK)
+            ON (  IT.COMPANY_CD = IP.COMPANY_CD
+              AND IT.BU_CD      = IP.BU_CD
+              AND IT.ITEM_CD    = IP.ITEM_CD
+              AND IP.PLANT_CD   = 'WF01'
+              AND ((@CUT_OFF_FLAG = 'Y')
+                OR (@CUT_OFF_FLAG = 'N' AND IP.VALID_FLAG = 'Y')
+              )
+#if($_parameter.routing and $_parameter.routing != "")
+              AND IP.ROUTING_ID IN ('$_parameter.routing.replace(",","','")')
+#end
+            )
+          JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+            ON (  CG.COMPANY_CD    = CT.COMPANY_CD
+              AND CG.BU_CD         = CT.BU_CD
+              AND CG.CUST_GROUP_CD = CT.CUST_CD
+              AND ((@CUT_OFF_FLAG = 'Y')
+                OR (@CUT_OFF_FLAG = 'N' AND CT.VALID_FLAG = 'Y')
+              )
+            )
+         WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+           AND CG.BU_CD         = @{GV_BU_CD}
+           <!-- AND ((@CUT_OFF_FLAG = 'Y') OR (@CUT_OFF_FLAG = 'N' AND CG.VALID_FLAG = 'Y' AND CG.SALES_PLAN_YN = 'Y')) -->
+           AND ((@CUT_OFF_FLAG = 'Y') OR (@CUT_OFF_FLAG = 'N' AND CG.VALID_FLAG = 'Y'))
+           AND IP.ROUTING_ID    IS NOT NULL
+           AND IT.PROD_LVL2_CD  IS NOT NULL
+           AND IT.PROD_LVL3_CD  IS NOT NULL
+           AND IT.ITEM_TYPE = '10'
+        GROUP BY CG.COMPANY_CD
+             , CG.BU_CD
+             , IT.PROD_LVL2_CD
+             , IT.PROD_LVL2_NM
+             , IP.ROUTING_ID
+             , IT.PROD_LVL3_CD
+             , IT.PROD_LVL3_NM
+    ),
+    W_PROD_CAPA_QTY AS (
+        SELECT CG.*
+             , LC.YEARMONTH
+             , LC.CAPA_QTY  AS PROD_CAPA_QTY
+             , 'Y'          AS CONFIRM_YN
+          FROM W_DIM CG
+          JOIN TB_DYN_CAPA_ALLOC_PROD_LATEST LC WITH(NOLOCK)
+            ON (  CG.COMPANY_CD   = LC.COMPANY_CD
+              AND CG.BU_CD        = LC.BU_CD
+              AND CG.ROUTING_ID   = LC.ROUTING_ID
+              AND CG.PROD_LVL3_CD = LC.PROD_LVL3_CD
+              AND LC.YEARMONTH    <![CDATA[< ]]> @{startMonth}  
+              AND LC.YEARMONTH    <![CDATA[>=]]> @{fromMon}
+              AND LC.YEARMONTH    <![CDATA[<=]]> @{toMon}
+            )
+         UNION ALL
+        SELECT CG.* 
+             , HC.YEARMONTH
+             , HC.CAPA_QTY  AS PROD_CAPA_QTY
+             , 'Y'          AS CONFIRM_YN
+          FROM W_DIM CG
+          JOIN TB_HIS_CAPA_ALLOC_PROD HC WITH(NOLOCK)
+            ON (  @CUT_OFF_FLAG   = 'Y'
+              AND CG.COMPANY_CD   = HC.COMPANY_CD
+              AND CG.BU_CD        = HC.BU_CD
+              AND CG.ROUTING_ID   = HC.ROUTING_ID
+              AND CG.PROD_LVL3_CD = HC.PROD_LVL3_CD
+              AND HC.PLAN_ID      = @{planId}
+              AND HC.YEARMONTH    <![CDATA[>=]]> @{startMonth}
+              AND HC.YEARMONTH    <![CDATA[<=]]> @{endMonth}
+              AND HC.YEARMONTH    <![CDATA[>=]]> @{fromMon}
+              AND HC.YEARMONTH    <![CDATA[<=]]> @{toMon}
+            )
+         UNION ALL
+        SELECT CG.* 
+             , DC.YEARMONTH
+             , DC.CAPA_QTY                AS PROD_CAPA_QTY
+             , ISNULL(DC.CONFIRM_YN, 'N') AS CONFIRM_YN
+          FROM W_DIM CG
+          JOIN TB_DYN_CAPA_ALLOC_PROD DC WITH(NOLOCK)
+            ON (  @CUT_OFF_FLAG   = 'N'
+              AND CG.COMPANY_CD   = DC.COMPANY_CD
+              AND CG.BU_CD        = DC.BU_CD
+              AND CG.ROUTING_ID   = DC.ROUTING_ID
+              AND CG.PROD_LVL3_CD = DC.PROD_LVL3_CD
+              AND DC.YEARMONTH    <![CDATA[>=]]> @{startMonth}
+              AND DC.YEARMONTH    <![CDATA[<=]]> @{endMonth}
+            )
+    ),
+    W_CONFIRM_YN AS (
+        SELECT COMPANY_CD
+             , BU_CD
+             , PROD_LVL2_CD
+             , PROD_LVL2_NM
+             , ROUTING_ID
+             , PROD_LVL3_CD
+             , PROD_LVL3_NM
+             , MAX(CONFIRM_YN) AS CONFIRM_YN
+          FROM W_PROD_CAPA_QTY
+         WHERE YEARMONTH <![CDATA[>=]]> @{startMonth}
+           AND YEARMONTH <![CDATA[<=]]> @{endMonth}
+        GROUP BY COMPANY_CD
+             , BU_CD
+             , PROD_LVL2_CD
+             , PROD_LVL2_NM
+             , ROUTING_ID
+             , PROD_LVL3_CD
+             , PROD_LVL3_NM
+    ),
+    W_DIM_CONFIRM AS (
+        SELECT D.*
+             , ISNULL(C.CONFIRM_YN, @CUT_OFF_FLAG) AS CONFIRM_YN
+          FROM W_DIM D
+          LEFT OUTER JOIN W_CONFIRM_YN C 
+            ON (  D.COMPANY_CD   = C.COMPANY_CD
+              AND D.BU_CD        = C.BU_CD
+              AND D.ROUTING_ID   = C.ROUTING_ID
+              AND D.PROD_LVL3_CD = C.PROD_LVL3_CD
+            )
+    ),
+    W_ROW AS (
+        SELECT NULL AS TMP_COL
+#foreach( $dimMap in $_parameter.dimList )
+             , D.$dimMap.DIM_CD 
+             , D.$dimMap.DIM_CD AS ${dimMap.DIM_CD}_NM 
+#end
+             , CASE WHEN @RELEASE_FLAG = 'Y' THEN 'Y'
+                    ELSE D.CONFIRM_YN
+                END AS CONFIRM_YN
+             , C.YEARMONTH
+             , C.PROD_CAPA_QTY
+          FROM W_DIM_CONFIRM D
+          LEFT OUTER JOIN W_PROD_CAPA_QTY C
+            ON (  D.COMPANY_CD   = C.COMPANY_CD
+              AND D.BU_CD        = C.BU_CD
+              AND D.ROUTING_ID   = C.ROUTING_ID
+              AND D.PROD_LVL3_CD = C.PROD_LVL3_CD
+              AND C.YEARMONTH   <![CDATA[>=]]> @{fromMon}
+              AND C.YEARMONTH   <![CDATA[<=]]> @{toMon}
+            )
+    ),
+    W_WORKING_DAYS AS (
+        SELECT YEARMONTH, SUM(CONVERT(NUMERIC(6,1), ISNULL(DAY_OFF_FLAG, '0'))) AS WORKING_DAYS
+          FROM TB_MST_CALENDAR WITH(NOLOCK)
+         WHERE YEARMONTH BETWEEN @{fromMon} AND @{toMon}
+         GROUP BY YEARMONTH
+    ),
+    W_MAIN AS (
+        SELECT NULL AS TMP_COL
+#foreach( $dimMap in $_parameter.dimList )
+             , $dimMap.DIM_CD 
+             , ${dimMap.DIM_CD}_NM 
+#end
+             , MAX(CONFIRM_YN) AS CONFIRM_YN
+             <include refid="include.getGrpLvlId"/>
+#foreach( $bucketMap in $_parameter.bucketList )
+ #if ($bucketMap.CD.indexOf("PROD_CAPA_QTY") > -1)
+             , SUM(CASE WHEN ('M'+YEARMONTH+'_PROD_CAPA_QTY') = '$bucketMap.CD' THEN PROD_CAPA_QTY END) AS $bucketMap.CD
+ #elseif ($bucketMap.CD.indexOf("WORKING_DAYS") > -1)
+             , (SELECT WORKING_DAYS FROM W_WORKING_DAYS WHERE YEARMONTH = '$bucketMap.BUCKET_VAL') AS $bucketMap.CD 
+ #end
+#end
+          FROM W_ROW
+         GROUP BY ROLLUP (
+            <include refid="include.getRollup"/>
+         )
+    )
+    SELECT NULL AS TMP_COL
+         <include refid="include.getDimTotal"/>
+         , CONFIRM_YN
+         , GRP_LVL_ID
+#foreach( $bucketMap in $_parameter.bucketList )
+  #if ($bucketMap.CD.indexOf("PROD_CAPA_QTY") > -1)
+         , CASE WHEN GRP_LVL_ID = 0
+                THEN $bucketMap.CD
+                ELSE ISNULL($bucketMap.CD, 0)
+            END AS $bucketMap.CD
+  #elseif ($bucketMap.CD.indexOf("WORKING_DAYS") > -1)
+         , $bucketMap.CD
+  #end
+#end
+      FROM W_MAIN A
+     ORDER BY TMP_COL
+#foreach( $dimMap in $_parameter.dimList )
+         , A.${dimMap.DIM_CD}_NM, A.$dimMap.DIM_CD
+#end
+         ;
+END
+    </select>
+    
+    <update id="prodCapaAllocMfgUpdate" parameterType="map">
+    /****** [ dp.salesPlan.prodCapaAllocMfgUpdate ] ******/
+    BEGIN
+        
+        DECLARE @CUT_OFF_FLAG    nvarchar(1)
+        DECLARE @CONFIRM_YN      nvarchar(1)
+        
+        /* Select : CUT_OFF_FLAG ---------------------------- */
+        SELECT @CUT_OFF_FLAG = CUT_OFF_FLAG
+          FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+         WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+           AND BU_CD        = @{GV_BU_CD}
+           AND PLAN_TYPE_CD = 'DP_M'
+           AND PLAN_ID      = @{planId};
+        
+        IF (@CUT_OFF_FLAG != 'Y')
+            BEGIN /* 1 : Begin */
+            
+                /* Select : CONFIRM_YN ---------------------------- */
+                SELECT @CONFIRM_YN = ISNULL(MAX(CONFIRM_YN), @CUT_OFF_FLAG)
+                  FROM TB_DYN_CAPA_ALLOC_PROD WITH(NOLOCK)
+                 WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+                   AND BU_CD        = @{GV_BU_CD}
+                   AND ROUTING_ID   = @{ROUTING_ID}
+                   AND PROD_LVL3_CD = @{PROD_LVL3_CD}
+                   AND YEARMONTH   <![CDATA[>=]]> @{startMonth}
+                   AND YEARMONTH   <![CDATA[<=]]> @{endMonth}
+                   ;
+
+                IF (@CONFIRM_YN != 'Y')
+                    BEGIN /* 2 : Begin */
+                
+                        /* Month Cursor ----------------------------------------------------- */
+                        DECLARE BUCKET_LIST CURSOR FOR
+#foreach ($bucketMap in $_parameter.BUCKET_LIST)
+#if ($foreach.count != 1)
+                             UNION ALL
+#end
+                            SELECT '$bucketMap.YEARMONTH' AS YEARMONTH, $bucketMap.CAPA_QTY AS CAPA_QTY
+#end
+
+                        /* Open : Month Cursor ---------------------------------------------- */
+                        OPEN BUCKET_LIST
+                        
+                        DECLARE @YEARMONTH    nvarchar(6)
+                        DECLARE @CAPA_QTY     int
+                        
+                        FETCH NEXT FROM BUCKET_LIST INTO @YEARMONTH, @CAPA_QTY
+                    
+                        WHILE (@@FETCH_STATUS = 0)
+                            BEGIN
+                            
+                                /* Start Save : TB_DYN_CAPA_ALLOC_PROD ----------------------------- */
+                                
+                                MERGE TB_DYN_CAPA_ALLOC_PROD AS A
+                                USING (SELECT 'X' AS DUAL) AS B
+                                   ON (  COMPANY_CD   = @{GV_COMPANY_CD}
+                                     AND BU_CD        = @{GV_BU_CD}
+                                     AND ROUTING_ID   = @{ROUTING_ID}
+                                     AND PROD_LVL3_CD = @{PROD_LVL3_CD}
+                                     AND YEARMONTH    = @YEARMONTH
+                                   )
+                                 WHEN MATCHED THEN
+                                   UPDATE
+                                      SET CAPA_QTY    = CASE WHEN @CAPA_QTY = -1                                                                       THEN CAPA_QTY    ELSE @CAPA_QTY END 
+                                        , UPDATE_ID   = CASE WHEN @CAPA_QTY = -1 OR (CAPA_QTY IS NULL AND @CAPA_QTY IS NULL) OR (CAPA_QTY = @CAPA_QTY) THEN UPDATE_ID   ELSE @{GV_USER_ID} END
+                                        , UPDATE_DTTM = CASE WHEN @CAPA_QTY = -1 OR (CAPA_QTY IS NULL AND @CAPA_QTY IS NULL) OR (CAPA_QTY = @CAPA_QTY) THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+                                 WHEN NOT MATCHED THEN
+                                   INSERT (
+                                       COMPANY_CD,
+                                       BU_CD,
+                                       ROUTING_ID,
+                                       PROD_LVL3_CD,
+                                       YEARMONTH,
+                                       CAPA_QTY,
+                                       CONFIRM_YN,
+                                       CREATE_ID,
+                                       CREATE_DTTM,
+                                       UPDATE_ID,
+                                       UPDATE_DTTM
+                                   ) VALUES (
+                                       @{GV_COMPANY_CD},
+                                       @{GV_BU_CD},
+                                       @{ROUTING_ID},
+                                       @{PROD_LVL3_CD},
+                                       @YEARMONTH,
+                                       CASE WHEN @CAPA_QTY != -1 THEN @CAPA_QTY ELSE NULL END,
+                                       'N',
+                                       @{GV_USER_ID},
+                                       DBO.UFN_GETDATE(),
+                                       @{GV_USER_ID},
+                                       DBO.UFN_GETDATE()
+                                   );
+                                
+                                /* End Save : TB_DYN_CAPA_ALLOC_PROD ----------------------------- */
+
+                                FETCH NEXT FROM BUCKET_LIST INTO @YEARMONTH, @CAPA_QTY
+                                
+                            END
+                            
+                        CLOSE BUCKET_LIST
+                        DEALLOCATE BUCKET_LIST
+                        /* Close : Month Cursor --------------------------------------------- */
+                    
+                    END /* 2 : End */
+            
+            END /* 1 : End */
+    END;
+    </update>
+    
+    <update id="prodCapaAllocMfgConfirmUpdate" parameterType="map">
+    /****** [ dp.salesPlan.prodCapaAllocMfgConfirmUpdate ] ******/
+    UPDATE TB_DYN_CAPA_ALLOC_PROD
+       SET CONFIRM_YN   = @{CONFIRM_YN}
+         , UPDATE_ID    = CASE WHEN CONFIRM_YN = @{CONFIRM_YN} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+         , UPDATE_DTTM  = CASE WHEN CONFIRM_YN = @{CONFIRM_YN} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+     WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+       AND BU_CD        = @{GV_BU_CD}
+       AND ROUTING_ID   = @{ROUTING_ID}
+       AND PROD_LVL3_CD = @{PROD_LVL3_CD}
+       AND YEARMONTH   <![CDATA[>=]]> @{startMonth}
+       AND YEARMONTH   <![CDATA[<=]]> @{endMonth}
+    </update>
+    
+    <update id="prodCapaAllocMfgReleaseUpdate" parameterType="map">
+    /****** [ dp.salesPlan.prodCapaAllocMfgReleaseUpdate ] ******/
+    BEGIN
+    
+        UPDATE TB_MST_PLAN_VERSION
+           SET RELEASE_FLAG = @{RELEASE_FLAG}
+             , UPDATE_ID    = CASE WHEN RELEASE_FLAG = @{RELEASE_FLAG} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+             , UPDATE_DTTM  = CASE WHEN RELEASE_FLAG = @{RELEASE_FLAG} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+         WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+           AND BU_CD        = @{GV_BU_CD}
+           AND PLAN_TYPE_CD = 'DP_M'
+           AND PLAN_ID      = @{PLAN_ID}
+           ;
+        
+        IF (@{RELEASE_FLAG} = 'Y')
+            BEGIN
+            exec USP_TB_HIS_CAPA_ALLOC_PROD        @{GV_COMPANY_CD}, @{GV_BU_CD}, @{PLAN_ID};
+            exec USP_TB_DYN_CAPA_ALLOC_PROD_LATEST @{GV_COMPANY_CD}, @{GV_BU_CD}, @{PLAN_ID};
+            END
+       
+    END
+    </update>
+    
+</mapper>

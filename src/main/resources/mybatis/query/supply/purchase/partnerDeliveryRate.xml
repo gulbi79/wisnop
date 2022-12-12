@@ -1,0 +1,761 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.purchase">
+
+	<select id="partnerDeliveryRateListSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.partnerDeliveryRateListSelect ] ******/
+		BEGIN
+
+			DECLARE @V_PLAN_START_DATE NVARCHAR(8),
+					@V_COMPARE_DATE NVARCHAR(8),
+					@V_PLAN_END_DATE NVARCHAR(8),
+			        @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+			
+			SELECT TOP 1 @V_PLAN_START_DATE = YYYYMMDD
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YEARWEEK <![CDATA[<]]> @{fromWeek}
+			  AND DAY_NM = 'THU'
+			ORDER BY YYYYMMDD DESC;
+			
+			SELECT @V_PLAN_END_DATE = YYYYMMDD
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YEARWEEK = @{fromWeek}
+			  AND DAY_NM = 'WED'
+			;
+			
+			SELECT @V_COMPARE_DATE = CASE WHEN @V_PLAN_END_DATE <![CDATA[>]]> @V_CUR_DATE THEN @V_CUR_DATE ELSE @V_PLAN_END_DATE END; 
+			
+			WITH W_GR AS
+			(
+				SELECT COMPANY_CD
+					 , BU_CD
+					 , ITEM_CD
+					 , SUM(GR_QTY) AS GR_QTY
+				FROM
+				(      
+					SELECT COMPANY_CD
+					     , BU_CD
+					     , ITEM_CD
+					     , GR_QTY      
+					FROM TB_DYN_GR WITH(NOLOCK)
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					  AND BU_CD = @{GV_BU_CD} 
+					  AND DEL_FLAG = 'N'
+					  AND GR_DATE BETWEEN @V_PLAN_START_DATE AND @V_PLAN_END_DATE
+					UNION ALL
+					SELECT COMPANY_CD
+					     , BU_CD
+					     , ITEM_CD
+					     , GR_QTY      
+					FROM TB_DYN_GR_PROD WITH(NOLOCK)
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					  AND BU_CD = @{GV_BU_CD} 
+					  AND PLANT_CD = 'WF01'
+					  AND GR_DATE BETWEEN @V_PLAN_START_DATE AND @V_PLAN_END_DATE
+				) A1
+				GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+			),
+			W_MAIN_REQ_QTY AS
+			(
+				SELECT HAWM.COMPANY_CD
+				     , HAWM.BU_CD
+				     , HAWM.MAIN_ITEM_CD
+				     , MPV.START_WEEK
+				     , SUM(HAWM.MAIN_REQ_QTY) AS MAIN_REQ_QTY
+				FROM TB_HIS_APS_WORKORDER_MRP HAWM WITH(NOLOCK)
+				INNER JOIN TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+				   ON MPV.COMPANY_CD = HAWM.COMPANY_CD
+				  AND MPV.BU_CD = HAWM.BU_CD
+				  AND MPV.PLAN_TYPE_CD = 'MP'
+				  AND MPV.PLAN_ID = HAWM.PLAN_ID
+				WHERE HAWM.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND HAWM.BU_CD = @{GV_BU_CD} 
+				  AND HAWM.MAIN_ITEM_CD IS NOT NULL
+				  AND MPV.START_WEEK = @{fromWeek}
+				GROUP BY HAWM.COMPANY_CD, HAWM.BU_CD, HAWM.MAIN_ITEM_CD, MPV.START_WEEK
+			),
+			W_OVER_SHORT_DATA AS
+			(
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+				     , (B1.INV_QTY + ISNULL(B2.GR_QTY, 0)) - (CASE WHEN ISNULL(B1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(B3.MAIN_REQ_QTY, 0) THEN ISNULL(B1.MRP_QTY, 0) - ISNULL(B3.MAIN_REQ_QTY, 0)
+	                        ELSE 0
+	                   END + B1.NON_MOVING_QTY + B1.NON_DEPLOY_QTY) AS OVER_SHORT 
+				FROM
+				(
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A1.ITEM_CD
+					     , A1.YEARWEEK
+					     , SUM(A1.INV_QTY) AS INV_QTY
+					     , SUM(A1.MRP_QTY) AS MRP_QTY
+					     , SUM(A1.NON_MOVING_QTY) AS NON_MOVING_QTY
+					     , SUM(A1.NON_DEPLOY_QTY) AS NON_DEPLOY_QTY
+					FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+					WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND A1.BU_CD = @{GV_BU_CD} 
+					  AND A1.YEARWEEK = @{fromWeek}
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.YEARWEEK 
+				) B1
+				LEFT OUTER JOIN W_GR B2
+				  ON B1.COMPANY_CD = B2.COMPANY_CD
+				 AND B1.BU_CD = B2.BU_CD
+				 AND B1.ITEM_CD = B2.ITEM_CD
+				LEFT OUTER JOIN W_MAIN_REQ_QTY B3
+				  ON B1.COMPANY_CD = B3.COMPANY_CD
+	          	 AND B1.BU_CD = B3.BU_CD
+	          	 AND B1.ITEM_CD = B3.MAIN_ITEM_CD
+			),
+			W_RECV_INSP AS
+			(
+				SELECT COMPANY_CD
+				     , BU_CD
+				     , ITEM_CD
+				     , (DIE.PRE_RECV_QTY + DIE.RCPT_INSP_QTY) AS RECV_INSP_QTY
+				FROM TB_DYN_INVENTORY_ETC DIE WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND INV_DATE = @V_COMPARE_DATE
+			),
+			W_CC AS
+			(
+				SELECT DPO.COMPANY_CD
+				     , DPO.BU_CD
+				     , DPO.ITEM_CD
+				     , SUM(DPO.CC_QTY) AS CC_QTY  
+				FROM TB_DYN_PUR_ORDER_DAILY DPO WITH(NOLOCK)
+				WHERE DPO.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND DPO.BU_CD = @{GV_BU_CD}
+				  AND DPO.YYYYMMDD = @V_COMPARE_DATE
+				  AND DPO.DEL_FLAG = 'N'
+				GROUP BY DPO.COMPANY_CD, DPO.BU_CD, DPO.ITEM_CD 
+			),
+			W_RECV_QC_NG AS
+			(
+				SELECT COMPANY_CD
+				     , BU_CD
+				     , ITEM_CD
+				     , SUM(RECV_QC_NG_QTY) AS RECV_QC_NG_QTY  
+  				FROM TB_DYN_PUR_RECV WITH(NOLOCK)
+ 				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND RECV_DATE BETWEEN @V_PLAN_START_DATE AND @V_PLAN_END_DATE
+				GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+			)
+			SELECT *
+			FROM
+			(
+				SELECT NULL AS TMP_COL 
+					#foreach( $dimMap in $_parameter.dimList )
+					#if($velocityCount == 1)
+					 , NULL AS $dimMap.DIM_CD  
+					 , 'Total'AS ${dimMap.DIM_CD}_NM
+					#else
+					 , NULL AS $dimMap.DIM_CD
+					 , NULL AS ${dimMap.DIM_CD}_NM
+					#end
+					#end 
+					#foreach($bucketMap in $_parameter.bucketList)
+					#if($bucketMap.CD.indexOf("_COMP_RATE") > -1)
+					 , AVG($bucketMap.CD) AS $bucketMap.CD
+					#else
+					 , SUM($bucketMap.CD) AS $bucketMap.CD
+					#end
+					#end
+				     , SUM(DAY_PLAN_QTY) AS DAY_PLAN_QTY
+				     , SUM(RST_QTY) AS RST_QTY
+				     , SUM(DAY_MOL_QTY) AS DAY_MOL_QTY
+				     , SUM(DAY_COMP_QTY) AS DAY_COMP_QTY
+				     , AVG(DAY_COMP_RATE) AS DAY_COMP_RATE
+				     , SUM(WEEK_PLAN_QTY) AS WEEK_PLAN_QTY
+				     , SUM(WEEK_RST_QTY) AS WEEK_RST_QTY
+				     , SUM(WEEK_MOL_QTY) AS WEEK_MOL_QTY
+				     , SUM(WEEK_COMP_QTY) AS WEEK_COMP_QTY
+				     , AVG(WEEK_COMP_RATE) AS WEEK_COMP_RATE
+				     , SUM(OVER_SHORT) AS OVER_SHORT
+				     , SUM(RECV_INSP_QTY) AS RECV_INSP_QTY
+				     , SUM(CC_QTY) AS CC_QTY
+				     , SUM(RECV_QC_NG_QTY) AS RECV_QC_NG_QTY
+				     , NULL AS DAY_YN
+				FROM 
+				(
+					SELECT NULL AS BP_CD2
+	                     , NULL AS BP_CD2_NM
+	                     , NULL AS BP_NM2
+	                     , NULL AS BP_NM2_NM
+						 , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD
+					     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD_NM
+					     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+					     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+					     , ISNULL(MI.SPEC, ' ') AS SPEC
+					     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+					     , ISNULL(MIP.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+					     , (
+				            SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+				                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+				                        ELSE CODE_NM
+				                   END AS CODE_NM
+				            FROM TB_MST_CODE WITH(NOLOCK)
+				            WHERE GROUP_CD = 'PROCUR_TYPE'
+				              AND USE_FLAG = 'Y'
+				              AND CODE_CD = MIP.PROCUR_TYPE
+				           ) AS PROCUR_TYPE_NM
+					     , ISNULL(MI.ITEM_TYPE, ' ') AS ITEM_TYPE_NM
+					     , (
+								SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+					                        WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+					                        ELSE CODE_NM
+					                    END AS CODE_NM
+								FROM TB_MST_CODE MC WITH(NOLOCK)
+					           WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+					             AND MC.GROUP_CD = 'ITEM_TYPE'
+					             AND MC.CODE_CD  = MI.ITEM_TYPE
+					             AND MC.USE_FLAG = 'Y'
+					         ) AS ITEM_TYPE_NM_NM
+					     , ISNULL(MI.KEY_MAT_YN, ' ') AS KEY_MAT_YN
+					     , ISNULL(MI.KEY_MAT_YN, ' ') AS KEY_MAT_YN_NM
+					     , ISNULL(MI.MIN_PUR_LT, ' ') AS MIN_PUR_LT2
+					     , ISNULL(MI.MIN_PUR_LT, ' ') AS MIN_PUR_LT2_NM
+					     , ISNULL(MIG.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+					     , ISNULL(MIG.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+					     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+					     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+						 , ISNULL(CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            					   WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	       						  END, ' ') AS WEEK_YN
+						 , ISNULL(CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            					   WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	       						   END, ' ') AS WEEK_YN_NM
+	       			     , CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            					   WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	            					   ELSE 'NULL'
+	       						   END AS WEEK_YN_FLAG
+						 , CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            				WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	       					END AS DAY_YN
+	       				 , CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            				WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	            				ELSE 'NULL'
+	       					END AS DAY_YN_FLAG
+						 , SUM(MGSOD.DAY_PLAN_QTY) AS DAY_PLAN_QTY
+	     				 , SUM(DPR.RST_QTY) AS RST_QTY
+						 , ISNULL(SUM(DPR.RST_QTY), 0) - ISNULL(SUM(MGSOD.DAY_PLAN_QTY), 0) AS DAY_MOL_QTY
+						 , dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.DAY_PLAN_QTY)) AS DAY_COMP_QTY
+						 , ROUND(dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.DAY_PLAN_QTY)) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) AS DAY_COMP_RATE
+						#set($strPlan = "")
+						#set($strRst = "")
+						#set($strPlanAcc = "")
+						#set($strRstAcc = "")
+						#foreach($bucketMap in $_parameter.bucketList)
+						#set($paramDay = "$bucketMap.BUCKET_VAL")
+						#if($bucketMap.BUCKET_ID.indexOf("_PLAN") != -1)
+						 , SUM($bucketMap.CD) AS $bucketMap.CD 
+						 #set($strPlan = $strPlan + "," +$bucketMap.CD)
+						 #set($strPlanAcc = $strPlanAcc + "," +$bucketMap.CD_SUB)
+						#elseif($bucketMap.BUCKET_ID.indexOf("_RST") != -1)
+						 , SUM($bucketMap.CD) AS $bucketMap.CD 
+						 #set($strRst = $strRst + "," +$bucketMap.CD)
+						 #set($strRstAcc = $strRstAcc + "," +$bucketMap.CD_SUB)
+						#elseif($bucketMap.BUCKET_ID.indexOf("_OVER") != -1)
+						 , ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0) AS $bucketMap.CD
+						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_QTY") != -1)
+							#if($velocityCount == 4)
+							 , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
+							#else
+							 , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
+							#end
+						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_RATE") != -1)
+							#if($velocityCount == 5)
+							  , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
+							#else
+							  , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
+							#end
+							#set($strPlan = "")
+							#set($strRst = "")
+							#set($strPlanAcc = "")
+							#set($strRstAcc = "")
+						#end
+						#end
+						 , SUM(MGSOD.WEEK_PLAN_QTY) AS WEEK_PLAN_QTY
+						 , SUM(DPR.RST_QTY) AS WEEK_RST_QTY
+					     , ISNULL(SUM(DPR.RST_QTY), 0) - ISNULL(SUM(MGSOD.WEEK_PLAN_QTY), 0) AS WEEK_MOL_QTY
+					     , dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.WEEK_PLAN_QTY)) AS WEEK_COMP_QTY
+						 , ROUND(dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.WEEK_PLAN_QTY)) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) AS WEEK_COMP_RATE
+					     , ROUND(MAX(OSD.OVER_SHORT), 1) AS OVER_SHORT
+					     , MAX(RI.RECV_INSP_QTY) AS RECV_INSP_QTY 
+					     , MAX(CC.CC_QTY) AS CC_QTY 
+					     , MAX(RQN.RECV_QC_NG_QTY) AS RECV_QC_NG_QTY 
+					FROM TB_DYN_PUR_ORDER DPO WITH(NOLOCK)
+					INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+	    			   ON MI.COMPANY_CD = DPO.COMPANY_CD
+	   				  AND MI.BU_CD = DPO.BU_CD
+	   				  AND MI.ITEM_CD = DPO.ITEM_CD
+					INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+					   ON MIP.COMPANY_CD = MI.COMPANY_CD
+					  AND MIP.BU_CD = MI.BU_CD
+					  AND MIP.PLANT_CD = 'WF01'
+					  AND MIP.ITEM_CD = MI.ITEM_CD
+					INNER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		               ON MIG.COMPANY_CD = MI.COMPANY_CD
+		              AND MIG.BU_CD = MI.BU_CD
+		              AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+					LEFT OUTER JOIN TB_MST_BIZ_PARTNER MBP WITH(NOLOCK)
+	    			  ON MBP.COMPANY_CD = DPO.COMPANY_CD
+	   				 AND MBP.BU_CD = DPO.BU_CD
+	   				 AND MBP.BP_CD = DPO.BP_CD
+					LEFT OUTER JOIN 
+					(
+						SELECT MGSOD.COMPANY_CD
+	                         , MGSOD.BU_CD
+	                         , MGSOD.PO_NO
+	                         , MGSOD.PO_SEQ
+							#foreach($bucketMap in $_parameter.bucketList)
+							#set($paramDay = "$bucketMap.BUCKET_VAL")
+							#if($bucketMap.BUCKET_ID.indexOf("_PLAN") != -1)
+								#if($velocityCount == 1)
+								, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD
+								#else
+									#if($_parameter.bucketList.size() - 4 == $foreach.count)
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD_SUB
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV = '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD	
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<]]> @V_CUR_DATE AND MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS DAY_PLAN_QTY
+									#else
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD_SUB
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV = '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD	
+									#end
+								#end
+							#end
+							#end
+		                     , SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> CONVERT(NVARCHAR, DATEADD(DD, 6, @V_PLAN_START_DATE), 112) THEN MGSOD.SCHED_QTY END) AS WEEK_PLAN_QTY
+						FROM UV_MAT_GR_SCHED_DAILY MGSOD WITH(NOLOCK)
+		                WHERE MGSOD.COMPANY_CD = @{GV_COMPANY_CD}
+		                  AND MGSOD.BU_CD = @{GV_BU_CD}
+		                  AND MGSOD.YYYYMMDD = @V_PLAN_START_DATE
+						  AND MGSOD.MATERIAL_ARRIVAL_TYPE <![CDATA[<>]]> 'INSPECT'
+						GROUP BY MGSOD.COMPANY_CD, MGSOD.BU_CD, MGSOD.PO_NO, MGSOD.PO_SEQ
+					) MGSOD
+					ON MGSOD.COMPANY_CD = MI.COMPANY_CD
+					AND MGSOD.BU_CD = MI.BU_CD
+					AND MGSOD.PO_NO = DPO.PO_NO
+	   				AND MGSOD.PO_SEQ = DPO.PO_SEQ
+					LEFT OUTER JOIN 
+					(
+						SELECT DPR.COMPANY_CD
+	                         , DPR.BU_CD
+	                         , DPR.PO_NO
+	                         , DPR.PO_SEQ
+							#foreach($bucketMap in $_parameter.bucketList)
+							#set($paramDay = "$bucketMap.BUCKET_VAL")
+							#if($bucketMap.BUCKET_ID.indexOf("_RST") != -1)
+							 , SUM(CASE WHEN DPR.RECV_DATE = '$paramDay' THEN DPR.RECV_QTY END) AS $bucketMap.CD
+							 , SUM(CASE WHEN DPR.RECV_DATE <![CDATA[<=]]> '$paramDay' THEN DPR.RECV_QTY END) AS $bucketMap.CD_SUB
+							#end
+							#end
+		                     , SUM(CASE WHEN DPR.RECV_DATE BETWEEN @V_PLAN_START_DATE AND CONVERT(NVARCHAR, DATEADD(DD, 6, @V_PLAN_START_DATE), 112) THEN DPR.RECV_QTY END) AS RST_QTY
+						FROM TB_DYN_PUR_RECV DPR WITH(NOLOCK)
+	                    WHERE DPR.COMPANY_CD = @{GV_COMPANY_CD}
+	                      AND DPR.BU_CD = @{GV_BU_CD}
+	                      AND DPR.RECV_DATE <![CDATA[>=]]> @V_PLAN_START_DATE
+	                    GROUP BY DPR.COMPANY_CD, DPR.BU_CD, DPR.PO_NO, DPR.PO_SEQ     
+					) DPR
+					ON DPR.COMPANY_CD = DPO.COMPANY_CD
+	   				AND DPR.BU_CD = DPO.BU_CD
+	   				AND DPR.PO_NO = DPO.PO_NO
+	   				AND DPR.PO_SEQ = DPO.PO_SEQ
+					LEFT OUTER JOIN W_OVER_SHORT_DATA OSD
+					  ON OSD.COMPANY_CD = MI.COMPANY_CD
+					 AND OSD.BU_CD = MI.BU_CD
+					 AND OSD.ITEM_CD = MI.ITEM_CD
+					LEFT OUTER JOIN W_RECV_INSP RI
+					  ON RI.COMPANY_CD = MI.COMPANY_CD
+					 AND RI.BU_CD = MI.BU_CD
+					 AND RI.ITEM_CD = MI.ITEM_CD
+					LEFT OUTER JOIN W_CC CC 
+					  ON CC.COMPANY_CD = MI.COMPANY_CD
+					 AND CC.BU_CD = MI.BU_CD
+					 AND CC.ITEM_CD = MI.ITEM_CD
+					LEFT OUTER JOIN W_RECV_QC_NG RQN
+					  ON RQN.COMPANY_CD = MI.COMPANY_CD
+					 AND RQN.BU_CD = MI.BU_CD
+					 AND RQN.ITEM_CD = MI.ITEM_CD
+					WHERE DPO.COMPANY_CD = @{GV_COMPANY_CD}
+				      AND DPO.BU_CD = @{GV_BU_CD}
+				      AND DPO.DEL_FLAG = 'N'
+				    --  AND ((MI.ITEM_TYPE = '30' AND MIP.PROCUR_TYPE = 'OP') OR (MI.ITEM_TYPE = '20' AND MIP.PROCUR_TYPE = 'OH'))
+					#if($_parameter.silinder == "Y")
+					  AND MIG.OTD_YN = 'Y'
+					#end
+					#if($_parameter.item_cd and $_parameter.item_cd != "")
+		       		  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		  			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		       		  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		  			#end
+		  			#if($_parameter.procurType and $_parameter.procurType != "")
+		       		  AND MIP.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+		  			#end
+					#if($_parameter.itemType and $_parameter.itemType != "")
+		       		  AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+		  			#end
+					GROUP BY DPO.BP_CD, MBP.BP_NM, MI.ITEM_CD, MI.ITEM_NM, MI.SPEC, MIP.PROCUR_TYPE, MI.ITEM_TYPE, MI.KEY_MAT_YN, MI.MIN_PUR_LT, MIG.ITEM_GROUP_CD, MIG.ITEM_GROUP_NM
+					HAVING CASE WHEN ROUND(SUM(DPR.RST_QTY) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+                         WHEN ROUND(SUM(DPR.RST_QTY) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+                         ELSE 'NULL'
+                      END IN 
+                      #if($_parameter.weekPlanYn and $_parameter.dailyPlanYn != "")
+                      ('$_parameter.dailyPlanYn.replace(",","','")')
+                      #else
+                      ('Y','N','NULL')
+                      #end
+                    #if($_parameter.weekPlanYn and $_parameter.weekPlanYn != "")
+		  			  AND CASE WHEN ROUND(SUM(DPR.RST_QTY) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+                          WHEN ROUND(SUM(DPR.RST_QTY) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+                          ELSE 'NULL'
+                      END IN ('$_parameter.weekPlanYn.replace(",","','")')
+		  			#end
+				) A1
+				UNION ALL
+				SELECT NULL AS TMP_COL 
+					#foreach( $dimMap in $_parameter.dimList )
+					 , $dimMap.DIM_CD  
+				 	 , ${dimMap.DIM_CD}_NM
+					#end 
+					#foreach($bucketMap in $_parameter.bucketList)
+					 , $bucketMap.CD
+					#end
+				     , DAY_PLAN_QTY
+				     , RST_QTY
+				     , DAY_MOL_QTY
+				     , DAY_COMP_QTY
+				     , DAY_COMP_RATE
+				     , WEEK_PLAN_QTY
+				     , WEEK_RST_QTY
+				     , WEEK_MOL_QTY
+				     , WEEK_COMP_QTY
+				     , WEEK_COMP_RATE
+				     , OVER_SHORT
+				     , RECV_INSP_QTY
+				     , CC_QTY
+				     , RECV_QC_NG_QTY
+				     , DAY_YN
+				FROM
+				(
+					SELECT ISNULL(DPO.BP_CD, ' ') AS BP_CD2
+					     , ISNULL(DPO.BP_CD, ' ') AS BP_CD2_NM
+					     , ISNULL(MBP.BP_NM, ' ') AS BP_NM2
+					     , ISNULL(MBP.BP_NM, ' ') AS BP_NM2_NM
+						 , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD
+					     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD_NM
+					     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+					     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+					     , ISNULL(MI.SPEC, ' ') AS SPEC
+					     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+					     , ISNULL(MIP.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+					     , (
+				            SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+				                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+				                        ELSE CODE_NM
+				                   END AS CODE_NM
+				            FROM TB_MST_CODE WITH(NOLOCK)
+				            WHERE GROUP_CD = 'PROCUR_TYPE'
+				              AND USE_FLAG = 'Y'
+				              AND CODE_CD = MIP.PROCUR_TYPE
+				           ) AS PROCUR_TYPE_NM
+					     , ISNULL(MI.ITEM_TYPE, ' ') AS ITEM_TYPE_NM
+					     , (
+								SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+					                        WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+					                        ELSE CODE_NM
+					                    END AS CODE_NM
+								FROM TB_MST_CODE MC WITH(NOLOCK)
+					           WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+					             AND MC.GROUP_CD = 'ITEM_TYPE'
+					             AND MC.CODE_CD  = MI.ITEM_TYPE
+					             AND MC.USE_FLAG = 'Y'
+					         ) AS ITEM_TYPE_NM_NM
+					     , ISNULL(MI.KEY_MAT_YN, ' ') AS KEY_MAT_YN
+					     , ISNULL(MI.KEY_MAT_YN, ' ') AS KEY_MAT_YN_NM
+					     , ISNULL(MI.MIN_PUR_LT, ' ') AS MIN_PUR_LT2
+					     , ISNULL(MI.MIN_PUR_LT, ' ') AS MIN_PUR_LT2_NM
+					     , ISNULL(MIG.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+					     , ISNULL(MIG.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+					     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+					     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+						 , ISNULL(CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            					   WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	       						  END, ' ') AS WEEK_YN
+						 , ISNULL(CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            					   WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	       						   END, ' ') AS WEEK_YN_NM
+	       			     , CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            					   WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	            					   ELSE 'NULL'
+	       						   END AS WEEK_YN_FLAG
+						 , CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            				WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	       					END AS DAY_YN
+	       				 , CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+	            				WHEN ROUND(ISNULL(SUM(DPR.RST_QTY), 0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+	            				ELSE 'NULL'
+	       					END AS DAY_YN_FLAG
+						 , SUM(MGSOD.DAY_PLAN_QTY) AS DAY_PLAN_QTY
+	     				 , SUM(DPR.RST_QTY) AS RST_QTY
+						 , ISNULL(SUM(DPR.RST_QTY), 0) - ISNULL(SUM(MGSOD.DAY_PLAN_QTY), 0) AS DAY_MOL_QTY
+						 , dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.DAY_PLAN_QTY)) AS DAY_COMP_QTY
+						 , ROUND(dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.DAY_PLAN_QTY)) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) AS DAY_COMP_RATE
+						#set($strPlan = "")
+						#set($strRst = "")
+						#set($strPlanAcc = "")
+						#set($strRstAcc = "")
+						#foreach($bucketMap in $_parameter.bucketList)
+						#set($paramDay = "$bucketMap.BUCKET_VAL")
+						#if($bucketMap.BUCKET_ID.indexOf("_PLAN") != -1)
+						 , SUM($bucketMap.CD) AS $bucketMap.CD 
+						 #set($strPlan = $strPlan + "," +$bucketMap.CD)
+						 #set($strPlanAcc = $strPlanAcc + "," +$bucketMap.CD_SUB)
+						#elseif($bucketMap.BUCKET_ID.indexOf("_RST") != -1)
+						 , SUM($bucketMap.CD) AS $bucketMap.CD 
+						 #set($strRst = $strRst + "," +$bucketMap.CD)
+						 #set($strRstAcc = $strRstAcc + "," +$bucketMap.CD_SUB)
+						#elseif($bucketMap.BUCKET_ID.indexOf("_OVER") != -1)
+						 , ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0) AS $bucketMap.CD
+						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_QTY") != -1)
+							#if($velocityCount == 4)
+							 , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
+							#else
+							 , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
+							#end
+						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_RATE") != -1)
+							#if($velocityCount == 5)
+							  , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
+							#else
+							  , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
+							#end
+							#set($strPlan = "")
+							#set($strRst = "")
+							#set($strPlanAcc = "")
+							#set($strRstAcc = "")
+						#end
+						#end
+						 , SUM(MGSOD.WEEK_PLAN_QTY) AS WEEK_PLAN_QTY
+						 , SUM(DPR.RST_QTY) AS WEEK_RST_QTY
+					     , ISNULL(SUM(DPR.RST_QTY), 0) - ISNULL(SUM(MGSOD.WEEK_PLAN_QTY), 0) AS WEEK_MOL_QTY
+					     , dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.WEEK_PLAN_QTY)) AS WEEK_COMP_QTY
+						 , ROUND(dbo.UFN_LEAST(SUM(DPR.RST_QTY), SUM(MGSOD.WEEK_PLAN_QTY)) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) AS WEEK_COMP_RATE
+					     , ROUND(MAX(OSD.OVER_SHORT), 1) AS OVER_SHORT
+					     , MAX(RI.RECV_INSP_QTY) AS RECV_INSP_QTY 
+					     , MAX(CC.CC_QTY) AS CC_QTY 
+					     , MAX(RQN.RECV_QC_NG_QTY) AS RECV_QC_NG_QTY 
+					FROM TB_DYN_PUR_ORDER DPO WITH(NOLOCK)
+					INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+	    			   ON MI.COMPANY_CD = DPO.COMPANY_CD
+	   				  AND MI.BU_CD = DPO.BU_CD
+	   				  AND MI.ITEM_CD = DPO.ITEM_CD
+					INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+					   ON MIP.COMPANY_CD = MI.COMPANY_CD
+					  AND MIP.BU_CD = MI.BU_CD
+					  AND MIP.PLANT_CD = 'WF01'
+					  AND MIP.ITEM_CD = MI.ITEM_CD
+					INNER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		               ON MIG.COMPANY_CD = MI.COMPANY_CD
+		              AND MIG.BU_CD = MI.BU_CD
+		              AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+					LEFT OUTER JOIN TB_MST_BIZ_PARTNER MBP WITH(NOLOCK)
+	    			  ON MBP.COMPANY_CD = DPO.COMPANY_CD
+	   				 AND MBP.BU_CD = DPO.BU_CD
+	   				 AND MBP.BP_CD = DPO.BP_CD
+					LEFT OUTER JOIN 
+					(
+						SELECT MGSOD.COMPANY_CD
+	                         , MGSOD.BU_CD
+	                         , MGSOD.PO_NO
+	                         , MGSOD.PO_SEQ
+							#foreach($bucketMap in $_parameter.bucketList)
+							#set($paramDay = "$bucketMap.BUCKET_VAL")
+							#if($bucketMap.BUCKET_ID.indexOf("_PLAN") != -1)
+								#if($velocityCount == 1)
+								, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD
+								#else
+									#if($_parameter.bucketList.size() - 4 == $foreach.count)
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD_SUB
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV = '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD	
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<]]> @V_CUR_DATE AND MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS DAY_PLAN_QTY
+									#else
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD_SUB
+									, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV = '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD	
+									#end
+								#end
+							#end
+							#end
+		                     , SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> CONVERT(NVARCHAR, DATEADD(DD, 6, @V_PLAN_START_DATE), 112) THEN MGSOD.SCHED_QTY END) AS WEEK_PLAN_QTY
+						FROM UV_MAT_GR_SCHED_DAILY MGSOD WITH(NOLOCK)
+		                WHERE MGSOD.COMPANY_CD = @{GV_COMPANY_CD}
+		                  AND MGSOD.BU_CD = @{GV_BU_CD}
+		                  AND MGSOD.YYYYMMDD = @V_PLAN_START_DATE
+						  AND MGSOD.MATERIAL_ARRIVAL_TYPE <![CDATA[<>]]> 'INSPECT'
+						GROUP BY MGSOD.COMPANY_CD, MGSOD.BU_CD, MGSOD.PO_NO, MGSOD.PO_SEQ
+					) MGSOD
+					ON MGSOD.COMPANY_CD = MI.COMPANY_CD
+					AND MGSOD.BU_CD = MI.BU_CD
+					AND MGSOD.PO_NO = DPO.PO_NO
+	   				AND MGSOD.PO_SEQ = DPO.PO_SEQ
+					LEFT OUTER JOIN 
+					(
+						SELECT DPR.COMPANY_CD
+	                         , DPR.BU_CD
+	                         , DPR.PO_NO
+	                         , DPR.PO_SEQ
+							#foreach($bucketMap in $_parameter.bucketList)
+							#set($paramDay = "$bucketMap.BUCKET_VAL")
+							#if($bucketMap.BUCKET_ID.indexOf("_RST") != -1)
+							 , SUM(CASE WHEN DPR.RECV_DATE = '$paramDay' THEN DPR.RECV_QTY END) AS $bucketMap.CD
+							 , SUM(CASE WHEN DPR.RECV_DATE <![CDATA[<=]]> '$paramDay' THEN DPR.RECV_QTY END) AS $bucketMap.CD_SUB
+							#end
+							#end
+		                     , SUM(CASE WHEN DPR.RECV_DATE BETWEEN @V_PLAN_START_DATE AND CONVERT(NVARCHAR, DATEADD(DD, 6, @V_PLAN_START_DATE), 112) THEN DPR.RECV_QTY END) AS RST_QTY
+						FROM TB_DYN_PUR_RECV DPR WITH(NOLOCK)
+	                    WHERE DPR.COMPANY_CD = @{GV_COMPANY_CD}
+	                      AND DPR.BU_CD = @{GV_BU_CD}
+	                      AND DPR.RECV_DATE <![CDATA[>=]]> @V_PLAN_START_DATE
+	                    GROUP BY DPR.COMPANY_CD, DPR.BU_CD, DPR.PO_NO, DPR.PO_SEQ     
+					) DPR
+					ON DPR.COMPANY_CD = DPO.COMPANY_CD
+	   				AND DPR.BU_CD = DPO.BU_CD
+	   				AND DPR.PO_NO = DPO.PO_NO
+	   				AND DPR.PO_SEQ = DPO.PO_SEQ
+					LEFT OUTER JOIN W_OVER_SHORT_DATA OSD
+					  ON OSD.COMPANY_CD = MI.COMPANY_CD
+					 AND OSD.BU_CD = MI.BU_CD
+					 AND OSD.ITEM_CD = MI.ITEM_CD
+					LEFT OUTER JOIN W_RECV_INSP RI
+					  ON RI.COMPANY_CD = MI.COMPANY_CD
+					 AND RI.BU_CD = MI.BU_CD
+					 AND RI.ITEM_CD = MI.ITEM_CD
+					LEFT OUTER JOIN W_CC CC 
+					  ON CC.COMPANY_CD = MI.COMPANY_CD
+					 AND CC.BU_CD = MI.BU_CD
+					 AND CC.ITEM_CD = MI.ITEM_CD
+					LEFT OUTER JOIN W_RECV_QC_NG RQN
+					  ON RQN.COMPANY_CD = MI.COMPANY_CD
+					 AND RQN.BU_CD = MI.BU_CD
+					 AND RQN.ITEM_CD = MI.ITEM_CD
+					WHERE DPO.COMPANY_CD = @{GV_COMPANY_CD}
+				      AND DPO.BU_CD = @{GV_BU_CD}
+				      AND DPO.DEL_FLAG = 'N'
+				     -- 20220819 김수호 수정: ITSM 752, 협력사 납기/입고준수율 관련 조달구분 추가 FROM 김지혜
+				    AND ((MI.ITEM_TYPE = '30' AND MIP.PROCUR_TYPE = 'OP') OR (MI.ITEM_TYPE = '20' AND MIP.PROCUR_TYPE = 'OH') OR (MIP.PROCUR_TYPE = 'MM'))
+					#if($_parameter.silinder == "Y")
+					  AND MIG.OTD_YN = 'Y'
+					#end
+					#if($_parameter.item_cd and $_parameter.item_cd != "")
+		       		  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		  			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		       		  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		  			#end
+		  			#if($_parameter.procurType and $_parameter.procurType != "")
+		       		  AND MIP.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+		  			#end
+					#if($_parameter.itemType and $_parameter.itemType != "")
+		       		  AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+		  			#end
+					GROUP BY DPO.BP_CD, MBP.BP_NM, MI.ITEM_CD, MI.ITEM_NM, MI.SPEC, MIP.PROCUR_TYPE, MI.ITEM_TYPE, MI.KEY_MAT_YN, MI.MIN_PUR_LT, MIG.ITEM_GROUP_CD, MIG.ITEM_GROUP_NM
+					
+					HAVING CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY),0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+                         WHEN ROUND(ISNULL(SUM(DPR.RST_QTY),0) / NULLIF(SUM(MGSOD.DAY_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+                         ELSE 'NULL'
+                      END IN 
+                      #if($_parameter.weekPlanYn and $_parameter.dailyPlanYn != "")
+                      ('$_parameter.dailyPlanYn.replace(",","','")')
+                      #else
+                      ('Y','N','NULL')
+                      #end
+					#if($_parameter.weekPlanYn and $_parameter.weekPlanYn != "")
+		  			  AND CASE WHEN ROUND(ISNULL(SUM(DPR.RST_QTY),0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[>=]]> 100 THEN 'Y'
+                          WHEN ROUND(ISNULL(SUM(DPR.RST_QTY),0) / NULLIF(SUM(MGSOD.WEEK_PLAN_QTY), 0) * 100, 0) <![CDATA[<]]> 100 THEN 'N'
+                          ELSE 'NULL'
+                      END IN ('$_parameter.weekPlanYn.replace(",","','")')
+		  			#end
+				) A1
+			) B1
+			ORDER BY TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+			 , B1.$dimMap.DIM_CD 
+			#end
+		END;
+	</select>
+	  
+	<select id="partnerDeliveryRateDetailListSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.partnerDeliveryRateDetailListSelect ] ******/
+		BEGIN
+			DECLARE @V_PLAN_START_DATE NVARCHAR(8)
+			      , @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+			
+			SELECT TOP 1 @V_PLAN_START_DATE = YYYYMMDD
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YEARWEEK <![CDATA[<]]> @{yearWeek}
+			  AND DAY_NM = 'THU'
+			ORDER BY YYYYMMDD DESC;
+			
+			SELECT MGSC.ITEM_CD
+			     , MBP.BP_NM
+			     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' THEN MC.CODE_NM_KR
+						WHEN UPPER(@{GV_LANG}) = 'CN' THEN MC.CODE_NM_CN
+						ELSE MC.CODE_NM
+					END CODE_NM
+			     , MGSC.PO_NO
+			     , MGSC.PO_SEQ
+			     , CONVERT(VARCHAR, CONVERT(DATETIME, MGSC.ORG_DATE), 23) AS ORG_DATE
+     			 , CONVERT(VARCHAR, CONVERT(DATETIME, MGSC.SCHED_DATE_PRE_RECV), 23) AS SCHED_DATE_PRE_RECV
+			     , MGSC.SCHED_QTY
+			     , CASE WHEN DG.RECV_QTY <![CDATA[>=]]> SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) THEN MGSC.SCHED_QTY
+			            WHEN DG.RECV_QTY <![CDATA[>]]> SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) - MGSC.SCHED_QTY
+			             AND DG.RECV_QTY <![CDATA[<]]> SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) THEN DG.RECV_QTY - (SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) - MGSC.SCHED_QTY)
+			       END AS RECV_QTY
+			     , CASE WHEN DG.RECV_QTY <![CDATA[>=]]> SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) THEN MGSC.SCHED_QTY
+			            WHEN DG.RECV_QTY <![CDATA[>]]> SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) - MGSC.SCHED_QTY
+			             AND DG.RECV_QTY <![CDATA[<]]> SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) THEN DG.RECV_QTY - (SUM(MGSC.SCHED_QTY) OVER(PARTITION BY MGSC.PO_NO, MGSC.PO_SEQ ORDER BY MGSC.SCHED_DATE_PRE_RECV) - MGSC.SCHED_QTY)
+			       END - MGSC.SCHED_QTY AS MOL_QTY
+			FROM UV_MAT_GR_SCHED_DAILY MGSC WITH(NOLOCK)
+			INNER JOIN TB_DYN_PUR_ORDER DPO WITH(NOLOCK)
+			   ON DPO.COMPANY_CD = MGSC.COMPANY_CD
+			  AND DPO.BU_CD = MGSC.BU_CD
+			  AND DPO.PO_NO = MGSC.PO_NO
+			  AND DPO.PO_SEQ = MGSC.PO_SEQ
+			LEFT OUTER JOIN TB_MST_BIZ_PARTNER MBP WITH(NOLOCK)
+			  ON MBP.COMPANY_CD = DPO.COMPANY_CD
+			 AND MBP.BU_CD = DPO.BU_CD
+			 AND MBP.BP_CD = DPO.BP_CD
+			INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+			   ON MC.BU_CD = MGSC.BU_CD
+			  AND MC.GROUP_CD = 'MATERIAL_ARRIVAL_TYPE'
+			  AND MC.CODE_CD = MGSC.MATERIAL_ARRIVAL_TYPE
+			LEFT OUTER JOIN 
+			(
+				SELECT DG.COMPANY_CD
+                     , DG.BU_CD
+                     , DG.PO_NO
+                     , DG.PO_SEQ
+                     , SUM(DG.RECV_QTY) AS RECV_QTY
+				FROM TB_DYN_PUR_RECV DG WITH(NOLOCK)
+                WHERE DG.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DG.BU_CD = @{GV_BU_CD}
+                  AND DG.RECV_DATE <![CDATA[>=]]> @V_PLAN_START_DATE
+                GROUP BY DG.COMPANY_CD, DG.BU_CD, DG.PO_NO, DG.PO_SEQ
+			) DG
+			ON DG.COMPANY_CD = MGSC.COMPANY_CD
+			AND DG.BU_CD = MGSC.BU_CD
+			AND DG.PO_NO = MGSC.PO_NO
+			AND DG.PO_SEQ = MGSC.PO_SEQ
+			WHERE MGSC.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MGSC.BU_CD = @{GV_BU_CD}
+			  AND MGSC.YYYYMMDD = @V_PLAN_START_DATE
+			  AND MGSC.ITEM_CD = @{itemCd}
+			  AND MGSC.MATERIAL_ARRIVAL_TYPE <![CDATA[<>]]> 'INSPECT'
+			  AND MBP.BP_CD = @{bpCd}
+			ORDER BY MGSC.PO_NO, MGSC.PO_SEQ, MGSC.SCHED_DATE_PRE_RECV
+			
+		END;
+	</select>
+	
+</mapper>

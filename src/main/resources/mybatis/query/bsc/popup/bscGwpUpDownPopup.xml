@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="bsc.popup">
+
+	<select id="codeSelect" parameterType="map" resultType="map">
+		/****** [ bsc.popup.codeSelect ] ******/
+		SELECT CODE_CD AS CD
+		     , CODE_NM AS NM
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE GROUP_CD = 'KPI_ID'
+		  AND USE_FLAG = 'Y'
+		  AND ATTB_1_CD = 'GWP'
+	</select>
+	
+	<select id="gwpFileNoSelect" parameterType="map" resultType="string">
+		/****** [ bsc.popup.gwpFileNoSelect ] ******/
+		SELECT MAX(FILE_NO) AS FILE_NO
+		FROM TB_KPI_BSC_FILE WITH(NOLOCK)
+	</select>
+	
+	<select id="gwpFileListSelect" parameterType="map" resultType="map">
+		/****** [ bsc.popup.gwpFileListSelect ] ******/
+		SELECT A1.COMPANY_CD
+		     , A1.BU_CD
+		     , A1.KPI_ID
+		     , A2.FILE_NO
+			 , A2.FILE_SEQ
+			 , A2.FILE_NM
+			 , A2.FILE_NM_ORG
+			 , A2.FILE_SIZE
+			 , A2.FILE_PATH
+			 , A2.EXTENSION
+		     , CONVERT(NVARCHAR, A2.CREATE_DTTM, 120) AS CREATE_DTTM
+		FROM TB_KPI_BSC_FILE A1 WITH(NOLOCK)
+		INNER JOIN TB_COMM_FILE A2 WITH(NOLOCK)
+		   ON A1.FILE_NO = A2.FILE_NO
+		  AND A1.FILE_SEQ = A2.FILE_SEQ
+		  AND A2.DEL_FLAG = 'N'
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+       	  AND A1.BU_CD = @{GV_BU_CD}
+       	#if($_parameter.kpiIdCode and $_parameter.kpiIdCode != "")
+		  AND A1.KPI_ID IN ('$_parameter.kpiIdCode.replace(",","','")')
+		#end
+       	  AND CONVERT(NVARCHAR, A2.CREATE_DTTM, 112) BETWEEN @{fromDate} AND @{toDate}
+	</select>
+	
+	
+</mapper>

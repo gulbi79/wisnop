@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.portal">
+	<select id="MonthSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.portal.MonthSelect ] ******/
+		BEGIN
+			DECLARE @P_FROM_MONTH NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -5, DBO.UFN_GETDATE()), 112));
+			DECLARE @P_TO_MONTH   NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112));
+			
+			SELECT 'M' + RIGHT (A.YEARMONTH, 2) DISMONTH
+			     , A.YEARMONTH
+			     , (SELECT 'M' + RIGHT (YEARMONTH, 2) FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -1, CAST (MAX(A.YYYYMMDD) AS DATE)), 112) ) AS PRE_DISMONTH
+				 , (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -1, CAST (MAX(A.YYYYMMDD) AS DATE)), 112) ) AS PRE_YEARMONTH
+			FROM TB_MST_CALENDAR A WITH(NOLOCK)
+			WHERE A.YEARMONTH BETWEEN @P_FROM_MONTH AND @P_TO_MONTH
+			GROUP BY A.YEARMONTH;
+		END;
+	</select>
+	
+	<select id="itemInvListSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.portal.itemInvListSelect ] ******/
+		/*제품 재고 현황 */
+		BEGIN
+			DECLARE @P_FROM_MONTH NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -5, DBO.UFN_GETDATE()), 112));
+			DECLARE @P_TO_MONTH   NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112));
+		
+			SELECT M.DASHBOARD_ID
+			     , M.TREND_MONTH
+			     , M.COMPANY_CD
+			     , M.BU_CD
+     			 , ROUND(SUM(M.RESULT_VALUE) / @{unitQuery}, 1) AS RESULT_VALUE
+			FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	        WHERE M.COMPANY_CD   = 'KO316'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND M.BU_CD = 'QT'
+			#else
+		      AND M.BU_CD = @{GV_BU_CD}
+			#end
+	          AND M.DASHBOARD_ID = 'DB_TREND26'
+	       	#if($_parameter.companyCons == "companyCons")
+	       	  AND M.MEAS_CD = 'INV_AMT_PRICE_CONS'
+	       	#else
+	       	  AND M.MEAS_CD = 'INV_AMT_PRICE'
+	       	#end   
+	          AND M.TREND_MONTH BETWEEN @P_FROM_MONTH AND @P_TO_MONTH
+			GROUP BY M.DASHBOARD_ID, M.TREND_MONTH, M.COMPANY_CD, M.BU_CD
+	          
+		END;
+	</select>
+	
+	
+	<select id="weekMaterialsAvailSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.portal.weekMaterialsAvailSelect ] ******/
+		/* 주간 자재 가용률 */
+		BEGIN
+			SELECT MEAS_CD
+		     , ISNULL(CHART_1, 0)  AS CHART_1
+		     , ISNULL(CHART_2, 0)  AS CHART_2
+		     , ISNULL(CHART_3, 0)  AS CHART_3
+		     , ISNULL(CHART_4, 0)  AS CHART_4
+		     , ISNULL(CHART_5, 0)  AS CHART_5
+		     , ISNULL(CHART_6, 0)  AS CHART_6
+		     , ISNULL(CHART_T, 0)  AS CHART_T        
+		     , ISNULL(CHART_TT, 0) AS CHART_TT
+		     , ISNULL(CHART_C, '') AS CHART_C      
+		FROM 
+		(
+			
+			SELECT 'MAT_PREP_RATE'        AS MEAS_CD
+      		 , KDMAD.TARGET_VALUE   AS CHART_1                   
+			 , KDMAD.LAST_WEEK_AVAIL_RATE  AS CHART_2         
+			 , NULL AS CHART_3
+			 , NULL AS CHART_4
+			 , NULL AS CHART_5
+			 , NULL AS CHART_6
+			 , ISNULL(KDMAD.LAST_WEEK_AVAIL_RATE,0) - ISNULL(KDMAD.BEF_LAST_WEEK_AVAIL_RATE,0) AS CHART_T
+			 , NULL	AS CHART_TT
+			 , CASE WHEN KDMAD.LAST_WEEK_AVAIL_RATE <![CDATA[>=]]> KDMAD.BEF_LAST_WEEK_AVAIL_RATE THEN 'green_f'
+					ELSE 'red_f'
+					END AS CHART_C
+      
+			FROM TB_KPI_DASHBOARD_MAT_AVAIL_DET KDMAD WITH(NOLOCK)
+			LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			  ON MC1.BU_CD = 'ALL'
+			 AND MC1.GROUP_CD = 'ITEM_TYPE'
+			 AND MC1.CODE_CD = KDMAD.MEAS_CD
+			 AND MC1.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			  ON MC2.BU_CD = 'ALL'
+			 AND MC2.GROUP_CD = 'PROCUR_TYPE'
+			 AND MC2.CODE_CD = KDMAD.MEAS_CD
+			 AND MC2.USE_FLAG = 'Y'
+			WHERE KDMAD.COMPANY_CD = 'KO316'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND KDMAD.BU_CD = 'QT'
+			#else
+		      AND KDMAD.BU_CD = @{GV_BU_CD}
+			#end
+			#if($_parameter.weekMaterialsAvail == "rawMaterials")
+				AND KDMAD.MEAS_CD = '30'
+			#else
+				AND KDMAD.MEAS_CD = 'OH'
+			#end
+			
+			
+		) A
+		END;
+	</select>
+	
+	
+	
+	
+	<select id="matInvListSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.portal.matInvListSelect ] ******/
+		/*자재 재고 */
+		BEGIN
+			DECLARE @P_FROM_MONTH NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -5, DBO.UFN_GETDATE()), 112));
+			DECLARE @P_TO_MONTH   NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112));
+		
+			SELECT M.DASHBOARD_ID
+			     , M.TREND_MONTH
+			     , M.COMPANY_CD
+			     , M.BU_CD
+     			 , ROUND(SUM(M.RESULT_VALUE) / @{unitQuery}, 1) AS RESULT_VALUE
+			FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	        WHERE M.COMPANY_CD   = 'KO316'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND M.BU_CD = 'QT'
+			#else
+		      AND M.BU_CD = @{GV_BU_CD}
+			#end
+	          AND M.DASHBOARD_ID = 'DB_TREND25'
+	          AND ITEM_TYPE IN ('20', '30')
+	          AND M.MEAS_CD = 'PRICE'
+	          AND M.TREND_MONTH BETWEEN @P_FROM_MONTH AND @P_TO_MONTH
+			GROUP BY M.DASHBOARD_ID, M.TREND_MONTH, M.COMPANY_CD, M.BU_CD
+		END;
+	</select>
+
+	<select id="mainSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.portal.mainSelect ] ******/
+		SELECT MEAS_CD
+		     , ISNULL(CHART_1, 0)  AS CHART_1
+		     , ISNULL(CHART_2, 0)  AS CHART_2
+		     , ISNULL(CHART_3, 0)  AS CHART_3
+		     , ISNULL(CHART_4, 0)  AS CHART_4
+		     , ISNULL(CHART_5, 0)  AS CHART_5
+		     , ISNULL(CHART_6, 0)  AS CHART_6
+		     , ISNULL(CHART_T, 0)  AS CHART_T        
+		     , ISNULL(CHART_TT, 0) AS CHART_TT
+		     , ISNULL(CHART_C, '') AS CHART_C      
+		FROM 
+		(
+			/* BSC 종합 */
+		    SELECT 'BSC'              AS MEAS_CD
+		         , A.LAST_MONTH_SCORE AS CHART_1
+		         , A.CUR_MONTH_SCORE  AS CHART_2
+		         , NULL               AS CHART_3
+		         , NULL               AS CHART_4
+		         , NULL               AS CHART_5
+		         , NULL               AS CHART_6
+		         , A.CUR_YEAR_SCORE   AS CHART_T
+		         , NULL               AS CHART_TT
+		         , B.ATTB_3_NM        AS CHART_C
+		    FROM TB_KPI_DASHBOARD_BSC A WITH(NOLOCK)
+		    LEFT JOIN 
+		    (
+		        SELECT ATTB_3_CD
+		             , MAX(ATTB_3_NM) AS ATTB_3_NM
+		             , MIN(CONVERT(INT, ATTB_1_CD)) AS ATTB_1_CD
+		             , MAX(CONVERT(INT, ATTB_2_CD)) AS ATTB_2_CD
+		        FROM TB_MST_CODE WITH(NOLOCK) 
+		        WHERE BU_CD    = 'ALL' 
+		          AND GROUP_CD = 'BSC_GRADE_CD'
+		        GROUP BY ATTB_3_CD
+		    ) B
+		    ON B.ATTB_1_CD <![CDATA[<=]]> ISNULL(A.CUR_YEAR_SCORE,0)
+		    AND B.ATTB_2_CD <![CDATA[>]]> ISNULL(A.CUR_YEAR_SCORE,0)
+		    WHERE A.COMPANY_CD = 'KO316'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND A.BU_CD = 'ALL'
+			#else
+		      AND A.BU_CD = @{GV_BU_CD}
+			#end
+		    /* 출하 예상(당월, 억) */
+		    UNION ALL
+		    SELECT 'ACTION_PLAN'          AS MEAS_CD
+		    	 , SUM(A.PLAN_AMT2)       AS CHART_1
+		         , SUM(A.PLAN_AMT3)       AS CHART_2
+		         , SUM(A.RESULT_AMT1)     AS CHART_3
+		         , SUM(A.RESULT_AMT2)     AS CHART_4
+		         , SUM(A.EXP_RESULT_AMT1) AS CHART_5
+		         , SUM(A.EXP_RESULT_AMT2) AS CHART_6
+		         , SUM(A.RESULT_AMT1 + A.RESULT_AMT2 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) / NULLIF(SUM(A.PLAN_AMT2 + A.PLAN_AMT3), 0) * 100  AS CHART_T
+		         , NULL               AS CHART_TT
+		         , CASE WHEN SUM(A.RESULT_AMT1 + A.RESULT_AMT2 + A.EXP_RESULT_AMT1 + A.EXP_RESULT_AMT2) >= SUM(A.PLAN_AMT2 + A.PLAN_AMT3) THEN 'green_f'
+		                ELSE 'red_f' 
+		           END AS CHART_C
+		         <!-- , SUM(A.PLAN_AMT1)       AS CHART_1
+		         , SUM(A.RESULT_AMT1)     AS CHART_2
+		         , SUM(A.EXP_RESULT_AMT1) AS CHART_3
+		         , NULL                   AS CHART_4
+		         , NULL                   AS CHART_5
+		         , NULL                   AS CHART_6
+		         , SUM(A.RESULT_AMT1 + A.EXP_RESULT_AMT1) / NULLIF(SUM(A.PLAN_AMT1), 0) * 100  AS CHART_T
+		         , NULL               AS CHART_TT
+		         , CASE WHEN SUM(A.RESULT_AMT1 + A.EXP_RESULT_AMT1) >= SUM(A.PLAN_AMT1) THEN 'green_f'
+		                ELSE 'red_f' 
+		           END AS CHART_C -->
+		    FROM TB_KPI_DASHBOARD_SALES A WITH(NOLOCK)
+		    WHERE A.COMPANY_CD = 'KO316'
+		      AND A.MEAS_CD    = 'ACTION_PLAN'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND A.BU_CD = 'QT'
+			#else
+		      AND A.BU_CD = @{GV_BU_CD}
+			#end
+		    /* 주간 생산계획 준수율 */
+		    UNION ALL
+		    SELECT 'PROD_COMP'  AS MEAS_CD
+		         , A.PLAN_AMT   AS CHART_1
+		         , A.RESULT_AMT AS CHART_2
+		         , NULL         AS CHART_3
+		         , NULL         AS CHART_4
+		         , NULL         AS CHART_5
+		         , NULL         AS CHART_6
+		         , A.COMP_RATE  AS CHART_T
+		         , A.WORKING_DAY_RATE AS CHART_TT
+		         , CASE WHEN A.COMP_RATE >= A.WORKING_DAY_RATE THEN 'green_f'
+		                ELSE 'red_f'
+		           END AS CHART_C
+		    FROM TB_KPI_DASHBOARD_PROD_COMP A WITH(NOLOCK) 
+		    WHERE A.COMPANY_CD = 'KO316'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND A.BU_CD = 'QT'
+			#else
+		      AND A.BU_CD = @{GV_BU_CD}
+			#end
+		    /* 주간 출하계획 준수율 */
+		    UNION ALL
+		    SELECT 'SALES_COMP'       AS MEAS_CD
+		         , A.PLAN_AMT         AS CHART_1
+		         , A.RESULT_AMT       AS CHART_2
+		         , A.CPFR_PLAN_AMT    AS CHART_3
+		         , A.CPFR_RESULT_AMT  AS CHART_4
+		         , NULL               AS CHART_5
+		         , NULL               AS CHART_6
+		         , A.COMP_RATE        AS CHART_T
+		         , A.WORKING_DAY_RATE AS CHART_TT
+		         , CASE WHEN A.COMP_RATE >= A.WORKING_DAY_RATE THEN 'green_f'
+		                ELSE 'red_f'
+		           END AS CHART_C
+		    FROM TB_KPI_DASHBOARD_SALES_COMP A WITH(NOLOCK) 
+		    WHERE A.COMPANY_CD = 'KO316'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND A.BU_CD = 'QT'
+			#else
+		      AND A.BU_CD = @{GV_BU_CD}
+			#end
+		    /* 주간 자재 가용률 */
+		    UNION ALL
+		 	
+			SELECT 'MAT_PREP_RATE'        AS MEAS_CD
+      		 , KDMAD.TARGET_VALUE   AS CHART_1                   
+			 , KDMAD.LAST_WEEK_AVAIL_RATE  AS CHART_2         
+			 , NULL AS CHART_3
+			 , NULL AS CHART_4
+			 , NULL AS CHART_5
+			 , NULL AS CHART_6
+			 , ISNULL(KDMAD.LAST_WEEK_AVAIL_RATE,0) - ISNULL(KDMAD.BEF_LAST_WEEK_AVAIL_RATE,0) AS CHART_T
+			 , NULL	AS CHART_TT
+			 , CASE WHEN KDMAD.LAST_WEEK_AVAIL_RATE <![CDATA[>=]]> KDMAD.BEF_LAST_WEEK_AVAIL_RATE THEN 'green_f'
+					ELSE 'red_f'
+					END AS CHART_C
+      
+			FROM TB_KPI_DASHBOARD_MAT_AVAIL_DET KDMAD WITH(NOLOCK)
+			LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			  ON MC1.BU_CD = 'ALL'
+			 AND MC1.GROUP_CD = 'ITEM_TYPE'
+			 AND MC1.CODE_CD = KDMAD.MEAS_CD
+			 AND MC1.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			  ON MC2.BU_CD = 'ALL'
+			 AND MC2.GROUP_CD = 'PROCUR_TYPE'
+			 AND MC2.CODE_CD = KDMAD.MEAS_CD
+			 AND MC2.USE_FLAG = 'Y'
+			WHERE KDMAD.COMPANY_CD = 'KO316'
+			#if($_parameter.PORTAL_YN == "Y")
+		      AND KDMAD.BU_CD = 'QT'
+			#else
+		      AND KDMAD.BU_CD = @{GV_BU_CD}
+			#end
+			#if($_parameter.weekMaterialsAvail == "rawMaterials")
+				AND KDMAD.MEAS_CD = '30'
+			#else
+				AND KDMAD.MEAS_CD = 'OH'
+			#end
+			
+			
+		) A
+	</select>
+
+	<!-- 경영실적 -->
+	<select id="bizSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.portal.bizSelect ] ******/
+		/* 경영실적 */
+		SELECT A.MEAS_CD
+		     , CASE WHEN A.MEAS_CD = 'OP_AMT'    THEN dbo.UFN_GET_TRANSLATE('lbl','operationProfit',@{GV_LANG})
+		            WHEN A.MEAS_CD = 'SALES_AMT' THEN dbo.UFN_GET_TRANSLATE('lbl','salesAmount',@{GV_LANG})
+		       END AS MEAS_NM
+		     , SUM(A.RESULT_AMT_Y)                                      AS RESULT_AMT_Y
+		     , SUM(A.RESULT_AMT_M)                                      AS RESULT_AMT_M
+		     , SUM(A.RESULT_AMT_Y) / NULLIF(SUM(A.PLAN_AMT_Y),0) * 100  AS AMT_Y_RATE
+		     , SUM(A.RESULT_AMT_M) / NULLIF(SUM(A.PLAN_AMT_M),0) * 100  AS AMT_M_RATE
+		     , CASE WHEN 1 > SUM(A.RESULT_AMT_Y) / NULLIF(SUM(A.PLAN_AMT_Y),0) THEN 'red_f'
+	                ELSE 'green_f'
+	           END AS Y_RATE_CLS
+	         , CASE WHEN AVG(WORKING_DAY_RATE) > SUM(A.RESULT_AMT_M) / NULLIF(SUM(A.PLAN_AMT_M),0) * 100 THEN 'red_f'
+	                ELSE 'green_f'
+	           END AS M_RATE_CLS
+		FROM TB_KPI_DASHBOARD_BIZ A WITH(NOLOCK)
+		WHERE A.COMPANY_CD = 'KO316'
+		#if($_parameter.PORTAL_YN == "Y")
+		  AND A.BU_CD      = 'ALL'
+		#else
+		  AND A.BU_CD      = @{GV_BU_CD}
+		#end
+		GROUP BY A.MEAS_CD
+		ORDER BY A.MEAS_CD DESC
+	</select>
+	
+	<!-- 불량율 현황 -->
+	<select id="defRateSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.portal.defRateSelect ] ******/
+		/* 불량율 현황 */
+		SELECT ISNULL(B1.TEAM_CD, '') AS TEAM_CD
+		     , ISNULL(MAX(B1.TEAM_NM), '') AS TEAM_NM
+		     , ISNULL(SUM(B1.DEFECT_QTY) / NULLIF(SUM(B1.LOT_SIZE),0) * 100,0)  AS DEF_RATE
+		     , SUM(B1.TARGET_DEF_RATE) AS TARGET_DEF_RATE
+		     , (1 - (SUM(B1.DEFECT_QTY_ALL) / NULLIF(SUM(B1.LOT_SIZE_ALL),0) * 100 - MAX(B1.ATTB_1_CD)) / MAX(B1.ATTB_1_CD)) * 100 AS ATTAIN_RATE
+		     , CASE WHEN (1 - (SUM(B1.DEFECT_QTY_ALL) / NULLIF(SUM(B1.LOT_SIZE_ALL), 0) * 100 - MAX(B1.ATTB_1_CD)) / MAX(B1.ATTB_1_CD)) * 100 <![CDATA[>=]]> 100 THEN 'green_f'
+		            ELSE 'red_f'
+		       END AS CHART_C
+		     , MAX(MAX_DATA) * 1.1 AS MAX_DATA 
+		FROM
+		(
+			SELECT A2.CODE_CD AS TEAM_CD
+			     , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND A2.CODE_NM_KR != '' THEN ISNULL(A2.CODE_NM_KR, A2.CODE_NM)
+		                WHEN UPPER(@{GV_LANG}) = 'CN' AND A2.CODE_NM_CN != '' THEN ISNULL(A2.CODE_NM_CN, A2.CODE_NM)
+		                ELSE A2.CODE_NM
+		           END AS TEAM_NM
+			     , A1.DEFECT_QTY
+				 , A1.LOT_SIZE
+				 , CAST(A2.ATTB_1_CD AS FLOAT) AS TARGET_DEF_RATE
+			     , A3.ATTB_1_CD
+		         , A3.ATTB_2_CD
+		         , A3.ATTB_3_CD
+		         , SUM(A1.DEFECT_QTY) OVER() AS DEFECT_QTY_ALL
+		         , SUM(A1.LOT_SIZE) OVER() AS LOT_SIZE_ALL
+		         , CASE WHEN MAX(CAST(A2.ATTB_1_CD AS FLOAT)) OVER() > MAX(ISNULL(A1.DEFECT_QTY / NULLIF(A1.LOT_SIZE,0) * 100,0)) OVER()
+	                    THEN MAX(CAST(A2.ATTB_1_CD AS FLOAT)) OVER()
+	                    ELSE MAX(ISNULL(A1.DEFECT_QTY / NULLIF(A1.LOT_SIZE,0) * 100,0)) OVER()
+	                END MAX_DATA
+			FROM TB_KPI_DASHBOARD_DEF_RATE_GPP A1 WITH(NOLOCK)
+			LEFT OUTER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+			  ON A1.BU_CD = A2.BU_CD
+			 AND A1.GOODS_PROD_PART = A2.CODE_CD
+			 AND A2.GROUP_CD = 'GOODS_PROD_PART'
+			 AND A2.USE_FLAG = 'Y'
+			LEFT JOIN TB_MST_CODE A3 WITH(NOLOCK)
+			  ON A3.GROUP_CD = 'DASHBOARD_ID'
+			 AND A3.CODE_CD  = 'DB_KPI04'
+			 AND A3.USE_FLAG = 'Y'
+			 AND A3.BU_CD    = A1.BU_CD
+			WHERE 1 = 1
+			#if($_parameter.PORTAL_YN == "Y")
+			  AND A1.BU_CD = 'QT'
+			#else
+			  AND A1.BU_CD = @{GV_BU_CD}
+			#end
+		) B1
+		GROUP BY B1.TEAM_CD
+		
+	</select>
+
+	<select id="mainExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ dashboard.portal.mainExcelSqlSelect ] ******/
+		SELECT CASE WHEN A1.ROLE_CD = 'SEC0001' THEN 'Y' 
+	
+		ELSE 'N' END AS USE_FLAG
+		, ROLE_CD
+			FROM(
+				SELECT BU_CD
+		         , ROLE_CD
+						 
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+			) A1
+		GROUP BY A1.BU_CD,A1.ROLE_CD
+	</select>
+
+
+</mapper>

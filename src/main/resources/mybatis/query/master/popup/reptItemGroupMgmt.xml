@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.popup">
+
+	<select id="reptItemGroupMgmtSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.reptItemGroupMgmtSelect ] ******/
+		SELECT COMPANY_CD
+		     , BU_CD
+		     , REP_ITEM_GROUP_CD
+		     , REP_ITEM_GROUP_NM
+		     , CONVERT(VARCHAR(19), CREATE_DTTM, 120) AS CREATE_DTTM
+		     , CREATE_ID
+		     , CONVERT(VARCHAR(19), UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , UPDATE_ID
+		FROM TB_MST_REP_ITEM_GROUP WITH (NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		#if($_parameter.reptItemGroup and $_parameter.reptItemGroup != "")
+		  AND (REP_ITEM_GROUP_CD LIKE '%' + @{reptItemGroup} + '%'
+		   OR REP_ITEM_GROUP_NM LIKE '%' + @{reptItemGroup} + '%')
+		#end
+		ORDER BY REP_ITEM_GROUP_CD ASC
+	</select>
+	
+	<sql id="reptItemGroupMgmtMaxSeq">
+	SELECT ISNULL(CONVERT(INT, SUBSTRING(MAX(REP_ITEM_GROUP_CD), 4, 6)), 0) + 1 AS MAX_SEQ
+	  FROM TB_MST_REP_ITEM_GROUP WITH (NOLOCK)
+	 WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	   AND BU_CD      = @{GV_BU_CD}
+	</sql>
+	
+	<select id="reptItemGroupMgmtMaxSeqSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.reptItemGroupMgmtMaxSeqSelect ] ******/
+		<include refid="master.popup.reptItemGroupMgmtMaxSeq"/>
+	</select>
+
+	<update id="reptItemGroupMgmtInsert" parameterType="map">
+		/****** [ master.popup.reptItemGroupMgmtInsert ] ******/
+		INSERT INTO TB_MST_REP_ITEM_GROUP (
+			  COMPANY_CD
+			, BU_CD
+			, REP_ITEM_GROUP_CD
+			, REP_ITEM_GROUP_NM
+			, CREATE_ID
+			, CREATE_DTTM
+			, UPDATE_ID
+			, UPDATE_DTTM
+		) VALUES (
+			  @{GV_COMPANY_CD}
+			, @{GV_BU_CD}
+			, (SELECT 'RIG' + REPLICATE('0', 3 - LEN(CONVERT(VARCHAR(3), MAX_SEQ))) + CONVERT(VARCHAR(3), MAX_SEQ) AS REP_ITEM_GROUP_CD_NEW
+			     FROM (
+			     <include refid="master.popup.reptItemGroupMgmtMaxSeq"/>
+			     ) MAX_TB
+			)
+			, LTRIM(RTRIM(@{REP_ITEM_GROUP_NM}))
+			, @{GV_USER_ID}
+			, DBO.UFN_GETDATE()
+			, @{GV_USER_ID}
+			, DBO.UFN_GETDATE()
+		)
+	</update>
+	
+	<update id="reptItemGroupMgmtUpdate" parameterType="map">
+		/****** [ master.popup.reptItemGroupMgmtUpdate ] ******/
+		UPDATE TB_MST_REP_ITEM_GROUP
+		   SET REP_ITEM_GROUP_NM = LTRIM(RTRIM(@{REP_ITEM_GROUP_NM}))
+		     , UPDATE_ID         = @{GV_USER_ID}
+		     , UPDATE_DTTM       = DBO.UFN_GETDATE()
+		 WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		   AND BU_CD             = @{GV_BU_CD}
+		   AND REP_ITEM_GROUP_CD = @{REP_ITEM_GROUP_CD}
+	</update>
+	
+	<delete id="reptItemGroupMgmtDelete" parameterType="map">
+		/****** [ master.popup.reptItemGroupMgmtDelete ] ******/
+		BEGIN
+			/* Backup */
+			INSERT INTO TB_HIS_REP_ITEM_GROUP (
+				  COMPANY_CD
+				, BU_CD
+				, REP_ITEM_GROUP_CD
+				, REP_ITEM_GROUP_NM
+				, CREATE_ID
+				, CREATE_DTTM
+				, UPDATE_ID
+				, UPDATE_DTTM
+			)
+			SELECT COMPANY_CD
+			     , BU_CD
+			     , REP_ITEM_GROUP_CD
+			     , REP_ITEM_GROUP_NM
+			     , CREATE_ID
+			     , CREATE_DTTM
+			     , UPDATE_ID
+			     , UPDATE_DTTM
+			  FROM TB_MST_REP_ITEM_GROUP WITH (NOLOCK)
+			 WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+			   AND BU_CD             = @{GV_BU_CD}
+			   AND REP_ITEM_GROUP_CD = @{REP_ITEM_GROUP_CD}
+			   ;
+			/* Delete */
+			DELETE FROM TB_MST_REP_ITEM_GROUP
+			 WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+			   AND BU_CD             = @{GV_BU_CD}
+			   AND REP_ITEM_GROUP_CD = @{REP_ITEM_GROUP_CD}
+			   ;
+		END;
+	</delete>
+
+	<select id="reptItemGroupMgmtExistPkDelete" parameterType="map" resultType="int">
+		/****** [ master.popup.reptItemGroupMgmtExistPkDelete ] ******/
+		SELECT COUNT(*)
+		FROM TB_MST_ITEM_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		  AND BU_CD             = @{GV_BU_CD}
+		  AND REP_ITEM_GROUP_CD = @{REP_ITEM_GROUP_CD}
+	</select>
+
+</mapper>

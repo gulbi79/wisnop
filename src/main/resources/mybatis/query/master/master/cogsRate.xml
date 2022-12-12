@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+	
+	<select id="cogsRateInfoSelect" parameterType="map" resultType="map">
+		/****** [ master.master.cogsRateInfoSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd="COMPANY_CD")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT ATTB_1_CD AS CURRENCY
+		     , ATTB_2_NM AS UOM
+		FROM W_CODE
+		WHERE CODE_CD = @{GV_COMPANY_CD}
+	</select>
+	
+	<select id="cogsRateTeamSelect" parameterType="map" resultType="map">
+		/****** [ master.master.cogsRateTeamSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd="DIV_CD,TEAM_CD")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT T.CODE_CD
+             , T.CODE_NM
+        FROM W_CODE T WITH(NOLOCK)
+       	WHERE T.GROUP_CD = 'TEAM_CD'
+          AND T.ATTB_4_CD IN (
+                              	SELECT CODE_CD
+                                FROM W_CODE D WITH(NOLOCK)
+                               	WHERE D.GROUP_CD = 'DIV_CD'
+                                  AND D.ATTB_2_CD = 'Y'
+                             )
+          AND T.ATTB_5_CD = 'Y'
+	</select>
+	
+	<select id="cogsRateSelect" parameterType="map" resultType="map">
+		/****** [ master.master.cogsRateSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd="COMPANY_CD")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT CR.COMPANY_CD
+		     , CR.BU_CD
+		     , CR.SEQ
+		     , CR.TEAM_CD
+		     , CC.ATTB_1_CD AS CURRENCY
+		     , CC.ATTB_2_NM AS UOM
+		     , CR.FROM_AMT / 1000000 AS FROM_AMT
+		     , CR.TO_AMT / 1000000 AS TO_AMT
+		     , CR.COGS_RATE
+		     , CONVERT(VARCHAR(19), CR.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , CR.CREATE_ID
+		     , CONVERT(VARCHAR(19), CR.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , CR.UPDATE_ID
+		FROM TB_MST_COGS_RATE CR WITH(NOLOCK)
+		LEFT OUTER JOIN W_CODE CC
+		  ON CR.COMPANY_CD = CC.CODE_CD
+		WHERE CR.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND CR.BU_CD = @{GV_BU_CD}
+		  AND CR.DEL_FLAG = 'N'
+		#if($_parameter.team and $_parameter.team != "")
+		  AND CR.TEAM_CD IN ('$_parameter.team.replace(",","','")')
+		#end
+		#if($_parameter.fromAmt and $_parameter.fromAmt != "")
+		  AND CR.FROM_AMT <![CDATA[>=]]> @{fromAmt}
+		#end
+		#if($_parameter.toAmt and $_parameter.toAmt != "")
+		  AND CR.TO_AMT <![CDATA[<=]]> @{toAmt}
+		#end
+		ORDER BY CR.TEAM_CD ASC, CR.FROM_AMT ASC
+	</select>
+	
+	<select id="cogsRateExistPkUpdate" parameterType="map" resultType="int">
+		/****** [ master.master.cogsRateExistPkUpdate ] ******/
+		BEGIN
+		#set ($seqNotIn = "")
+		#foreach( $rateMap in $_parameter.RATE_LT )
+	  		#if ($rateMap.state != "inserted")
+	    		#set ($seqNotIn = $seqNotIn + ",'" + $rateMap.SEQ + "'")
+	  		#end
+		#end
+	
+		/* 임시테이블 생성 */
+		DECLARE @COGS_RATE_TB TABLE (
+		    FROM_AMT numeric(21,6)
+		  , TO_AMT   numeric(21,6)
+		  , RN       int
+		);
+		
+		INSERT INTO @COGS_RATE_TB
+		SELECT FROM_AMT
+		     , TO_AMT, RN
+		FROM 
+		(
+			SELECT FROM_AMT, TO_AMT, -1 AS RN
+		    FROM TB_MST_COGS_RATE WITH(NOLOCK)
+		    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD      = @{GV_BU_CD}
+		      <!-- AND DIV_CD     = @{DIV_CD} -->
+		      AND TEAM_CD    = @{TEAM_CD}
+		      AND DEL_FLAG   = 'N'
+			#if ($seqNotIn != "")
+		       AND SEQ NOT IN ($seqNotIn.substring(1))
+			#end
+			#foreach( $rateMap in $_parameter.RATE_LT )
+		  		#if ($rateMap.state != "deleted")
+			    	UNION ALL
+			    	SELECT $rateMap.FROM_AMT * 1000000.0 AS FROM_AMT
+			    	     , $rateMap.TO_AMT * 1000000.0 AS TO_AMT
+			    	     , $rateMap.get("_ROWNUM") AS RN
+		  		#end
+			#end
+		) T;
+		
+		/* 'FROM_AMT'이 NULL인 경우 제일 처음 자료임 */
+		DECLARE RATE_LIST CURSOR FOR
+		SELECT FROM_AMT
+		     , TO_AMT
+		     , RN 
+		FROM @COGS_RATE_TB
+		ORDER BY CASE WHEN FROM_AMT IS NULL THEN 0 ELSE 1 END ASC, FROM_AMT ASC
+		
+		OPEN RATE_LIST
+		
+		    DECLARE @FROM_AMT numeric(21,6)
+		    DECLARE @TO_AMT   numeric(21,6)
+		    DECLARE @RN       int
+		    
+		    DECLARE @FROM_TMT numeric(21,6)
+		    DECLARE @TO_TMT   numeric(21,6)
+		    DECLARE @RN_TMT   int
+		    
+		    DECLARE @DUP_CNT  int
+		    DECLARE @CUR_IDX  int = 1
+		    DECLARE @RESULT   int = 0
+		    
+		    FETCH NEXT FROM RATE_LIST INTO @FROM_AMT, @TO_AMT, @RN
+		
+		    WHILE (@@FETCH_STATUS = 0)
+		      BEGIN
+		      
+		        IF (@RN != -1)
+		          BEGIN
+		        
+		            /* 'FROM_AMT' 중복검사 */
+		            SELECT @DUP_CNT = COUNT(*) FROM @COGS_RATE_TB WHERE RN != @RN AND (FROM_AMT = @FROM_AMT OR (FROM_AMT IS NULL AND @FROM_AMT IS NULL));
+		            IF (@DUP_CNT > 0)
+		              BEGIN
+		                /*PRINT 'FROM_AMT is DUP : ' + ISNULL(CONVERT(VARCHAR(30), @FROM_AMT), 'NULL');*/
+		                SET @RESULT = @RN;
+		                BREAK;
+		              END
+		            
+		            /* 'TO_AMT' 중복검사 */
+		            SELECT @DUP_CNT = COUNT(*) FROM @COGS_RATE_TB WHERE RN != @RN AND (TO_AMT = @TO_AMT OR (TO_AMT IS NULL AND @TO_AMT IS NULL));
+		            IF (@DUP_CNT > 0)
+		              BEGIN
+		                /*PRINT 'TO_AMT is DUP : ' + ISNULL(CONVERT(VARCHAR(30), @TO_AMT), 'NULL');*/
+		                SET @RESULT = @RN;
+		                BREAK;
+		              END
+		            
+		            /* 'TO_AMT'은 마지막만 NULL허용 */  
+		            IF (@@CURSOR_ROWS != @CUR_IDX AND @TO_AMT IS NULL)
+		              BEGIN
+		                /*PRINT 'TO_AMT is NULL';*/
+		                SET @RESULT = @RN;
+		                BREAK;
+		              END
+		        
+		          END
+		        
+		        /* 현재 'FROM_AMT'값은 이전 'TO_AMT'값 보다 작으면 */
+		        IF (@CUR_IDX != 1)
+		          BEGIN
+		            IF (@FROM_AMT <![CDATA[<]]> @TO_TMT)
+		              BEGIN
+		                /*PRINT 'FROM_AMT is Invalid (Pre TO_AMT : ' + ISNULL(CONVERT(VARCHAR(30), @TO_TMT), 'NULL') + ', Cur FROM_AMT : ' + ISNULL(CONVERT(VARCHAR(30), @FROM_AMT), 'NULL') + ')';*/
+		                IF (@RN_TMT != -1)
+		                    SET @RESULT = @RN_TMT;
+		                ELSE
+		                    SET @RESULT = @RN;
+		                BREAK;
+		              END
+		          END
+		        
+		        SET @FROM_TMT = @FROM_AMT;
+		        SET @TO_TMT   = @TO_AMT;
+		        SET @RN_TMT   = @RN;
+		        SET @CUR_IDX += 1;
+		        
+		        FETCH NEXT FROM RATE_LIST INTO @FROM_AMT, @TO_AMT, @RN
+		      
+		      END
+		      
+		CLOSE RATE_LIST
+		DEALLOCATE RATE_LIST
+		    
+		/*PRINT 'RESULT : ' + CONVERT(VARCHAR(30), @RESULT);*/
+		SELECT @RESULT;
+		
+		END;
+	</select>
+	
+	<update id="cogsRateUpdate" parameterType="map">
+		/****** [ master.master.cogsRateUpdate ] ******/
+		BEGIN
+		
+		#foreach( $rateMap in $_parameter.RATE_LT )
+		  	#if ($rateMap.state == "deleted")
+			    UPDATE TB_MST_COGS_RATE
+			       SET DEL_FLAG    = 'Y'
+			         , UPDATE_ID   = @{GV_USER_ID}
+			         , UPDATE_DTTM = DBO.UFN_GETDATE()
+			    WHERE COMPANY_CD  = @{GV_COMPANY_CD}
+			      AND BU_CD       = @{GV_BU_CD}
+			      <!-- AND DIV_CD      = @{DIV_CD} -->
+			      AND TEAM_CD     = @{TEAM_CD}
+			      AND SEQ         = '$rateMap.SEQ';
+		  	#elseif ($rateMap.state == "updated")
+			    UPDATE TB_MST_COGS_RATE
+			       SET FROM_AMT    = $rateMap.FROM_AMT * 1000000.0
+			         , TO_AMT      = $rateMap.TO_AMT * 1000000.0
+			         , COGS_RATE   = $rateMap.COGS_RATE
+			         , UPDATE_ID   = @{GV_USER_ID}
+			         , UPDATE_DTTM = DBO.UFN_GETDATE()
+			    WHERE COMPANY_CD  = @{GV_COMPANY_CD}
+			      AND BU_CD       = @{GV_BU_CD}
+			      <!-- AND DIV_CD      = @{DIV_CD} -->
+			      AND TEAM_CD     = @{TEAM_CD}
+			      AND SEQ         = '$rateMap.SEQ';
+		  	#elseif ($rateMap.state == "inserted")
+				INSERT INTO TB_MST_COGS_RATE 
+				(
+			    	COMPANY_CD
+			      , BU_CD
+			      <!-- , DIV_CD -->
+			      , TEAM_CD
+			      , SEQ
+			      , FROM_AMT
+			      , TO_AMT
+			      , COGS_RATE
+			      , DEL_FLAG
+			      , CREATE_ID
+			      , CREATE_DTTM
+			      , UPDATE_ID
+			      , UPDATE_DTTM
+				) VALUES (
+			    	@{GV_COMPANY_CD}
+			      , @{GV_BU_CD}
+			      <!-- , @{DIV_CD} -->
+			      , @{TEAM_CD}
+			      , (SELECT ISNULL(MAX(SEQ),0)+1 FROM TB_MST_COGS_RATE)
+			      , $rateMap.FROM_AMT * 1000000.0
+			      , $rateMap.TO_AMT * 1000000.0
+			      , $rateMap.COGS_RATE
+			      , 'N'
+			      , @{GV_USER_ID}
+			      , DBO.UFN_GETDATE()
+			      , @{GV_USER_ID}
+			      , DBO.UFN_GETDATE()
+			    );
+		  	#end
+		#end
+		END
+	</update>
+
+</mapper>

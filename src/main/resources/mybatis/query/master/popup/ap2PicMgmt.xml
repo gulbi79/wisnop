@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.popup">
+
+	<select id="ap2PicMgmtAp1TeamSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.reptItemGroupMgmtSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd="DP_AUTH_CTRL")
+		    <include refid="include.mstCode"/>
+		),
+		AP1_ROLE_DEPT AS 
+		(
+			SELECT D.COMPANY_CD
+			     , D.DEPT_CD
+				 , D.PAR_DEPT_CD
+			     , D.DEPT_NM
+				 , D.LVL
+			FROM TB_MST_USER U WITH(NOLOCK)
+			INNER JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+			   ON (U.USER_ID = R.USER_ID AND R.BU_CD = @{GV_BU_CD} AND R.USE_FLAG = 'Y')
+			INNER JOIN W_CODE C
+			   ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_1_CD = 'Y')
+			INNER JOIN TB_MST_DEPT D WITH(NOLOCK)
+			   ON (U.DEPT_CD = D.DEPT_CD AND D.COMPANY_CD = @{GV_COMPANY_CD})
+			WHERE U.DEL_FLAG = 'N'
+			  AND U.USE_FLAG = 'Y'
+			GROUP BY D.COMPANY_CD, D.DEPT_CD, D.PAR_DEPT_CD, D.DEPT_NM, D.LVL
+		)
+		SELECT L3.DEPT_CD AS CODE_CD
+		     , L3.DEPT_NM AS CODE_NM
+		FROM AP1_ROLE_DEPT L3
+		WHERE L3.LVL = 3
+		UNION
+		SELECT DM.DEPT_CD AS CODE_CD
+		     , DM.DEPT_NM AS CODE_NM
+		FROM AP1_ROLE_DEPT L4
+		INNER JOIN TB_MST_DEPT DM
+		   ON (L4.COMPANY_CD = DM.COMPANY_CD AND L4.PAR_DEPT_CD = DM.DEPT_CD)
+		WHERE L4.LVL = 4
+	</select>
+
+	<select id="ap2PicMgmtSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.reptItemGroupMgmtSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd="DP_AUTH_CTRL")
+		    <include refid="include.mstCode"/>
+		),
+		AP1_ROLE_USER AS 
+		(
+		    SELECT U.USER_ID AS AP1_USER_ID
+		         , U.USER_NM AS AP1_USER_NM
+		         , D.DEPT_CD AS AP1_DEPT_CD
+		         , D.DEPT_NM AS AP1_DEPT_NM
+		         , CASE WHEN D.LVL = 3 THEN D.DEPT_CD ELSE D.PAR_DEPT_CD END AS AP1_4LV_DEPT_CD
+			FROM TB_MST_USER U WITH(NOLOCK)
+		    INNER JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+		       ON (U.USER_ID = R.USER_ID AND R.BU_CD = @{GV_BU_CD} AND R.USE_FLAG = 'Y')
+			INNER JOIN W_CODE C
+		       ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_1_CD = 'Y')
+			LEFT OUTER JOIN TB_MST_DEPT D WITH(NOLOCK)
+		      ON (U.DEPT_CD = D.DEPT_CD AND D.COMPANY_CD = @{GV_COMPANY_CD})
+			WHERE U.DEL_FLAG = 'N'
+		      AND U.USE_FLAG = 'Y'
+			#if($_parameter.ap1Pic and $_parameter.ap1Pic != "")
+		       AND U.USER_ID IN ('$_parameter.ap1Pic.replace(",","','")')
+			#end
+			GROUP BY U.USER_ID, U.USER_NM, D.DEPT_CD, D.DEPT_NM, D.LVL, D.PAR_DEPT_CD
+		)
+		SELECT AP1.AP1_DEPT_NM
+		     , AP1.AP1_USER_ID
+		     , AP1.AP1_USER_NM
+		     , AP2.USER_ID AS AP2_USER_ID
+		     , AP2.USER_NM AS AP2_USER_NM
+		     , CONVERT(VARCHAR(19), APM.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , APM.CREATE_ID
+		     , CONVERT(VARCHAR(19), APM.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , APM.UPDATE_ID
+		FROM AP1_ROLE_USER AP1
+		LEFT OUTER JOIN TB_MAP_AP1_AP2 APM WITH(NOLOCK)
+		  ON (AP1.AP1_USER_ID = APM.AP1_USER_ID AND APM.COMPANY_CD  = @{GV_COMPANY_CD})
+		LEFT OUTER JOIN TB_MST_USER AP2 WITH(NOLOCK)
+		  ON (APM.AP2_USER_ID = AP2.USER_ID AND AP2.DEL_FLAG = 'N' AND AP2.USE_FLAG = 'Y')
+		WHERE 1 = 1
+		#if($_parameter.newAp1Pic and $_parameter.newAp1Pic == "Y")
+		  AND APM.AP2_USER_ID IS NULL
+		#elseif($_parameter.newAp1Pic and $_parameter.newAp1Pic == "N")
+		  AND APM.AP2_USER_ID IS NOT NULL
+		#end
+		#if($_parameter.ap2Pic and $_parameter.ap2Pic != "")
+		  AND APM.AP2_USER_ID IN ('$_parameter.ap2Pic.replace(",","','")')
+		#end
+		#if($_parameter.ap1PicTeam and $_parameter.ap1PicTeam != "")
+		  AND AP1.AP1_4LV_DEPT_CD IN ('$_parameter.ap1PicTeam.replace(",","','")')
+		#end
+	</select>
+	
+	<update id="ap2PicMgmtUpdate" parameterType="map">
+		/****** [ master.popup.ap2PicMgmtUpdate ] ******/
+		#if($_parameter.AP2_USER_ID and $_parameter.AP2_USER_ID != "")
+		MERGE TB_MAP_AP1_AP2 AS A
+		USING (SELECT 'X' AS DUAL) AS B 
+		   ON (COMPANY_CD = @{GV_COMPANY_CD} AND AP1_USER_ID = @{AP1_USER_ID})
+		 WHEN MATCHED THEN
+		   UPDATE
+		      SET AP2_USER_ID = @{AP2_USER_ID}
+		        , UPDATE_ID   = @{GV_USER_ID}
+		        , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHEN NOT MATCHED THEN
+		   INSERT (
+		      COMPANY_CD, AP1_USER_ID, AP2_USER_ID, CREATE_ID, CREATE_DTTM, UPDATE_ID, UPDATE_DTTM
+		   ) VALUES (
+		      @{GV_COMPANY_CD}, @{AP1_USER_ID}, @{AP2_USER_ID}, @{GV_USER_ID}, DBO.UFN_GETDATE(), @{GV_USER_ID}, DBO.UFN_GETDATE()
+		   );
+		#else
+		MERGE TB_MAP_AP1_AP2 AS A
+		USING (SELECT 'X' AS DUAL) AS B 
+		   ON (COMPANY_CD = @{GV_COMPANY_CD} AND AP1_USER_ID = @{AP1_USER_ID})
+		 WHEN MATCHED THEN
+		   DELETE;
+		#end
+	</update>
+	
+	<select id="ap2PicMgmtExcelSqlSelect" parameterType="map" resultType="map">
+        /****** [ master.popup.ap2PicMgmtExcelSqlSelect ] ******/
+        SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+        , A2.ACTION_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+                 , ACTION_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD = @{popUpMenuCd}
+              AND ACTION_CD IN ('EXCEL','SQL')
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+        , A2.ACTION_CD
+    </select>
+	
+</mapper>

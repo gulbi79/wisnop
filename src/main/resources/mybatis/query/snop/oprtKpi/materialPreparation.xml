@@ -1,0 +1,1640 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.oprtKpi">
+
+    <select id="grDateSelect" parameterType="map" resultType="map">
+        /****** [ snop.oprtKpi.grDateSelect ] ******/
+        SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT), CONVERT(DATE, @{swFromDate}, 112)), 112) AS GR_START_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT), CONVERT(DATE, @{swFromDate}, 112)), 112) AS GR_END_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT) - 7, CONVERT(DATE, @{swFromDate}, 112)), 112) AS ONE_WEEK_GR_START_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT) - 7, CONVERT(DATE, @{swFromDate}, 112)), 112) AS ONE_WEEK_GR_END_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT) - 14, CONVERT(DATE, @{swFromDate}, 112)), 112) AS TWO_WEEK_GR_START_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT) - 14, CONVERT(DATE, @{swFromDate}, 112)), 112) AS TWO_WEEK_GR_END_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT) - 21, CONVERT(DATE, @{swFromDate}, 112)), 112) AS THREE_WEEK_GR_START_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT) - 21, CONVERT(DATE, @{swFromDate}, 112)), 112) AS THREE_WEEK_GR_END_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT) - 28, CONVERT(DATE, @{swFromDate}, 112)), 112) AS FOUR_WEEK_GR_START_DATE
+             , CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT) - 28, CONVERT(DATE, @{swFromDate}, 112)), 112) AS FOUR_WEEK_GR_END_DATE
+        FROM TB_MST_CODE
+        WHERE BU_CD = @{GV_BU_CD}
+          AND GROUP_CD = 'GR_PERIOD'
+          AND USE_FLAG = 'Y'
+    </select>
+    
+    <select id="prepareMaterialsAuthorityListSelect" parameterType="map" resultType="map">
+        /****** [ snop.oprtKpi.prepareMaterialsAuthorityListSelect ] ******/
+        SELECT COUNT(*) AS CNT
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+          AND BU_CD = @{GV_BU_CD}
+          AND ROLE_CD IN ('GOCQT0001', 'ADMINDP0001')
+          AND USE_FLAG = 'Y'
+    </select>
+    
+    <select id="materialSummarySelect" parameterType="map" resultType="map">
+        /****** [ snop.oprtKpi.materialSummarySelect ] ******/
+        SELECT X1.*
+        FROM
+        (
+            SELECT CASE WHEN ROUTING_ID IS NULL THEN 'Total' ELSE ROUTING_ID END ROUTING_ID
+                 , ROUTING_ID AS ROUTING_ID_NM
+                 , SUM(REQ_AMOUNT) AS REQ_AMOUNT 
+                 , SUM(MRP_AMOUNT) AS MRP_AMOUNT
+                 , SUM(MRP_AMOUNT) - SUM(REQ_AMOUNT) AS MRP_REQ_AMOUNT
+                 , SUM(ONE_WEEK_DATA) AS ONE_WEEK_DATA 
+                 , SUM(TWO_WEEK_DATA) AS TWO_WEEK_DATA 
+                 , SUM(THREE_WEEK_DATA) AS THREE_WEEK_DATA 
+                 , SUM(FOUR_WEEK_DATA) AS FOUR_WEEK_DATA 
+            FROM
+            (
+                SELECT T1.*
+                     , (T2.MRP_QTY + T2.NON_MOVING_QTY + T2.NON_DEPLOY_QTY) * T2.PRICE_KRW AS ONE_WEEK_DATA
+                     , (T3.MRP_QTY + T3.NON_MOVING_QTY + T3.NON_DEPLOY_QTY) * T3.PRICE_KRW AS TWO_WEEK_DATA
+                     , (T4.MRP_QTY + T4.NON_MOVING_QTY + T4.NON_DEPLOY_QTY) * T4.PRICE_KRW AS THREE_WEEK_DATA
+                     , (T5.MRP_QTY + T5.NON_MOVING_QTY + T5.NON_DEPLOY_QTY) * T5.PRICE_KRW AS FOUR_WEEK_DATA
+                FROM
+                (
+                    SELECT A1.COMPANY_CD
+                         , A1.BU_CD
+                         , A1.ITEM_CD
+                         , CASE WHEN A2.ROUTING_ID IS NULL OR A2.ROUTING_ID = ' ' THEN 'OTHERS' ELSE A2.ROUTING_ID END ROUTING_ID
+                         , (A1.MRP_QTY + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY) * A1.PRICE_KRW AS REQ_AMOUNT
+                         , A1.PROD_ORDER_QTY * A1.PRICE_KRW AS MRP_AMOUNT
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -1, @{fromCal}), 112)) AS ONE_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -2, @{fromCal}), 112)) AS TWO_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -3, @{fromCal}), 112)) AS THREE_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -4, @{fromCal}), 112)) AS FOUR_WEEK_AGO
+                    FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                    INNER JOIN
+                    ( 
+                        <include refid="snop.common.t_itemCust" />
+                    ) A2
+                    ON A1.COMPANY_CD = A2.COMPANY_CD
+                    AND A1.BU_CD = A2.BU_CD
+                    AND A1.ITEM_CD = A2.ITEM_CD     
+                    WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND A1.BU_CD = @{GV_BU_CD}
+                      AND A1.YEARWEEK = @{fromWeek}
+                      AND A2.ITEM_TYPE IN ('20', '30')
+                ) T1
+                LEFT OUTER JOIN TB_KPI_MAT_PREPARATION T2 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T2.COMPANY_CD
+                 AND T1.BU_CD = T2.BU_CD
+                 AND T1.ITEM_CD = T2.ITEM_CD
+                 AND T1.ONE_WEEK_AGO = T2.YEARWEEK
+                LEFT OUTER JOIN TB_KPI_MAT_PREPARATION T3 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T3.COMPANY_CD
+                 AND T1.BU_CD = T3.BU_CD
+                 AND T1.ITEM_CD = T3.ITEM_CD
+                 AND T1.TWO_WEEK_AGO = T3.YEARWEEK
+                LEFT OUTER JOIN TB_KPI_MAT_PREPARATION T4 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T4.COMPANY_CD
+                 AND T1.BU_CD = T4.BU_CD
+                 AND T1.ITEM_CD = T4.ITEM_CD
+                 AND T1.THREE_WEEK_AGO = T4.YEARWEEK
+                LEFT OUTER JOIN TB_KPI_MAT_PREPARATION T5 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T5.COMPANY_CD
+                 AND T1.BU_CD = T5.BU_CD
+                 AND T1.ITEM_CD = T5.ITEM_CD
+                 AND T1.FOUR_WEEK_AGO = T5.YEARWEEK
+            ) U1    
+            GROUP BY ROLLUP(ROUTING_ID)
+        ) X1        
+        ORDER BY ROUTING_ID_NM  
+    </select>
+    
+    <select id="prepareMaterialsConfirmSelect" parameterType="map" resultType="map">
+        /****** [ snop.oprtKpi.prepareMaterialsConfirmSelect ] ******/
+        SELECT ISNULL(CONFIRM_YN, 'N') AS CONFRIM_YN
+        FROM TB_KPI_MAT_PREPARATION_CONFIRM WITH(NOLOCK)
+        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+          AND BU_CD = @{GV_BU_CD}
+          AND YEARWEEK = @{fromWeek}
+    </select>
+    
+    
+    <select id="prepareMaterialsSelect" parameterType="map" resultType="map">
+        /****** [ snop.oprtKpi.prepareMaterialsSelect ] ******/
+        BEGIN
+        
+            <!-- #foreach( $dimMap in $_parameter.dimList )
+                #if($velocityCount == 1)
+                    #set($grpLvlId = ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+                #else
+                    #set($grpLvlId = ${grpLvlId} + ", " + ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+                #end
+            #end -->
+            
+            DECLARE @V_PLAN_START_DATE NVARCHAR(8),
+                    @V_COMPARE_DATE NVARCHAR(8),
+                    @V_PLAN_END_DATE NVARCHAR(8),
+                    @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112),
+                   
+            -- 20210526 김수호 추가
+            ------------------------------------------
+                    @PLAN_ID   NVARCHAR(10),
+                    @PLAN_ID_TEMP   NVARCHAR(10),
+                    @SEARCH_CRITERIA_WEEK NVARCHAR(10)
+                    
+            SELECT @SEARCH_CRITERIA_WEEK =  @{fromWeek}       
+                    
+            SELECT @PLAN_ID_TEMP = PLAN_ID
+            FROM TB_MST_PLAN_VERSION A WITH(NOLOCK)
+            WHERE  A.COMPANY_CD   = @{GV_COMPANY_CD}
+            AND A.BU_CD           = @{GV_BU_CD}
+            AND A.PLAN_TYPE_CD IN ('MP')
+            AND A.APS_START_WEEK = @SEARCH_CRITERIA_WEEK
+
+
+            IF RIGHT(@PLAN_ID_TEMP,1) = 'M'
+                
+                SELECT  @PLAN_ID = @PLAN_ID_TEMP
+                
+            ELSE
+            
+                SELECT @PLAN_ID = PLAN_ID
+                FROM TB_MST_PLAN_VERSION A WITH(NOLOCK)
+                WHERE  A.COMPANY_CD   = @{GV_COMPANY_CD}
+            AND A.BU_CD        = @{GV_BU_CD}
+            AND A.PLAN_TYPE_CD IN ('MP')
+            AND A.START_WEEK = @SEARCH_CRITERIA_WEEK
+            
+            ------------------------------------------
+                    
+            SELECT TOP 1 @V_PLAN_START_DATE = YYYYMMDD
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YEARWEEK <![CDATA[<]]> @{fromWeek}
+              AND DAY_NM = 'THU'
+            ORDER BY YYYYMMDD DESC;
+            
+            SELECT @V_PLAN_END_DATE = YYYYMMDD
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YEARWEEK = @{fromWeek}
+              AND DAY_NM = 'WED';
+            
+            SELECT @V_COMPARE_DATE = CASE WHEN @V_PLAN_END_DATE <![CDATA[>]]> @V_CUR_DATE THEN @V_CUR_DATE ELSE @V_PLAN_END_DATE END; 
+            
+            WITH W_PAST AS
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , SUM(CASE WHEN GI_DATE <![CDATA[>=]]> CONVERT(VARCHAR, DATEADD(mm, -3, @{fromMon} + '01'), 112) THEN QTY END) / 3 AS THREE_MONTH_QTY
+                FROM TB_DYN_GI WITH(NOLOCK)
+                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                  AND PLANT_CD = 'WF01'
+                  AND GI_DATE <![CDATA[>=]]> CONVERT(VARCHAR, DATEADD(mm, -3, @{fromMon} + '01'), 112)
+                  AND GI_DATE <![CDATA[<]]> @{fromMon} + '01'
+                  AND DEL_FLAG = 'N'
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+            ), 
+            W_GR AS
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY
+                FROM
+                (      
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{grStartDate} AND @{grEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{grStartDate} AND @{grEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'ONE_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY 
+                FROM
+                (
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY           
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{oneWeekGrStartDate} AND @{oneWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{oneWeekGrStartDate} AND @{oneWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'TWO_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY 
+                FROM
+                (           
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY        
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{twoWeekGrStartDate} AND @{twoWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{twoWeekGrStartDate} AND @{twoWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'THREE_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY 
+                FROM
+                (
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY       
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{threeWeekGrStartDate} AND @{threeWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{threeWeekGrStartDate} AND @{threeWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'FOUR_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY
+                FROM
+                ( 
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY     
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{fourWeekGrStartDate} AND @{fourWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{fourWeekGrStartDate} AND @{fourWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+            ),
+            W_MAIN_REQ_QTY AS
+            (
+                SELECT HAWM.COMPANY_CD
+                     , HAWM.BU_CD
+                     , HAWM.MAIN_ITEM_CD
+                     , MPV.START_WEEK
+                     , SUM(HAWM.MAIN_REQ_QTY) AS MAIN_REQ_QTY
+                  FROM TB_HIS_APS_WORKORDER_MRP HAWM WITH(NOLOCK)
+                 INNER JOIN TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+                    ON MPV.COMPANY_CD = HAWM.COMPANY_CD
+                   AND MPV.BU_CD = HAWM.BU_CD
+                   AND MPV.PLAN_TYPE_CD = 'MP'
+                   AND MPV.PLAN_ID = HAWM.PLAN_ID
+                 WHERE HAWM.COMPANY_CD = @{GV_COMPANY_CD}
+                   AND HAWM.BU_CD = @{GV_BU_CD} 
+                   AND HAWM.MAIN_ITEM_CD IS NOT NULL
+                 GROUP BY HAWM.COMPANY_CD, HAWM.BU_CD, HAWM.MAIN_ITEM_CD, MPV.START_WEEK
+            ),
+            W_RECV_INSP AS
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , (DIE.PRE_RECV_QTY + DIE.RCPT_INSP_QTY) AS RECV_INSP_QTY
+                FROM TB_DYN_INVENTORY_ETC DIE WITH(NOLOCK)
+                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                  AND INV_DATE = @V_COMPARE_DATE
+            ),
+            W_CC AS
+            (
+                SELECT DPO.COMPANY_CD
+                     , DPO.BU_CD
+                     , DPO.ITEM_CD
+                     , SUM(DPO.CC_QTY) AS CC_QTY  
+                FROM TB_DYN_PUR_ORDER_DAILY DPO WITH(NOLOCK)
+                WHERE DPO.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPO.BU_CD = @{GV_BU_CD}
+                  AND DPO.YYYYMMDD = @V_COMPARE_DATE
+                  AND DPO.DEL_FLAG = 'N'
+                GROUP BY DPO.COMPANY_CD, DPO.BU_CD, DPO.ITEM_CD 
+            ),
+            W_REQ_QTY AS
+            (
+                SELECT DPOH.COMPANY_CD
+                     , DPOH.BU_CD
+                     , DPOM.CHILD_ITEM_CD
+                     , SUM(DPOM.REQ_QTY) AS REQ_QTY
+                FROM TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                INNER JOIN TB_DYN_PROD_ORDER_MAT DPOM WITH(NOLOCK)
+                   ON DPOM.COMPANY_CD = DPOH.COMPANY_CD
+                  AND DPOM.BU_CD = DPOH.BU_CD
+                  AND DPOM.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+                WHERE DPOH.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPOH.BU_CD = @{GV_BU_CD}
+                  AND DPOH.PROD_ORDER_NO NOT LIKE 'PQ%'
+                  AND DPOH.DEL_FLAG = 'N'
+                  AND DPOH.CREATE_DTTM BETWEEN @{grStartDate} AND @{grEndDate} 
+                GROUP BY DPOH.COMPANY_CD, DPOH.BU_CD, DPOM.CHILD_ITEM_CD
+            ),
+            W_GAP_QTY AS
+            (
+                SELECT HAMS.COMPANY_CD
+                     , HAMS.BU_CD
+                     , HAMS.ITEM_CD
+                     , SUM(HAMS.MRP_QTY_W1) AS GAP_QTY
+                FROM TB_HIS_APS_MRP_SUM HAMS WITH(NOLOCK)
+                WHERE HAMS.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND HAMS.BU_CD = @{GV_BU_CD}
+                  AND HAMS.MEAS_CD = 'G'
+                  AND EXISTS (
+                                SELECT 1
+                                FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+                                WHERE MPV.COMPANY_CD = HAMS.COMPANY_CD
+                                  AND MPV.BU_CD = HAMS.BU_CD
+                                  AND MPV.PLAN_TYPE_CD = 'MP'
+                                  AND MPV.PLAN_ID = HAMS.PLAN_ID
+                                  AND MPV.START_WEEK = @{fromWeek}
+                              )
+                GROUP BY HAMS.COMPANY_CD, HAMS.BU_CD, HAMS.ITEM_CD
+            ),
+            W_RECV_QC_NG_QTY AS
+            (
+                SELECT DPR.COMPANY_CD
+                     , DPR.BU_CD
+                     , DPR.ITEM_CD
+                     , SUM(DPR.RECV_QC_NG_QTY) AS RECV_QC_NG_QTY
+                FROM TB_DYN_PUR_RECV DPR WITH(NOLOCK)
+                WHERE DPR.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPR.BU_CD = @{GV_BU_CD}
+                  AND DPR.RECV_DATE BETWEEN @{grStartDate} AND @{grEndDate} 
+                GROUP BY DPR.COMPANY_CD, DPR.BU_CD, DPR.ITEM_CD         
+            ),
+            W_WEEK_PREPARATION AS
+            (
+                /*1주전*/
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) > ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                           ELSE 0
+                      END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY AS REQ_TOTAL
+                 , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0) AS INV_GR_QTY
+                     
+                     , MAT_GR_SCHED_QTY
+                     , 'ONE_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'ONE_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -1, @{fromCal}), 112))
+                
+                /*2주전*/ 
+                UNION ALL
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) > ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                           ELSE 0
+                      END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY AS REQ_TOTAL
+                 , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0) AS INV_GR_QTY
+                     
+                     
+                     , MAT_GR_SCHED_QTY
+                     , 'TWO_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'TWO_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -2, @{fromCal}), 112))
+                 
+                 /*3주전*/
+                 UNION ALL
+                 SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) > ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                           ELSE 0
+                      END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY AS REQ_TOTAL
+                 , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0) AS INV_GR_QTY
+                     
+                     , MAT_GR_SCHED_QTY
+                     , 'THREE_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'THREE_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -3, @{fromCal}), 112))
+                 
+                 /*4주전*/
+                 UNION ALL
+                 SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) > ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                           ELSE 0
+                      END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY AS REQ_TOTAL
+                 , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0) AS INV_GR_QTY
+                     
+                     
+                     , MAT_GR_SCHED_QTY
+                     , 'FOUR_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'FOUR_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -4, @{fromCal}), 112))
+            )
+            
+            
+            SELECT NULL AS TMP_COL
+                 , ITEM_CD
+                 , CASE WHEN ITEM_CD IS NULL THEN 'Total' ELSE MAX ( ITEM_CD_NM ) END AS ITEM_CD_NM
+                 , ITEM_NM
+                 , CASE WHEN ITEM_CD IS NOT NULL THEN CASE WHEN ITEM_NM IS NULL THEN 'Sub Total' ELSE MAX ( ITEM_NM_NM ) END
+                        ELSE CASE WHEN ITEM_NM IS NULL THEN '' ELSE MAX ( ITEM_NM_NM ) END
+                   END AS ITEM_NM_NM
+                 , SPEC
+                 , CASE WHEN ITEM_NM IS NOT NULL THEN CASE WHEN SPEC IS NULL THEN 'Sub Total' ELSE MAX ( SPEC_NM ) END
+                        ELSE CASE WHEN SPEC IS NULL THEN '' ELSE MAX ( SPEC_NM ) END
+                   END AS SPEC_NM
+                 , GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) AS GRP_LVL_ID
+                 , MAX(COMPANY_CD) AS COMPANY_CD
+                 , MAX(BU_CD) AS BU_CD
+                 , MAX(YEARWEEK) AS YEARWEEK
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN MAX(SUPPLY_YN) ELSE NULL END SUPPLY_YN_NM
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN MAX(REMARK) ELSE NULL END REMARK_NM
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN MAX(MAT_SHORT_TYPE) ELSE NULL END MAT_SHORT_TYPE_NM
+                 -- 20220613 김수호 추가, ITSM 511
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN MAX(ISSUE_YN) ELSE NULL END ISSUE_YN_NM
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN MAX(REMARK_CONF) ELSE NULL END REMARK_CONF_NM
+                 ----------------------------------------------
+                 , SUM(MRP_QTY) AS MRP_QTY_NM
+                 , SUM(NON_MOVING_QTY) AS NON_MOVING_QTY_NM
+                 , SUM(NON_DEPLOY_QTY) AS NON_DEPLOY_QTY_NM
+                 , SUM(REQ_TOTAL) AS REQ_TOTAL_NM
+                 , SUM(INV_QTY) AS INV_QTY2_NM
+                 , SUM(GR_QTY) AS GR_QTY_NM
+                 , SUM(INV_GR_QTY) AS INV_GR_QTY_NM
+                 , SUM(OVER_SHORT) AS OVER_SHORT_NM
+                 , AVG(AVAIL_RATE) AS AVAIL_RATE_NM
+                 , AVG(AVAIL_RATE2) AS AVAIL_RATE2_NM
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN SUM(PRICE_KRW) ELSE NULL END PRICE_KRW_NM
+                 , SUM(REQ_AMOUNT) AS REQ_AMOUNT_NM
+                 , SUM(AVAIL_AMOUNT) AS AVAIL_AMOUNT_NM
+                 , AVG(ONE_WEEK_DATA) AS ONE_WEEK_DATA
+                 , AVG(TWO_WEEK_DATA) AS TWO_WEEK_DATA
+                 , AVG(THREE_WEEK_DATA) AS THREE_WEEK_DATA
+                 , AVG(FOUR_WEEK_DATA) AS FOUR_WEEK_DATA
+                 , SUM(READY) AS READY_NM
+                 , SUM(NO_READY) AS NO_READY_NM
+                 , SUM(STK_ON_INSP_QTY) AS STK_ON_INSP_QTY_NM
+                 , SUM(CC_QTY) AS CC_QTY2_NM
+                 <!-- , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN MAX(REMARK_PUR) ELSE NULL END REMARK_PUR
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN MAX(REMARK_PROD) ELSE NULL END REMARK_PROD -->
+                 , CASE WHEN GROUPING_ID(ITEM_CD, ITEM_NM, SPEC) = 0 THEN SUM(THREE_MONTH_QTY) ELSE NULL END THREE_MONTH_QTY_NM
+                 , ROUND(AVG(CAST(PERCENTAGE AS decimal(8, 4))), 0) AS PERCENTAGE_NM
+                 , ROUND(AVG(CAST(PERCENTAGE AS decimal(8, 4))), 0) AS PERCENTAGE2_NM
+                 , SUM(OS_NON_MOVING_QTY) AS OS_NON_MOVING_QTY_NM
+                 
+                 , SUM(GR_OVER_SHORT_W0)  AS GR_OVER_SHORT_W0_NM
+                 
+                 , SUM(MAIN_REQ_QTY) AS MAIN_REQ_QTY_NM
+                 , SUM(ADJ_QTY) AS ADJ_QTY_NM
+                 
+                 -- 20210526 김수호 수정
+                 ------------------------------------------------------------------
+                 , NULL     AS PROCUR_CATE_NAME_NM
+                 , NULL     AS PROCUR_CATE_NM
+                 , MAX(@PLAN_ID) AS PLAN_ID
+                 , CASE WHEN ITEM_CD IS NULL THEN 'N' ELSE 'Y' END AS DETAIL_POPUP
+                 ------------------------------------------------------------------              
+                 
+                 , SUM(URGENT_REMAIN_QTY) AS URGENT_REMAIN_QTY_NM
+                 , SUM(MAT_GR_SCHED_QTY) AS MAT_GR_SCHED_QTY_NM
+                 , SUM(MAT_GR_SCHED_QTY_W0) AS MAT_GR_SCHED_QTY_W0
+                 , SUM(MAT_GR_SCHED_QTY_W1) AS MAT_GR_SCHED_QTY_W1
+                 , SUM(MAT_GR_SCHED_QTY_W2) AS MAT_GR_SCHED_QTY_W2
+                 , SUM(MAT_GR_SCHED_QTY_W3) AS MAT_GR_SCHED_QTY_W3
+                 , SUM(REQ_QTY) AS REQ_QTY_NM
+                 , SUM(GAP_QTY) AS GAP_QTY_NM
+                 , SUM(MRP_ONE_WEEK_DATA) AS MRP_ONE_WEEK_DATA
+                 , SUM(MRP_TWO_WEEK_DATA) AS MRP_TWO_WEEK_DATA
+                 , SUM(MRP_THREE_WEEK_DATA) AS MRP_THREE_WEEK_DATA
+                 , SUM(MRP_FOUR_WEEK_DATA) AS MRP_FOUR_WEEK_DATA
+                 , MAX(PUR_LT) AS PUR_LT_NM
+                 , ISNULL(ABS(SUM(MRP_QTY)), 0) 
+                 + ISNULL(ABS(SUM(NON_MOVING_QTY)), 0)
+                 + ISNULL(ABS(SUM(NON_DEPLOY_QTY)), 0)
+                 + ISNULL(ABS(SUM(REQ_TOTAL)), 0)
+                 + ISNULL(ABS(SUM(INV_QTY)), 0)
+                 + ISNULL(ABS(SUM(OVER_SHORT)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W0)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W1)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W2)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W3)), 0)
+                 AS OMIT_FLAG
+            FROM
+            (
+                SELECT T1.*
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 'Y' ELSE 'N' END SUPPLY_YN
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 1 ELSE 0 END READY
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 0 ELSE 1 END NO_READY
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 100 ELSE 0 END PERCENTAGE
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 100 ELSE 0 END PERCENTAGE2
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                        END AVAIL_RATE
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                        END AVAIL_RATE2
+                     , CASE WHEN ISNULL(T2.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T2.INV_GR_QTY / NULLIF(T2.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T2.INV_GR_QTY / NULLIF(T2.REQ_TOTAL, 0) * 100)
+                        END ONE_WEEK_DATA
+                     , CASE WHEN ISNULL(T3.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T3.INV_GR_QTY / NULLIF(T3.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T3.INV_GR_QTY / NULLIF(T3.REQ_TOTAL, 0) * 100)
+                        END TWO_WEEK_DATA
+                     , CASE WHEN ISNULL(T4.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T4.INV_GR_QTY / NULLIF(T4.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T4.INV_GR_QTY / NULLIF(T4.REQ_TOTAL, 0) * 100)
+                        END THREE_WEEK_DATA
+                     , CASE WHEN ISNULL(T5.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T5.INV_GR_QTY / NULLIF(T5.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T5.INV_GR_QTY / NULLIF(T5.REQ_TOTAL, 0) * 100)
+                        END FOUR_WEEK_DATA     
+                FROM
+                (
+                    SELECT A1.COMPANY_CD
+                         , A1.BU_CD
+                         , A1.YEARWEEK
+                         , ISNULL(A2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD 
+                         , ISNULL(A2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM 
+                         , ISNULL(A2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM  
+                         , ISNULL(A2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+                         , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD 
+                         , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD_NM 
+                         , ISNULL(A2.ITEM_NM, ' ') AS ITEM_NM  
+                         , ISNULL(A2.ITEM_NM, ' ') AS ITEM_NM_NM  
+                         , ISNULL(A2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+                         , ISNULL(A2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+                         , ISNULL(A2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+                         , ISNULL(A2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+                         , ISNULL(A2.SPEC, ' ') AS SPEC  
+                         , ISNULL(A2.SPEC, ' ') AS SPEC_NM  
+                         , ISNULL(A2.UOM_CD, ' ') AS UOM_CD  
+                         , ISNULL(A2.UOM_CD, ' ') AS UOM_CD_NM  
+                         , ISNULL(A2.MFG_LT, ' ') AS MFG_LT  
+                         , ISNULL(A2.MFG_LT, ' ') AS MFG_LT_NM  
+                         , ISNULL(A2.PUR_LT, ' ') AS PUR_LT  
+                         , ISNULL(A2.PUR_LT, ' ') AS PUR_LT_NM  
+                         , ISNULL(A2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD  
+                         , ISNULL(A2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM  
+                         , ISNULL(A2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM  
+                         , ISNULL(A2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+                         
+                         , A2.PROCUR_TYPE AS PROCUR_CATE_NAME
+                         , A2.PROCUR_TYPE AS PROCUR_CATE_NAME_NM
+                         , A2.PROCUR_TYPE_CD AS PROCUR_CATE
+                         , A2.PROCUR_TYPE_CD AS PROCUR_CATE_NM
+                       
+                         
+                         , A1.MRP_QTY
+                         , A1.NON_MOVING_QTY
+                         , A1.NON_DEPLOY_QTY
+                         
+                         , CASE WHEN ISNULL(A1.MRP_QTY, 0) > ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                              ELSE 0
+                         END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY AS REQ_TOTAL
+                         
+                         , A1.INV_QTY
+                         , A4.GR_QTY
+                         
+                         
+                          , ISNULL(A1.INV_QTY, 0) + ISNULL(A4.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0) AS INV_GR_QTY
+                         
+                         
+                         , (A1.INV_QTY + ISNULL(A4.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0)) - (CASE WHEN ISNULL(A1.MRP_QTY, 0) > ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                              ELSE 0
+                         END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY) AS OVER_SHORT 
+                        , A1.PRICE_KRW
+                         
+                         
+                         , (CASE WHEN ISNULL(A1.MRP_QTY, 0) > ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                              ELSE 0
+                         END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY) * A1.PRICE_KRW AS REQ_AMOUNT
+                         
+                         
+                         
+                        , (A1.INV_QTY + ISNULL(A4.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0)) * A1.PRICE_KRW AS AVAIL_AMOUNT
+                        
+                        
+                         , WRI.RECV_INSP_QTY AS STK_ON_INSP_QTY
+                         , WCC.CC_QTY
+                         , A1.REMARK_PUR 
+                         , A1.REMARK_PROD 
+                         , A3.THREE_MONTH_QTY
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -1, @{fromCal}), 112)) AS ONE_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -2, @{fromCal}), 112)) AS TWO_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -3, @{fromCal}), 112)) AS THREE_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -4, @{fromCal}), 112)) AS FOUR_WEEK_AGO
+                         , A1.OS_NON_MOVING_QTY
+                         , A4.GR_QTY - A1.MAT_GR_SCHED_QTY_W0 AS GR_OVER_SHORT_W0
+                         , HAWM.MAIN_REQ_QTY
+                         , A1.MAT_GR_SCHED_QTY
+                         , A1.MAT_GR_SCHED_QTY_W0
+                         , A1.MAT_GR_SCHED_QTY_W1 
+                         , A1.MAT_GR_SCHED_QTY_W2
+                         , A1.MAT_GR_SCHED_QTY_W3
+                         , A1.REMARK
+                         , A1.MAT_SHORT_TYPE
+                         , A1.ADJ_QTY
+                         , A1.URGENT_REMAIN_QTY
+                         , WRQ.REQ_QTY
+                         , WGQ.GAP_QTY
+                         , A1.[MRP_QTY_W-01] AS MRP_ONE_WEEK_DATA
+                         , A1.[MRP_QTY_W-02] AS MRP_TWO_WEEK_DATA
+                         , A1.[MRP_QTY_W-03] AS MRP_THREE_WEEK_DATA
+                         , A1.[MRP_QTY_W-04] AS MRP_FOUR_WEEK_DATA
+                         -- 20220613 김수호 추가, ITSM 511 
+                         , A1.ISSUE_YN   -- 이슈여부
+                         , A1.REMARK_CONF  -- 협의내용
+                         -----------------------------------------------------
+                         
+                    FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                    INNER JOIN
+                    ( 
+                        <include refid="snop.common.t_itemCust" />
+                    ) A2
+                    ON A1.COMPANY_CD = A2.COMPANY_CD
+                    AND A1.BU_CD = A2.BU_CD
+                    AND A1.ITEM_CD = A2.ITEM_CD
+                    LEFT OUTER JOIN W_PAST A3 
+                      ON A1.COMPANY_CD = A3.COMPANY_CD
+                     AND A1.BU_CD = A3.BU_CD
+                     AND A1.ITEM_CD = A3.ITEM_CD
+                    LEFT OUTER JOIN W_GR A4
+                      ON A1.COMPANY_CD = A4.COMPANY_CD
+                     AND A1.BU_CD = A4.BU_CD
+                     AND A1.ITEM_CD = A4.ITEM_CD
+                     AND A4.WEEK_NAME = 'WEEK'
+                    LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                      ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                     AND HAWM.BU_CD = A1.BU_CD
+                     AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                     AND HAWM.START_WEEK = A1.YEARWEEK
+                    LEFT OUTER JOIN W_CC WCC
+                      ON A1.COMPANY_CD = WCC.COMPANY_CD
+                     AND A1.BU_CD = WCC.BU_CD
+                     AND A1.ITEM_CD = WCC.ITEM_CD
+                    LEFT OUTER JOIN W_RECV_INSP WRI
+                      ON A1.COMPANY_CD = WRI.COMPANY_CD
+                     AND A1.BU_CD = WRI.BU_CD
+                     AND A1.ITEM_CD = WRI.ITEM_CD
+                    LEFT OUTER JOIN W_REQ_QTY WRQ
+                      ON A1.COMPANY_CD = WRQ.COMPANY_CD
+                     AND A1.BU_CD = WRQ.BU_CD
+                     AND A1.ITEM_CD = WRQ.CHILD_ITEM_CD
+                    LEFT OUTER JOIN W_GAP_QTY WGQ
+                      ON A1.COMPANY_CD = WGQ.COMPANY_CD
+                     AND A1.BU_CD = WGQ.BU_CD
+                     AND A1.ITEM_CD = WGQ.ITEM_CD
+                    WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND A1.BU_CD = @{GV_BU_CD}
+                      AND A1.YEARWEEK = @{fromWeek}
+                      AND A2.ITEM_TYPE IN ('20', '30')
+                      
+                     /* 210127 이큰산 - 집계제외 포함여부 */ 
+                        AND (
+                    (
+                        @{incYn} = 'Y'
+                        AND 1 = 1
+                        )
+                    OR (
+                        @{incYn} = 'N'
+                        AND SUBSTRING(A1.ITEM_CD, 1, 3) NOT IN (
+                            SELECT CODE_CD
+                            FROM TB_MST_CODE
+                            WHERE BU_CD = 'QT'
+                                AND GROUP_CD = 'MAT_PRE_EXCEPT'
+                                AND USE_FLAG = 'Y'
+                            )
+                        )
+                    )
+                     --------------------------------------- 
+                ) T1
+                LEFT OUTER JOIN W_WEEK_PREPARATION T2 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T2.COMPANY_CD
+                 AND T1.BU_CD = T2.BU_CD
+                 AND T1.ITEM_CD = T2.ITEM_CD
+                 AND T1.ONE_WEEK_AGO = T2.YEARWEEK
+                 AND T2.WEEK_NAME = 'ONE_WEEK'
+                LEFT OUTER JOIN W_WEEK_PREPARATION T3 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T3.COMPANY_CD
+                 AND T1.BU_CD = T3.BU_CD
+                 AND T1.ITEM_CD = T3.ITEM_CD
+                 AND T1.TWO_WEEK_AGO = T3.YEARWEEK
+                 AND T3.WEEK_NAME = 'TWO_WEEK'
+                LEFT OUTER JOIN W_WEEK_PREPARATION T4 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T4.COMPANY_CD
+                 AND T1.BU_CD = T4.BU_CD
+                 AND T1.ITEM_CD = T4.ITEM_CD
+                 AND T1.THREE_WEEK_AGO = T4.YEARWEEK
+                 AND T4.WEEK_NAME = 'THREE_WEEK'
+                LEFT OUTER JOIN W_WEEK_PREPARATION T5 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T5.COMPANY_CD
+                 AND T1.BU_CD = T5.BU_CD
+                 AND T1.ITEM_CD = T5.ITEM_CD
+                 AND T1.FOUR_WEEK_AGO = T5.YEARWEEK
+                 AND T5.WEEK_NAME = 'FOUR_WEEK' 
+            ) A
+            #if($_parameter.avail and $_parameter.avail != "")
+                WHERE READY IN (CASE WHEN '$_parameter.avail' = 'Y' THEN 1 
+                                     WHEN '$_parameter.avail' = 'N' THEN 0 END)
+            #end 
+            GROUP BY ROLLUP ((ITEM_CD, ITEM_NM, SPEC))
+            ORDER BY TMP_COL
+                            , A.ITEM_CD
+                            , A.ITEM_NM
+                            , A.SPEC
+            <!-- ORDER BY TMP_COL
+            #foreach($dimMap in $_parameter.dimList)
+                , A.$dimMap.DIM_CD
+            #end -->
+        END;
+        <!-- BEGIN
+        
+            #foreach( $dimMap in $_parameter.dimList )
+                #if($velocityCount == 1)
+                    #set($grpLvlId = ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+                #else
+                    #set($grpLvlId = ${grpLvlId} + ", " + ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+                #end
+            #end
+            
+            DECLARE @V_PLAN_START_DATE NVARCHAR(8),
+                    @V_COMPARE_DATE NVARCHAR(8),
+                    @V_PLAN_END_DATE NVARCHAR(8),
+                    @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+            
+            SELECT TOP 1 @V_PLAN_START_DATE = YYYYMMDD
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YEARWEEK <![CDATA[<]]> @{fromWeek}
+              AND DAY_NM = 'THU'
+            ORDER BY YYYYMMDD DESC;
+            
+            SELECT @V_PLAN_END_DATE = YYYYMMDD
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YEARWEEK = @{fromWeek}
+              AND DAY_NM = 'WED';
+            
+            SELECT @V_COMPARE_DATE = CASE WHEN @V_PLAN_END_DATE <![CDATA[>]]> @V_CUR_DATE THEN @V_CUR_DATE ELSE @V_PLAN_END_DATE END; 
+            
+            WITH W_PAST AS
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , SUM(CASE WHEN GI_DATE <![CDATA[>=]]> CONVERT(VARCHAR, DATEADD(mm, -3, @{fromMon} + '01'), 112) THEN QTY END) / 3 AS THREE_MONTH_QTY
+                FROM TB_DYN_GI WITH(NOLOCK)
+                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                  AND PLANT_CD = 'WF01'
+                  AND GI_DATE <![CDATA[>=]]> CONVERT(VARCHAR, DATEADD(mm, -3, @{fromMon} + '01'), 112)
+                  AND GI_DATE <![CDATA[<]]> @{fromMon} + '01'
+                  AND DEL_FLAG = 'N'
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+            ), 
+            W_GR AS
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY
+                FROM
+                (      
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{grStartDate} AND @{grEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{grStartDate} AND @{grEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'ONE_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY 
+                FROM
+                (
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY           
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{oneWeekGrStartDate} AND @{oneWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{oneWeekGrStartDate} AND @{oneWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'TWO_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY 
+                FROM
+                (           
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY        
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{twoWeekGrStartDate} AND @{twoWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{twoWeekGrStartDate} AND @{twoWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'THREE_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY 
+                FROM
+                (
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY       
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{threeWeekGrStartDate} AND @{threeWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{threeWeekGrStartDate} AND @{threeWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+                
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , 'FOUR_WEEK' AS WEEK_NAME
+                     , SUM(GR_QTY) AS GR_QTY
+                FROM
+                ( 
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY     
+                    FROM TB_DYN_GR WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND DEL_FLAG = 'N'
+                      AND GR_DATE BETWEEN @{fourWeekGrStartDate} AND @{fourWeekGrEndDate}
+                    UNION ALL
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , GR_QTY      
+                    FROM TB_DYN_GR_PROD WITH(NOLOCK)
+                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD} 
+                      AND PLANT_CD = 'WF01'
+                      AND GR_DATE BETWEEN @{fourWeekGrStartDate} AND @{fourWeekGrEndDate}
+                ) A1
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+            ),
+            W_MAIN_REQ_QTY AS
+            (
+                SELECT HAWM.COMPANY_CD
+                     , HAWM.BU_CD
+                     , HAWM.MAIN_ITEM_CD
+                     , MPV.START_WEEK
+                     , SUM(HAWM.MAIN_REQ_QTY) AS MAIN_REQ_QTY
+                  FROM TB_HIS_APS_WORKORDER_MRP HAWM WITH(NOLOCK)
+                 INNER JOIN TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+                    ON MPV.COMPANY_CD = HAWM.COMPANY_CD
+                   AND MPV.BU_CD = HAWM.BU_CD
+                   AND MPV.PLAN_TYPE_CD = 'MP'
+                   AND MPV.PLAN_ID = HAWM.PLAN_ID
+                 WHERE HAWM.COMPANY_CD = @{GV_COMPANY_CD}
+                   AND HAWM.BU_CD = @{GV_BU_CD} 
+                   AND HAWM.MAIN_ITEM_CD IS NOT NULL
+                 GROUP BY HAWM.COMPANY_CD, HAWM.BU_CD, HAWM.MAIN_ITEM_CD, MPV.START_WEEK
+            ),
+            W_RECV_INSP AS
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , (DIE.PRE_RECV_QTY + DIE.RCPT_INSP_QTY) AS RECV_INSP_QTY
+                FROM TB_DYN_INVENTORY_ETC DIE WITH(NOLOCK)
+                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                  AND INV_DATE = @V_COMPARE_DATE
+            ),
+            W_CC AS
+            (
+                SELECT DPO.COMPANY_CD
+                     , DPO.BU_CD
+                     , DPO.ITEM_CD
+                     , SUM(DPO.CC_QTY) AS CC_QTY  
+                FROM TB_DYN_PUR_ORDER_DAILY DPO WITH(NOLOCK)
+                WHERE DPO.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPO.BU_CD = @{GV_BU_CD}
+                  AND DPO.YYYYMMDD = @V_COMPARE_DATE
+                  AND DPO.DEL_FLAG = 'N'
+                GROUP BY DPO.COMPANY_CD, DPO.BU_CD, DPO.ITEM_CD 
+            ),
+            W_REQ_QTY AS
+            (
+                SELECT DPOH.COMPANY_CD
+                     , DPOH.BU_CD
+                     , DPOM.CHILD_ITEM_CD
+                     , SUM(DPOM.REQ_QTY) AS REQ_QTY
+                FROM TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                INNER JOIN TB_DYN_PROD_ORDER_MAT DPOM WITH(NOLOCK)
+                   ON DPOM.COMPANY_CD = DPOH.COMPANY_CD
+                  AND DPOM.BU_CD = DPOH.BU_CD
+                  AND DPOM.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+                WHERE DPOH.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPOH.BU_CD = @{GV_BU_CD}
+                  AND DPOH.PROD_ORDER_NO NOT LIKE 'PQ%'
+                  AND DPOH.DEL_FLAG = 'N'
+                  AND DPOH.CREATE_DTTM BETWEEN @{grStartDate} AND @{grEndDate} 
+                GROUP BY DPOH.COMPANY_CD, DPOH.BU_CD, DPOM.CHILD_ITEM_CD
+            ),
+            W_GAP_QTY AS
+            (
+                SELECT HAMS.COMPANY_CD
+                     , HAMS.BU_CD
+                     , HAMS.ITEM_CD
+                     , SUM(HAMS.MRP_QTY_W1) AS GAP_QTY
+                FROM TB_HIS_APS_MRP_SUM HAMS WITH(NOLOCK)
+                WHERE HAMS.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND HAMS.BU_CD = @{GV_BU_CD}
+                  AND HAMS.MEAS_CD = 'G'
+                  AND EXISTS (
+                                SELECT 1
+                                FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+                                WHERE MPV.COMPANY_CD = HAMS.COMPANY_CD
+                                  AND MPV.BU_CD = HAMS.BU_CD
+                                  AND MPV.PLAN_TYPE_CD = 'MP'
+                                  AND MPV.PLAN_ID = HAMS.PLAN_ID
+                                  AND MPV.START_WEEK = @{fromWeek}
+                              )
+                GROUP BY HAMS.COMPANY_CD, HAMS.BU_CD, HAMS.ITEM_CD
+            ),
+            W_RECV_QC_NG_QTY AS
+            (
+                SELECT DPR.COMPANY_CD
+                     , DPR.BU_CD
+                     , DPR.ITEM_CD
+                     , SUM(DPR.RECV_QC_NG_QTY) AS RECV_QC_NG_QTY
+                FROM TB_DYN_PUR_RECV DPR WITH(NOLOCK)
+                WHERE DPR.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPR.BU_CD = @{GV_BU_CD}
+                  AND DPR.RECV_DATE BETWEEN @{grStartDate} AND @{grEndDate} 
+                GROUP BY DPR.COMPANY_CD, DPR.BU_CD, DPR.ITEM_CD         
+            ),
+            W_WEEK_PREPARATION AS
+            (
+                /*1주전*/
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                            ELSE 0
+                       END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0) AS REQ_TOTAL
+                     , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) AS INV_GR_QTY
+                     , MAT_GR_SCHED_QTY
+                     , 'ONE_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'ONE_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -1, @{fromCal}), 112))
+                
+                /*2주전*/ 
+                UNION ALL
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                            ELSE 0
+                       END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0) AS REQ_TOTAL
+                     , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) AS INV_GR_QTY
+                     , MAT_GR_SCHED_QTY
+                     , 'TWO_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'TWO_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -2, @{fromCal}), 112))
+                 
+                 /*3주전*/
+                 UNION ALL
+                 SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                            ELSE 0
+                       END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0) AS REQ_TOTAL
+                     , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) AS INV_GR_QTY
+                     , MAT_GR_SCHED_QTY
+                     , 'THREE_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'THREE_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -3, @{fromCal}), 112))
+                 
+                 /*4주전*/
+                 UNION ALL
+                 SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.YEARWEEK
+                     , CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                            ELSE 0
+                       END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0) AS REQ_TOTAL
+                     , ISNULL(A1.INV_QTY, 0) + ISNULL(A2.GR_QTY, 0) AS INV_GR_QTY
+                     , MAT_GR_SCHED_QTY
+                     , 'FOUR_WEEK' AS WEEK_NAME
+                FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                LEFT OUTER JOIN W_GR A2
+                  ON A1.COMPANY_CD = A2.COMPANY_CD
+                 AND A1.BU_CD = A2.BU_CD
+                 AND A1.ITEM_CD = A2.ITEM_CD
+                 AND A2.WEEK_NAME = 'FOUR_WEEK'
+                LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                 AND HAWM.BU_CD = A1.BU_CD
+                 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                 AND HAWM.START_WEEK = A1.YEARWEEK
+                WHERE A1.YEARWEEK = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -4, @{fromCal}), 112))
+            )
+            
+            
+            SELECT NULL AS TMP_COL
+                <include refid="include.getCdDimTotal"/>
+                <include refid="include.getGrpLvlId"/>
+                 , MAX(COMPANY_CD) AS COMPANY_CD
+                 , MAX(BU_CD) AS BU_CD
+                 , MAX(YEARWEEK) AS YEARWEEK
+                 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN MAX(SUPPLY_YN) ELSE NULL END SUPPLY_YN
+                 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN MAX(REMARK) ELSE NULL END REMARK
+                 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN MAX(MAT_SHORT_TYPE) ELSE NULL END MAT_SHORT_TYPE
+                 , SUM(MRP_QTY) AS MRP_QTY
+                 , SUM(NON_MOVING_QTY) AS NON_MOVING_QTY
+                 , SUM(NON_DEPLOY_QTY) AS NON_DEPLOY_QTY
+                 , SUM(REQ_TOTAL) AS REQ_TOTAL
+                 , SUM(INV_QTY) AS INV_QTY
+                 , SUM(GR_QTY) AS GR_QTY
+                 , SUM(INV_GR_QTY) AS INV_GR_QTY
+                 , SUM(OVER_SHORT) AS OVER_SHORT
+                 , AVG(AVAIL_RATE) AS AVAIL_RATE
+                 , AVG(AVAIL_RATE2) AS AVAIL_RATE2
+                 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN SUM(PRICE_KRW) ELSE NULL END PRICE_KRW
+                 , SUM(REQ_AMOUNT) AS REQ_AMOUNT
+                 , SUM(AVAIL_AMOUNT) AS AVAIL_AMOUNT
+                 , AVG(ONE_WEEK_DATA) AS ONE_WEEK_DATA
+                 , AVG(TWO_WEEK_DATA) AS TWO_WEEK_DATA
+                 , AVG(THREE_WEEK_DATA) AS THREE_WEEK_DATA
+                 , AVG(FOUR_WEEK_DATA) AS FOUR_WEEK_DATA
+                 , SUM(READY) AS READY
+                 , SUM(NO_READY) AS NO_READY
+                 , SUM(STK_ON_INSP_QTY) AS STK_ON_INSP_QTY
+                 , SUM(CC_QTY) AS CC_QTY
+                 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN MAX(REMARK_PUR) ELSE NULL END REMARK_PUR
+                 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN MAX(REMARK_PROD) ELSE NULL END REMARK_PROD
+                 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN SUM(THREE_MONTH_QTY) ELSE NULL END THREE_MONTH_QTY
+                 , ROUND(AVG(CAST(PERCENTAGE AS decimal(8, 4))), 0) AS PERCENTAGE
+                 , ROUND(AVG(CAST(PERCENTAGE AS decimal(8, 4))), 0) AS PERCENTAGE2
+                 , SUM(OS_NON_MOVING_QTY) AS OS_NON_MOVING_QTY
+                 , SUM(MAIN_REQ_QTY) AS MAIN_REQ_QTY
+                 , SUM(ADJ_QTY) AS ADJ_QTY
+                 , SUM(URGENT_REMAIN_QTY) AS URGENT_REMAIN_QTY
+                 , SUM(MAT_GR_SCHED_QTY) AS MAT_GR_SCHED_QTY
+                 , SUM(MAT_GR_SCHED_QTY_W0) AS MAT_GR_SCHED_QTY_W0
+                 , SUM(MAT_GR_SCHED_QTY_W1) AS MAT_GR_SCHED_QTY_W1
+                 , SUM(MAT_GR_SCHED_QTY_W2) AS MAT_GR_SCHED_QTY_W2
+                 , SUM(MAT_GR_SCHED_QTY_W3) AS MAT_GR_SCHED_QTY_W3
+                 , SUM(REQ_QTY) AS REQ_QTY
+                 , SUM(GAP_QTY) AS GAP_QTY
+                 , SUM(MRP_ONE_WEEK_DATA) AS MRP_ONE_WEEK_DATA
+                 , SUM(MRP_TWO_WEEK_DATA) AS MRP_TWO_WEEK_DATA
+                 , SUM(MRP_THREE_WEEK_DATA) AS MRP_THREE_WEEK_DATA
+                 , SUM(MRP_FOUR_WEEK_DATA) AS MRP_FOUR_WEEK_DATA
+                 , MAX(PUR_LT) AS PUR_LT
+                 , ISNULL(ABS(SUM(MRP_QTY)), 0) 
+                 + ISNULL(ABS(SUM(NON_MOVING_QTY)), 0)
+                 + ISNULL(ABS(SUM(NON_DEPLOY_QTY)), 0)
+                 + ISNULL(ABS(SUM(REQ_TOTAL)), 0)
+                 + ISNULL(ABS(SUM(INV_QTY)), 0)
+                 + ISNULL(ABS(SUM(OVER_SHORT)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W0)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W1)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W2)), 0)
+                 + ISNULL(ABS(SUM(MAT_GR_SCHED_QTY_W3)), 0)
+                 AS OMIT_FLAG
+            FROM
+            (
+                SELECT T1.*
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 'Y' ELSE 'N' END SUPPLY_YN
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 1 ELSE 0 END READY
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 0 ELSE 1 END NO_READY
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 100 ELSE 0 END PERCENTAGE
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL  
+                            WHEN CASE WHEN ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                                      ELSE ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                                  END <![CDATA[>=]]> @{availRate} THEN 100 ELSE 0 END PERCENTAGE2
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T1.INV_GR_QTY / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                        END AVAIL_RATE
+                     , CASE WHEN ISNULL(T1.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE ((T1.CC_QTY + T1.STK_ON_INSP_QTY + T1.INV_GR_QTY) / NULLIF(T1.REQ_TOTAL, 0) * 100)
+                        END AVAIL_RATE2
+                     , CASE WHEN ISNULL(T2.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T2.INV_GR_QTY / NULLIF(T2.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T2.INV_GR_QTY / NULLIF(T2.REQ_TOTAL, 0) * 100)
+                        END ONE_WEEK_DATA
+                     , CASE WHEN ISNULL(T3.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T3.INV_GR_QTY / NULLIF(T3.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T3.INV_GR_QTY / NULLIF(T3.REQ_TOTAL, 0) * 100)
+                        END TWO_WEEK_DATA
+                     , CASE WHEN ISNULL(T4.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T4.INV_GR_QTY / NULLIF(T4.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T4.INV_GR_QTY / NULLIF(T4.REQ_TOTAL, 0) * 100)
+                        END THREE_WEEK_DATA
+                     , CASE WHEN ISNULL(T5.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL
+                            WHEN (T5.INV_GR_QTY / NULLIF(T5.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+                            ELSE (T5.INV_GR_QTY / NULLIF(T5.REQ_TOTAL, 0) * 100)
+                        END FOUR_WEEK_DATA     
+                FROM
+                (
+                    SELECT A1.COMPANY_CD
+                         , A1.BU_CD
+                         , A1.YEARWEEK
+                         , ISNULL(A2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD 
+                         , ISNULL(A2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM 
+                         , ISNULL(A2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM  
+                         , ISNULL(A2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+                         , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD 
+                         , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD_NM 
+                         , ISNULL(A2.ITEM_NM, ' ') AS ITEM_NM  
+                         , ISNULL(A2.ITEM_NM, ' ') AS ITEM_NM_NM  
+                         , ISNULL(A2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+                         , ISNULL(A2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+                         , ISNULL(A2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+                         , ISNULL(A2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+                         , ISNULL(A2.SPEC, ' ') AS SPEC  
+                         , ISNULL(A2.SPEC, ' ') AS SPEC_NM  
+                         , ISNULL(A2.UOM_CD, ' ') AS UOM_CD  
+                         , ISNULL(A2.UOM_CD, ' ') AS UOM_CD_NM  
+                         , ISNULL(A2.MFG_LT, ' ') AS MFG_LT  
+                         , ISNULL(A2.MFG_LT, ' ') AS MFG_LT_NM  
+                         , ISNULL(A2.PUR_LT, ' ') AS PUR_LT  
+                         , ISNULL(A2.PUR_LT, ' ') AS PUR_LT_NM  
+                         , ISNULL(A2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD  
+                         , ISNULL(A2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM  
+                         , ISNULL(A2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM  
+                         , ISNULL(A2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+                         , A1.MRP_QTY
+                         , A1.NON_MOVING_QTY
+                         , A1.NON_DEPLOY_QTY
+                         , CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                                ELSE 0
+                           END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0) AS REQ_TOTAL
+                         , A1.INV_QTY
+                         , A4.GR_QTY
+                         , ISNULL(A1.INV_QTY, 0) + ISNULL(A4.GR_QTY, 0) AS INV_GR_QTY
+                         , (A1.INV_QTY + ISNULL(A4.GR_QTY, 0)) - (CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                                ELSE 0
+                           END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0)) AS OVER_SHORT 
+                         , A1.PRICE_KRW
+                         , (CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                                ELSE 0
+                           END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0)) * A1.PRICE_KRW AS REQ_AMOUNT
+                         , (A1.INV_QTY + ISNULL(A4.GR_QTY, 0)) * A1.PRICE_KRW AS AVAIL_AMOUNT 
+                         , WRI.RECV_INSP_QTY AS STK_ON_INSP_QTY
+                         , WCC.CC_QTY
+                         , A1.REMARK_PUR 
+                         , A1.REMARK_PROD 
+                         , A3.THREE_MONTH_QTY
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -1, @{fromCal}), 112)) AS ONE_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -2, @{fromCal}), 112)) AS TWO_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -3, @{fromCal}), 112)) AS THREE_WEEK_AGO
+                         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(wk, -4, @{fromCal}), 112)) AS FOUR_WEEK_AGO
+                         , A1.OS_NON_MOVING_QTY
+                         , HAWM.MAIN_REQ_QTY
+                         , A1.MAT_GR_SCHED_QTY
+                         , A1.MAT_GR_SCHED_QTY_W0
+                         , A1.MAT_GR_SCHED_QTY_W1 
+                         , A1.MAT_GR_SCHED_QTY_W2
+                         , A1.MAT_GR_SCHED_QTY_W3
+                         , A1.REMARK
+                         , A1.MAT_SHORT_TYPE
+                         , A1.ADJ_QTY
+                         , A1.URGENT_REMAIN_QTY
+                         , WRQ.REQ_QTY
+                         , WGQ.GAP_QTY
+                         , A1.[MRP_QTY_W-01] AS MRP_ONE_WEEK_DATA
+                         , A1.[MRP_QTY_W-02] AS MRP_TWO_WEEK_DATA
+                         , A1.[MRP_QTY_W-03] AS MRP_THREE_WEEK_DATA
+                         , A1.[MRP_QTY_W-04] AS MRP_FOUR_WEEK_DATA
+                    FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+                    INNER JOIN
+                    ( 
+                        <include refid="snop.common.t_itemCust" />
+                    ) A2
+                    ON A1.COMPANY_CD = A2.COMPANY_CD
+                    AND A1.BU_CD = A2.BU_CD
+                    AND A1.ITEM_CD = A2.ITEM_CD
+                    LEFT OUTER JOIN W_PAST A3 
+                      ON A1.COMPANY_CD = A3.COMPANY_CD
+                     AND A1.BU_CD = A3.BU_CD
+                     AND A1.ITEM_CD = A3.ITEM_CD
+                    LEFT OUTER JOIN W_GR A4
+                      ON A1.COMPANY_CD = A4.COMPANY_CD
+                     AND A1.BU_CD = A4.BU_CD
+                     AND A1.ITEM_CD = A4.ITEM_CD
+                     AND A4.WEEK_NAME = 'WEEK'
+                    LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+                      ON HAWM.COMPANY_CD = A1.COMPANY_CD
+                     AND HAWM.BU_CD = A1.BU_CD
+                     AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+                     AND HAWM.START_WEEK = A1.YEARWEEK
+                    LEFT OUTER JOIN W_CC WCC
+                      ON A1.COMPANY_CD = WCC.COMPANY_CD
+                     AND A1.BU_CD = WCC.BU_CD
+                     AND A1.ITEM_CD = WCC.ITEM_CD
+                    LEFT OUTER JOIN W_RECV_INSP WRI
+                      ON A1.COMPANY_CD = WRI.COMPANY_CD
+                     AND A1.BU_CD = WRI.BU_CD
+                     AND A1.ITEM_CD = WRI.ITEM_CD
+                    LEFT OUTER JOIN W_REQ_QTY WRQ
+                      ON A1.COMPANY_CD = WRQ.COMPANY_CD
+                     AND A1.BU_CD = WRQ.BU_CD
+                     AND A1.ITEM_CD = WRQ.CHILD_ITEM_CD
+                    LEFT OUTER JOIN W_GAP_QTY WGQ
+                      ON A1.COMPANY_CD = WGQ.COMPANY_CD
+                     AND A1.BU_CD = WGQ.BU_CD
+                     AND A1.ITEM_CD = WGQ.ITEM_CD
+                    WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND A1.BU_CD = @{GV_BU_CD}
+                      AND A1.YEARWEEK = @{fromWeek}
+                      AND A2.ITEM_TYPE IN ('20', '30')
+                ) T1
+                LEFT OUTER JOIN W_WEEK_PREPARATION T2 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T2.COMPANY_CD
+                 AND T1.BU_CD = T2.BU_CD
+                 AND T1.ITEM_CD = T2.ITEM_CD
+                 AND T1.ONE_WEEK_AGO = T2.YEARWEEK
+                 AND T2.WEEK_NAME = 'ONE_WEEK'
+                LEFT OUTER JOIN W_WEEK_PREPARATION T3 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T3.COMPANY_CD
+                 AND T1.BU_CD = T3.BU_CD
+                 AND T1.ITEM_CD = T3.ITEM_CD
+                 AND T1.TWO_WEEK_AGO = T3.YEARWEEK
+                 AND T3.WEEK_NAME = 'TWO_WEEK'
+                LEFT OUTER JOIN W_WEEK_PREPARATION T4 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T4.COMPANY_CD
+                 AND T1.BU_CD = T4.BU_CD
+                 AND T1.ITEM_CD = T4.ITEM_CD
+                 AND T1.THREE_WEEK_AGO = T4.YEARWEEK
+                 AND T4.WEEK_NAME = 'THREE_WEEK'
+                LEFT OUTER JOIN W_WEEK_PREPARATION T5 WITH(NOLOCK)
+                  ON T1.COMPANY_CD = T5.COMPANY_CD
+                 AND T1.BU_CD = T5.BU_CD
+                 AND T1.ITEM_CD = T5.ITEM_CD
+                 AND T1.FOUR_WEEK_AGO = T5.YEARWEEK
+                 AND T5.WEEK_NAME = 'FOUR_WEEK' 
+            ) A
+            #if($_parameter.avail and $_parameter.avail != "")
+                WHERE READY IN (CASE WHEN '$_parameter.avail' = 'Y' THEN 1 
+                                     WHEN '$_parameter.avail' = 'N' THEN 0 END)
+            #end 
+            GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+            ORDER BY TMP_COL
+            #foreach($dimMap in $_parameter.dimList)
+                , A.$dimMap.DIM_CD
+            #end
+        END; -->
+    </select>
+    
+    <update id="prepareMaterialsUpdate" parameterType="map">
+        /****** [ snop.oprtKpi.prepareMaterialsUpdate ] ******/
+        UPDATE TB_KPI_MAT_PREPARATION
+        SET UPDATE_ID = @{GV_USER_ID}
+          , UPDATE_DTTM = DBO.UFN_GETDATE()
+        #if($_parameter.REMARK_NM and $_parameter.REMARK_NM != "")
+          , REMARK = @{REMARK_NM}
+        #else
+          , REMARK = NULL
+        #end      
+        #if($_parameter.MAT_SHORT_TYPE_NM and $_parameter.MAT_SHORT_TYPE_NM != "")
+          , MAT_SHORT_TYPE = @{MAT_SHORT_TYPE_NM}
+        #else
+          , MAT_SHORT_TYPE = NULL
+        #end        
+        #if($_parameter.ADJ_QTY_NM and $_parameter.ADJ_QTY_NM != "")
+          , ADJ_QTY = @{ADJ_QTY_NM}
+        #else
+          , ADJ_QTY = NULL
+        #end
+        
+        -- 20220613 김수호 추가, ITSM 511 
+        #if($_parameter.ISSUE_YN_NM and $_parameter.ISSUE_YN_NM != "")
+          , ISSUE_YN = @{ISSUE_YN_NM}
+        #else
+          , ISSUE_YN = NULL
+        #end
+        
+        #if($_parameter.REMARK_CONF_NM and $_parameter.REMARK_CONF_NM != "")
+          , REMARK_CONF = @{REMARK_CONF_NM}
+        #else
+          , REMARK_CONF = NULL
+        #end
+        --------------------------------------------------------------------------
+        
+        WHERE COMPANY_CD = @{COMPANY_CD}
+          AND BU_CD = @{BU_CD}
+          AND YEARWEEK = @{YEARWEEK}
+          AND ITEM_CD = @{ITEM_CD_NM}
+    </update>
+    
+    <update id="prepareMaterialsConfirmYnUpdate" parameterType="map">
+        /****** [ snop.oprtKpi.prepareMaterialsConfirmYnUpdate ] ******/
+        MERGE TB_KPI_MAT_PREPARATION_CONFIRM AS A
+        USING (SELECT 'X' AS DUAL) AS B 
+        ON (  COMPANY_CD   = @{GV_COMPANY_CD}
+              AND BU_CD    = @{GV_BU_CD}
+              AND YEARWEEK  = @{fromWeek}
+            )
+        WHEN MATCHED THEN
+        UPDATE
+        SET CONFIRM_YN = @{confirmYn}
+          , UPDATE_ID = CASE WHEN CONFIRM_YN = @{confirmYn} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+          , UPDATE_DTTM = CASE WHEN CONFIRM_YN = @{confirmYn} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+        WHEN NOT MATCHED THEN
+        INSERT 
+        (
+            COMPANY_CD
+          , BU_CD
+          , YEARWEEK
+          , CONFIRM_YN
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+        ) VALUES (
+            @{GV_COMPANY_CD}
+          , @{GV_BU_CD}
+          , @{fromWeek}
+          , @{confirmYn}
+          , @{GV_USER_ID}
+          , DBO.UFN_GETDATE()
+          , @{GV_USER_ID}
+          , DBO.UFN_GETDATE()
+        );     
+    </update>
+    
+    <select id="materialSummaryExcelSqlSelect" parameterType="map" resultType="map">
+    /****** [ snop.oprtKpi.materialSummaryExcelSqlSelect ] ******/
+        SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+        , A2.ACTION_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+                 , ACTION_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD = @{popUpMenuCd}
+              AND ACTION_CD IN ('EXCEL','SQL')
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+        , A2.ACTION_CD
+    
+    </select>
+    
+</mapper>

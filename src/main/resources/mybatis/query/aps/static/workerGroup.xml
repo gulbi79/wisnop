@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	<select id="workerGroupListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workerGroupListSelect ] ******/
+		WITH W_ITEM AS 
+		(
+		    <include refid="snop.common.t_itemCust" />
+		),
+	    W_PROD_CATE AS
+	    (
+			SELECT MC2.CODE_CD
+		    	 , MC2.CODE_NM 
+			     , MI.ITEM_CD
+			     , MIPG.WORKER_GROUP
+			     , MIPG.VALID_FLAG
+			     , MI.COMPANY_CD
+			     , MI.BU_CD
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			   ON MIP.COMPANY_CD = MI.COMPANY_CD
+			  AND MIP.BU_CD = MI.BU_CD
+			  AND MIP.PLANT_CD = 'WF01'
+			  AND MIP.ITEM_CD = MI.ITEM_CD
+			INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			   ON MC1.BU_CD = MIP.BU_CD
+			  AND MC1.GROUP_CD = 'PROD_L2'
+			  AND MC1.CODE_CD = MIP.ROUTING_ID
+			INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			   ON MC2.BU_CD = MC1.BU_CD
+			  AND MC2.GROUP_CD = 'PROD_PART'
+			  AND MC2.CODE_CD = MC1.ATTB_2_CD
+			LEFT OUTER JOIN TB_MST_ITEM_WORKER_GROUP MIPG WITH(NOLOCK)
+			  ON MIPG.COMPANY_CD = MI.COMPANY_CD
+			 AND MIPG.BU_CD = MI.BU_CD
+			 AND MIPG.ITEM_CD = MI.ITEM_CD
+			WHERE 1 = 1
+			#if($_parameter.prodPart and $_parameter.prodPart != "")
+		      AND MC2.CODE_CD IN ('$_parameter.prodPart.replace(",","','")')
+		  	#end
+	    )
+	    SELECT B.*
+	    FROM
+	    (
+		    SELECT NULL AS TMP_COL
+			    <include refid="include.getCdDimTotal"/>
+			    <include refid="include.getGrpLvlId"/>
+			    #foreach( $meaMap in $_parameter.meaList )
+		         , MAX(CASE WHEN WORKER_GROUP = '${meaMap.CD}' THEN VALID_FLAG END) AS ${meaMap.CD}_NM
+	       		#end
+	       	  	 , MAX(FIREWORK_YN_HIDDEN) AS FIREWORK_YN_HIDDEN
+		    FROM
+		    (
+			    SELECT A1.COMPANY_CD
+		             , A1.BU_CD
+		             , ISNULL (A1.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+		             , ISNULL (A1.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+		             , ISNULL (A1.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+		             , ISNULL (A1.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+		             , ISNULL (A1.ROUTING_ID, ' ')        AS ROUTING_ID
+		             , ISNULL (A1.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+		             , ISNULL (A1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+		             , ISNULL (A1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+		             , ISNULL (A1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+		             , ISNULL (A1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+		             , ISNULL (A1.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+		             , ISNULL (A1.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+		             , ISNULL (A1.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+		             , ISNULL (A1.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+		             , ISNULL (A1.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+		             , ISNULL (A1.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+		             , ISNULL (A1.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+		             , ISNULL (A1.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+		             , ISNULL (A1.ITEM_CD, ' ')           AS ITEM_CD
+		             , ISNULL (A1.ITEM_CD, ' ')           AS ITEM_CD_NM
+		             , ISNULL (A1.ITEM_NM, ' ')           AS ITEM_NM
+		             , ISNULL (A1.ITEM_NM, ' ')           AS ITEM_NM_NM
+		             , ISNULL (A1.SPEC, ' ')              AS SPEC
+		             , ISNULL (A1.SPEC, ' ')              AS SPEC_NM
+		             , ISNULL (A1.DRAW_NO, ' ')           AS DRAW_NO
+		             , ISNULL (A1.DRAW_NO, ' ')           AS DRAW_NO_NM
+		             , ISNULL (A1.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+		             , ISNULL (A1.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+		             , ISNULL (A1.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+		             , ISNULL (A1.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+		             , ISNULL (A1.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+		             , ISNULL (A1.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+		             , ISNULL (A1.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+		             , ISNULL (A1.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+		             , ISNULL (A1.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+		             , ISNULL (A1.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+		             , ISNULL (A1.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+		             , ISNULL (A1.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+		             , ISNULL (A1.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+	               	 , ISNULL (A1.PROCUR_TYPE, ' ') AS PROCUR_TYPE_NM
+			         , ISNULL (CAST (A1.MFG_LT AS NVARCHAR(20)), ' ')          AS MFG_LT
+		             , ISNULL (CAST (A1.MFG_LT AS NVARCHAR(20)), ' ')          AS MFG_LT_NM
+		             , ISNULL (CAST (A1.PUR_LT AS NVARCHAR(20)), ' ')          AS PUR_LT
+		             , ISNULL (CAST (A1.PUR_LT AS NVARCHAR(20)), ' ')          AS PUR_LT_NM
+		             , ISNULL (CAST (A1.SS_QTY AS NVARCHAR(20)), ' ')          AS SS_QTY
+		             , ISNULL (CAST (A1.SS_QTY AS NVARCHAR(20)), ' ')          AS SS_QTY_NM
+		             , ISNULL (CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+		             , ISNULL (CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+	                 , ISNULL (A1.CPFR_YN, ' ') AS CPFR_YN
+			         , ISNULL (A1.CPFR_YN, ' ') AS CPFR_YN_NM
+	                 , ISNULL (A1.UOM_CD, ' ')  AS UOM_CD
+			         , ISNULL (A1.UOM_CD, ' ')  AS UOM_CD_NM
+			         , ISNULL (A1.CUST_CD, ' ') AS REP_CUST_CD
+			         , ISNULL (A1.CUST_CD, ' ') AS REP_CUST_CD_NM
+	                 , ISNULL (A1.CUST_NM, ' ') AS REP_CUST_NM
+			         , ISNULL (A1.CUST_NM, ' ') AS REP_CUST_NM_NM
+		             , ISNULL( A2.CODE_CD, ' ') AS PART_CD	             
+		             , ISNULL( A2.CODE_CD, ' ') AS PART_CD_NM	             
+		             , ISNULL( A2.CODE_NM, ' ') AS PART_NM
+		             , ISNULL( A2.CODE_NM, ' ') AS PART_NM_NM
+		             , ISNULL( A1.UPPER_ITEM_GROUP_CD, ' ') AS UPPER_ITEM_GROUP_CD
+		             , ISNULL( A1.UPPER_ITEM_GROUP_CD, ' ') AS UPPER_ITEM_GROUP_CD_NM
+		             , ISNULL( A1.UPPER_ITEM_GROUP_NM, ' ') AS UPPER_ITEM_GROUP_NM
+		             , ISNULL( A1.UPPER_ITEM_GROUP_NM, ' ') AS UPPER_ITEM_GROUP_NM_NM
+		             , ISNULL( A1.SS_YN, ' ') AS SS_YN
+		             , ISNULL( A1.SS_YN, ' ') AS SS_YN_NM
+		             , ISNULL( A1.FIREWORK_YN, ' ') AS FIREWORK_YN
+		             , ISNULL( A1.FIREWORK_YN, ' ') AS FIREWORK_YN_NM
+		             , ISNULL( A1.FIREWORK_YN, ' ') AS FIREWORK_YN_HIDDEN
+		             , A2.WORKER_GROUP
+		             , A2.VALID_FLAG
+				FROM W_ITEM A1
+			    INNER JOIN W_PROD_CATE A2
+			       ON A1.COMPANY_CD = A2.COMPANY_CD
+			      AND A1.BU_CD = A2.BU_CD
+			      AND A1.ITEM_CD = A2.ITEM_CD
+				WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND A1.BU_CD      = @{GV_BU_CD}
+			) A
+			GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+		) B
+		WHERE B.GRP_LVL_ID = 0
+		#if($_parameter.fireWorkYn and $_parameter.fireWorkYn != "")
+	      AND B.FIREWORK_YN_HIDDEN = @{fireWorkYn}
+	  	#end
+	    ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		  , B.$dimMap.DIM_CD
+		#end 
+	</select>
+	
+	<select id="measureWorkerListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.measureWorkerListSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                ELSE CODE_NM
+	           END AS CODE_NM
+		     , ATTB_1_CD
+		     , ATTB_1_NM
+		     , ATTB_2_CD
+		     , ATTB_2_NM
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE GROUP_CD = 'WORKER_GROUP'
+		  AND USE_FLAG = 'Y'
+		ORDER BY SORT 
+	</select>
+	
+	<select id="workerGroupRoutingSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.workerGroupRoutingSelect ] ******/
+		
+		  DECLARE @DIFFUSION_LAM_TEL_COMMON_ROLE NVARCHAR(10);
+        DECLARE @COMMON_DETAIL_ROLE_CNT INT; -- 사용자가 가진 공통권한과 세부권한 개수를 세어 공통권한과 세부권한을 2개 이상가지고 있을 경우 권한 부여하지 않기 위한변수
+            
+        
+        -- 공통권한인지 세부 권한 인부 구분하여 TB_MST_CODE테이블 GRP_CODE:PROD_L2, ATTB8_CD/ATTB9_CD 중 어느 CODE를 참조할지 분기 타기 위한 변수
+        SELECT @DIFFUSION_LAM_TEL_COMMON_ROLE = ROLE_CD
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0009','PRO0010', 'PRO0011')
+        
+        
+        SELECT @COMMON_DETAIL_ROLE_CNT = COUNT(*)
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0006','PRO0007', 'PRO0008', 'PRO0009','PRO0010', 'PRO0011')
+        
+        
+        IF @COMMON_DETAIL_ROLE_CNT <![CDATA[>=]]> 1 AND @COMMON_DETAIL_ROLE_CNT <![CDATA[<]]> 2 
+        BEGIN
+        
+                            
+                            IF @DIFFUSION_LAM_TEL_COMMON_ROLE = 'PRO0009' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0010' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0011' 
+                            BEGIN
+                            
+                                              
+                                        SELECT MC.CODE_CD
+                                        FROM(
+                                        
+                                        SELECT A2.ROLE_CD
+                                                FROM
+                                                (
+                                                    SELECT BU_CD
+                                                         , ROLE_CD
+                                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                                                    WHERE USER_ID = @{GV_USER_ID}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND USE_FLAG = 'Y'
+                                                ) A1
+                                                INNER JOIN
+                                                (
+                                                    SELECT COMPANY_CD
+                                                         , BU_CD
+                                                         , ROLE_CD
+                                                         , MENU_CD
+                                                    FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND MENU_CD IN ('APS10601', 'APS10602', 'APS10603', 'APS10604')
+                                                      AND ACTION_CD = 'SAVE'
+                                                      AND USE_FLAG = 'Y'
+                                                ) A2
+                                                ON A1.BU_CD = A2.BU_CD
+                                                AND A1.ROLE_CD = A2.ROLE_CD
+                                                GROUP BY A2.ROLE_CD
+                                        ) R
+                                        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                        ON R.ROLE_CD = MC.ATTB_9_CD
+                                        AND MC.BU_CD = 'QT'
+                                        AND MC.GROUP_CD = 'PROD_L2'
+                                                
+                              END
+                            ELSE
+                            BEGIN
+                                      
+                                                
+                                        SELECT MC.CODE_CD
+                                        FROM(
+                                        
+                                        SELECT A2.ROLE_CD
+                                                FROM
+                                                (
+                                                    SELECT BU_CD
+                                                         , ROLE_CD
+                                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                                                    WHERE USER_ID = @{GV_USER_ID}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND USE_FLAG = 'Y'
+                                                ) A1
+                                                INNER JOIN
+                                                (
+                                                    SELECT COMPANY_CD
+                                                         , BU_CD
+                                                         , ROLE_CD
+                                                         , MENU_CD
+                                                    FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND MENU_CD IN ('APS10601', 'APS10602', 'APS10603', 'APS10604')
+                                                      AND ACTION_CD = 'SAVE'
+                                                      AND USE_FLAG = 'Y'
+                                                ) A2
+                                                ON A1.BU_CD = A2.BU_CD
+                                                AND A1.ROLE_CD = A2.ROLE_CD
+                                                GROUP BY A2.ROLE_CD
+                                        ) R
+                                        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                        ON R.ROLE_CD = MC.ATTB_8_CD
+                                        AND MC.BU_CD = 'QT'
+                                        AND MC.GROUP_CD = 'PROD_L2'
+                            END
+                   
+          END
+          
+          
+        IF @{GV_USER_ID} = '00602'
+        BEGIN
+        
+                
+                IF @DIFFUSION_LAM_TEL_COMMON_ROLE = 'PRO0009' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0010' OR @DIFFUSION_LAM_TEL_COMMON_ROLE='PRO0011' 
+                            BEGIN
+                            
+                                              
+                                        SELECT MC.CODE_CD
+                                        FROM(
+                                        
+                                        SELECT A2.ROLE_CD
+                                                FROM
+                                                (
+                                                    SELECT BU_CD
+                                                         , ROLE_CD
+                                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                                                    WHERE USER_ID = @{GV_USER_ID}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND USE_FLAG = 'Y'
+                                                ) A1
+                                                INNER JOIN
+                                                (
+                                                    SELECT COMPANY_CD
+                                                         , BU_CD
+                                                         , ROLE_CD
+                                                         , MENU_CD
+                                                    FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND MENU_CD IN ('APS10601', 'APS10602', 'APS10603', 'APS10604')
+                                                      AND ACTION_CD = 'SAVE'
+                                                      AND USE_FLAG = 'Y'
+                                                ) A2
+                                                ON A1.BU_CD = A2.BU_CD
+                                                AND A1.ROLE_CD = A2.ROLE_CD
+                                                GROUP BY A2.ROLE_CD
+                                        ) R
+                                        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                        ON R.ROLE_CD = MC.ATTB_9_CD
+                                        AND MC.BU_CD = 'QT'
+                                        AND MC.GROUP_CD = 'PROD_L2'
+                                                
+                              END
+                            ELSE
+                            BEGIN
+                                      
+                                                
+                                        SELECT MC.CODE_CD
+                                        FROM(
+                                        
+                                        SELECT A2.ROLE_CD
+                                                FROM
+                                                (
+                                                    SELECT BU_CD
+                                                         , ROLE_CD
+                                                    FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                                                    WHERE USER_ID = @{GV_USER_ID}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND USE_FLAG = 'Y'
+                                                ) A1
+                                                INNER JOIN
+                                                (
+                                                    SELECT COMPANY_CD
+                                                         , BU_CD
+                                                         , ROLE_CD
+                                                         , MENU_CD
+                                                    FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                                                    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                                      AND BU_CD = @{GV_BU_CD}
+                                                      AND MENU_CD IN ('APS10601', 'APS10602', 'APS10603', 'APS10604')
+                                                      AND ACTION_CD = 'SAVE'
+                                                      AND USE_FLAG = 'Y'
+                                                ) A2
+                                                ON A1.BU_CD = A2.BU_CD
+                                                AND A1.ROLE_CD = A2.ROLE_CD
+                                                GROUP BY A2.ROLE_CD
+                                        ) R
+                                        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                        ON R.ROLE_CD = MC.ATTB_8_CD
+                                        AND MC.BU_CD = 'QT'
+                                        AND MC.GROUP_CD = 'PROD_L2'
+                            END
+		
+		
+		END
+		
+		
+		
+	</select>
+	
+	<select id="workerGroupAuthoritySelect" parameterType="map" resultType="map">
+        /****** [ aps.static.workerGroupAuthoritySelect ] ******/
+        
+          DECLARE @DIFFUSION_LAM_TEL_COMMON_ROLE NVARCHAR(10);
+        DECLARE @COMMON_DETAIL_ROLE_CNT INT; -- 사용자가 가진 공통권한과 세부권한 개수를 세어 공통권한과 세부권한을 2개 이상가지고 있을 경우 권한 부여하지 않기 위한변수
+            
+        
+        -- 공통권한인지 세부 권한 인부 구분하여 TB_MST_CODE테이블 GRP_CODE:PROD_L2, ATTB8_CD/ATTB9_CD 중 어느 CODE를 참조할지 분기 타기 위한 변수
+        SELECT @DIFFUSION_LAM_TEL_COMMON_ROLE = ROLE_CD
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0009','PRO0010', 'PRO0011')
+        
+        
+        SELECT @COMMON_DETAIL_ROLE_CNT = COUNT(*)
+        FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+        WHERE USER_ID = @{GV_USER_ID}
+        AND BU_CD = @{GV_BU_CD}
+        AND USE_FLAG = 'Y'
+        AND ROLE_CD IN ('PRO0006','PRO0007', 'PRO0008', 'PRO0009','PRO0010', 'PRO0011')
+        
+        
+        IF @COMMON_DETAIL_ROLE_CNT <![CDATA[>=]]> 1 AND @COMMON_DETAIL_ROLE_CNT <![CDATA[<]]> 2 
+        BEGIN
+        
+                          
+                  
+                  
+				SELECT A2.ROLE_CD
+		        FROM
+		        (
+				            SELECT BU_CD
+				                 , ROLE_CD
+				            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+				            WHERE USER_ID = @{GV_USER_ID}
+				              AND BU_CD = @{GV_BU_CD}
+				              AND USE_FLAG = 'Y'
+		        ) A1
+		        INNER JOIN
+		        (
+				            SELECT COMPANY_CD
+				                 , BU_CD
+				                 , ROLE_CD
+				                 , MENU_CD
+				            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+				            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				              AND BU_CD = @{GV_BU_CD}
+				              AND MENU_CD IN ('APS10601', 'APS10602', 'APS10603', 'APS10604')
+				              AND ACTION_CD = 'SAVE'
+				              AND USE_FLAG = 'Y'
+		        ) A2
+		        ON A1.BU_CD = A2.BU_CD
+		        AND A1.ROLE_CD = A2.ROLE_CD
+		        GROUP BY A2.ROLE_CD
+
+                   
+          END
+        
+        
+        IF @{GV_USER_ID} = '00602'
+        BEGIN
+        
+                
+                
+                
+                  
+                SELECT A2.ROLE_CD
+                FROM
+                (
+                            SELECT BU_CD
+                                 , ROLE_CD
+                            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+                            WHERE USER_ID = @{GV_USER_ID}
+                              AND BU_CD = @{GV_BU_CD}
+                              AND USE_FLAG = 'Y'
+                ) A1
+                INNER JOIN
+                (
+                            SELECT COMPANY_CD
+                                 , BU_CD
+                                 , ROLE_CD
+                                 , MENU_CD
+                            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+                            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                              AND BU_CD = @{GV_BU_CD}
+                              AND MENU_CD IN ('APS10601', 'APS10602', 'APS10603', 'APS10604')
+                              AND ACTION_CD = 'SAVE'
+                              AND USE_FLAG = 'Y'
+                ) A2
+                ON A1.BU_CD = A2.BU_CD
+                AND A1.ROLE_CD = A2.ROLE_CD
+                GROUP BY A2.ROLE_CD
+                
+        
+        
+        END
+        
+        
+    </select>
+	
+	
+	<update id="workerGroupListUpdate" parameterType="map">
+		/****** [ aps.static.workerGroupListUpdate ] ******/
+		BEGIN
+		
+			DECLARE BUCKET_LIST CURSOR FOR
+			#foreach ($bucketMap in $_parameter.BUCKET_LIST)
+			#if ($foreach.count != 1)
+			  UNION ALL
+			#end
+			  SELECT '$bucketMap.WORKER_GROUP' AS WORKER_GROUP
+			       , '$bucketMap.VALID_FLAG' AS VALID_FLAG
+			#end
+			
+			OPEN BUCKET_LIST
+	                
+	        DECLARE @WORKER_GROUP nvarchar(50)
+	        DECLARE @VALID_FLAG   nvarchar(6)
+	        
+	        FETCH NEXT FROM BUCKET_LIST INTO @WORKER_GROUP, @VALID_FLAG
+	        
+	        WHILE (@@FETCH_STATUS = 0)
+	            BEGIN
+					IF (@VALID_FLAG = 'NULL')
+						BEGIN
+							UPDATE TB_MST_ITEM_WORKER_GROUP
+							   SET VALID_FLAG = NULL
+							     , UPDATE_ID     = CASE WHEN VALID_FLAG IS NULL THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                             , UPDATE_DTTM   = CASE WHEN VALID_FLAG IS NULL THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	                         WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+	                           AND BU_CD         = @{GV_BU_CD}
+	                           AND ITEM_CD       = @{ITEM_CD}
+	                           AND WORKER_GROUP  = @WORKER_GROUP
+						END
+					ELSE
+						BEGIN
+							MERGE TB_MST_ITEM_WORKER_GROUP AS A
+	                        USING (SELECT 'X' AS DUAL) AS B 
+	                        ON (  COMPANY_CD      = @{GV_COMPANY_CD}
+	                             AND BU_CD        = @{GV_BU_CD}
+	                             AND ITEM_CD      = @{ITEM_CD}
+	                             AND WORKER_GROUP = @WORKER_GROUP
+	                           )
+							WHEN MATCHED THEN
+	                        UPDATE
+	                           SET VALID_FLAG = @VALID_FLAG
+	                             , UPDATE_ID   = CASE WHEN VALID_FLAG = @VALID_FLAG THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                             , UPDATE_DTTM = CASE WHEN VALID_FLAG = @VALID_FLAG THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+							WHEN NOT MATCHED THEN
+	                        INSERT 
+	                        (
+	                        	COMPANY_CD
+	                          , BU_CD
+	                          , ITEM_CD
+	                          , WORKER_GROUP
+	                          , VALID_FLAG
+	                          , CREATE_ID
+	                          , CREATE_DTTM
+	                          , UPDATE_ID
+	                          , UPDATE_DTTM
+							) VALUES (
+	                            @{GV_COMPANY_CD}
+	                          , @{GV_BU_CD}
+	                          , @{ITEM_CD}
+	                          , @WORKER_GROUP
+	                          , @VALID_FLAG
+	                          , @{GV_USER_ID}
+	                          , DBO.UFN_GETDATE()
+	                          , @{GV_USER_ID}
+	                          , DBO.UFN_GETDATE()
+	                       );
+	                      END
+					FETCH NEXT FROM BUCKET_LIST INTO @WORKER_GROUP, @VALID_FLAG
+				END
+			CLOSE BUCKET_LIST
+			DEALLOCATE BUCKET_LIST
+		END;
+	</update>
+</mapper>

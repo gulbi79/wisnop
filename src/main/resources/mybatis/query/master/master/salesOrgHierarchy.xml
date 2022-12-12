@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.master">
+
+	<select id="salesOrgHierarchySelect" parameterType="map" resultType="map">
+		/****** [ master.master.salesOrgHierarchySelect ] ******/
+		<include refid="include.macros"/>
+		#getSalesOrgTree()
+		
+		SELECT S.COMPANY_CD
+		     , S.BU_CD
+		     , S.SALES_ORG_LVL1_CD
+		     , S.SALES_ORG_LVL1_NM
+		     , S.SALES_ORG_LVL2_CD
+		     , S.SALES_ORG_LVL2_NM
+		     , S.SALES_ORG_LVL3_CD
+		     , S.SALES_ORG_LVL3_NM
+		     , S.SALES_ORG_LVL4_CD
+		     , S.SALES_ORG_LVL4_NM
+		     , S.SALES_ORG_LVL5_CD
+		     , S.SALES_ORG_LVL5_NM
+		     /*
+		     2020-11-30
+			 UV_MAP_SALES_ORG 테이블 컬럼에 아래 컬럼 정보가 존재하지 않아 수정함
+			
+		     , CONVERT(VARCHAR(19), S.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , S.CREATE_ID
+		     , CONVERT(VARCHAR(19), S.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , S.UPDATE_ID
+		     */
+		FROM UV_MAP_SALES_ORG S WITH (NOLOCK)
+		WHERE S.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND S.BU_CD      = @{GV_BU_CD}
+		#set($treeAlias = "S")
+		<include refid="include.salesOrgTree"/>
+		ORDER BY S.SALES_ORG_LVL1_CD ASC, S.SALES_ORG_LVL2_CD ASC, S.SALES_ORG_LVL3_CD ASC, S.SALES_ORG_LVL4_CD ASC, S.SALES_ORG_LVL5_CD ASC
+	</select>
+
+</mapper>

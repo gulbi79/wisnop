@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	
+	<select id="noticeBoardSelect" parameterType="map" resultType="map">
+	/*** admin.noticeBoardSelect ***/
+	 SELECT DISTINCT
+	 KN.COMPANY_CD AS COMPANY_CD
+	 , KN.NOTICE_ID AS NOTICE_ID
+	 , KN.BU_CD AS BU_CD
+	 , KN.TITLE AS TITLE
+     , dbo.UFN_GET_USER_NAME(KN.USER_ID) AS USER_ID
+     , MU.USER_NM AS USER_NM
+     , KN.CONTENT AS CONTENT
+     , KN.USER_ID AS USER_ID_TEMP
+     , KN.UPDATE_ID AS UPDATE_ID_TEMP
+     , MC.CODE_CD AS TEAM_CD 
+     , CONVERT(VARCHAR(30), CAST(KN.REG_DATE AS DATE), 23) REG_DATE
+     , CONVERT(VARCHAR(30), CAST(KN.START_DATE AS DATE), 23) START_DATE
+     , CONVERT(VARCHAR(30), CAST(KN.CLOSE_DATE AS DATE), 23) CLOSE_DATE
+     , KN.FILE_NO AS FILE_NO
+     , CF.FILE_NM_ORG AS FILE_NM_ORG
+     , KN.CREATE_DTTM
+     , KN.NOTICE_STATUS_CD AS NOTICE_STATUS_CD
+     
+  	 FROM TB_SNOP_NOTICE KN WITH(NOLOCK)
+ 	 INNER JOIN TB_MST_USER MU WITH(NOLOCK)
+     ON MU.USER_ID = KN.CREATE_ID
+ 	 INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+     ON  MC.GROUP_CD = 'TEAM_CD'
+     AND MC.CODE_CD = KN.TEAM_CD
+     AND MC.BU_CD = KN.BU_CD
+     OUTER APPLY (
+              SELECT TOP 1 CF.FILE_NM_ORG
+                FROM TB_COMM_FILE CF WITH(NOLOCK)
+               WHERE CF.FILE_NO = KN.FILE_NO
+               	AND DEL_FLAG != 'Y'
+				ORDER BY CF.FILE_SEQ
+             ) CF
+ 	 WHERE KN.COMPANY_CD = @{GV_COMPANY_CD}
+     AND KN.DEL_FLAG != 'Y'
+   
+   	 #if($_parameter.txtMeetingNoteId and $_parameter.txtMeetingNoteId !="" ) 
+		AND   KN.NOTICE_ID  LIKE '%'+ @{txtMeetingNoteId}+'%'
+	#end 
+	#if($_parameter.txtMeetingTitle and $_parameter.txtMeetingTitle !="" ) 
+		AND  KN.TITLE   LIKE '%'+ @{txtMeetingTitle}+'%'
+	#end 
+	#if($_parameter.showYn and $_parameter.showYn !="" ) 
+		AND   KN.NOTICE_STATUS_CD  LIKE '%'+ @{showYn}+'%'
+	#end 
+	#if($_parameter.team and $_parameter.team !="" ) 
+		
+		AND   MC.CODE_CD IN ('$_parameter.team.replace(",","','")')
+	#end 
+	#if($_parameter.manager_nm and $_parameter.manager_nm !="" ) 
+		
+		AND  (MU.USER_NM LIKE '%' + @{manager_nm}+ '%'  OR  KN.CREATE_ID  LIKE '%' + @{manager_nm}+ '%'  )
+	
+	#end 
+	#if($_parameter.txtSearchReqmt and $_parameter.txtSearchReqmt !="" ) 
+
+		AND   KN.CONTENT  LIKE '%'+ @{txtSearchReqmt}+'%'
+		
+	#end
+   
+	AND CONVERT(VARCHAR,KN.CREATE_DTTM,112) BETWEEN @{fromCal} AND @{toCal} 
+	ORDER BY KN.CREATE_DTTM DESC
+	
+	
+	</select>
+	
+	
+	<select id="noticeBoardPopupSelect" parameterType="map" resultType="map">
+	/*** admin.noticeBoardPopupSelect ***/
+	/*
+		현재 팝업에 대한 유효기간 filter 적용하지 않은 상태
+		
+		test 후 유효기간 안에 있는 공지사항만 메인화면에 출력하도록 filter 조건 추가  필요
+		
+	*/
+	
+	
+	 SELECT DISTINCT
+	 KN.NOTICE_ID AS NOTICE_ID
+	 , KN.FILE_NO AS FILE_NO
+	 , KN.CREATE_DTTM AS CREATE_DTTM
+  	 
+  	 FROM TB_SNOP_NOTICE KN WITH(NOLOCK)
+ 	 
+ 	 WHERE KN.COMPANY_CD = @{GV_COMPANY_CD}
+     AND KN.DEL_FLAG != 'Y'
+   	 AND KN.NOTICE_STATUS_CD ='OP'
+ 	 AND CONVERT(VARCHAR,dbo.UFN_GETDATE() ,112) BETWEEN KN.START_DATE AND KN.CLOSE_DATE
+	ORDER BY KN.CREATE_DTTM DESC
+	
+	
+	</select>
+	
+	<select id="noticeBoardPopupContentSelect" parameterType="map" resultType="map">
+	/*** admin.noticeBoardPopupContentSelect ***/
+	
+	 SELECT DISTINCT
+	   KN.CONTENT AS CONTENT
+	 , KN.TITLE   AS TITLE
+	 , dbo.UFN_GET_USER_NAME(KN.USER_ID) AS USER_ID
+	 , CASE WHEN 'ko'=@{GV_LANG} THEN MC.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC.CODE_NM_CN
+	            ELSE MC.CODE_NM 
+	       		END								AS TEAM_CD
+	 , CONVERT(VARCHAR(30), CAST(KN.REG_DATE AS DATE), 23) AS REG_DATE
+	 , CONVERT(VARCHAR(30), CAST(KN.START_DATE AS DATE), 23) AS START_DATE
+	 , CONVERT(VARCHAR(30), CAST(KN.CLOSE_DATE AS DATE), 23) AS CLOSE_DATE
+	
+	 FROM TB_SNOP_NOTICE KN WITH(NOLOCK)
+ 	 INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+     ON  MC.GROUP_CD = 'TEAM_CD'
+     AND MC.CODE_CD = KN.TEAM_CD
+     AND MC.BU_CD = KN.BU_CD
+ 	 WHERE KN.COMPANY_CD = @{GV_COMPANY_CD}
+     AND KN.DEL_FLAG != 'Y'
+     AND KN.NOTICE_ID =@{NOTICE_ID}
+ 
+	</select>
+	
+	
+	
+		
+	
+	<insert id="noticeBoardInsert">
+	
+	
+	/****** [ admin.noticeBoardInsert ] ******/
+	/* TB_SNOP_NOTICE   PRIMARY KEY:COMPANY_CD,  NOTICE_ID   */
+    BEGIN 
+    
+		DECLARE @P_NOTICE_ID  nvarchar(9)
+		
+		SET @P_NOTICE_ID = (SELECT dbo.UFN_GET_NOTICE_ID())
+		
+	    INSERT INTO TB_SNOP_NOTICE (
+	            COMPANY_CD
+	          , NOTICE_ID
+	          , BU_CD
+	          , TITLE
+	          , CONTENT
+	          , USER_ID
+	          , TEAM_CD
+	          , REG_DATE
+	          , START_DATE
+	          , CLOSE_DATE
+	          , NOTICE_STATUS_CD
+	          , FILE_NO
+	          , DEL_FLAG
+	          , CREATE_ID
+	          , CREATE_DTTM
+	          , UPDATE_ID
+	          , UPDATE_DTTM 
+	         
+	    ) VALUES (
+	            ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+	          , @P_NOTICE_ID
+	          , ISNULL(@{BU_CD},@{GV_BU_CD})
+	          , @{TITLE}
+	          , @{CONTENT}
+	          , @{USER_ID_TEMP}
+	          , @{TEAM_CD}
+	          , REPLACE (@{REG_DATE}, '-', '')
+	          , REPLACE (@{START_DATE}, '-', '')
+	          , REPLACE (@{CLOSE_DATE}, '-', '')
+	          , @{NOTICE_STATUS_CD}
+	          , @{FILE_NO}
+	          , ISNULL(@{DEL_FLAG}, 'N')
+	          , @{CREATE_ID}
+	          , DBO.UFN_GETDATE()
+	          , @{USER_ID_TEMP}
+	          , DBO.UFN_GETDATE()
+	        
+	    );
+    END;
+    
+	
+	</insert>
+	
+	
+	
+	<update id="noticeBoardUpdate" parameterType="map">
+		/****** [ admin.noticeBoardUpdate ] ******/
+		/* TB_SNOP_NOTICE   PRIMARY KEY:COMPANY_CD,  NOTICE_ID, BU_CD   */
+		
+		
+		
+		UPDATE TB_SNOP_NOTICE
+		SET  
+	           TITLE = @{TITLE}
+	          , CONTENT = @{CONTENT}
+	          , USER_ID = @{UPDATE_ID_TEMP}
+	          , TEAM_CD = @{TEAM_CD}
+	          , REG_DATE = REPLACE (@{REG_DATE}, '-', '')
+	          , START_DATE = REPLACE (@{START_DATE}, '-', '')
+	          , CLOSE_DATE = REPLACE (@{CLOSE_DATE}, '-', '')
+	          , NOTICE_STATUS_CD = @{NOTICE_STATUS_CD}
+	          , FILE_NO = @{FILE_NO}
+	          , DEL_FLAG = ISNULL(@{DEL_FLAG}, 'N')
+	          , UPDATE_ID = @{UPDATE_ID_TEMP}
+	          , UPDATE_DTTM = DBO.UFN_GETDATE()
+		  
+		WHERE COMPANY_CD = @{COMPANY_CD}
+		 AND NOTICE_ID =@{NOTICE_ID}
+		 AND BU_CD = ISNULL(@{BU_CD},@{GV_BU_CD})
+		
+	
+	</update>
+	
+	
+	<update id="noticeBoardDelete" parameterType="map">
+		/****** [ admin.noticeBoardDelete ] ******/
+		/* TB_SNOP_NOTICE   PRIMARY KEY:COMPANY_CD,  NOTICE_ID, BU_CD   */
+		
+		
+		
+		UPDATE TB_SNOP_NOTICE
+		SET  
+	           DEL_FLAG = 'Y'
+	          , UPDATE_ID = @{UPDATE_ID_TEMP}
+	          , UPDATE_DTTM = DBO.UFN_GETDATE()
+		  
+		WHERE COMPANY_CD = @{COMPANY_CD}
+		 AND NOTICE_ID =@{NOTICE_ID}
+		 AND BU_CD = ISNULL(@{BU_CD},@{GV_BU_CD})
+		
+	
+	</update>
+	
+	
+	
+	
+	
+	<!-- noticeBoard"+"isAdmin -->
+	<select id="noticeBoardIsAdmin" parameterType="map" resultType="map">
+	/*** admin.noticeBoardIsAdminSelect ***/
+	BEGIN
+	
+	with USER_ROLE AS(
+		select *
+		from TB_MAP_USER_ROLE
+	where USER_ID = @{USER_ID})
+
+	/* GOCQT0001: SCM팀 ROLE CODE */
+	/* ADMINDP0001: ADMIN ROLE CODE */
+	/* QCT0001: QC ROLE CODE */
+	
+	
+	
+	SELECT COUNT(*) AS isSCMTeamAdmin
+	FROM USER_ROLE
+	WHERE ROLE_CD = 'ADMINDP0001'
+	OR ROLE_CD = 'GOCQT0001'
+	
+	END;
+	
+	</select>
+	
+	
+	<update id="noticeBoardFileNoUpdate" parameterType="map">
+		/****** [ admin.noticeBoardFileNoUpdate ] ******/
+		
+	/* TB_SNOP_NOTICE PRIMARY KEY:COMPANY_CD, BU_CD, NOTICE_ID   */
+	
+	UPDATE TB_SNOP_NOTICE
+	SET FILE_NO = @{FILE_NO}
+	WHERE COMPANY_CD = @{COMPANY_CD}
+	 AND BU_CD = ISNULL(@{BU_CD},@{GV_BU_CD})
+	  AND NOTICE_ID   = @{NOTICE_ID}
+	
+	
+	</update>
+	
+	
+	
+	
+</mapper>

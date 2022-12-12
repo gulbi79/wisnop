@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	<select id="ovenSchSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.ovenSchSelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT MR.COMPANY_CD
+			     , MR.BU_CD
+			     , MR.PLANT_CD
+			     , MC2.CODE_CD AS PROD_PART_CD
+			     , MC2.CODE_NM AS PROD_PART_NM
+			     , MWC.WC_CD
+			     , MWC.WC_NM
+			     , MR.RESOURCE_CD
+			     , MR.RESOURCE_NM
+			     , MR.CAMPUS_CD
+			     , MC3.CODE_NM AS CAMPUS_NM
+			     , MR.OVEN_RUN_TIME / 60 AS OVEN_RUN_TIME
+			     , RANK() OVER(PARTITION BY MR.COMPANY_CD, MR.BU_CD, MR.PLANT_CD, MR.RESOURCE_CD ORDER BY MOS.SEQ) AS RN
+			     , MOS.START_TIME
+			     , REPLACE(CONVERT(NVARCHAR(5), DATEADD(SS, MR.OVEN_RUN_TIME, CAST('20190101' + ' ' + LEFT(REPLACE(MOS.START_TIME, '2400', '0000'), 2) + ':' + RIGHT(REPLACE(MOS.START_TIME, '2400', '0000'), 2) + ':00' AS DATETIME)), 108), ':', '') AS END_TIME
+			     , MOS.SEQ
+			     , MC2.SORT AS MC2_SORT
+			     , MC3.SORT AS MC3_SORT
+			FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+			INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+			   ON MWC.COMPANY_CD = MR.COMPANY_CD
+			  AND MWC.BU_CD = MR.BU_CD
+			  AND MWC.PLANT_CD = MR.PLANT_CD
+			  AND MWC.WC_CD = MR.WC_CD
+			INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			   ON MC1.BU_CD = MWC.BU_CD
+			  AND MC1.GROUP_CD = 'PROD_L2'
+			  AND MC1.CODE_CD = MWC.ROUTING_ID
+			INNER JOIN 
+			(
+				SELECT A.BU_CD
+                     , A.GROUP_CD
+                     , A.CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN A.CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN A.CODE_NM_CN
+                            ELSE A.CODE_NM
+                     	END AS CODE_NM
+                     , A.SORT
+				FROM TB_MST_CODE A WITH(NOLOCK)
+            ) MC2
+			ON MC2.BU_CD = MC1.BU_CD
+			AND MC2.GROUP_CD = 'PROD_PART'
+			AND MC2.CODE_CD = MC1.ATTB_2_CD
+			INNER JOIN 
+			(
+				SELECT A.BU_CD
+                     , A.GROUP_CD
+                     , A.CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN A.CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN A.CODE_NM_CN
+                            ELSE A.CODE_NM
+                     	END AS CODE_NM
+                     , A.SORT
+                FROM TB_MST_CODE A WITH(NOLOCK)
+            ) MC3
+			ON MC3.BU_CD = MR.BU_CD
+			AND MC3.GROUP_CD = 'CAMPUS_CD'
+			AND MC3.CODE_CD = MR.CAMPUS_CD
+			LEFT OUTER JOIN TB_MST_OVEN_SCHED MOS WITH(NOLOCK)
+			  ON MOS.COMPANY_CD = MR.COMPANY_CD
+			 AND MOS.BU_CD = MR.BU_CD
+			 AND MOS.PLANT_CD = MR.PLANT_CD
+			 AND MOS.RESOURCE_CD = MR.RESOURCE_CD
+			 AND MOS.USE_FLAG = 'Y'
+			WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MR.BU_CD = @{GV_BU_CD}
+			  AND MR.PLANT_CD = 'WF01'
+			  AND MR.RESOURCE_TYPE = 'M'
+			  AND MR.OVEN_FLAG = 'Y'
+			  AND MR.USE_FLAG = 'Y'
+		)
+		SELECT A.COMPANY_CD
+		     , A.BU_CD
+		     , A.PLANT_CD
+		     , A.PROD_PART_CD
+		     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+		     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+		     , ISNULL(A.WC_CD, ' ') AS WC_CD
+		     , ISNULL(A.WC_CD, ' ') AS WC_CD_NM
+		     , ISNULL(A.WC_NM, ' ') AS WC_NM
+		     , ISNULL(A.WC_NM, ' ') AS WC_NM_NM
+		     , ISNULL(A.RESOURCE_CD, ' ') AS RESOURCE_CD
+		     , ISNULL(A.RESOURCE_CD, ' ') AS RESOURCE_CD_NM
+		     , ISNULL(A.RESOURCE_NM, ' ') AS RESOURCE_NM
+		     , ISNULL(A.RESOURCE_NM, ' ') AS RESOURCE_NM_NM
+		     , A.CAMPUS_CD
+		     , ISNULL(A.CAMPUS_NM, ' ') AS CAMPUS_NM
+		     , ISNULL(A.CAMPUS_NM, ' ') AS CAMPUS_NM_NM
+		     , ISNULL(A.OVEN_RUN_TIME, ' ') AS OVEN_RUN_TIME
+		     , ISNULL(A.OVEN_RUN_TIME, ' ' ) AS OVEN_RUN_TIME_NM
+		     , ISNULL(A.RN, 0) AS RN
+		     , ISNULL(A.RN, 0) AS RN_NM
+		     , A.START_TIME
+		     , A.END_TIME
+		     , A.SEQ
+		FROM W_MAIN A
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD = @{GV_BU_CD}
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+		  AND A.PROD_PART_CD IN ('$_parameter.prodPart.replace(",","','")')
+		#end
+		#if($_parameter.workplaces and $_parameter.workplaces != "")
+		  AND A.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+		#end
+		#if($_parameter.resource and $_parameter.resource != "")
+		  AND (A.RESOURCE_CD LIKE '%' + @{resource} + '%' OR RESOURCE_NM LIKE '%' + @{resource} + '%')
+		#end
+		ORDER BY A.MC2_SORT, A.WC_CD, A.RESOURCE_CD, A.MC3_SORT, A.SEQ
+	</select>
+	
+	<select id="ovenSchAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.ovenSchAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS11401', 'APS11402', 'APS11403','APS11404')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<insert id="ovenSchMerge" parameterType="map">
+		/****** [ aps.static.ovenSchMerge ] ******/
+		MERGE TB_MST_OVEN_SCHED A
+		USING 
+		(
+			SELECT @{COMPANY_CD}   AS COMPANY_CD
+		         , @{BU_CD}        AS BU_CD
+		         , @{PLANT_CD}     AS PLANT_CD
+		         , @{RESOURCE_CD}  AS RESOURCE_CD
+				#if($_parameter.SEQ and $_parameter.SEQ != "")
+		         , @{SEQ}          AS SEQ
+				#else
+		         , (
+						SELECT ISNULL(MAX(SEQ), 0) + 1 
+						FROM TB_MST_OVEN_SCHED
+						WHERE COMPANY_CD  = @{COMPANY_CD}
+						  AND BU_CD       = @{BU_CD}
+						  AND PLANT_CD    = @{PLANT_CD}
+						  AND RESOURCE_CD = @{RESOURCE_CD}
+		             ) AS SEQ
+				#end
+		) B
+		ON 
+		(
+			A.COMPANY_CD  = B.COMPANY_CD
+		    AND A.BU_CD       = B.BU_CD
+		    AND A.PLANT_CD    = B.PLANT_CD
+		    AND A.RESOURCE_CD = B.RESOURCE_CD
+		    AND A.SEQ         = B.SEQ
+		)
+		WHEN MATCHED THEN
+		    UPDATE SET START_TIME  = '$_parameter.START_TIME.replace(":","")'
+		         , USE_FLAG    = 'Y'
+		         , UPDATE_ID   = @{GV_USER_ID}
+		         , UPDATE_DTTM = dbo.UFN_GETDATE()
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+			COMPANY_CD
+		  , BU_CD
+		  , PLANT_CD
+		  , RESOURCE_CD
+		  , SEQ
+		  , START_TIME
+		  , USE_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		)VALUES(
+			B.COMPANY_CD
+		  , B.BU_CD
+		  , B.PLANT_CD
+		  , B.RESOURCE_CD
+		  , B.SEQ
+		  , '$_parameter.START_TIME.replace(":","")'
+		  , 'Y'
+		  , @{GV_USER_ID}
+		  , dbo.UFN_GETDATE()
+		);
+	</insert>
+	
+	<insert id="ovenSchDelete" parameterType="map">
+		/****** [ aps.static.ovenSchDelete ] ******/
+		UPDATE TB_MST_OVEN_SCHED
+		   SET USE_FLAG    = 'N'
+		     , UPDATE_ID   = @{GV_USER_ID}
+		     , UPDATE_DTTM = dbo.UFN_GETDATE()
+		 WHERE COMPANY_CD  = @{COMPANY_CD}
+		   AND BU_CD       = @{BU_CD}
+		   AND PLANT_CD    = @{PLANT_CD}
+		   AND RESOURCE_CD = @{RESOURCE_CD}
+		   AND SEQ         = @{SEQ}
+	</insert>
+
+</mapper>

@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="inputPlanAnalSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.inputPlanAnalSelect ] ******/
+		SELECT CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+			   		ELSE MC2.CODE_NM
+			  	END PROD_PART
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+			   		ELSE MC2.CODE_NM
+			  	END PROD_PART_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+			   		ELSE MC3.CODE_NM
+			  	END APS_DEMAND_TYPE
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+			   		ELSE MC3.CODE_NM
+			  	END APS_DEMAND_TYPE_NM
+		     , HAPIA.DEMAND_ID
+		     , HAPIA.DEMAND_ID AS DEMAND_ID_NM
+		     , HAPIA.SP_WEEK
+		     , HAPIA.SP_WEEK AS SP_WEEK_NM
+		     , HAPIA.PRIORITY AS APS_ADJ_PRIORITY
+		     , HAPIA.PRIORITY AS APS_ADJ_PRIORITY_NM
+		     , HAPIA.ITEM_CD
+		     , HAPIA.ITEM_CD AS ITEM_CD_NM
+		     , MI.ITEM_NM
+		     , MI.ITEM_NM AS ITEM_NM_NM
+		     , MI.SPEC
+		     , MI.SPEC AS SPEC_NM
+		     , MI.ITEM_GROUP_CD
+		     , MI.ITEM_GROUP_CD AS ITEM_GROUP_CD_NM
+		     , MIG.ITEM_GROUP_NM
+		     , MIG.ITEM_GROUP_NM AS ITEM_GROUP_NM_NM
+		     , MIP.ROUTING_ID
+		     , MIP.ROUTING_ID AS ROUTING_ID_NM
+		     , MI.ITEM_GRADE
+		     , MI.ITEM_GRADE AS ITEM_GRADE_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+			   		ELSE MC4.CODE_NM
+			  	END PROCUR_TYPE
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+			   		ELSE MC4.CODE_NM
+			  	END PROCUR_TYPE_NM
+			  	
+			 , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+			   		ELSE MC5.CODE_NM
+			  	END ITEM_TYPE_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+			   		ELSE MC5.CODE_NM
+			  	END ITEM_TYPE_NM_NM 	
+		     , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) AS SALES_PRICE_KRW
+		     , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) AS SALES_PRICE_KRW_NM
+		     , MC.CUST_NM AS REP_CUST_NM
+		     , MC.CUST_NM AS REP_CUST_NM_NM
+		     , MC.CUST_GROUP_NM
+		     , MC.CUST_GROUP_NM AS CUST_GROUP_NM_NM
+		     , MC.REP_CUST_GROUP_NM
+		     , MC.REP_CUST_GROUP_NM AS REP_CUST_GROUP_NM_NM
+		     , MIP.SS_QTY
+		     , MIP.SS_QTY AS SS_QTY_NM
+		     , MI.CPFR_YN
+		     , MI.CPFR_YN AS CPFR_YN_NM
+		     , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+		     , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN_NM
+		     , MI.FIREWORK_YN
+		     , MI.FIREWORK_YN AS FIREWORK_YN_NM
+		     , HAPIA.SP_QTY
+		     , HAPIA.SP_QTY AS SP_QTY_NM
+		     , HAPIA.INV_QTY AS BASE_INV_QTY
+		     , HAPIA.INV_QTY AS BASE_INV_QTY_NM
+		     , HAPIA.PROD_QTY AS PROD_SP_QTY
+		     , HAPIA.PROD_QTY AS PROD_SP_QTY_NM
+		     , HAPIA.REMAIN_INV_QTY
+		     , HAPIA.REMAIN_INV_QTY AS REMAIN_INV_QTY_NM
+		     , HAPIA.WIP_QTY AS BASE_WIP_QTY
+		     , HAPIA.WIP_QTY AS BASE_WIP_QTY_NM
+		     , HAPIA.PROD_QTY_NEW
+		     , HAPIA.PROD_QTY_NEW AS PROD_QTY_NEW_NM
+		     , HAPIA.REMAIN_WIP_QTY
+		     , HAPIA.REMAIN_WIP_QTY AS REMAIN_WIP_QTY_NM
+		     , HAPIA.FIN_QTY_W1
+		     , HAPIA.FIN_QTY_W1 AS FIN_QTY_W1_NM
+		     , HAPIA.PRE_QTY_W1
+		     , HAPIA.PRE_QTY_W1 AS PRE_QTY_W1_NM
+		     , HAPIA.PRE_QTY_W2
+		     , HAPIA.PRE_QTY_W2 AS PRE_QTY_W2_NM
+		     , HAPIA.PRE_QTY_W3
+		     , HAPIA.PRE_QTY_W3 AS PRE_QTY_W3_NM
+		     , HAPIA.PRE_QTY_W4
+		     , HAPIA.PRE_QTY_W4 AS PRE_QTY_W4_NM
+		     , HAPIA.PRE_QTY_W5
+		     , HAPIA.PRE_QTY_W5 AS PRE_QTY_W5_NM
+		     , HAPIA.PRE_QTY_W6
+		     , HAPIA.PRE_QTY_W6 AS PRE_QTY_W6_NM
+		FROM TB_HIS_APS_PROD_IN_ANALYZE HAPIA WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = HAPIA.COMPANY_CD
+		  AND MI.BU_CD = HAPIA.BU_CD
+		  AND MI.ITEM_CD = HAPIA.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MI.COMPANY_CD
+		 AND MC.BU_CD = MI.BU_CD
+		 AND MC.CUST_CD = MI.REP_CUST_CD
+		LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+		  ON MICG.COMPANY_CD = MI.COMPANY_CD
+		 AND MICG.BU_CD = MI.BU_CD
+		 AND MICG.ITEM_CD = MI.ITEM_CD
+		 AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+		LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		  ON MIG.COMPANY_CD = MI.COMPANY_CD
+		 AND MIG.BU_CD = MI.BU_CD
+		 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = MIP.BU_CD
+		 AND MC1.GROUP_CD = 'CL_SL_CD'
+		 AND MC1.CODE_CD = MIP.RCPT_SL_CD
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = HAPIA.BU_CD
+		 AND MC2.GROUP_CD = 'PROD_PART'
+		 AND MC2.CODE_CD = HAPIA.PROD_PART
+		 AND MC2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		  ON MC3.BU_CD = HAPIA.BU_CD
+		 AND MC3.GROUP_CD = 'APS_DEMAND_TYPE'
+		 AND MC3.CODE_CD = HAPIA.APS_DEMAND_TYPE
+		 AND MC3.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+		  ON MC4.BU_CD = 'ALL'
+		 AND MC4.GROUP_CD = 'PROCUR_TYPE'
+		 AND MC4.CODE_CD = MIP.PROCUR_TYPE
+		 AND MC4.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+		  ON MC5.BU_CD = 'ALL'
+		 AND MC5.GROUP_CD = 'ITEM_TYPE'
+		 AND MC5.CODE_CD = MI.ITEM_TYPE
+		 AND MC5.USE_FLAG = 'Y'
+		WHERE HAPIA.COMPANY_CD = @{GV_COMPANY_CD} 
+		  AND HAPIA.BU_CD = @{GV_BU_CD}
+  	    #if($_parameter.planId and $_parameter.planId != "")
+          AND HAPIA.PLAN_ID = @{planId}
+  	    #end
+  	    #if($_parameter.prodPart and $_parameter.prodPart != "")
+          AND MC2.CODE_CD IN ('$_parameter.prodPart.replace(",","','")')
+  	    #end
+  	    #if($_parameter.itemType and $_parameter.itemType != "")
+          AND MC5.CODE_CD IN ('$_parameter.itemType.replace(",","','")')
+  	    #end
+  	    #if($_parameter.route and $_parameter.route != "")
+          AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+  	    #end
+  	    #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+          AND MIG.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  	    #end
+  	    #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+          AND MC.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+  	    #end
+  	    #if($_parameter.reptCust and $_parameter.reptCust != "")
+          AND MC.CUST_NM LIKE '%' + @{reptCust} + '%'
+  	    #end
+  	    #if($_parameter.apsDemandType and $_parameter.apsDemandType != "")
+          AND MC3.CODE_CD IN ('$_parameter.apsDemandType.replace(",","','")')
+  	    #end
+  	    #if($_parameter.demandId and $_parameter.demandId != "")
+          AND HAPIA.DEMAND_ID LIKE '%' + @{demandId} + '%'
+  	    #end
+  	    #if($_parameter.inputConfirmYn == "Y")
+          AND HAPIA.FIN_QTY_W1 <![CDATA[>]]> 0
+        #elseif($_parameter.inputConfirmYn == "N")
+          AND ISNULL(HAPIA.FIN_QTY_W1, 0) = 0
+  	    #end
+		#if($_parameter.fromCal and $_parameter.fromCal != "" and $_parameter.toCal and $_parameter.toCal != "")
+		  AND HAPIA.SP_WEEK BETWEEN @{fromPWeek} AND @{toPWeek}
+		#end
+		#if($_parameter.item_cd and $_parameter.item_cd != "")
+		  AND MI.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		  AND (MI.ITEM_CD LIKE '%' + @{item_nm} + '%' OR MI.ITEM_NM LIKE '%' + @{item_nm} + '%')
+		#end
+		ORDER BY MC2.CODE_NM, HAPIA.PRIORITY
+		   
+	</select>
+</mapper>

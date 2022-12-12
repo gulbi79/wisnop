@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	<select id="productCategoryListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.productCategoryListSelect ] ******/
+		WITH W_ITEM AS 
+		(
+		    <include refid="snop.common.t_itemCust" />
+		),
+		W_EDIT_YN AS
+		(
+			SELECT COMPANY_CD
+			     , BU_CD
+			     , PLANT_CD
+			     , ITEM_CD
+				#foreach($meaMap in $_parameter.meaList)
+			     , $meaMap.CD_SUB AS '$meaMap.CD_SUB'
+			    #end
+  			FROM 
+  			(
+				SELECT DISTINCT MR.COMPANY_CD
+				     , MR.BU_CD
+				     , MR.PLANT_CD
+				     , MR.ITEM_CD
+					#if ($_parameter.prodPart == "TEL")
+					 , MC.ATTB_5_CD + '_YN' AS PROD_GROUP
+					#end
+					#if ($_parameter.prodPart == "LAM")
+					 , MC.ATTB_6_CD + '_YN' AS PROD_GROUP
+					#end
+					#if ($_parameter.prodPart == "DIFFUSION")
+					 , MC.ATTB_7_CD + '_YN' AS PROD_GROUP
+					#end
+					#if ($_parameter.prodPart == "MATERIAL")
+					 , MC.ATTB_8_CD + '_YN' AS PROD_GROUP
+					#end
+				     , 'Y' AS EDIT_YN
+				FROM TB_MST_ROUTING MR WITH(NOLOCK)
+				INNER JOIN TB_MST_ROUTING_PRIORITY MRP WITH(NOLOCK)
+				   ON MRP.COMPANY_CD = MR.COMPANY_CD
+				  AND MRP.BU_CD = MR.BU_CD
+				  AND MRP.ITEM_CD = MR.ITEM_CD
+				  AND MRP.ROUTING_NO = MR.ROUTING_NO 
+				  AND MRP.USE_FLAG = 'Y'
+				INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+			       ON MC.BU_CD = MR.BU_CD
+				  AND MC.GROUP_CD = 'ROUTE_CD'
+				  AND MC.CODE_CD = MR.JOB_CD
+				INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+           		   ON MC2.BU_CD = MR.BU_CD
+           		  AND MC2.GROUP_CD = 'PROD_ITEM_GROUP_MST'
+           		#if ($_parameter.prodPart == "TEL")
+				  AND MC2.CODE_CD = MC.ATTB_5_CD
+				#end
+				#if ($_parameter.prodPart == "LAM")
+				  AND MC2.CODE_CD = MC.ATTB_6_CD
+				#end
+				#if ($_parameter.prodPart == "DIFFUSION")
+				  AND MC2.CODE_CD = MC.ATTB_7_CD
+				#end
+				#if ($_parameter.prodPart == "MATERIAL")
+				  AND MC2.CODE_CD = MC.ATTB_8_CD
+				#end
+            	  AND MC2.ATTB_3_CD = MR.WC_CD 
+				WHERE MR.PLANT_CD = 'WF01'
+				  AND MR.H_VALID_FROM_DATE <![CDATA[<=]]> CONVERT(CHAR(8), DBO.UFN_GETDATE(), 112)
+				  AND MR.H_VALID_TO_DATE <![CDATA[>=]]> CONVERT(CHAR(8), DBO.UFN_GETDATE(), 112)
+				#if ($_parameter.prodPart == "TEL")
+				  AND ISNULL(MC.ATTB_5_CD, '') <![CDATA[<>]]> ''
+				#end
+				#if ($_parameter.prodPart == "LAM")
+				  AND ISNULL(MC.ATTB_6_CD, '') <![CDATA[<>]]> ''
+				#end
+				#if ($_parameter.prodPart == "DIFFUSION")
+				  AND ISNULL(MC.ATTB_7_CD, '') <![CDATA[<>]]> ''
+				#end
+				#if ($_parameter.prodPart == "MATERIAL")
+				  AND ISNULL(MC.ATTB_8_CD, '') <![CDATA[<>]]> ''
+				#end
+			) A
+			PIVOT (MAX(EDIT_YN) FOR PROD_GROUP IN 
+			(
+				#set($strCnt = "")
+           		#foreach($meaMap in $_parameter.meaList)
+					
+					#if($strCnt == "1")
+						,
+					#end
+					[$meaMap.CD_SUB]
+					#set($strCnt = "1")
+				#end 
+			)) PVT
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+		),
+	    W_PROD_CATE AS
+	    (
+			SELECT MC2.CODE_CD
+		    	 , MC2.CODE_NM 
+			     , MI.ITEM_CD
+			     , MIPG.PROD_GROUP
+			     , MIPG.PROD_GROUP_DET
+			     , MI.COMPANY_CD
+			     , MI.BU_CD
+			     , HAV.SALES_PLAN_YN
+	             , HAV.WIP_QTY
+	             , HAV.SP_QTY 
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			   ON MIP.COMPANY_CD = MI.COMPANY_CD
+			  AND MIP.BU_CD = MI.BU_CD
+			  AND MIP.PLANT_CD = 'WF01'
+			  AND MIP.ITEM_CD = MI.ITEM_CD
+			INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			   ON MC1.BU_CD = MIP.BU_CD
+			  AND MC1.GROUP_CD = 'PROD_L2'
+			  AND MC1.CODE_CD = MIP.ROUTING_ID
+			INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			   ON MC2.BU_CD = MC1.BU_CD
+			  AND MC2.GROUP_CD = 'PROD_PART'
+			  AND MC2.CODE_CD = MC1.ATTB_2_CD
+			LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+			  ON MIPG.COMPANY_CD = MI.COMPANY_CD
+			 AND MIPG.BU_CD = MI.BU_CD
+			 AND MIPG.ITEM_CD = MI.ITEM_CD
+			 AND MIPG.DEL_FLAG = 'N' 
+			OUTER APPLY 
+			(
+            	SELECT TOP 1 HAV.SALES_PLAN_YN
+                     , HAV.WIP_QTY
+                     , HAV.SP_QTY
+				FROM TB_HIS_APS_VALIDATION HAV WITH(NOLOCK)
+                INNER JOIN TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+                   ON MPV.COMPANY_CD = HAV.COMPANY_CD
+                  AND MPV.BU_CD = HAV.BU_CD
+                  AND MPV.PLAN_TYPE_CD = 'MP'
+                  AND MPV.PLAN_ID = HAV.PLAN_ID
+                WHERE HAV.COMPANY_CD = MI.COMPANY_CD
+                  AND HAV.BU_CD = MI.BU_CD
+                  AND HAV.PROD_PART = MC2.CODE_CD
+                  AND HAV.ITEM_CD = MI.ITEM_CD
+                ORDER BY MPV.START_WEEK DESC
+			) HAV 
+			WHERE 1 = 1
+			#if($_parameter.prodPart and $_parameter.prodPart != "")
+		      AND MC2.CODE_CD IN ('$_parameter.prodPart.replace(",","','")')
+		  	#end
+	    )
+	    SELECT B.*
+		    #foreach( $meaMap in $_parameter.meaList )
+		     , CASE WHEN '$meaMap.CD_SUB' = 'TEL_REPT_YN' THEN 'Y' ELSE ISNULL(C.$meaMap.CD_SUB, 'N') END '$meaMap.CD_SUB'
+		    #end
+	    FROM
+	    (
+		    SELECT NULL AS TMP_COL
+			    <include refid="include.getCdDimTotal"/>
+			    <include refid="include.getGrpLvlId"/>
+			    #foreach( $meaMap in $_parameter.meaList )
+			      , MAX(CASE WHEN PROD_GROUP = '${meaMap.CD}' THEN PROD_GROUP_DET END) AS ${meaMap.CD}_NM
+		       	#end
+		    FROM
+		    (
+			    SELECT A1.COMPANY_CD
+		             , A1.BU_CD
+		             , ISNULL (A1.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+		             , ISNULL (A1.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+		             , ISNULL (A1.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+		             , ISNULL (A1.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+		             , ISNULL (A1.ROUTING_ID, ' ')        AS ROUTING_ID
+		             , ISNULL (A1.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+		             , ISNULL (A1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+		             , ISNULL (A1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+		             , ISNULL (A1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+		             , ISNULL (A1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+		             , ISNULL (A1.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+		             , ISNULL (A1.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+		             , ISNULL (A1.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+		             , ISNULL (A1.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+		             , ISNULL (A1.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+		             , ISNULL (A1.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+		             , ISNULL (A1.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+		             , ISNULL (A1.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+		             , ISNULL (A1.ITEM_CD, ' ')           AS ITEM_CD
+		             , ISNULL (A1.ITEM_CD, ' ')           AS ITEM_CD_NM
+		             , ISNULL (A1.ITEM_NM, ' ')           AS ITEM_NM
+		             , ISNULL (A1.ITEM_NM, ' ')           AS ITEM_NM_NM
+		             , ISNULL (A1.SPEC, ' ')              AS SPEC
+		             , ISNULL (A1.SPEC, ' ')              AS SPEC_NM
+		             , ISNULL (A1.DRAW_NO, ' ')           AS DRAW_NO
+		             , ISNULL (A1.DRAW_NO, ' ')           AS DRAW_NO_NM
+		             , ISNULL (A1.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+		             , ISNULL (A1.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+		             , ISNULL (A1.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+		             , ISNULL (A1.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+		             , ISNULL (A1.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+		             , ISNULL (A1.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+		             , ISNULL (A1.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+		             , ISNULL (A1.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+		             , ISNULL (A1.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+		             , ISNULL (A1.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+		             , ISNULL (A1.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+		             , ISNULL (A1.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+		             , ISNULL (A1.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+	               	 , ISNULL (A1.PROCUR_TYPE, ' ') AS PROCUR_TYPE_NM
+			         , ISNULL (CAST (A1.MFG_LT AS NVARCHAR(20)), ' ')          AS MFG_LT
+		             , ISNULL (CAST (A1.MFG_LT AS NVARCHAR(20)), ' ')          AS MFG_LT_NM
+		             , ISNULL (CAST (A1.PUR_LT AS NVARCHAR(20)), ' ')          AS PUR_LT
+		             , ISNULL (CAST (A1.PUR_LT AS NVARCHAR(20)), ' ')          AS PUR_LT_NM
+		             , ISNULL (CAST (A1.SS_QTY AS NVARCHAR(20)), ' ')          AS SS_QTY
+		             , ISNULL (CAST (A1.SS_QTY AS NVARCHAR(20)), ' ')          AS SS_QTY_NM
+		             , ISNULL (CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+		             , ISNULL (CAST (A1.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+	                 , ISNULL (A1.CPFR_YN, ' ') AS CPFR_YN
+			         , ISNULL (A1.CPFR_YN, ' ') AS CPFR_YN_NM
+	                 , ISNULL (A1.UOM_CD, ' ') AS UOM_CD
+			         , ISNULL (A1.UOM_CD, ' ') AS UOM_CD_NM
+			         , ISNULL (A1.CUST_CD, ' ') AS REP_CUST_CD
+			         , ISNULL (A1.CUST_CD, ' ') AS REP_CUST_CD_NM
+	                 , ISNULL (A1.CUST_NM, ' ') AS REP_CUST_NM
+			         , ISNULL (A1.CUST_NM, ' ') AS REP_CUST_NM_NM
+		             , ISNULL( A2.CODE_CD, ' ') AS PART_CD	             
+		             , ISNULL( A2.CODE_CD, ' ') AS PART_CD_NM	             
+		             , ISNULL( A2.CODE_NM, ' ') AS PART_NM
+		             , ISNULL( A2.CODE_NM, ' ') AS PART_NM_NM
+		             , ISNULL( A1.UPPER_ITEM_GROUP_CD, ' ') AS UPPER_ITEM_GROUP_CD
+		             , ISNULL( A1.UPPER_ITEM_GROUP_CD, ' ') AS UPPER_ITEM_GROUP_CD_NM
+		             , ISNULL( A1.UPPER_ITEM_GROUP_NM, ' ') AS UPPER_ITEM_GROUP_NM
+		             , ISNULL( A1.UPPER_ITEM_GROUP_NM, ' ') AS UPPER_ITEM_GROUP_NM_NM
+		             , ISNULL( A1.SS_YN, ' ') AS SS_YN
+		             , ISNULL( A1.SS_YN, ' ') AS SS_YN_NM
+		             , ISNULL( A2.SALES_PLAN_YN, ' ') AS SALES_PLAN_YN2
+		             , ISNULL( A2.SALES_PLAN_YN, ' ') AS SALES_PLAN_YN2_NM
+		             , ISNULL( CAST(A2.WIP_QTY AS NVARCHAR(20)), ' ') AS WIP_QTY2
+		             , ISNULL( CAST(A2.WIP_QTY AS NVARCHAR(20)), ' ') AS WIP_QTY2_NM
+		             , ISNULL( CAST(A2.SP_QTY AS NVARCHAR(20)), ' ') AS SP_QTY2
+		             , ISNULL( CAST(A2.SP_QTY AS NVARCHAR(20)), ' ') AS SP_QTY2_NM 
+		             , A2.PROD_GROUP
+		             , A2.PROD_GROUP_DET
+				FROM W_ITEM A1
+			    INNER JOIN W_PROD_CATE A2
+			       ON A1.COMPANY_CD = A2.COMPANY_CD
+			      AND A1.BU_CD = A2.BU_CD
+			      AND A1.ITEM_CD = A2.ITEM_CD
+				WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND A1.BU_CD      = @{GV_BU_CD}
+			) A
+			GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+		) B
+		LEFT OUTER JOIN W_EDIT_YN C
+	      ON B.ITEM_CD = C.ITEM_CD
+		WHERE B.GRP_LVL_ID = 0
+	    ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		  , B.$dimMap.DIM_CD
+		#end 
+	</select>
+	
+	<select id="measureProductListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.measureProductListSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                ELSE CODE_NM
+	           END AS CODE_NM
+		     , ATTB_1_CD
+		     , ATTB_1_NM
+		     , ATTB_2_CD
+		     , ATTB_2_NM
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE GROUP_CD = 'PROD_ITEM_GROUP_MST'
+		  AND USE_FLAG = 'Y'
+		ORDER BY SORT 
+	</select>
+	
+	<select id="comboProductListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.comboProductListSelect ] ******/
+		SELECT *
+		FROM
+		(
+			SELECT CODE_CD
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+		                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+		                ELSE CODE_NM
+		           END AS CODE_NM
+			     , ATTB_1_CD
+			     , ATTB_1_NM
+			     , ATTB_2_CD
+			     , ATTB_2_NM
+			     , COUNT(*) OVER(PARTITION BY ATTB_1_CD, ATTB_2_CD) RN
+			     , SORT
+			FROM TB_MST_CODE WITH(NOLOCK)
+			WHERE GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			  AND USE_FLAG = 'Y'
+		) A
+		ORDER BY ATTB_1_CD, RN, ATTB_2_CD, SORT
+	</select>
+	
+	<select id="productCategoryAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.productCategoryAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS10301', 'APS10302', 'APS10303', 'APS10304')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD 
+	</select>
+	
+	<select id="productCategoryListStepSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.productCategoryListStepSelect ] ******/
+		SELECT COUNT(*) AS DATA_CNT
+		FROM TB_MST_CODE
+		WHERE BU_CD = @{GV_BU_CD}
+		  AND GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+		  AND CODE_CD IN (
+			#foreach ($bucketMap in $_parameter.dataStep)
+			#if ($foreach.count != 1)
+			  UNION ALL
+			#end
+			  SELECT '$bucketMap' AS DATA_STEP
+			#end
+		  )
+		#end
+		  AND USE_FLAG = 'Y'
+	</select>
+	
+	<update id="productCategoryListUpdate" parameterType="map">
+		/****** [ aps.static.productCategoryListUpdate ] ******/
+		BEGIN
+		
+			DECLARE BUCKET_LIST CURSOR FOR
+			#foreach ($bucketMap in $_parameter.BUCKET_LIST)
+			#if ($foreach.count != 1)
+			  UNION ALL
+			#end
+			  SELECT '$bucketMap.PROD_GROUP' AS PROD_GROUP
+			       , '$bucketMap.PROD_GROUP_DET' AS PROD_GROUP_DET
+			#end
+			
+			OPEN BUCKET_LIST
+	                
+	        DECLARE @PROD_GROUP     nvarchar(50)
+	        DECLARE @PROD_GROUP_DET nvarchar(50)
+	        
+	        FETCH NEXT FROM BUCKET_LIST INTO @PROD_GROUP, @PROD_GROUP_DET
+	        
+	        WHILE (@@FETCH_STATUS = 0)
+	            BEGIN
+					IF (@PROD_GROUP_DET = 'NULL')
+						BEGIN
+							UPDATE TB_MST_ITEM_PROD_GROUP
+							   SET PROD_GROUP_DET = NULL
+							     , UPDATE_ID     = CASE WHEN PROD_GROUP_DET IS NULL THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                             , UPDATE_DTTM   = CASE WHEN PROD_GROUP_DET IS NULL THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	                         WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+	                           AND BU_CD         = @{GV_BU_CD}
+	                           AND ITEM_CD       = @{ITEM_CD}
+	                           AND PROD_GROUP    = @PROD_GROUP
+						END
+					ELSE
+						BEGIN
+							MERGE TB_MST_ITEM_PROD_GROUP AS A
+	                        USING (SELECT 'X' AS DUAL) AS B 
+	                        ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+	                             AND BU_CD      = @{GV_BU_CD}
+	                             AND ITEM_CD    = @{ITEM_CD}
+	                             AND PROD_GROUP = @PROD_GROUP
+	                           )
+							WHEN MATCHED THEN
+	                        UPDATE
+	                           SET PROD_GROUP_DET = @PROD_GROUP_DET
+	                             , UPDATE_ID   = CASE WHEN PROD_GROUP_DET = @PROD_GROUP_DET THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                             , UPDATE_DTTM = CASE WHEN PROD_GROUP_DET = @PROD_GROUP_DET THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+							WHEN NOT MATCHED THEN
+	                        INSERT 
+	                        (
+	                        	COMPANY_CD
+	                          , BU_CD
+	                          , ITEM_CD
+	                          , PROD_GROUP
+	                          , PROD_GROUP_DET
+	                          , CREATE_ID
+	                          , CREATE_DTTM
+	                          , UPDATE_ID
+	                          , UPDATE_DTTM
+							) VALUES (
+	                            @{GV_COMPANY_CD}
+	                          , @{GV_BU_CD}
+	                          , @{ITEM_CD}
+	                          , @PROD_GROUP
+	                          , @PROD_GROUP_DET
+	                          , @{GV_USER_ID}
+	                          , DBO.UFN_GETDATE()
+	                          , @{GV_USER_ID}
+	                          , DBO.UFN_GETDATE()
+	                       );
+	                      END
+					FETCH NEXT FROM BUCKET_LIST INTO @PROD_GROUP, @PROD_GROUP_DET
+				END
+			CLOSE BUCKET_LIST
+			DEALLOCATE BUCKET_LIST
+		END;
+	</update>
+</mapper>

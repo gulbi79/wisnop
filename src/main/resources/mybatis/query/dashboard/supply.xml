@@ -1,0 +1,841 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.supply">
+	
+	<select id="trendWeekSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.trendWeekSelect ] ******/
+		SELECT TOP 1 'W' + RIGHT(YEARWEEK, 2) AS APS_START_WEEK
+  		FROM TB_MST_CALENDAR WITH(NOLOCK)
+ 		WHERE YEARWEEK <![CDATA[<]]>  
+ 		(
+			SELECT MIN(TREND_WEEK)
+            FROM TB_KPI_DASHBOARD_TREND_WEEKLY
+            WHERE DASHBOARD_ID = 'DB_TREND34'
+              AND COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+		)
+ 		ORDER BY YYYYMMDD DESC
+	</select>
+
+	<select id="trendBucketWeekSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.trendBucketWeekSelect ] ******/
+		BEGIN
+		  	DECLARE @V_START_WEEK NVARCHAR(6), @V_END_WEEK NVARCHAR(6);
+		  	
+		  	SELECT TOP 1 @V_START_WEEK = MPV.START_WEEK
+			FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+			WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MPV.BU_CD = @{GV_BU_CD}
+			  AND MPV.PLAN_TYPE_CD = 'MP'
+			  AND MPV.RELEASE_FLAG = 'Y'
+			ORDER BY MPV.START_WEEK DESC;
+		
+			SELECT TOP 1 @V_END_WEEK = YEARWEEK
+			FROM 
+			(
+				SELECT TOP 4 YEARWEEK
+			    FROM 
+			    (
+			    	SELECT DISTINCT YEARWEEK
+			        FROM TB_MST_CALENDAR WITH(NOLOCK)
+			        WHERE YEARWEEK <![CDATA[>=]]> @V_START_WEEK
+				) A
+				ORDER BY YEARWEEK
+			) A
+			ORDER BY YEARWEEK DESC;
+			 
+			SELECT 'W' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARWEEK)) AS DISWEEK
+			      , 'W' + RIGHT (A.YEARWEEK, 2) AS DISYEARWEEK
+			      , 'FLAG_W' + RIGHT (A.YEARWEEK, 2) AS FLAGYEARWEEK
+				  , A.YEARWEEK
+			FROM TB_MST_CALENDAR A WITH(NOLOCK)
+			WHERE YEARWEEK BETWEEN @V_START_WEEK AND @V_END_WEEK
+			GROUP BY YEARWEEK
+			UNION ALL
+			SELECT 'Total' AS DISWEEK
+	           	 , 'Total' AS DISYEARWEEK
+	           	 , 'Total' AS FLAGYEARWEEK
+	           	 , 'Total' AS YEARWEEK
+			;
+		END;
+	</select>
+	
+	<select id="trendBucketWeek2Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.trendBucketWeek2Select ] ******/
+		BEGIN
+		  	DECLARE @V_START_WEEK NVARCHAR(6), @V_END_WEEK NVARCHAR(6);
+		
+			SELECT TOP 1 @V_START_WEEK = MPV.START_WEEK
+			FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+			WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MPV.BU_CD = @{GV_BU_CD}
+			  AND MPV.PLAN_TYPE_CD = 'MP'
+			  AND MPV.CUT_OFF_FLAG = 'Y'
+			ORDER BY MPV.START_WEEK DESC;
+			 
+			SELECT TOP 1 @V_END_WEEK = YEARWEEK
+			FROM 
+			(
+				SELECT TOP 4 YEARWEEK
+			    FROM 
+			    (
+			    	SELECT DISTINCT YEARWEEK
+			        FROM TB_MST_CALENDAR WITH(NOLOCK)
+			        WHERE YEARWEEK <![CDATA[>=]]> @V_START_WEEK
+				) A
+				ORDER BY YEARWEEK
+			) A
+			ORDER BY YEARWEEK DESC;
+			 
+			SELECT 'W' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARWEEK)) AS DISWEEK
+			      , 'W' + RIGHT (A.YEARWEEK, 2) AS DISYEARWEEK
+			      , 'FLAG_W' + RIGHT (A.YEARWEEK, 2) AS FLAGYEARWEEK
+				  , A.YEARWEEK
+			FROM TB_MST_CALENDAR A WITH(NOLOCK)
+			WHERE YEARWEEK BETWEEN @V_START_WEEK AND @V_END_WEEK
+			GROUP BY YEARWEEK
+			<!-- UNION ALL
+			SELECT 'Total' AS DISWEEK
+	           	 , 'Total' AS DISYEARWEEK
+	           	 , 'Total' AS FLAGYEARWEEK
+	           	 , 'Total' AS YEARWEEK -->
+			;
+		END;
+	</select>
+	 
+	<select id="trendBucketDaySelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.trendBucketDaySelect ] ******/
+		BEGIN
+			DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+		
+			SELECT *
+			FROM
+		    (
+				SELECT MC.YYYYMMDD
+					 , LEFT(CONVERT(NVARCHAR, CONVERT(DATETIME, MC.YYYYMMDD), 1), 5) + ' [' + DAY_NM + ']' AS DISDAY
+		             , ROW_NUMBER() OVER(ORDER BY MC.YYYYMMDD DESC) AS RN
+		             , MC.YEARWEEK
+		             , 'W' + RIGHT(MC.YEARWEEK, 2) AS DISYEARWEEK
+				FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+				WHERE MC.YYYYMMDD <![CDATA[<]]> @V_CUR_DATE
+				  AND MC.DAY_NM NOT IN ('SAT', 'SUN')
+			) C1
+		    WHERE C1.RN BETWEEN 1 AND 5
+		    ORDER BY RN DESC
+		END;
+	</select>
+
+	<select id="weekSupplyPlanSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.weekSupplyPlanSelect ]  [ 주간 공급 계획 ] ******/
+		BEGIN
+
+			DECLARE @V_PLAN_ID NVARCHAR(8), @V_VERSION_ID NVARCHAR(20), @V_START_WEEK NVARCHAR(6), @V_END_WEEK NVARCHAR(6);
+			
+			SELECT TOP 1 @V_PLAN_ID = MPV.PLAN_ID
+			     , @V_VERSION_ID = MPVS.VERSION_ID
+			     , @V_START_WEEK = MPV.START_WEEK
+			FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+			INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+			   ON MPVS.COMPANY_CD = MPV.COMPANY_CD
+			  AND MPVS.BU_CD = MPV.BU_CD
+			  AND MPVS.PLAN_TYPE_CD = MPV.PLAN_TYPE_CD
+			  AND MPVS.PLAN_ID = MPV.PLAN_ID
+			  AND MPVS.VERSION_TYPE_CD = 'F'
+			WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MPV.BU_CD = @{GV_BU_CD}
+			  AND MPV.PLAN_TYPE_CD = 'MP'
+			  AND MPV.RELEASE_FLAG = 'Y'
+			ORDER BY MPV.START_WEEK DESC;
+			 
+			SELECT TOP 1 @V_END_WEEK = YEARWEEK
+			FROM 
+			(
+				SELECT TOP 4 YEARWEEK
+			    FROM 
+			    (
+			    	SELECT DISTINCT YEARWEEK
+			        FROM TB_MST_CALENDAR WITH(NOLOCK)
+			        WHERE YEARWEEK <![CDATA[>=]]> @V_START_WEEK
+				) A
+				ORDER BY YEARWEEK
+			) A
+			ORDER BY YEARWEEK DESC;
+			
+			WITH W_MAIN AS
+			(
+				SELECT CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+               				WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+               		   		ELSE MC1.CODE_NM
+               		    END FIRST_CODE_NM
+					 , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+               				WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+               		   		ELSE MC2.CODE_NM
+						END SECOND_CODE_NM
+				     , HAPR.YEARWEEK
+				     , HAPR.[VALUE]
+				     , MC1.SORT AS FIRST_SROT
+				     , MC2.SORT AS SECOND_SORT
+				     , MC1.CODE_CD AS FIRST_CODE_CD
+				     , MC2.CODE_CD AS SECOND_CODE_CD
+				FROM TB_HIS_APS_PLAN_RESULT HAPR WITH(NOLOCK)
+				INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+				   ON MC1.BU_CD = HAPR.BU_CD
+				  AND MC1.GROUP_CD = 'PROD_PART'
+				  AND MC1.CODE_CD = HAPR.PROD_PART
+				  AND MC1.ATTB_3_CD = 'Y'
+				INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+				   ON MC2.BU_CD = HAPR.BU_CD
+				  AND MC2.GROUP_CD = 'APS_PLAN_RESULT_CATEGORY'
+				  AND MC2.CODE_CD = HAPR.MEAS_CD
+				  AND MC2.CODE_CD IN ('RESULT05', 'RESULT13', 'RESULT14', 'RESULT15', 'RESULT03')
+				WHERE HAPR.PLAN_ID = @V_PLAN_ID
+				  AND HAPR.VERSION_ID = @V_VERSION_ID
+				  AND HAPR.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND HAPR.BU_CD = @{GV_BU_CD}
+				  AND HAPR.YEARWEEK BETWEEN @V_START_WEEK AND @V_END_WEEK
+				  AND HAPR.ROUTING_ID = 'ALL'
+				  AND HAPR.PROD_PART = @{weekSupplyPlanBodyType}
+			)
+			SELECT B1.FIRST_CODE_NM
+				 , B1.SECOND_CODE_NM
+				 , B1.SECOND_CODE_CD
+				#set($strWeekTot = "")
+				#foreach($bucketMap in $_parameter.week)
+				#if($bucketMap.DISWEEK.indexOf("Total") > -1)
+				 , CASE WHEN B1.SECOND_CODE_CD = 'RESULT03' THEN ROUND((ISNULL($strWeekTot.substring(1).replace(",",",0)+ISNULL("),0)) / 4, 1)
+				        ELSE ISNULL($strWeekTot.substring(1).replace(",",",0)+ISNULL("),0)
+				    END $bucketMap.DISWEEK
+				 #set($strWeekTot = "")
+				#else
+				 , ISNULL($bucketMap.DISWEEK, 0) AS $bucketMap.DISWEEK
+				 , $bucketMap.FLAGYEARWEEK
+				 #set($strWeekTot = $strWeekTot + "," +$bucketMap.DISWEEK)
+				#end
+				#end
+			FROM
+			(
+				SELECT A1.FIRST_CODE_NM
+					 , A1.SECOND_CODE_NM
+					 , A1.FIRST_SROT
+					 , A1.SECOND_SORT
+					 , A1.SECOND_CODE_CD
+					#foreach($bucketMap in $_parameter.week)
+					#if($bucketMap.DISWEEK.indexOf("Total") > -1)
+					#else
+					 , CASE WHEN A1.SECOND_CODE_CD = 'RESULT03' THEN SUM(CASE A1.YEARWEEK WHEN '$bucketMap.YEARWEEK' THEN A1.[VALUE] END)
+					 	    ELSE ROUND(SUM(CASE A1.YEARWEEK WHEN '$bucketMap.YEARWEEK' THEN A1.[VALUE] END) / @{unit}, 1)
+					 	END $bucketMap.DISWEEK
+					 , CASE WHEN SUM(CASE A1.YEARWEEK WHEN '$bucketMap.YEARWEEK' THEN A1.[VALUE] END) -
+					 			 SUM(CASE A1.YEARWEEK WHEN '$bucketMap.YEARWEEK' THEN A1.[COMPARE_VALUE] END) <![CDATA[<]]> 0 THEN 'Y'
+					 		WHEN SUM(CASE A1.YEARWEEK WHEN '$bucketMap.YEARWEEK' THEN A1.[VALUE] END) IS NULL AND A1.SECOND_CODE_CD = 'RESULT05' THEN 'Y'
+					 		ELSE 'N'
+					 	END $bucketMap.FLAGYEARWEEK
+					#end
+					#end
+				FROM
+				(
+					SELECT D1.FIRST_CODE_NM
+					     , D1.SECOND_CODE_NM
+					     , D1.FIRST_SROT
+					     , D1.SECOND_SORT
+					     , D1.FIRST_CODE_CD
+					     , D1.SECOND_CODE_CD
+					     , D1.YEARWEEK
+					     , D1.VALUE 
+					     , D2.VALUE AS COMPARE_VALUE
+					FROM
+					(
+						SELECT C1.FIRST_CODE_NM
+						     , C1.SECOND_CODE_NM
+						     , C1.FIRST_SROT
+						     , C1.SECOND_SORT
+						     , C1.FIRST_CODE_CD
+						     , C1.SECOND_CODE_CD
+						     , C1.YEARWEEK
+						     , SUM(C1.[VALUE]) AS VALUE
+						FROM W_MAIN C1
+						GROUP BY C1.FIRST_CODE_NM, C1.SECOND_CODE_NM, C1.FIRST_SROT, C1.SECOND_SORT, C1.FIRST_CODE_CD, C1.SECOND_CODE_CD, C1.YEARWEEK
+					) D1
+					LEFT OUTER JOIN
+					(
+						SELECT C1.FIRST_CODE_NM
+						     , C1.SECOND_CODE_NM
+						     , C1.FIRST_SROT
+						     , C1.SECOND_SORT
+						     , C1.FIRST_CODE_CD
+						     , 'RESULT05' AS SECOND_CODE_CD
+						     , C1.YEARWEEK
+						     , SUM(C1.[VALUE]) AS VALUE
+						FROM W_MAIN C1
+						WHERE C1.SECOND_CODE_CD = 'RESULT15'
+						GROUP BY C1.FIRST_CODE_NM, C1.SECOND_CODE_NM, C1.FIRST_SROT, C1.SECOND_SORT, C1.FIRST_CODE_CD, C1.SECOND_CODE_CD, C1.YEARWEEK
+					) D2
+					ON D1.FIRST_CODE_CD = D2.FIRST_CODE_CD
+					AND D1.SECOND_CODE_CD = D2.SECOND_CODE_CD
+					AND D1.YEARWEEK = D2.YEARWEEK
+				) A1
+				GROUP BY A1.FIRST_CODE_NM, A1.SECOND_CODE_NM, A1.FIRST_SROT, A1.SECOND_SORT, A1.SECOND_CODE_CD
+			) B1
+			ORDER BY B1.FIRST_SROT, B1.SECOND_SORT
+		END;
+	</select>
+	
+	<select id="mainEquSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.mainEquSelect ]  [ 주요 작업장 예상부하율] ******/
+		BEGIN
+ 
+			DECLARE @V_PLAN_ID NVARCHAR(8), @V_START_WEEK NVARCHAR(6), @V_END_WEEK NVARCHAR(6);
+			
+			SELECT TOP 1 @V_PLAN_ID = MPV.PLAN_ID
+			     , @V_START_WEEK = MPV.START_WEEK
+			FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+			WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MPV.BU_CD = @{GV_BU_CD}
+			  AND MPV.PLAN_TYPE_CD = 'MP'
+			  AND MPV.CUT_OFF_FLAG = 'Y'
+			ORDER BY MPV.START_WEEK DESC;
+			 
+			SELECT TOP 1 @V_END_WEEK = YEARWEEK
+			FROM 
+			(
+				SELECT TOP 4 YEARWEEK
+			    FROM 
+			    (
+			    	SELECT DISTINCT YEARWEEK
+			        FROM TB_MST_CALENDAR WITH(NOLOCK)
+			        WHERE YEARWEEK <![CDATA[>=]]> @V_START_WEEK
+				) A
+				ORDER BY YEARWEEK
+			) A
+			ORDER BY YEARWEEK DESC;
+			
+			WITH W_MAIN_DATA AS
+      		(
+      			SELECT *
+           			 , COUNT(*) OVER(PARTITION BY WC_CD) AS PART_CNT
+          
+      			FROM 
+		      	(
+		        	SELECT HAWCL.WC_CD
+		        	     , MC.CODE_NM
+		        	     , MC.SORT
+		        	     , MAX(MC.ATTB_3_CD) AS ATTB_3_CD
+		            	 , MAX(MC.ATTB_4_CD) AS ATTB_4_CD	
+		        	FROM TB_HIS_APS_WORK_CENTER_LOAD HAWCL WITH(NOLOCK)
+		        	INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+		  			   ON MC.BU_CD = HAWCL.BU_CD
+		  			  AND MC.GROUP_CD = 'WC_CD'
+		  			  AND MC.CODE_CD = HAWCL.WC_CD
+		  			  AND MC.USE_FLAG = 'Y'
+		  			  AND MC.ATTB_2_CD = 'Y'
+		        	WHERE HAWCL.COMPANY_CD = @{GV_COMPANY_CD}
+		  			  AND HAWCL.BU_CD = @{GV_BU_CD}
+		  			  AND HAWCL.PLAN_ID = @V_PLAN_ID
+		  			  AND HAWCL.YEARWEEK BETWEEN @V_START_WEEK AND @V_END_WEEK
+		        	GROUP BY HAWCL.WC_CD, MC.CODE_NM, MC.SORT
+		      	) A1
+		      	CROSS JOIN
+		      	(
+			        SELECT YEARWEEK
+			        FROM TB_MST_CALENDAR WITH(NOLOCK)
+			        WHERE YEARWEEK BETWEEN @V_START_WEEK AND @V_END_WEEK
+			        GROUP BY YEARWEEK
+		      	) A2
+			)
+			
+			SELECT B1.WC_CD
+	             , B1.CODE_NM
+	             , B1.YEARWEEK
+	             , B2.LOAD_FACTOR
+	             , B1.SORT
+	             , B1.PART_CNT
+	             , B1.ATTB_3_CD
+	             , B1.ATTB_4_CD
+	      	FROM W_MAIN_DATA B1
+	      	LEFT OUTER JOIN
+	      	(
+	        	SELECT HAWCL.WC_CD
+	  			     , HAWCL.YEARWEEK
+	  				 , ROUND(SUM(CASE WHEN HAWCL.MEAS_CD = 'NEED_TIME' THEN HAWCL.VALUE END) / NULLIF(SUM(CASE WHEN HAWCL.MEAS_CD = 'AVAIL_TIME' THEN HAWCL.VALUE END), 0) * 100, 1) AS LOAD_FACTOR
+	  			FROM TB_HIS_APS_WORK_CENTER_LOAD HAWCL WITH(NOLOCK)
+	  			WHERE HAWCL.COMPANY_CD = @{GV_COMPANY_CD}
+	  			  AND HAWCL.BU_CD = @{GV_BU_CD}
+	  			  AND HAWCL.PLAN_ID = @V_PLAN_ID
+	  			  AND HAWCL.YEARWEEK BETWEEN @V_START_WEEK AND @V_END_WEEK
+	  			GROUP BY HAWCL.WC_CD, HAWCL.YEARWEEK
+	      	) B2
+	      	ON B1.WC_CD = B2.WC_CD
+	      	AND B1.YEARWEEK = B2.YEARWEEK
+			ORDER BY B1.SORT, B1.YEARWEEK;
+		END;
+	</select>
+	
+	<select id="weekProgressSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.weekProgressSelect ] [ 주간 진척률 ] ******/
+		WITH W_ROUTING AS 
+		(
+		    SELECT '1-L' AS ROUTING_ID
+		         , 0 AS ORD
+		         , 'L-LATHE' AS ROUTING_NM
+		    UNION ALL 
+		    SELECT '1-S'
+		         , 1
+		         , 'S-LATHE'
+		    UNION ALL 
+		    SELECT '1-B'
+		         , 2
+		         , 'BENCH'
+		    UNION ALL 
+		    SELECT '2-L'
+		         , 3
+		         , 'LAM'
+		    UNION ALL 
+		    SELECT '2-T'
+		         , 4
+		         , 'TEL'
+		    UNION ALL 
+		    SELECT '2-M'
+		         , 5
+		         , 'MACHINING'
+		)
+		SELECT A.ROUTING_ID
+		     , A.ROUTING_NM
+		     , A.ORD
+		     , A.ROUTING_NM + CHAR(13)+CHAR(10) + '(' + A.ROUTING_ID + ')' AS CHART_TXT
+		     , ISNULL(A.CHART_1, 0) AS CHART_1
+		     , ISNULL(A.CHART_2, 0) AS CHART_2
+		     , ISNULL(A.CHART_3, 0) AS CHART_3
+		     , ISNULL(ROUND(A.CHART_T, 0), 0) AS CHART_T
+		     , ISNULL(SUM(CHART_1) OVER(), 0) AS CHART_1_SUM
+		     , ISNULL(SUM(CHART_2) OVER(), 0) AS CHART_2_SUM
+		     , ISNULL(SUM(CHART_3) OVER(), 0) AS CHART_3_SUM
+		FROM 
+		(
+		    SELECT A.ROUTING_ID
+		         , A.ROUTING_NM
+		         , A.ORD
+		         , SUM(B.NON_DEPLOY_ORDER_CNT) AS CHART_1
+		         , SUM(ISNULL(B.DEFECT_QTY, 0)) AS CHART_2
+		         , SUM(ISNULL(B.DEFECT_QTY_W, 0)) AS CHART_3
+		         , SUM(B.RESULT_AMT_W) / NULLIF(SUM(B.PLAN_AMT_W), 0) * 100 AS CHART_T
+		    FROM W_ROUTING A WITH(NOLOCK)
+		    LEFT JOIN TB_KPI_DASHBOARD_PROD B
+	           ON B.ROUTING_ID = A.ROUTING_ID
+	          AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND B.BU_CD      = @{GV_BU_CD}  
+		    GROUP BY A.ROUTING_ID, A.ROUTING_NM, A.ORD
+		) A
+		ORDER BY A.ORD
+	</select>
+	
+	<select id="fqcFaultyRateSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.fqcFaultyRateSelect ] [ FQC 불량률 ] ******/
+		BEGIN
+		
+			DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+			
+			SELECT MIG.ITEM_GROUP_CD
+			     , MIG.MAJOR_GROUP_NM
+			     , MC.YYYYMMDD
+			     , MIG.DEF_RATE_TARGET
+			     , ISNULL(SUM(DI.DEFECT_QTY), 0) AS DEF_RATE
+			     , COUNT(*) OVER(PARTITION BY MIG.MAJOR_GROUP_NM) AS PART_CNT
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+			   ON MIG.COMPANY_CD = MI.COMPANY_CD
+			  AND MIG.BU_CD = MI.BU_CD
+			  AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+			  AND MIG.MAJOR_GROUP_YN = 'Y'
+			CROSS JOIN 
+			(
+				SELECT TOP 5 MC.YYYYMMDD
+			    FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+			    WHERE MC.YYYYMMDD <![CDATA[<]]> @V_CUR_DATE
+			      AND MC.DAY_NM NOT IN ('SAT', 'SUN')
+				ORDER BY MC.YYYYMMDD DESC
+			) MC
+			LEFT OUTER JOIN 
+			(
+				SELECT DI.COMPANY_CD
+                     , DI.BU_CD
+                     , DI.ITEM_CD
+                     , DI.LOT_SIZE
+                     , DI.DEFECT_QTY
+                     , DI.RELEASE_DATE
+				FROM TB_DYN_INSPECTION DI WITH(NOLOCK)
+                INNER JOIN 
+                (
+                	SELECT TOP 5 MC.YYYYMMDD
+					FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+                    WHERE MC.YYYYMMDD <![CDATA[<]]> @V_CUR_DATE
+                      AND MC.DAY_NM NOT IN ('SAT', 'SUN')
+					ORDER BY MC.YYYYMMDD DESC
+				) MC
+                ON MC.YYYYMMDD = DI.RELEASE_DATE
+                WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DI.BU_CD = @{GV_BU_CD}  
+                  AND DI.PLANT_CD = 'WF01'
+                  AND DI.DEL_FLAG = 'N'
+			) DI
+			ON DI.COMPANY_CD = MI.COMPANY_CD
+			AND DI.BU_CD = MI.BU_CD
+			AND DI.ITEM_CD = MI.ITEM_CD
+			AND DI.RELEASE_DATE = MC.YYYYMMDD
+			WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MI.BU_CD = @{GV_BU_CD}
+			GROUP BY MIG.ITEM_GROUP_CD, MIG.MAJOR_GROUP_NM, MIG.DEF_RATE_TARGET, MC.YYYYMMDD
+			ORDER BY MIG.ITEM_GROUP_CD DESC, MC.YYYYMMDD
+		 
+		END;
+	</select>
+	
+	<select id="mainItemWeekProdSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.mainItemWeekProdSelect ] [ 주요 품목그룹 생산 실적/계획 ] ******/
+		BEGIN
+      
+	    	DECLARE @V_START_DATE NVARCHAR(8), @V_END_DATE NVARCHAR(8), @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+	   
+	      	SELECT @V_START_DATE = MIN(MC.YYYYMMDD)
+	             , @V_END_DATE = MAX(MC.YYYYMMDD)
+	        FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+	       	WHERE YEARWEEK = (
+								SELECT MC.YEARWEEK
+	                            FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+	                           	WHERE MC.YYYYMMDD = @V_CUR_DATE
+	                         );
+	                                
+	      	SELECT MIG.ITEM_GROUP_CD
+	        	 , MIG.MAJOR_GROUP_NM
+	         	 , LEFT(CONVERT(VARCHAR, CONVERT(DATETIME, MC.YYYYMMDD), 101), 5) + ' [' + MAX(MC.DAY_NM) + ']'AS DIS_DAY
+	         	 , 'W' + RIGHT(MAX(MC.YEARWEEK), 2) AS DIS_YEARWEEK
+	           	 , ISNULL(SUM(PR.QTY), 0) AS RST_QTY
+	         	 , ISNULL(SUM(KAPPW.QTY), 0) AS PLAN_QTY
+	         	 , ROW_NUMBER() OVER(PARTITION BY MIG.ITEM_GROUP_CD ORDER BY MIG.ITEM_GROUP_CD DESC) AS RN
+	        FROM TB_MST_ITEM MI WITH(NOLOCK)
+	       	INNER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+	           ON MIG.COMPANY_CD = MI.COMPANY_CD
+	          AND MIG.BU_CD = MI.BU_CD
+	          AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+	          AND MIG.MAJOR_GROUP_YN = 'Y'
+	     	CROSS JOIN 
+	     	(
+	        	SELECT *
+	            FROM TB_MST_CALENDAR WITH(NOLOCK)
+	            WHERE YYYYMMDD BETWEEN @V_START_DATE AND @V_END_DATE
+			) MC
+	        LEFT OUTER JOIN UV_PROD_RESULT PR WITH(NOLOCK)
+	          ON PR.COMPANY_CD = MI.COMPANY_CD
+	         AND PR.BU_CD = MI.BU_CD
+	         AND PR.PLANT_CD = 'WF01'
+	         AND PR.ITEM_CD = MI.ITEM_CD
+	         AND PR.PROD_DATE = MC.YYYYMMDD
+	      	LEFT OUTER JOIN TB_KPI_APS_PROD_PLAN_WEEKLY KAPPW WITH(NOLOCK)
+	          ON KAPPW.COMPANY_CD = MI.COMPANY_CD
+	         AND KAPPW.BU_CD = MI.BU_CD
+	         AND KAPPW.ITEM_CD = MI.ITEM_CD
+	         AND KAPPW.YYYYMMDD = MC.YYYYMMDD
+	       	WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+	          AND MI.BU_CD = @{GV_BU_CD}
+	       	  AND MI.ITEM_TYPE = '10'
+			#if($_parameter.mainItemWeekRadio != "etch")
+			  AND MIG.ITEM_GROUP_CD NOT IN ('1ELE', '1ETE')			
+			#else
+			  AND MIG.ITEM_GROUP_CD IN ('1ELE', '1ETE')
+			#end
+	       	GROUP BY MIG.ITEM_GROUP_CD, MIG.MAJOR_GROUP_NM, MC.YYYYMMDD
+	       	ORDER BY MIG.ITEM_GROUP_CD DESC, MC.YYYYMMDD
+       END;
+	</select>
+	
+	<select id="manufLeadTimeSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.manufLeadTimeSelect ] [ 제조 Lead Time(최근 4주) ] ******/
+		BEGIN
+		
+			DECLARE @V_START_DATE NVARCHAR(8), @V_END_DATE NVARCHAR(8);
+			
+			SELECT TOP 1 @V_END_DATE = YYYYMMDD
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YYYYMMDD <![CDATA[<]]> CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+			  AND DAY_NM = 'SAT'
+			ORDER BY YYYYMMDD DESC;
+			 
+			SELECT TOP 1 @V_START_DATE = CONVERT(NVARCHAR, DATEADD(WW, -3, YYYYMMDD), 112)
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YYYYMMDD <![CDATA[<]]> @V_END_DATE
+			  AND DAY_NM = 'SUN'
+			ORDER BY YYYYMMDD DESC;
+			
+			
+			SELECT MIG.ITEM_GROUP_CD
+		    , MIG.MAJOR_GROUP_NM
+		    , MIG.MFG_LT_TARGET
+		    , AVG(DATEDIFF(DAY, DPOH.RELEASE_DATE, DI.RELEASE_DATE)) AS QTY
+		    
+					
+			
+			FROM TB_MST_ITEM MI WITH (NOLOCK)
+			LEFT OUTER JOIN TB_MST_CUSTOMER CT WITH (NOLOCK) 
+			ON MI.COMPANY_CD = CT.COMPANY_CD
+			AND MI.BU_CD = CT.BU_CD
+			AND MI.REP_CUST_CD = CT.CUST_CD
+			
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH (NOLOCK) 
+			ON MIP.COMPANY_CD = MI.COMPANY_CD
+			AND MIP.BU_CD = MI.BU_CD
+			AND MIP.PLANT_CD = 'WF01'
+			AND MIP.ITEM_CD = MI.ITEM_CD
+			
+			INNER JOIN TB_MST_CODE MC WITH (NOLOCK) 
+			ON MC.BU_CD = MIP.BU_CD
+			AND MC.GROUP_CD = 'PROD_L2'
+			AND MC.CODE_CD = MIP.ROUTING_ID
+			
+			INNER JOIN TB_MST_ITEM_GROUP MIG WITH (NOLOCK) 
+			ON MIG.COMPANY_CD = MI.COMPANY_CD
+			AND MIG.BU_CD = MI.BU_CD
+			AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+			
+			INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH (NOLOCK) 
+			ON DPOH.COMPANY_CD = MI.COMPANY_CD
+			AND DPOH.BU_CD = MI.BU_CD
+			AND DPOH.ITEM_CD = MI.ITEM_CD
+			AND ISNULL(DPOH.REWORK_FLAG, 'N') = 'N'
+			
+			INNER JOIN (
+			
+			
+			        SELECT MR.COMPANY_CD
+			        , MR.BU_CD
+			        , MR.ITEM_CD
+			        , CEILING(SUM(MR.JC_TIME + MR.WAIT_TIME + MR.FIRST_TIME + MR.RUN_TIME + MR.AFTER_TIME) / 3600.0 / 8.0 + SUM(MR.MOVE_TIME) / 3600.0 / 24.0) AS WORK_LT
+			        FROM TB_MST_ROUTING MR WITH (NOLOCK)
+			        WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+			        AND MR.BU_CD = @{GV_BU_CD}
+			        AND MR.PLANT_CD = 'WF01'
+			        AND EXISTS (
+			
+			                    SELECT 1
+			                    FROM TB_MST_ROUTING_PRIORITY MRP WITH (NOLOCK)
+			                    WHERE MRP.COMPANY_CD = MR.COMPANY_CD
+			                    AND MRP.BU_CD = MR.BU_CD
+			                    AND MRP.ITEM_CD = MR.ITEM_CD
+			                    AND MRP.ROUTING_NO = MR.ROUTING_NO
+			                    AND MRP.MAJOR_FLAG = 'Y'
+			        )
+			        GROUP BY MR.COMPANY_CD
+			        ,MR.BU_CD
+			        ,MR.ITEM_CD
+			
+			
+			) MR 
+			ON MR.COMPANY_CD = MI.COMPANY_CD
+			AND MR.BU_CD = MI.BU_CD
+			AND MR.ITEM_CD = MI.ITEM_CD
+			
+			INNER JOIN (
+			            
+			        SELECT DI.COMPANY_CD
+			        , DI.BU_CD
+			        , DI.PROD_ORDER_NO
+			        , DI.RELEASE_DATE AS COMP_DATE
+			        , DI.GOODS_QTY AS RESULT_QTY
+			        , DI.RELEASE_DATE
+			        FROM TB_DYN_INSPECTION DI WITH (NOLOCK)
+			        WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+			        AND DI.BU_CD = @{GV_BU_CD}
+			        AND DI.PLANT_CD = 'WF01'
+			        AND DI.RELEASE_DATE BETWEEN @V_START_DATE AND @V_END_DATE
+			        AND DI.DEL_FLAG = 'N'
+			
+			        UNION ALL
+			
+			        SELECT DGP.COMPANY_CD
+			        , DGP.BU_CD
+			        , DGP.PROD_ORDER_NO
+			        , DGP.GR_DATE AS COMP_DATE
+			        , DGP.GR_QTY AS RESULT_QTY
+			        , DGP.GR_DATE AS RELEASE_DATE
+			        FROM TB_DYN_GR_PROD DGP WITH (NOLOCK)
+			        WHERE DGP.COMPANY_CD = @{GV_COMPANY_CD}
+			        AND DGP.BU_CD = @{GV_BU_CD}
+			        AND DGP.PLANT_CD = 'WF01'
+			        AND DGP.GR_DATE BETWEEN @V_START_DATE AND @V_END_DATE
+			
+			) DI 
+			ON DI.COMPANY_CD = DPOH.COMPANY_CD
+			AND DI.BU_CD = DPOH.BU_CD
+			AND DI.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+			
+			INNER JOIN TB_MST_CALENDAR MCAL WITH (NOLOCK) 
+			ON MCAL.YYYYMMDD = DI.COMP_DATE
+			
+			LEFT OUTER JOIN TB_MST_CODE CD WITH (NOLOCK) 
+			ON CD.GROUP_CD = 'ITEM_TYPE'
+			AND CD.CODE_CD = MI.ITEM_TYPE
+			AND CD.USE_FLAG = 'Y'
+			
+			
+			WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+			AND MI.BU_CD = @{GV_BU_CD}
+			AND MIG.MAJOR_GROUP_NM IS NOT NULL
+			AND MIG.MFG_LT_TARGET IS NOT NULL
+			AND MI.ITEM_TYPE = '10'
+			GROUP BY MIG.ITEM_GROUP_CD
+			, MIG.MAJOR_GROUP_NM
+			, MIG.MFG_LT_TARGET
+			ORDER BY MIG.ITEM_GROUP_CD DESC
+						
+						
+			
+		END;
+	</select>
+	
+	<select id="cpfrInvInfoSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.cpfrInvInfoSelect ] [ 삼성전자 CPFR 품목 PSI ] ******/
+		SELECT *
+		FROM
+		(
+			SELECT CASE MEAS_CD WHEN 'CPFR' THEN dbo.UFN_GET_TRANSLATE('lbl', 'trend34_1', @{GV_LANG})
+			                    WHEN 'NORMAL' THEN dbo.UFN_GET_TRANSLATE('lbl', 'trend34_2', @{GV_LANG})
+			                    WHEN 'BOH' THEN dbo.UFN_GET_TRANSLATE('lbl', 'trend34_3', @{GV_LANG})
+			                    WHEN 'PROD' THEN dbo.UFN_GET_TRANSLATE('lbl', 'trend34_4', @{GV_LANG})
+			                    WHEN 'EOH' THEN dbo.UFN_GET_TRANSLATE('lbl', 'trend34_5', @{GV_LANG})
+			        END DIS_NAME
+			     , CASE MEAS_CD WHEN 'BOH' THEN 1
+			                    WHEN 'CPFR' THEN 2
+			                    WHEN 'NORMAL' THEN 3
+			                    WHEN 'PROD' THEN 4
+			                    WHEN 'EOH' THEN 5
+			        END SORT       
+			     , 'W' + RIGHT(TREND_WEEK, 2) AS DIS_WEEK
+			     , ISNULL(ROUND(CASE WHEN MEAS_CD = 'RETENTION' THEN RESULT_VALUE
+			            ELSE RESULT_VALUE / @{unit}
+			        END, 1), 0) AS RESULT_VALUE 
+			     , ROW_NUMBER() OVER(PARTITION BY MEAS_CD ORDER BY TREND_WEEK) AS RN
+			FROM TB_KPI_DASHBOARD_TREND_WEEKLY WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND DASHBOARD_ID = 'DB_TREND34'
+		) A1
+		ORDER BY A1.SORT, A1.RN
+	</select>
+	
+	<select id="mainWorkRateChartSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.supply.mainWorkRateChartSelect ] [ 주요 작업장 계획 준수율] ******/
+		BEGIN
+		
+			DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+			
+			SELECT *
+			FROM
+			(
+				SELECT LEFT(CONVERT(VARCHAR, CONVERT(DATETIME, B1.YYYYMMDD), 101), 5) + ' [' + DAY_NM + ']' AS TREND_DATE
+				     , B1.WC_CD
+				     , B1.CODE_NM 
+				     , B2.RESULT_VALUE
+				     , B1.TARGET_VALUE
+				     , ROW_NUMBER() OVER(PARTITION BY B1.YYYYMMDD ORDER BY YYYYMMDD,WC_CD_SORT ) - 1 AS SORT
+				     , COUNT(*) OVER(PARTITION BY B1.WC_CD) AS PART_CNT
+				FROM
+				(
+					SELECT *
+		          	FROM
+		          	(
+						SELECT KDTD.COMPANY_CD
+			                 , KDTD.BU_CD
+			                 , KDTD.WC_CD
+			                 , MC.CODE_NM
+			                 , CAST(MAX(ATTB_5_CD) AS INT) AS TARGET_VALUE
+			                 /*20201207 UI 개선요청사항 85번:WC_CD순서 변경요청에 따른  수정  */
+			                 , CASE WHEN KDTD.WC_CD = 'Q-C0530' THEN '1'  
+							  WHEN KDTD.WC_CD = 'Q-M0520' THEN '2'
+								WHEN KDTD.WC_CD = 'Q-M0530' THEN '3'
+								WHEN KDTD.WC_CD = 'Q-C0535' THEN '4'
+								WHEN KDTD.WC_CD = 'Q-M0720' THEN '5'
+								WHEN KDTD.WC_CD = 'Q-M0730' THEN '6'
+								WHEN KDTD.WC_CD = 'Q-M0820' THEN '7'
+								WHEN KDTD.WC_cD = 'Q-M0830' THEN '8'
+								END 'WC_CD_SORT'
+			                 
+			        	FROM TB_KPI_DASHBOARD_TREND_DAILY KDTD WITH(NOLOCK)
+			    		INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+			    		   ON MC.BU_CD = KDTD.BU_CD
+			    		  AND MC.GROUP_CD = 'WC_CD'
+			    		  AND MC.CODE_CD = KDTD.WC_CD
+			    		  AND MC.USE_FLAG = 'Y'
+			    		WHERE KDTD.COMPANY_CD = @{GV_COMPANY_CD}
+					  	  AND KDTD.BU_CD = @{GV_BU_CD}
+					      AND DASHBOARD_ID = 'DB_TREND02'
+			        	GROUP BY KDTD.COMPANY_CD, KDTD.BU_CD, KDTD.WC_CD, MC.CODE_NM
+		          	) A1
+		          	CROSS JOIN
+		          	(
+						SELECT TOP 5 MC.YYYYMMDD
+						     , DAY_NM
+		    			FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+		    			WHERE MC.YYYYMMDD <![CDATA[<]]> @V_CUR_DATE
+		    			  AND MC.DAY_NM NOT IN ('SAT', 'SUN')
+						ORDER BY MC.YYYYMMDD DESC
+					) A2 
+				) B1
+				LEFT OUTER JOIN
+			    (
+					SELECT TREND_DATE
+					     , KDTD.WC_CD
+					     , MC.CODE_NM
+					     , KDTD.RESULT_VALUE
+					FROM TB_KPI_DASHBOARD_TREND_DAILY KDTD WITH(NOLOCK)
+					INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+					   ON MC.BU_CD = KDTD.BU_CD
+					  AND MC.GROUP_CD = 'WC_CD'
+					  AND MC.CODE_CD = KDTD.WC_CD
+					  AND MC.USE_FLAG = 'Y'
+					WHERE KDTD.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND KDTD.BU_CD = @{GV_BU_CD}
+					  AND KDTD.DASHBOARD_ID = 'DB_TREND02'
+			    ) B2
+			    ON B1.WC_CD = B2.WC_CD
+			    AND B1.YYYYMMDD = B2.TREND_DATE
+			) C1
+		    ORDER BY C1.SORT, C1.TREND_DATE
+			
+		END;
+	</select>
+	
+	
+	<select id="isSalesTeamSelect" parameterType="map" resultType="map">
+	
+	/*** dashboard.supply.isSalesTeamSelect ***/
+	/*  영업지원팀, 영업지원팀장 권한에 대해 공급 대시보드 2내 주요품목그룹 제조 Lead Time차트를 보여 주지 않기 위함  */
+	
+	/* 이종관 과장, 김민철 사원에 대한 영업지원팀장 권한 예외처리 => 두 사람은 제조리드타입 차트를 봐야 함, 영업지원팀장 권한도 있어야 함 */
+	#if($_parameter.GV_USER_ID =='00932' || $_parameter.GV_USER_ID=='00707')
+		with USER_ROLE AS(
+			select *
+			from TB_MAP_USER_ROLE
+		where USER_ID = @{GV_USER_ID}
+		AND ROLE_CD NOT IN ('SALES002')
+		)
+	#else
+		with USER_ROLE AS(
+			select *
+			from TB_MAP_USER_ROLE
+		where USER_ID = @{GV_USER_ID}
+		)
+	#end
+
+	
+	SELECT CASE WHEN COUNT(*) <![CDATA[>=]]> 1 THEN 'T'  
+		    ELSE 'F'
+		   END isSalesTeam
+	FROM USER_ROLE
+	WHERE ROLE_CD = 'SALES001'
+	OR ROLE_CD = 'SALES002'
+	/* SALES001: 영업지원팀 */
+	/* SALES002: 영업지원팀장 */
+	
+	</select>
+	
+	
+</mapper>

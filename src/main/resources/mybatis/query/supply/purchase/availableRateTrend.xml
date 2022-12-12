@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.purchase">
+	<select id="availableRateTrendListSelect" parameterType="map" resultType="map">
+		/****** [ snop.availableRateTrendListSelect ] ******/
+	   WITH W_GR AS
+	   (
+	   		SELECT COMPANY_CD
+			     , BU_CD
+			     , ITEM_CD
+			     , YEARWEEK
+			     , SUM(GR_QTY) AS GR_QTY
+			FROM 
+			(
+	   		#foreach($bucketMap in $_parameter.bucketList)
+	    	#set($paramWeek = "$bucketMap.BUCKET_VAL")
+	    		#if($velocityCount == 1)
+	    			SELECT COMPANY_CD
+				         , BU_CD
+				         , ITEM_CD
+				         , GR_QTY
+				         , '$paramWeek' AS YEARWEEK
+				  	FROM TB_DYN_GR A1
+				  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			    	  AND BU_CD = @{GV_BU_CD}
+			   		  AND DEL_FLAG = 'N'
+			    	  AND GR_DATE BETWEEN (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112) 
+								          FROM TB_MST_CODE
+										    WHERE BU_CD = @{GV_BU_CD}
+								              AND GROUP_CD = 'GR_PERIOD'
+										      AND USE_FLAG = 'Y'
+										  )
+						    	  AND (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112)
+										FROM TB_MST_CODE
+										WHERE BU_CD = @{GV_BU_CD}
+								          AND GROUP_CD = 'GR_PERIOD'
+										  AND USE_FLAG = 'Y'
+						    	  )
+					UNION ALL
+					SELECT COMPANY_CD
+					     , BU_CD
+					     , ITEM_CD
+					     , GR_QTY      
+					     , '$paramWeek' AS YEARWEEK
+					FROM TB_DYN_GR_PROD WITH(NOLOCK)
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					  AND BU_CD = @{GV_BU_CD} 
+					  AND PLANT_CD = 'WF01'
+					  AND GR_DATE BETWEEN (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112) 
+								          FROM TB_MST_CODE
+										    WHERE BU_CD = @{GV_BU_CD}
+								              AND GROUP_CD = 'GR_PERIOD'
+										      AND USE_FLAG = 'Y'
+										  )
+						    	  AND (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112)
+										FROM TB_MST_CODE
+										WHERE BU_CD = @{GV_BU_CD}
+								          AND GROUP_CD = 'GR_PERIOD'
+										  AND USE_FLAG = 'Y'
+						    	  )
+	    		#else
+	    			UNION ALL
+	    			SELECT COMPANY_CD
+				         , BU_CD
+				         , ITEM_CD
+				         , GR_QTY
+				         , '$paramWeek' AS YEARWEEK
+				  	FROM TB_DYN_GR A1
+				  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			    	  AND BU_CD = @{GV_BU_CD}
+			   		  AND DEL_FLAG = 'N'
+			    	  AND GR_DATE BETWEEN (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112) 
+								          FROM TB_MST_CODE
+										    WHERE BU_CD = @{GV_BU_CD}
+								              AND GROUP_CD = 'GR_PERIOD'
+										      AND USE_FLAG = 'Y'
+										  )
+						    	  AND (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112)
+										FROM TB_MST_CODE
+										WHERE BU_CD = @{GV_BU_CD}
+								          AND GROUP_CD = 'GR_PERIOD'
+										  AND USE_FLAG = 'Y'
+						    	  )
+					UNION ALL
+					SELECT COMPANY_CD
+					     , BU_CD
+					     , ITEM_CD
+					     , GR_QTY      
+					     , '$paramWeek' AS YEARWEEK
+					FROM TB_DYN_GR_PROD WITH(NOLOCK)
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+					  AND BU_CD = @{GV_BU_CD} 
+					  AND PLANT_CD = 'WF01'
+					  AND GR_DATE BETWEEN (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_1_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112) 
+								          FROM TB_MST_CODE
+										    WHERE BU_CD = @{GV_BU_CD}
+								              AND GROUP_CD = 'GR_PERIOD'
+										      AND USE_FLAG = 'Y'
+										  )
+						    	  AND (SELECT CONVERT(VARCHAR(8), DATEADD(D, CAST(ATTB_2_CD AS INT), CONVERT(DATE, (SELECT TOP 1 YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = '$paramWeek'), 112)), 112)
+										FROM TB_MST_CODE
+										WHERE BU_CD = @{GV_BU_CD}
+								          AND GROUP_CD = 'GR_PERIOD'
+										  AND USE_FLAG = 'Y'
+						    	  )
+	    		#end
+	    	#end
+	    	) B1
+			GROUP BY COMPANY_CD, BU_CD, ITEM_CD, YEARWEEK
+	   	),
+		W_MAIN_REQ_QTY AS
+        (
+            SELECT HAWM.COMPANY_CD
+                 , HAWM.BU_CD
+                 , HAWM.MAIN_ITEM_CD
+                 , MPV.START_WEEK
+                 , SUM(HAWM.MAIN_REQ_QTY) AS MAIN_REQ_QTY
+			FROM TB_HIS_APS_WORKORDER_MRP HAWM WITH(NOLOCK)
+            INNER JOIN TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+               ON MPV.COMPANY_CD = HAWM.COMPANY_CD
+              AND MPV.BU_CD = HAWM.BU_CD
+              AND MPV.PLAN_TYPE_CD = 'MP'
+              AND MPV.PLAN_ID = HAWM.PLAN_ID
+            WHERE HAWM.COMPANY_CD = @{GV_COMPANY_CD}
+              AND HAWM.BU_CD = @{GV_BU_CD}  
+              AND HAWM.MAIN_ITEM_CD IS NOT NULL
+             GROUP BY HAWM.COMPANY_CD, HAWM.BU_CD, HAWM.MAIN_ITEM_CD, MPV.START_WEEK
+		)
+		SELECT NULL AS TMP_COL
+    	<include refid="include.getCdDimTotal"/>
+    	<include refid="include.getGrpLvlId"/>
+	    	#foreach($bucketMap in $_parameter.bucketList)
+	    	#set($paramWeek = "$bucketMap.BUCKET_VAL")
+				, AVG(CASE WHEN ISNULL(A.REQ_TOTAL, 0) <![CDATA[<=]]> 0 THEN NULL 
+				           WHEN YEARWEEK = '$paramWeek' THEN CASE WHEN (A.INV_GR_QTY / NULLIF(A.REQ_TOTAL, 0) * 100) <![CDATA[>]]> 100 THEN 100
+					           									  ELSE (A.INV_GR_QTY / NULLIF(A.REQ_TOTAL, 0) * 100)
+					       								 	  END
+					  END) AS $bucketMap.CD
+	    	#end
+    	FROM
+    	(
+			SELECT A1.COMPANY_CD
+			     , A2.BU_CD
+			     , ISNULL(A2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(A2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(A2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			     , ISNULL(A2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			     , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD
+			     , ISNULL(A1.ITEM_CD, ' ') AS ITEM_CD_NM
+			     , ISNULL(A2.ITEM_NM, ' ') AS ITEM_NM
+			     , ISNULL(A2.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(A2.SPEC, ' ') AS SPEC
+			     , ISNULL(A2.SPEC, ' ') AS SPEC_NM
+			     , ISNULL(A2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+			     , ISNULL(A2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+			     , ISNULL(A2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+			     , ISNULL(A2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+			     , ISNULL(A2.MFG_LT, ' ') AS MFG_LT
+			     , ISNULL(A2.MFG_LT, ' ') AS MFG_LT_NM
+			     , ISNULL(A2.UOM_CD, ' ') AS UOM_CD
+			     , ISNULL(A2.UOM_CD, ' ') AS UOM_CD_NM
+			     , ISNULL(A2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD
+			     , ISNULL(A2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM
+			     , ISNULL(A2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM
+			     , ISNULL(A2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+			     , ISNULL(A2.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+			     , ISNULL(A2.PROCUR_TYPE, ' ') AS PROCUR_TYPE_NM
+			     , A2.ITEM_TYPE
+			     , A1.YEARWEEK
+			     , A1.MRP_QTY
+			     , A1.NON_MOVING_QTY
+			     , A1.NON_DEPLOY_QTY
+			     
+			     -- 20220225 김수호 수정: VOC-332 : 자재준비율과 자재별 가용률 추세 데이터 데이터 다름(김동현B)
+			     -- SCM > 운영 KPI > 자재 준비율 기준에 맞게 수정
+			     , CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                  		ELSE 0
+             		END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY  AS REQ_TOTAL
+			     , A4.GR_QTY
+			     , A1.INV_QTY
+			     
+			     -- 20220225 김수호 수정: VOC-332 : 자재준비율과 자재별 가용률 추세 데이터 데이터 다름(김동현B)
+			     --, ISNULL(A1.INV_QTY, 0) + ISNULL(A4.GR_QTY, 0) AS INV_GR_QTY 
+			     , ISNULL(A1.INV_QTY, 0) + ISNULL(A4.GR_QTY, 0) - ISNULL(A1.ADJ_QTY, 0) AS INV_GR_QTY
+			     
+			     , (A1.INV_QTY + ISNULL(A4.GR_QTY, 0)) - (CASE WHEN ISNULL(A1.MRP_QTY, 0) <![CDATA[>]]> ISNULL(HAWM.MAIN_REQ_QTY, 0) THEN ISNULL(A1.MRP_QTY, 0) - ISNULL(HAWM.MAIN_REQ_QTY, 0)
+                                                         	   ELSE 0
+                                                    	   END + A1.NON_MOVING_QTY + A1.NON_DEPLOY_QTY + ISNULL(A1.ADJ_QTY, 0)) AS OVER_SHORT 
+			FROM TB_KPI_MAT_PREPARATION A1 WITH(NOLOCK)
+			INNER JOIN
+			( 
+				<include refid="snop.common.t_itemCust" />
+			) A2
+			ON A1.COMPANY_CD = A2.COMPANY_CD
+			AND A1.BU_CD = A2.BU_CD
+			AND A1.ITEM_CD = A2.ITEM_CD
+			LEFT OUTER JOIN W_GR A4
+			  ON A1.COMPANY_CD = A4.COMPANY_CD
+			 AND A1.BU_CD = A4.BU_CD
+			 AND A1.ITEM_CD = A4.ITEM_CD
+			 AND A1.YEARWEEK = A4.YEARWEEK
+			LEFT OUTER JOIN W_MAIN_REQ_QTY HAWM
+           	  ON HAWM.COMPANY_CD = A1.COMPANY_CD
+        	 AND HAWM.BU_CD = A1.BU_CD
+        	 AND HAWM.MAIN_ITEM_CD = A1.ITEM_CD
+         	 AND HAWM.START_WEEK = A1.YEARWEEK
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.YEARWEEK <![CDATA[>=]]> @{fromWeek}
+			  AND A1.YEARWEEK <![CDATA[<=]]> @{toWeek}
+		) A
+		GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+	    ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    	, A.$dimMap.DIM_CD
+		#end
+	</select>
+	
+	
+	
+	
+	
+	
+	
+</mapper>

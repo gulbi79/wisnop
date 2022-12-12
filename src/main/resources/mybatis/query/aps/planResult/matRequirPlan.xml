@@ -1,0 +1,848 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="matRequirPlanSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.matRequirPlanSelect ] ******/
+		WITH W_DATA AS 
+		(
+			SELECT HAMSS.COMPANY_CD
+		         , HAMSS.BU_CD
+		         , HAMSS.PLAN_ID
+		         , HAMSS.ITEM_CD
+		         , MI.ITEM_NM
+		         , MI.SPEC
+		         , MI.ITEM_TYPE AS ITEM_TYPE_CD
+		         , MC1.CODE_NM AS ITEM_TYPE_NM
+		         , MIP.PROCUR_TYPE AS PROCUR_TYPE_CD
+		         , MC2.CODE_NM AS PROCUR_TYPE
+		         , MI.ITEM_GROUP_CD
+		         , MIG.ITEM_GROUP_NM
+		         , MIP.PUR_LT
+		         , MI.ITEM_COST_KRW
+		         , HAMSS.VENDOR_OUT_QTY
+		         , HAMSS.EX_PLANT_QTY
+		         , HAMSS.BL_QTY
+		         , HAMSS.CC_QTY
+		         , HAMSS.INSPECT_QTY
+		         , HAMSS.EXP_GR_QTY_W0
+		         , HAMSS.EXP_GR_QTY_W1
+		         , HAMSS.EXP_GR_QTY_W2
+		         , HAMSS.EXP_GR_QTY_W3
+		         , HAMSS.EXP_GR_QTY_W4
+		         , HAMSS.EXP_GR_QTY_W5
+		         , HAMSS.EXP_GR_QTY_W6
+		         , HAMSS.EXP_GR_QTY_M0
+		         , HAMSS.EXP_GR_QTY_M1
+		         , HAMSS.EXP_GR_QTY_M2
+		         , HAMSS.EXP_GR_QTY_M3
+		         , HAMSS.MOL_QTY_W1
+		         , HAMSS.MOL_QTY_W2
+		         , HAMSS.WI01_MOL_QTY
+		         , HAMSS.OUT_MOL_QTY
+		         , HAMSS.INV_QTY
+		         , HAMSS.NON_DEPLOY_QTY
+		         , HAMSS.NON_MOVING_QTY
+		         , ISNULL(HAMSS.MOL_QTY_W1, 0) + ISNULL(HAMSS.MOL_QTY_W2, 0) AS MOL_QTY_TOT
+		         , HAMSS.MEAS_CD
+		         , HAMS.MRP_QTY_W1
+		         , HAMS.MRP_QTY_W2
+		         , HAMS.MRP_QTY_W3
+		         , HAMS.MRP_QTY_W4
+		         , HAMS.MRP_QTY_W5
+		         , HAMS.MRP_QTY_W6
+		         , HAMS.MRP_QTY_M0
+		         , HAMS.MRP_QTY_M1
+		         , HAMS.MRP_QTY_M2
+		         , HAMS.MRP_QTY_M3
+		         , HAMS.MRP_QTY_M4
+		         , HAMS.MRP_QTY_M5
+		         , HAMS.MRP_QTY_M6
+		         , HAMS.MRP_QTY_M7
+		         , HAMS.MRP_QTY_M8
+		         , HAMS.MRP_QTY_M9
+		         , HAMS.MRP_QTY_M10
+		         , HAMS.MRP_QTY_M11
+			FROM
+			(
+				SELECT COMPANY_CD
+				     , BU_CD
+				     , PLAN_ID
+				     , ITEM_CD
+				     , MEAS_CD
+				     , SUM(VENDOR_OUT_QTY) AS VENDOR_OUT_QTY
+				     , SUM(EX_PLANT_QTY) AS EX_PLANT_QTY
+				     , SUM(BL_QTY) AS BL_QTY
+				     , SUM(CC_QTY) AS CC_QTY
+				     , SUM(INSPECT_QTY) AS INSPECT_QTY
+				     , SUM(EXP_GR_QTY_W0) AS EXP_GR_QTY_W0
+				     , SUM(EXP_GR_QTY_W1) AS EXP_GR_QTY_W1
+				     , SUM(EXP_GR_QTY_W2) AS EXP_GR_QTY_W2
+				     , SUM(EXP_GR_QTY_W3) AS EXP_GR_QTY_W3
+				     , SUM(EXP_GR_QTY_W4) AS EXP_GR_QTY_W4
+				     , SUM(EXP_GR_QTY_W5) AS EXP_GR_QTY_W5
+				     , SUM(EXP_GR_QTY_W6) AS EXP_GR_QTY_W6
+				     , SUM(EXP_GR_QTY_M0) AS EXP_GR_QTY_M0
+				     , SUM(EXP_GR_QTY_M1) AS EXP_GR_QTY_M1
+				     , SUM(EXP_GR_QTY_M2) AS EXP_GR_QTY_M2
+				     , SUM(EXP_GR_QTY_M3) AS EXP_GR_QTY_M3
+				     
+				     , SUM(MOL_QTY_W1) AS MOL_QTY_W1
+				     , SUM(MOL_QTY_W2) AS MOL_QTY_W2
+				     , SUM(WI01_MOL_QTY) AS WI01_MOL_QTY
+				     , SUM(OUT_MOL_QTY) AS OUT_MOL_QTY
+				     , SUM(INV_QTY) AS INV_QTY
+				     , SUM(NON_DEPLOY_QTY) AS NON_DEPLOY_QTY
+				     , SUM(NON_MOVING_QTY) AS NON_MOVING_QTY
+				FROM TB_HIS_APS_MRP_SUM_SUB WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @{planId}
+				GROUP BY COMPANY_CD, BU_CD, PLAN_ID, ITEM_CD, MEAS_CD
+			) HAMSS
+		    LEFT OUTER JOIN 
+		    (
+				SELECT HAMS.COMPANY_CD
+                     , HAMS.BU_CD
+                     , HAMS.PLAN_ID
+                     , HAMS.ITEM_CD
+                     , HAMS.MEAS_CD
+                     , SUM(HAMS.MRP_QTY_W1) AS MRP_QTY_W1
+                     , SUM(HAMS.MRP_QTY_W2) AS MRP_QTY_W2
+                     , SUM(HAMS.MRP_QTY_W3) AS MRP_QTY_W3
+                     , SUM(HAMS.MRP_QTY_W4) AS MRP_QTY_W4
+                     , SUM(HAMS.MRP_QTY_W5) AS MRP_QTY_W5
+                     , SUM(HAMS.MRP_QTY_W6) AS MRP_QTY_W6
+                     , SUM(HAMS.MRP_QTY_M0) AS MRP_QTY_M0
+                     , SUM(HAMS.MRP_QTY_M1) AS MRP_QTY_M1
+                     , SUM(HAMS.MRP_QTY_M2) AS MRP_QTY_M2
+                     , SUM(HAMS.MRP_QTY_M3) AS MRP_QTY_M3
+                     , SUM(HAMS.MRP_QTY_M4) AS MRP_QTY_M4
+                     , SUM(HAMS.MRP_QTY_M5) AS MRP_QTY_M5
+                     , SUM(HAMS.MRP_QTY_M6) AS MRP_QTY_M6
+                     , SUM(HAMS.MRP_QTY_M7) AS MRP_QTY_M7
+                     , SUM(HAMS.MRP_QTY_M8) AS MRP_QTY_M8
+                     , SUM(HAMS.MRP_QTY_M9) AS MRP_QTY_M9
+                     , SUM(HAMS.MRP_QTY_M10) AS MRP_QTY_M10
+                     , SUM(HAMS.MRP_QTY_M11) AS MRP_QTY_M11
+                     
+                     
+                     
+                     
+				FROM TB_HIS_APS_MRP_SUM HAMS WITH(NOLOCK)
+				WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				  AND BU_CD = @{GV_BU_CD}
+				  AND PLAN_ID = @{planId}
+				GROUP BY HAMS.COMPANY_CD, HAMS.BU_CD, HAMS.PLAN_ID, HAMS.ITEM_CD, HAMS.MEAS_CD
+			) HAMS
+			ON HAMS.COMPANY_CD = HAMSS.COMPANY_CD
+			AND HAMS.BU_CD = HAMSS.BU_CD
+			AND HAMS.PLAN_ID = HAMSS.PLAN_ID
+			AND HAMS.ITEM_CD = HAMSS.ITEM_CD 
+			AND HAMS.MEAS_CD = HAMSS.MEAS_CD 
+			INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		       ON MI.COMPANY_CD = HAMSS.COMPANY_CD
+		      AND MI.BU_CD = HAMSS.BU_CD
+		      AND MI.ITEM_CD = HAMSS.ITEM_CD
+		    LEFT JOIN TB_MST_ITEM_GROUP MIG WITH (NOLOCK)
+		      ON MI.COMPANY_CD    = MIG.COMPANY_CD
+		     AND MI.BU_CD         = MIG.BU_CD
+		     AND MI.ITEM_GROUP_CD = MIG.ITEM_GROUP_CD
+		     AND MIG.DEL_FLAG      = 'N'
+		    INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		       ON MIP.COMPANY_CD = MI.COMPANY_CD
+		      AND MIP.BU_CD = MI.BU_CD
+		      AND MIP.PLANT_CD = 'WF01'
+		      AND MIP.ITEM_CD = MI.ITEM_CD
+		    LEFT OUTER JOIN 
+		    (
+		    	SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                        END AS CODE_NM
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+			) MC1
+		    ON MC1.BU_CD = 'ALL' 
+		    AND MC1.GROUP_CD = 'ITEM_TYPE'
+		    AND MC1.CODE_CD = MI.ITEM_TYPE
+		    AND MC1.USE_FLAG = 'Y'
+		    LEFT OUTER JOIN 
+		    (
+		    	SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                            ELSE CODE_NM
+                       END AS CODE_NM
+                     , SORT
+                     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+			) MC2
+		    ON MC2.BU_CD = 'ALL'
+		    AND MC2.GROUP_CD = 'PROCUR_TYPE'
+		    AND MC2.CODE_CD = MIP.PROCUR_TYPE
+		    AND MC2.USE_FLAG = 'Y'
+			WHERE MI.USE_FLAG = 'Y'
+			  AND MI.ITEM_TYPE NOT IN ('10', '50')
+		),
+		W_MEASURE AS 
+		(
+			SELECT CATEGORY_CD
+			     , CATEGORY_NM
+			     , CATEGORY_IDX 
+		    FROM 
+		    (
+				SELECT NULL AS CATEGORY_CD
+			       	 , NULL AS CATEGORY_NM
+			       	 , NULL AS CATEGORY_IDX
+				#foreach( $meaMap in $_parameter.meaList )
+			    UNION ALL 
+			    SELECT '$meaMap.CD'
+			         , '$meaMap.NM'
+			         , $velocityCount 
+				#end
+			) A
+		    WHERE CATEGORY_CD IS NOT NULL
+		),
+		W_COL AS 
+		(
+		    SELECT T1.COMPANY_CD
+		         , T1.BU_CD
+		         , T1.PLAN_ID
+		         , T1.ITEM_CD
+		         , T1.ITEM_NM
+		         , T1.SPEC
+		         , T1.ITEM_TYPE_CD
+		         , T1.ITEM_TYPE_NM
+		         , T1.PROCUR_TYPE_CD
+		         , T1.PROCUR_TYPE
+		         , T1.ITEM_GROUP_CD
+		         , T1.ITEM_GROUP_NM
+		         , T1.PUR_LT
+		         , T1.ITEM_COST_KRW
+				#foreach( $meaMap in $_parameter.meaList )
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W1 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_W1
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W2 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_W2
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W3 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_W3
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W4 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_W4
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W5 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_W5
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W6 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_W6
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M0 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M0
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M1 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M1
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M2 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M2
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M3 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M3
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M4 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M4
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M5 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M5
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M6 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M6
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M7 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M7
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M8 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M8
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M9 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M9
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M10 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M10
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M11 ELSE NULL END) AS ${meaMap.CD}_MRP_QTY_M11
+		         
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VENDOR_OUT_QTY ELSE NULL END) AS ${meaMap.CD}_VENDOR_OUT_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EX_PLANT_QTY ELSE NULL END) AS ${meaMap.CD}_EX_PLANT_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.BL_QTY ELSE NULL END) AS ${meaMap.CD}_BL_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.CC_QTY ELSE NULL END) AS ${meaMap.CD}_CC_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.INSPECT_QTY ELSE NULL END) AS ${meaMap.CD}_INSPECT_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W0 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_W0
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W1 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_W1
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W2 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_W2
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W3 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_W3
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W4 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_W4
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W5 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_W5
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W6 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_W6
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M0 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_M0
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M1 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_M1
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M2 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_M2
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M3 ELSE NULL END) AS ${meaMap.CD}_EXP_GR_QTY_M3
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MOL_QTY_W1 ELSE NULL END) AS ${meaMap.CD}_MOL_QTY_W1
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MOL_QTY_W2 ELSE NULL END) AS ${meaMap.CD}_MOL_QTY_W2
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.WI01_MOL_QTY ELSE NULL END) AS ${meaMap.CD}_WI01_MOL_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.OUT_MOL_QTY ELSE NULL END) AS ${meaMap.CD}_OUT_MOL_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.INV_QTY ELSE NULL END) AS ${meaMap.CD}_INV_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.NON_DEPLOY_QTY ELSE NULL END) AS ${meaMap.CD}_NON_DEPLOY_QTY
+		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.NON_MOVING_QTY ELSE NULL END) AS ${meaMap.CD}_NON_MOVING_QTY
+				#end
+		        #foreach( $meaMap in $_parameter.meaList )
+		         	#if($velocityCount > 1)
+						 + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W4 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W5 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W6 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M0 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M4 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M5 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M6 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M7 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M8 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M9 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M10 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M11 ELSE NULL END)), 0)
+				         
+				         
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VENDOR_OUT_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EX_PLANT_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.BL_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.CC_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.INSPECT_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W0 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W4 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W5 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W6 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M0 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MOL_QTY_W1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MOL_QTY_W2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.WI01_MOL_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.OUT_MOL_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.INV_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.NON_DEPLOY_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.NON_MOVING_QTY ELSE NULL END)), 0)
+					#else
+						 , ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W4 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W5 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W6 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M0 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M4 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M5 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M6 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M7 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M8 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M9 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M10 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_M11 ELSE NULL END)), 0)
+				         
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VENDOR_OUT_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EX_PLANT_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.BL_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.CC_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.INSPECT_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W0 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W4 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W5 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_W6 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M0 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.EXP_GR_QTY_M3 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MOL_QTY_W1 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MOL_QTY_W2 ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.WI01_MOL_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.OUT_MOL_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.INV_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.NON_DEPLOY_QTY ELSE NULL END)), 0)
+				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.NON_MOVING_QTY ELSE NULL END)), 0)
+					#end
+				#end AS OMIT_FLAG
+		         , SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_W1 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_W2 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_W3 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_W4 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_W5 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_W6 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M0 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M1 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M2 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M3 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M4 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M5 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M6 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M7 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M8 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M9 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M10 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'P' THEN T1.MRP_QTY_M11 ELSE NULL END) AS PRE_MRP_QTY_TOT
+		         , SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_W1 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_W2 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_W3 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_W4 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_W5 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_W6 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M0 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M1 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M2 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M3 ELSE NULL END) + 
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M4 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M5 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M6 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M7 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M8 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M9 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M10 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'F' THEN T1.MRP_QTY_M11 ELSE NULL END) AS FIN_MRP_QTY_TOT
+		         , SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_W1 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_W2 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_W3 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_W4 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_W5 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_W6 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M0 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M1 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M2 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M3 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M4 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M5 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M6 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M7 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M8 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M9 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M10 ELSE NULL END) +
+		           SUM(CASE WHEN T1.MEAS_CD = 'G' THEN T1.MRP_QTY_M11 ELSE NULL END) AS GAP_MRP_QTY_TOT
+			FROM W_DATA T1
+		    GROUP BY T1.COMPANY_CD, T1.BU_CD, T1.PLAN_ID, T1.ITEM_CD, T1.ITEM_NM, T1.SPEC, T1.ITEM_TYPE_CD, T1.ITEM_TYPE_NM, T1.PROCUR_TYPE_CD
+		         , T1.PROCUR_TYPE, T1.ITEM_GROUP_CD, T1.ITEM_GROUP_NM, T1.PUR_LT, T1.ITEM_COST_KRW
+		),
+		W_MAIN AS 
+		(
+			SELECT T1.COMPANY_CD
+		         , T1.BU_CD
+		         , T1.PLAN_ID
+		         , T1.ITEM_CD
+		         , T1.ITEM_NM
+		         , T1.SPEC
+		         , T1.ITEM_TYPE_CD
+		         , T1.ITEM_TYPE_NM
+		         , T1.PROCUR_TYPE_CD
+		         , T1.PROCUR_TYPE
+		         , T1.ITEM_GROUP_CD
+		         , T1.ITEM_GROUP_NM
+		         , T1.PUR_LT
+		         , T1.ITEM_COST_KRW
+		         , T2.CATEGORY_CD
+		         , T2.CATEGORY_NM
+		         , T2.CATEGORY_IDX
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_VENDOR_OUT_QTY
+		                               #end
+		           END AS VENDOR_OUT_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EX_PLANT_QTY
+		                               #end
+		           END AS EX_PLANT_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_BL_QTY
+		                               #end
+		           END AS BL_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_CC_QTY
+		                               #end
+		           END AS CC_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_INSPECT_QTY
+		                               #end
+		           END AS INSPECT_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_W0
+		                               #end
+		           END AS EXP_GR_QTY_W0
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_W1
+		                               #end
+		           END AS EXP_GR_QTY_W1
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_W2
+		                               #end
+		           END AS EXP_GR_QTY_W2
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_W3
+		                               #end
+		           END AS EXP_GR_QTY_W3 
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_W4
+		                               #end
+		           END AS EXP_GR_QTY_W4
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_W5
+		                               #end
+		           END AS EXP_GR_QTY_W5
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_W6
+		                               #end
+		           END AS EXP_GR_QTY_W6
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_M0
+		                               #end
+		           END AS EXP_GR_QTY_M0
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_M1
+		                               #end
+		           END AS EXP_GR_QTY_M1
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_M2
+		                               #end
+		           END AS EXP_GR_QTY_M2
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_EXP_GR_QTY_M3
+		                               #end
+		           END AS EXP_GR_QTY_M3
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MOL_QTY_W1
+		                               #end
+		           END AS MOL_QTY_W1
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MOL_QTY_W2
+		                               #end
+		           END AS MOL_QTY_W2   
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_WI01_MOL_QTY
+		                               #end
+		           END AS WI01_MOL_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_OUT_MOL_QTY
+		                               #end
+		           END AS OUT_MOL_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_INV_QTY
+		                               #end
+		           END AS INV_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_NON_DEPLOY_QTY
+		                               #end
+		           END AS NON_DEPLOY_QTY
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_NON_MOVING_QTY
+		                               #end
+		           END AS NON_MOVING_QTY
+		         
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_W1
+		                               #end
+		           END AS MRP_QTY_W1
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_W2
+		                               #end
+		           END AS MRP_QTY_W2
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_W3
+		                               #end
+		           END AS MRP_QTY_W3
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_W4
+		                               #end
+		           END AS MRP_QTY_W4
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_W5
+		                               #end
+		           END AS MRP_QTY_W5
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_W6
+		                               #end
+		           END AS MRP_QTY_W6
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M0
+		                               #end
+		           END AS MRP_QTY_M0
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M1
+		                               #end
+		           END AS MRP_QTY_M1
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M2
+		                               #end
+		           END AS MRP_QTY_M2
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M3
+		                               #end
+		           END AS MRP_QTY_M3
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M4
+		                               #end
+		           END AS MRP_QTY_M4
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M5
+		                               #end
+		           END AS MRP_QTY_M5
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M6
+		                               #end
+		           END AS MRP_QTY_M6
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M7
+		                               #end
+		           END AS MRP_QTY_M7
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M8
+		                               #end
+		           END AS MRP_QTY_M8
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M9
+		                               #end
+		           END AS MRP_QTY_M9
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M10
+		                               #end
+		           END AS MRP_QTY_M10
+		         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+		                               WHEN '${meaMap.CD}' THEN T1.${meaMap.CD}_MRP_QTY_M11
+		                               #end
+		           END AS MRP_QTY_M11
+		         , T1.PRE_MRP_QTY_TOT
+		         , T1.FIN_MRP_QTY_TOT
+		         , T1.GAP_MRP_QTY_TOT
+		         , T1.OMIT_FLAG
+			FROM W_COL T1
+		    CROSS JOIN W_MEASURE T2
+		    WHERE T1.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND T1.BU_CD = @{GV_BU_CD}
+		      AND T1.PLAN_ID = @{planId}
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+			  AND T1.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			#end
+			#if($_parameter.itemType and $_parameter.itemType != "")
+			  AND T1.ITEM_TYPE_CD IN ('$_parameter.itemType.replace(",","','")')
+			#end
+			#if($_parameter.procurType and $_parameter.procurType != "")
+			  AND T1.PROCUR_TYPE_CD IN ('$_parameter.procurType.replace(",","','")')
+			#end
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+			  AND T1.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+			  AND (T1.ITEM_CD LIKE '%' + @{item_nm} + '%' OR T1.ITEM_NM LIKE '%' + @{item_nm} + '%')
+			#end
+			#if($_parameter.parentItem_cd and $_parameter.parentItem_cd != "")
+			AND EXISTS (
+			        		SELECT 1
+			        		FROM TB_HIS_APS_MRP_SUM_DTL A1 WITH(NOLOCK)
+			        		WHERE A1.COMPANY_CD = T1.COMPANY_CD
+			          		  AND A1.BU_CD = T1.BU_CD
+			          		  AND A1.PLAN_ID = T1.PLAN_ID
+			          		  AND A1.CHILD_ITEM_CD = T1.ITEM_CD
+			          	 	  AND A1.PARENT_ITEM_CD IN ('$_parameter.parentItem_cd.replace(",","','")')
+			      )
+			#elseif($_parameter.parentItem_nm and $_parameter.parentItem_nm != "")
+			 AND EXISTS (
+			 				SELECT 1
+                  			FROM TB_HIS_APS_MRP_SUM_DTL HAMSD WITH(NOLOCK)
+                 			INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                    		   ON MI.COMPANY_CD = HAMSD.COMPANY_CD
+                   			  AND MI.BU_CD = HAMSD.BU_CD
+                   			  AND MI.ITEM_CD = HAMSD.PARENT_ITEM_CD
+			                WHERE HAMSD.COMPANY_CD = T1.COMPANY_CD
+			                  AND HAMSD.BU_CD = T1.BU_CD
+			                  AND HAMSD.PLAN_ID = T1.PLAN_ID
+			                  AND HAMSD.CHILD_ITEM_CD = T1.ITEM_CD
+			                  AND (HAMSD.PARENT_ITEM_CD LIKE '%' + @{parentItem_nm} + '%' OR MI.ITEM_NM LIKE '%' + @{parentItem_nm} + '%')
+			 )
+			#end
+			#if($_parameter.mrpQtyTot and $_parameter.mrpQtyTot != "")
+			    #if($_parameter.mrpQtyTot == "Y")
+				  AND ISNULL(T1.FIN_MRP_QTY_TOT, ISNULL(T1.PRE_MRP_QTY_TOT, 0)) <![CDATA[>]]> 0
+			    #else
+				  AND ISNULL(T1.FIN_MRP_QTY_TOT, ISNULL(T1.PRE_MRP_QTY_TOT, 0)) = 0
+			    #end
+			#end
+			#if($_parameter.molQtyTot and $_parameter.molQtyTot != "")
+			    #if($_parameter.molQtyTot == "Y")
+				  AND T1.MOL_QTY_TOT <![CDATA[>]]> 0
+			    #else
+				  AND T1.MOL_QTY_TOT = 0
+			    #end
+			#end
+		)
+		SELECT TT.TMP_COL
+		     , TT.COMPANY_CD
+		     , TT.BU_CD
+		     , TT.HID_ITEM_NM
+			#foreach( $dimMap in $_parameter.dimList )
+		     , TT.$dimMap.DIM_CD
+		     , TT.${dimMap.DIM_CD}_NM
+		    #end
+		     , TT.CATEGORY_NM
+		     , TT.MRP_QTY_W1
+		     , TT.MRP_QTY_W2
+		     , TT.MRP_QTY_W3
+		     , TT.MRP_QTY_W4
+		     , TT.MRP_QTY_W5
+		     , TT.MRP_QTY_W6
+		     , TT.MRP_QTY_M0
+		     , TT.MRP_QTY_M1
+		     , TT.MRP_QTY_M2
+		     , TT.MRP_QTY_M3
+		     , TT.MRP_QTY_M4
+		     , TT.MRP_QTY_M5
+		     , TT.MRP_QTY_M6
+		     , TT.MRP_QTY_M7
+		     , TT.MRP_QTY_M8
+		     , TT.MRP_QTY_M9
+		     , TT.MRP_QTY_M10
+		     , TT.MRP_QTY_M11
+		     
+		     , TT.VENDOR_OUT_QTY
+	         , TT.EX_PLANT_QTY
+	         , TT.BL_QTY
+	         , TT.CC_QTY
+	         , TT.INSPECT_QTY
+	         , TT.EXP_GR_QTY_W0
+	         , TT.EXP_GR_QTY_W1
+	         , TT.EXP_GR_QTY_W2
+	         , TT.EXP_GR_QTY_W3
+	         , TT.EXP_GR_QTY_W4
+	         , TT.EXP_GR_QTY_W5
+	         , TT.EXP_GR_QTY_W6
+	         , TT.EXP_GR_QTY_M0
+	         , TT.EXP_GR_QTY_M1
+	         , TT.EXP_GR_QTY_M2
+	         , TT.EXP_GR_QTY_M3
+	         , TT.MOL_QTY_W1
+	         , TT.MOL_QTY_W2
+	         , TT.WI01_MOL_QTY
+	         , TT.OUT_MOL_QTY
+	         , TT.INV_QTY
+	         , TT.NON_DEPLOY_QTY
+	         , TT.NON_MOVING_QTY
+		     , TT.OMIT_FLAG
+		FROM 
+		(
+			SELECT NULL AS TMP_COL
+	             , T.COMPANY_CD
+	             , T.BU_CD
+	             , T.ITEM_NM AS HID_ITEM_NM
+	             , ISNULL(T.PLAN_ID         , ' ') AS PLAN_ID
+	             , ISNULL(T.PLAN_ID         , ' ') AS PLAN_ID_NM
+	             , ISNULL(T.ITEM_CD         , ' ') AS ITEM_CD
+	             , ISNULL(T.ITEM_CD         , ' ') AS ITEM_CD_NM
+	             , ISNULL(T.ITEM_NM         , ' ') AS ITEM_NM
+	             , ISNULL(T.ITEM_NM         , ' ') AS ITEM_NM_NM
+	             , ISNULL(T.SPEC            , ' ') AS SPEC
+	             , ISNULL(T.SPEC            , ' ') AS SPEC_NM
+	             , ISNULL(T.ITEM_TYPE_CD    , ' ') AS ITEM_TYPE_CD
+	             , ISNULL(T.ITEM_TYPE_CD    , ' ') AS ITEM_TYPE_CD_NM
+	             , ISNULL(T.ITEM_TYPE_NM    , ' ') AS ITEM_TYPE_NM
+	             , ISNULL(T.ITEM_TYPE_NM    , ' ') AS ITEM_TYPE_NM_NM
+	             , ISNULL(T.PROCUR_TYPE     , ' ') AS PROCUR_TYPE
+	             , ISNULL(T.PROCUR_TYPE     , ' ') AS PROCUR_TYPE_NM
+	             , ISNULL(T.ITEM_GROUP_CD   , ' ') AS ITEM_GROUP_CD
+	             , ISNULL(T.ITEM_GROUP_CD   , ' ') AS ITEM_GROUP_CD_NM
+	             , ISNULL(T.ITEM_GROUP_NM   , ' ') AS ITEM_GROUP_NM
+	             , ISNULL(T.ITEM_GROUP_NM   , ' ') AS ITEM_GROUP_NM_NM
+	             , ISNULL(CONVERT(VARCHAR, T.PUR_LT)          , ' ') AS PUR_LT
+	             , ISNULL(CONVERT(VARCHAR, T.PUR_LT)          , ' ') AS PUR_LT_NM
+	             , ISNULL(CONVERT(VARCHAR, T.ITEM_COST_KRW)   , ' ') AS ITEM_COST_KRW
+	             , ISNULL(CONVERT(VARCHAR, T.ITEM_COST_KRW)   , ' ') AS ITEM_COST_KRW_NM
+				#if($_parameter.rdoType == "QTY")
+	             , T.VENDOR_OUT_QTY
+	             , T.EX_PLANT_QTY
+	             , T.BL_QTY
+	             , T.CC_QTY
+	             , T.INSPECT_QTY
+	             , T.EXP_GR_QTY_W0
+	             , T.EXP_GR_QTY_W1
+	             , T.EXP_GR_QTY_W2
+	             , T.EXP_GR_QTY_W3
+	             , T.EXP_GR_QTY_W4
+	             , T.EXP_GR_QTY_W5
+	             , T.EXP_GR_QTY_W6
+	             , T.EXP_GR_QTY_M0
+	             , T.EXP_GR_QTY_M1
+	             , T.EXP_GR_QTY_M2
+	             , T.EXP_GR_QTY_M3
+	             , T.MOL_QTY_W1
+	             , T.MOL_QTY_W2
+	             , T.WI01_MOL_QTY
+	             , T.OUT_MOL_QTY
+	             , T.INV_QTY
+	             , T.NON_DEPLOY_QTY
+	             , T.NON_MOVING_QTY
+	             , T.MRP_QTY_W1
+	             , T.MRP_QTY_W2
+	             , T.MRP_QTY_W3
+	             , T.MRP_QTY_W4
+	             , T.MRP_QTY_W5
+	             , T.MRP_QTY_W6
+	             , T.MRP_QTY_M0
+	             , T.MRP_QTY_M1
+	             , T.MRP_QTY_M2
+	             , T.MRP_QTY_M3
+	             , T.MRP_QTY_M4
+	             , T.MRP_QTY_M5
+	             , T.MRP_QTY_M6
+	             , T.MRP_QTY_M7
+	             , T.MRP_QTY_M8
+	             , T.MRP_QTY_M9
+	             , T.MRP_QTY_M10
+	             , T.MRP_QTY_M11
+	             
+	             
+				#else
+	             , T.ITEM_COST_KRW * T.VENDOR_OUT_QTY AS VENDOR_OUT_QTY
+	             , T.ITEM_COST_KRW * T.EX_PLANT_QTY AS EX_PLANT_QTY
+	             , T.ITEM_COST_KRW * T.BL_QTY AS BL_QTY
+	             , T.ITEM_COST_KRW * T.CC_QTY AS CC_QTY
+	             , T.ITEM_COST_KRW * T.INSPECT_QTY AS INSPECT_QTY
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_W0 AS EXP_GR_QTY_W0
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_W1 AS EXP_GR_QTY_W1
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_W2 AS EXP_GR_QTY_W2
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_W3 AS EXP_GR_QTY_W3
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_W4 AS EXP_GR_QTY_W4
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_W5 AS EXP_GR_QTY_W5
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_W6 AS EXP_GR_QTY_W6
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_M0 AS EXP_GR_QTY_M0
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_M1 AS EXP_GR_QTY_M1
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_M2 AS EXP_GR_QTY_M2
+	             , T.ITEM_COST_KRW * T.EXP_GR_QTY_M3 AS EXP_GR_QTY_M3
+	             , T.ITEM_COST_KRW * T.MOL_QTY_W1 AS MOL_QTY_W1
+	             , T.ITEM_COST_KRW * T.MOL_QTY_W2 AS MOL_QTY_W2
+	             , T.ITEM_COST_KRW * T.WI01_MOL_QTY AS WI01_MOL_QTY
+	             , T.ITEM_COST_KRW * T.OUT_MOL_QTY AS OUT_MOL_QTY
+	             , T.ITEM_COST_KRW * T.INV_QTY AS INV_QTY
+	             , T.ITEM_COST_KRW * T.NON_DEPLOY_QTY AS NON_DEPLOY_QTY
+	             , T.ITEM_COST_KRW * T.NON_MOVING_QTY AS NON_MOVING_QTY
+	             , T.ITEM_COST_KRW * T.MRP_QTY_W1 AS MRP_QTY_W1
+	             , T.ITEM_COST_KRW * T.MRP_QTY_W2 AS MRP_QTY_W2
+	             , T.ITEM_COST_KRW * T.MRP_QTY_W3 AS MRP_QTY_W3
+	             , T.ITEM_COST_KRW * T.MRP_QTY_W4 AS MRP_QTY_W4
+	             , T.ITEM_COST_KRW * T.MRP_QTY_W5 AS MRP_QTY_W5
+	             , T.ITEM_COST_KRW * T.MRP_QTY_W6 AS MRP_QTY_W6
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M0 AS MRP_QTY_M0
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M1 AS MRP_QTY_M1
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M2 AS MRP_QTY_M2
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M3 AS MRP_QTY_M3
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M4 AS MRP_QTY_M4
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M5 AS MRP_QTY_M5
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M6 AS MRP_QTY_M6
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M7 AS MRP_QTY_M7
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M8 AS MRP_QTY_M8
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M9 AS MRP_QTY_M9
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M10 AS MRP_QTY_M10
+	             , T.ITEM_COST_KRW * T.MRP_QTY_M11 AS MRP_QTY_M11
+	             
+	             
+				#end
+	             , T.CATEGORY_CD
+	             , T.CATEGORY_NM
+	             , T.CATEGORY_IDX
+	             , T.OMIT_FLAG
+			FROM W_MAIN T
+		) TT
+		ORDER BY TT.TMP_COL
+       	#foreach( $dimMap in $_parameter.dimList )
+       	, TT.${dimMap.DIM_CD}_NM, TT.$dimMap.DIM_CD
+       	#end
+	</select>
+</mapper>

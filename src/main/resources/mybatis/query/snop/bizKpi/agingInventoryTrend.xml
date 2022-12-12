@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.bizKpi">
+	<select id="agingInventoryTrendListSelect" parameterType="map" resultType="map">
+		/****** [ snop.agingInventoryTrendList ] ******/
+		
+		SELECT NULL AS TMP_COL
+	    	<include refid="include.getCdDimTotal"/>
+	    	<include refid="include.getGrpLvlId"/>
+	    	#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramMonth = "$bucketMap.BUCKET_VAL")
+				#if($bucketMap.CD.indexOf("_AMT") > -1)
+					, SUM
+						(
+							CASE WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_ONE_MONTH' THEN ONE_MONTH_AMT
+					             WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_THREE_MONTH' THEN THREE_MONTH_AMT
+					             WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_SIX_MONTH' THEN SIX_MONTH_AMT 
+					             WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_NINE_MONTH' THEN NINE_MONTH_AMT
+					             WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_ONE_YEAR' THEN TWELVE_MONTH_AMT 
+					             WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_ONE_YEAR_OVER' THEN ONE_YEAR_OVER_AMT 
+					         END 
+					  ) AS $bucketMap.CD
+				#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+					, AVG
+						(
+							CASE WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_ONE_MONTH' THEN ROUND(ONE_MONTH_AMT / NULLIF(TOTAL_AMT, 0) * 100, 1)
+							     WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_THREE_MONTH' THEN ROUND(THREE_MONTH_AMT / NULLIF(TOTAL_AMT, 0) * 100, 1)
+							     WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_SIX_MONTH' THEN ROUND(SIX_MONTH_AMT / NULLIF(TOTAL_AMT, 0) * 100, 1)
+							     WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_NINE_MONTH' THEN ROUND(NINE_MONTH_AMT / NULLIF(TOTAL_AMT, 0) * 100, 1)
+							     WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_ONE_YEAR' THEN ROUND(TWELVE_MONTH_AMT / NULLIF(TOTAL_AMT, 0) * 100, 1)
+							     WHEN YEARMONTH = '$paramMonth' AND CATEGORY_CD = 'AGING_ONE_YEAR_OVER' THEN ROUND(ONE_YEAR_OVER_AMT / NULLIF(TOTAL_AMT, 0) * 100, 1)
+						     END 
+						) AS $bucketMap.CD 
+				#end
+			#end
+			, A.CATEGORY_CD
+            , A.CATEGORY_NM
+            , A.CATEGORY_IDX
+		FROM
+		(	    	
+			SELECT B1.COMPANY_CD
+			     , B1.BU_CD
+			     , B1.YEARMONTH
+			     , ISNULL(B1.ITEM_CD, ' ') AS ITEM_CD
+			     , ISNULL(B1.ITEM_CD, ' ') AS ITEM_CD_NM
+			     , ISNULL(B2.ITEM_NM, ' ') AS ITEM_NM
+			     , ISNULL(B2.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(B2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+			     , ISNULL(B2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+			     , ISNULL(B2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+			     , ISNULL(B2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+			     , ISNULL(B2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(B2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(B2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			     , ISNULL(B2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			     , ISNULL(B2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD
+			     , ISNULL(B2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM
+			     , ISNULL(B2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM
+			     , ISNULL(B2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+			     , TOTAL_QTY
+			     , ONE_MONTH_QTY
+			     , THREE_MONTH_QTY
+			     , SIX_MONTH_QTY
+			     , NINE_MONTH_QTY
+			     , TWELVE_MONTH_QTY
+			     , ONE_YEAR_OVER_QTY
+			     , B3.CATEGORY_CD
+	             , B3.CATEGORY_NM
+	             , B3.CATEGORY_IDX
+	             #if($_parameter.unitPrice == "COST")
+			     , TOTAL_AMT
+			     , ONE_MONTH_AMT
+			     , THREE_MONTH_AMT
+			     , SIX_MONTH_AMT
+			     , NINE_MONTH_AMT
+			     , TWELVE_MONTH_AMT
+			     , ONE_YEAR_OVER_AMT
+			     #else
+			     , CASE WHEN B2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN B2.SALES_PRICE_KRW * ISNULL(B1.TOTAL_QTY, 0) ELSE ISNULL(B1.TOTAL_AMT, 0) END TOTAL_AMT
+			     , CASE WHEN B2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN B2.SALES_PRICE_KRW * ISNULL(B1.ONE_MONTH_QTY, 0) ELSE ISNULL(B1.ONE_MONTH_AMT, 0) END ONE_MONTH_AMT
+			     , CASE WHEN B2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN B2.SALES_PRICE_KRW * ISNULL(B1.THREE_MONTH_QTY, 0) ELSE ISNULL(B1.THREE_MONTH_AMT, 0) END THREE_MONTH_AMT
+			     , CASE WHEN B2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN B2.SALES_PRICE_KRW * ISNULL(B1.SIX_MONTH_QTY, 0) ELSE ISNULL(B1.SIX_MONTH_AMT, 0) END SIX_MONTH_AMT
+			     , CASE WHEN B2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN B2.SALES_PRICE_KRW * ISNULL(B1.NINE_MONTH_QTY, 0) ELSE ISNULL(B1.NINE_MONTH_AMT, 0) END NINE_MONTH_AMT
+			     , CASE WHEN B2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN B2.SALES_PRICE_KRW * ISNULL(B1.TWELVE_MONTH_QTY, 0) ELSE ISNULL(B1.TWELVE_MONTH_AMT, 0) END TWELVE_MONTH_AMT
+			     , CASE WHEN B2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN B2.SALES_PRICE_KRW * ISNULL(B1.ONE_YEAR_OVER_QTY, 0) ELSE ISNULL(B1.ONE_YEAR_OVER_AMT, 0) END ONE_YEAR_OVER_AMT
+			     #end
+			FROM
+			(
+				SELECT A1.COMPANY_CD
+				     , A1.BU_CD
+				     , A1.ITEM_CD
+				     , A1.YEARMONTH				     
+				     , A1.SALES_PRICE * A1.INV_QTY AS INV_AMT
+				     , A1.M1_QTY AS ONE_MONTH_QTY
+		         	 , A1.M2_QTY + A1.M3_QTY AS THREE_MONTH_QTY
+		         	 , A1.M4_QTY + A1.M5_QTY + A1.M6_QTY AS SIX_MONTH_QTY
+		         	 , A1.M7_QTY + A1.M8_QTY + A1.M9_QTY AS NINE_MONTH_QTY
+		         	 , A1.M10_QTY + A1.M11_QTY + A1.M12_QTY AS TWELVE_MONTH_QTY
+		         	 , A1.Y1_QTY + A1.OVER_Y2_QTY AS ONE_YEAR_OVER_QTY
+		         	 , A1.SALES_PRICE * A1.M1_QTY AS ONE_MONTH_AMT 
+		       		 , A1.SALES_PRICE * (A1.M2_QTY + A1.M3_QTY) AS THREE_MONTH_AMT
+		       		 , A1.SALES_PRICE * (A1.M4_QTY + A1.M5_QTY + A1.M6_QTY) AS SIX_MONTH_AMT
+		       		 , A1.SALES_PRICE * (A1.M7_QTY + A1.M8_QTY + A1.M9_QTY) AS NINE_MONTH_AMT
+		       		 , A1.SALES_PRICE * (A1.M10_QTY + A1.M11_QTY + A1.M12_QTY) AS TWELVE_MONTH_AMT
+		       		 , A1.SALES_PRICE * (A1.Y1_QTY + A1.OVER_Y2_QTY) AS ONE_YEAR_OVER_AMT
+		       		 , (A1.M1_QTY + A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) AS TOTAL_QTY
+				     , (A1.M1_QTY + A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) * A1.SALES_PRICE AS TOTAL_AMT
+				FROM TB_DYN_INVENTORY_AGING A1 WITH(NOLOCK)
+				WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND A1.BU_CD = @{GV_BU_CD}
+		          AND A1.PLANT_CD = 'WF01'
+		          AND A1.YEARMONTH <![CDATA[>=]]> @{fromMon}
+		          AND A1.YEARMONTH <![CDATA[<=]]> @{toMon}
+			) B1
+			INNER JOIN
+			( 
+				<include refid="snop.common.t_itemCust" />
+			) B2
+			ON B1.COMPANY_CD = B2.COMPANY_CD
+			AND B1.BU_CD = B2.BU_CD
+			AND B1.ITEM_CD = B2.ITEM_CD
+			AND B2.ITEM_TYPE NOT IN ('25', '35')
+			CROSS JOIN 
+			(
+				SELECT CATEGORY_CD, CATEGORY_NM, CATEGORY_IDX 
+	        	FROM 
+	        	(
+	            	SELECT NULL AS CATEGORY_CD, NULL AS CATEGORY_NM, NULL AS CATEGORY_IDX
+					#foreach($meaMap in $_parameter.meaList)
+	            		UNION ALL SELECT '$meaMap.CD', '$meaMap.NM', $velocityCount 
+					#end
+	        	) SS
+	        	WHERE CATEGORY_CD IS NOT NULL
+			) B3
+			WHERE 1 = 1
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+		       AND B2.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		  	#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		       AND (B2.ITEM_CD LIKE '%'+@{item_nm}+'%' OR B2.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		  	#end
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		       AND B2.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+		    #end
+			#if($_parameter.itemType and $_parameter.itemType != "")
+		       AND B2.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+		    #end
+		) A		  
+		GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), CATEGORY_CD, CATEGORY_NM, CATEGORY_IDX
+	    ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    	, A.$dimMap.DIM_CD
+		#end							
+		    , CATEGORY_IDX
+		
+	</select>
+	
+</mapper>

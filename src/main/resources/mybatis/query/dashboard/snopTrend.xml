@@ -1,0 +1,1413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.snopTrend">
+
+	<select id="trendBucketWeekSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.trendBucketWeekSelect ] ******/
+		BEGIN
+			DECLARE @P_FROM_WEEK NVARCHAR(6) = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(WEEK, -11, DBO.UFN_GETDATE()), 112));
+			DECLARE @P_TO_WEEK   NVARCHAR(6) = (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112));
+			
+			SELECT 'W' + RIGHT (A.YEARWEEK, 2) DISWEEK
+				 , A.YEARWEEK
+				 , (SELECT 'W' + RIGHT (YEARWEEK, 2) FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(WEEK, -1, CAST (MAX(A.YYYYMMDD) AS DATE)), 112) ) AS PRE_DISWEEK
+				 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(WEEK, -1, CAST (MAX(A.YYYYMMDD) AS DATE)), 112) ) AS PRE_YEARWEEK
+			FROM TB_MST_CALENDAR A WITH(NOLOCK)
+			WHERE YEARWEEK BETWEEN @P_FROM_WEEK AND @P_TO_WEEK
+			GROUP BY YEARWEEK;
+		END;
+	</select>
+	
+	<select id="trendBucketMonthSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.trendBucketMonthSelect ] ******/
+		BEGIN
+			DECLARE @P_FROM_MONTH NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -11, DBO.UFN_GETDATE()), 112));
+			DECLARE @P_TO_MONTH   NVARCHAR(6) = (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112));
+			
+			SELECT 'M' + RIGHT (A.YEARMONTH, 2) DISMONTH
+			     , A.YEARMONTH
+			     , (SELECT 'M' + RIGHT (YEARMONTH, 2) FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -1, CAST (MAX(A.YYYYMMDD) AS DATE)), 112) ) AS PRE_DISMONTH
+				 , (SELECT YEARMONTH FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(NVARCHAR(30), DATEADD(MONTH, -1, CAST (MAX(A.YYYYMMDD) AS DATE)), 112) ) AS PRE_YEARMONTH
+			FROM TB_MST_CALENDAR A WITH(NOLOCK)
+			WHERE A.YEARMONTH BETWEEN @P_FROM_MONTH AND @P_TO_MONTH
+			GROUP BY A.YEARMONTH;
+		END;
+	</select>
+	
+	<select id="chart1Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart1Select ]  [ PROFIT_TREND ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.profit != "total")
+				SELECT PROD_LVL2_NM AS "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND13'
+				GROUP BY PROD_LVL2_NM
+#else
+	            SELECT dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND13'
+#end
+			) A
+			FOR JSON AUTO
+		) PROFIT_TREND
+	</select>
+	
+	
+	<select id="chart2Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart2Select ]  [ CUST ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.chart2_type != "total")
+				SELECT M.REP_CUST_GROUP_CD  "code"
+	                 , B.REP_CUST_GROUP_NM  "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            INNER JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	               ON M.COMPANY_CD        = B.COMPANY_CD
+	              AND M.BU_CD             = B.BU_CD
+	              AND M.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	              AND B.USE_FLAG          = 'Y'
+	            WHERE M.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND M.BU_CD             = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID      = 'DB_TREND14'
+	            GROUP BY M.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+#else
+				SELECT dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 , JSON_QUERY( '['
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND14'
+#end
+			) A
+			FOR JSON AUTO
+		) CUST
+	</select>
+	
+	<select id="chart3Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart3Select ]  [ claim ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+	            SELECT dbo.UFN_GET_TRANSLATE('lbl', 'claim', @{GV_LANG})  "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND02'
+	            UNION ALL
+	            SELECT dbo.UFN_GET_TRANSLATE('lbl', 'claim', @{GV_LANG})  + ' Target' "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.TARGET_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND02'
+			) A
+			FOR JSON AUTO
+		) CLAIM
+	</select>
+	
+	<select id="chart4Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart4Select ]  [ PROD_TREND ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.prod != "total")
+	            SELECT ROUTING_ID    "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND15'
+	            GROUP BY ROUTING_ID
+#else
+	            SELECT dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND15'
+#end
+			) A
+			FOR JSON AUTO
+		) PROD_TREND
+	</select>
+	
+	<select id="chart5Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart5Select ]  [ CAPA ] ******/
+	    SELECT 
+	    (
+			SELECT A.*
+			FROM 
+			(  
+	            SELECT M.REP_CUST_GROUP_CD  "code"
+					#if($_parameter.agingTrend == "total")
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+					#else
+	                 , B.REP_CUST_GROUP_NM  "name"
+					#end
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            LEFT JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	              ON M.COMPANY_CD        = B.COMPANY_CD
+	             AND M.BU_CD             = B.BU_CD
+	             AND M.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	             AND B.USE_FLAG          = 'Y'
+	            WHERE M.COMPANY_CD        = @{GV_COMPANY_CD}
+	             AND M.BU_CD             = @{GV_BU_CD}
+	             AND M.DASHBOARD_ID      = 'DB_TREND16'
+				#if($_parameter.agingTrend == "total")
+	             AND M.REP_CUST_GROUP_CD = 'ALL'
+				#else
+	             AND M.REP_CUST_GROUP_CD != 'ALL'
+				#end
+	             GROUP BY M.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+			) A
+			FOR JSON AUTO
+		) CAPA
+	</select>
+	
+	
+	<select id="chart6Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart6Select ]  [ 불량률 ] ******/
+#if($_parameter.key == "total")
+		SELECT 
+		(
+    		SELECT A.*
+      		FROM 
+      		( 
+            	SELECT M.TEAM_CD AS "code"
+                	 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+                     		WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+                     		ELSE B.CODE_NM
+                   		END "name"
+                	 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+                 	+ CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+                  	AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+             	INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+                   ON B.GROUP_CD = 'TEAM_CD'
+                  AND B.BU_CD    = M.BU_CD
+                  AND B.CODE_CD  = M.TEAM_CD
+                  AND B.USE_FLAG = 'Y'
+             	WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+                  AND M.BU_CD        = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID = 'DB_TREND01'
+                  AND M.TEAM_CD IS NOT NULL
+             	GROUP BY M.TEAM_CD, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+             	UNION ALL
+            	SELECT M.TEAM_CD + '_T' AS "code"
+                	 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+                     		WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+                     		ELSE B.CODE_NM
+                   		END + ' (Target)' AS "name"
+                 	 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+                 	+ CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.TARGET_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+                 	AS "data"
+              	FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+             	INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+                   ON B.GROUP_CD = 'TEAM_CD'
+                  AND B.BU_CD    = M.BU_CD
+                  AND B.CODE_CD  = M.TEAM_CD
+                  AND B.USE_FLAG = 'Y'
+             	WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+                  AND M.BU_CD        = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID = 'DB_TREND01'
+               	  AND M.TEAM_CD IS NOT NULL
+             	GROUP BY M.TEAM_CD, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+			) A
+       		FOR JSON AUTO
+		) DEFECT
+
+#elseif($_parameter.key == "key")
+		SELECT 
+		(
+			SELECT A.*
+			FROM 
+			(
+				SELECT B.REP_ITEM_GROUP_CD "code"
+		             , B.REP_ITEM_GROUP_NM "name"
+		             , JSON_QUERY( '['
+		             #foreach($bucketMap in $_parameter.month)
+		             + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30))
+		             	#if($foreach.hasNext) 
+		             	+ ','
+		             	#end
+		             #end 
+		             + ']') "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+		        INNER JOIN TB_MST_REP_ITEM_GROUP B WITH(NOLOCK)
+		           ON M.COMPANY_CD = B.COMPANY_CD
+		          AND M.BU_CD = B.BU_CD
+		          AND M.REP_ITEM_GROUP_CD = B.REP_ITEM_GROUP_CD
+		        WHERE M.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND M.BU_CD = @{GV_BU_CD}
+		          AND M.DASHBOARD_ID = 'DB_TREND01'
+		          AND M.REP_ITEM_GROUP_CD IS NOT NULL
+		        GROUP BY B.REP_ITEM_GROUP_CD, B.REP_ITEM_GROUP_NM
+			) A
+			FOR JSON AUTO
+		) DEFECT
+#elseif($_parameter.key == "part")
+		SELECT 
+		(
+			SELECT A.*
+			FROM 
+			(
+                SELECT M.ROUTING_ID "code"
+                     , M.ROUTING_ID "name"
+                     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                     + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30))
+                         #if($foreach.hasNext) 
+                         + ','
+                         #end
+                     #end
+                     +  ']') AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+                WHERE M.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND M.BU_CD = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID = 'DB_TREND01'
+                  AND M.ROUTING_ID IS NOT NULL
+                GROUP BY M.ROUTING_ID       
+			) A
+		    FOR JSON AUTO
+		) DEFECT
+#elseif($_parameter.key == "mainItem")
+		SELECT 
+		(
+			SELECT A.*
+			FROM 
+			(
+                SELECT M.ITEM_GROUP_CD "code"
+                     , MIG.ITEM_GROUP_NM "name"
+                     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                     + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30))
+                         #if($foreach.hasNext) 
+                         + ','
+                         #end
+                     #end
+                     +  ']') AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+				LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+				  ON M.COMPANY_CD = MIG.COMPANY_CD
+				 AND M.BU_CD = MIG.BU_CD
+				 AND M.ITEM_GROUP_CD = MIG.ITEM_GROUP_CD
+                WHERE M.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND M.BU_CD = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID = 'DB_TREND01'
+                  AND M.ITEM_GROUP_CD IS NOT NULL
+                  AND MIG.DEL_FLAG = 'N'
+                GROUP BY M.ITEM_GROUP_CD, MIG.ITEM_GROUP_NM
+			) A
+		    FOR JSON AUTO
+		) DEFECT
+#end
+	</select>
+	
+	<select id="chart7Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart7Select ]  [ INVENTORY ] ******/
+	    SELECT ISNULL( 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.inv != "total")
+	            SELECT W.ITEM_TYPE "code"
+	                 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+	                     	WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+	                     	ELSE B.CODE_NM
+	                    END AS "name"
+	#if($_parameter.inv_weekMonth_type == "WEEK")
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+					+ CAST (ROUND (SUM (CASE TREND_WEEK WHEN '$bucketMap.YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"				
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'ITEM_TYPE'
+	              AND B.CODE_CD  = W.ITEM_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND04'
+	#else
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+					+ CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'ITEM_TYPE'
+	              AND B.CODE_CD  = W.ITEM_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND25'
+	#end	                  
+				#if($_parameter.inv_type == "COST")
+	              AND W.MEAS_CD = 'COST'
+	            #end
+	            #if($_parameter.inv_type == "PRICE")
+	              AND W.MEAS_CD = 'PRICE'
+	            #end
+				GROUP BY W.ITEM_TYPE, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+#else 
+	            SELECT 'total' "code"
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                  
+	#if($_parameter.inv_weekMonth_type == "WEEK")
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (ROUND (SUM (CASE TREND_WEEK WHEN '$bucketMap.YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND04'
+	#else
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'ITEM_TYPE'
+	              AND B.CODE_CD  = W.ITEM_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND25'
+	#end
+	            #if($_parameter.inv_type == "COST")
+	              AND W.MEAS_CD = 'COST'
+	            #end
+	            #if($_parameter.inv_type == "PRICE")
+	              AND W.MEAS_CD = 'PRICE'
+	            #end
+#end
+			) A
+			FOR JSON AUTO
+		), '') INVENTORY
+	
+	</select>
+	
+	<select id="chart8Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart8Select ]  [ ITEM_INV ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.trend5 == "amt")
+				SELECT W.REP_CUST_GROUP_CD  "code"
+	                 , B.REP_CUST_GROUP_NM  "name"
+	                 , B.SORT AS "sort"
+	#if($_parameter.trend5_weekMonth_type == "WEEK")
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (ROUND (SUM (CASE TREND_WEEK WHEN '$bucketMap.YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	               ON W.COMPANY_CD        = B.COMPANY_CD
+	              AND W.BU_CD             = B.BU_CD
+	              AND W.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	              AND B.USE_FLAG          = 'Y'
+	            WHERE W.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND W.BU_CD             = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID      = 'DB_TREND05'
+	#else
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	               ON W.COMPANY_CD        = B.COMPANY_CD
+	              AND W.BU_CD             = B.BU_CD
+	              AND W.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	              AND B.USE_FLAG          = 'Y'
+	            WHERE W.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND W.BU_CD             = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID      = 'DB_TREND26'
+	#end
+	
+	
+				#if($_parameter.companyCons == "companyCons")
+					#if($_parameter.trend5_type == "COST")
+		              AND W.MEAS_CD           = 'INV_AMT_COST_CONS'
+		            #end
+		            #if($_parameter.trend5_type == "PRICE")
+		              AND W.MEAS_CD           = 'INV_AMT_PRICE_CONS'
+		            #end
+				#else
+					#if($_parameter.trend5_type == "COST")
+		              AND W.MEAS_CD           = 'INV_AMT_COST'
+		            #end
+		            #if($_parameter.trend5_type == "PRICE")
+		              AND W.MEAS_CD           = 'INV_AMT_PRICE'
+		            #end
+				#end
+	            GROUP BY W.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM, B.SORT
+#else
+	            SELECT W.REP_CUST_GROUP_CD  "code"
+	                 , B.REP_CUST_GROUP_NM  "name"
+	                 , B.SORT AS "sort"
+	#if($_parameter.trend5_weekMonth_type == "WEEK")
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	               ON W.COMPANY_CD        = B.COMPANY_CD
+	              AND W.BU_CD             = B.BU_CD
+	              AND W.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	              AND B.USE_FLAG          = 'Y'
+	            WHERE W.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND W.BU_CD             = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID      = 'DB_TREND05'
+	#else
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	               ON W.COMPANY_CD        = B.COMPANY_CD
+	              AND W.BU_CD             = B.BU_CD
+	              AND W.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	              AND B.USE_FLAG          = 'Y'
+	            WHERE W.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND W.BU_CD             = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID      = 'DB_TREND26'
+	#end
+	
+				#if($_parameter.companyCons == "companyCons")
+					#if($_parameter.trend5_type == "COST")
+		              AND W.MEAS_CD           = 'INV_DAY_COST_CONS'
+		            #end
+					#if($_parameter.trend5_type == "PRICE")
+		              AND W.MEAS_CD           = 'INV_DAY_PRICE_CONS'
+		            #end
+				#else
+					#if($_parameter.trend5_type == "COST")
+		              AND W.MEAS_CD           = 'INV_DAY_COST'
+		            #end
+					#if($_parameter.trend5_type == "PRICE")
+		              AND W.MEAS_CD           = 'INV_DAY_PRICE'
+		            #end
+				#end
+				
+				
+	            
+	            GROUP BY W.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM, B.SORT
+#end
+			) A
+			ORDER BY A.SORT
+			FOR JSON AUTO
+		) ITEM_INV
+	</select>
+	
+	<select id="chart9Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart9Select ]  [ CAPA ] ******/
+		SELECT 
+		(
+			SELECT A.*
+			FROM 
+			(
+				SELECT KDTM.ITEM_GROUP_CD "code"
+                 	 , MIG.MAJOR_GROUP_NM "name"	
+					 , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                      + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+                     #end AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY KDTM WITH(NOLOCK)
+               INNER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+                  ON MIG.COMPANY_CD = KDTM.COMPANY_CD
+                 AND MIG.BU_CD = KDTM.BU_CD
+                 AND MIG.ITEM_GROUP_CD = KDTM.ITEM_GROUP_CD
+                 
+                 
+                 
+                WHERE KDTM.DASHBOARD_ID = 'DB_TREND18'
+                  AND KDTM.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND KDTM.BU_CD = @{GV_BU_CD}
+                GROUP BY KDTM.ITEM_GROUP_CD, MIG.MAJOR_GROUP_NM
+			) A
+		    FOR JSON AUTO
+		) CAPA
+	</select>
+	
+	<select id="chart10Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart10Select ]  [ SALES_CML ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+	            SELECT W.REP_CUST_GROUP_CD  "code"
+	                 #if($_parameter.sales == "total")
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 #else
+	                 , B.REP_CUST_GROUP_NM  "name"
+	                 #end
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            LEFT JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	              ON W.COMPANY_CD        = B.COMPANY_CD
+	             AND W.BU_CD             = B.BU_CD
+	             AND W.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	             AND B.USE_FLAG          = 'Y'
+	            WHERE W.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND W.BU_CD             = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID      = 'DB_TREND11'
+				#if($_parameter.sales == "total")
+	              AND W.REP_CUST_GROUP_CD = 'ALL'
+				#else
+	              AND W.REP_CUST_GROUP_CD != 'ALL'
+				#end
+				#if($_parameter.salesInv == "inv")
+				  AND W.MEAS_CD = 'INV'
+				#else
+				  AND W.MEAS_CD = 'NO_INV'
+				#end
+				GROUP BY W.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+			) A
+			FOR JSON AUTO
+		) SALES_CML
+	</select>
+	
+	<select id="chart11Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart11Select ]  [ SALES_FCST ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+	            SELECT M.REP_CUST_GROUP_CD  "code"
+	                 #if($_parameter.salesFcst == "total")
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 #else
+	                 , B.REP_CUST_GROUP_NM  "name"
+	                 #end
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            LEFT JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	              ON M.COMPANY_CD        = B.COMPANY_CD
+	             AND M.BU_CD             = B.BU_CD
+	             AND M.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	             AND B.USE_FLAG          = 'Y'
+	            WHERE M.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND M.BU_CD             = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID      = 'DB_TREND09'
+				#if($_parameter.salesFcst == "total")
+	              AND M.REP_CUST_GROUP_CD = 'ALL'
+				#else
+	              AND M.REP_CUST_GROUP_CD != 'ALL'
+				#end
+				GROUP BY M.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+			) A
+	       	FOR JSON AUTO
+		) SALES_FCST
+	
+	</select>
+	
+	<select id="chart12Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart12Select ]  [ ACHIV_RT ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+	            SELECT M.REP_CUST_GROUP_CD  "code"
+	                 #if($_parameter.achivRt == "total")
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 #else
+	                 , B.REP_CUST_GROUP_NM  "name"
+	                 #end
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            LEFT JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	              ON M.COMPANY_CD        = B.COMPANY_CD
+	             AND M.BU_CD             = B.BU_CD
+	             AND M.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	             AND B.USE_FLAG          = 'Y'
+	            WHERE M.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND M.BU_CD             = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID      = 'DB_TREND08'
+				#if($_parameter.achivRt == "total")
+	              AND M.REP_CUST_GROUP_CD = 'ALL'
+	            #else
+	              AND M.REP_CUST_GROUP_CD != 'ALL'
+	            #end
+				GROUP BY M.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+			) A
+	       	FOR JSON AUTO
+		) ACHIV_RT
+	
+	</select>
+	
+	<select id="chart13Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart13Select ]  [ PROD_CML ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+	            SELECT 
+	                   #if($_parameter.prodRate == "total")
+	                   dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                   #else
+	                   W.ROUTING_ID    "name"
+	                   #end
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND12'
+				#if($_parameter.prodRate == "total")
+	              AND W.ROUTING_ID = 'ALL'
+	            #else
+	              AND W.ROUTING_ID != 'ALL'
+	            #end
+	            #if($_parameter.prodRateWeek == "std")
+	              AND W.MEAS_CD = 'STD'
+	            #else
+	              AND W.MEAS_CD = 'SALES'
+	            #end
+				GROUP BY W.ROUTING_ID
+			) A
+	       	FOR JSON AUTO
+		) PROD_CML
+	</select>
+	
+	<select id="chart14Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart14Select ]  [ TREND19 ] ******/
+		SELECT 
+		(
+	        SELECT A.*
+			FROM 
+			(
+                SELECT 
+                       #if($_parameter.trend19 == "total")
+                       dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+                       #else
+				       (
+				        SELECT PART_NM
+				          FROM dbo.TB_MST_ORG A WITH(NOLOCK)
+				         WHERE A.COMPANY_CD = M.COMPANY_CD
+				           AND A.BU_CD = M.BU_CD
+				           AND A.DIV_CD = M.DIV_CD
+				           AND A.TEAM_CD = M.TEAM_CD
+				           AND A.PART_CD = M.PART_CD
+				       ) "name"
+                       #end
+                     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                     + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / 10000, 0) AS NVARCHAR(30))
+                     + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+                     #end AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+                WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+                  AND M.BU_CD        = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID = 'DB_TREND19'
+				#if($_parameter.trend19 == "total")
+                  AND M.PART_CD      = 'ALL'
+				#else
+                  AND M.PART_CD != 'ALL'
+                GROUP BY M.COMPANY_CD, M.BU_CD, M.DIV_CD, M.TEAM_CD, M.PART_CD
+				#end
+			) A
+	        FOR JSON AUTO
+		) TREND19
+
+	</select>
+	
+	<select id="chart15Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart15Select ]  [ TREND20 ] ******/
+		SELECT 
+		(
+			SELECT A.*
+		    FROM 
+		    (
+		    	SELECT 
+					#if($_parameter.trend20 == "total")
+		            dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+		            #else
+			       (
+			        SELECT PART_NM
+			          FROM dbo.TB_MST_ORG A WITH(NOLOCK)
+			         WHERE A.COMPANY_CD = M.COMPANY_CD
+			           AND A.BU_CD = M.BU_CD
+			           AND A.DIV_CD = M.DIV_CD
+			           AND A.TEAM_CD = M.TEAM_CD
+			           AND A.PART_CD = M.PART_CD
+			       ) "name"
+                      #end
+                    , JSON_QUERY( '[' 
+                    #foreach($bucketMap in $_parameter.month)
+                    + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 2) AS NVARCHAR(30))
+                    + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+                    #end AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+                WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+                  AND M.BU_CD        = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID = 'DB_TREND20'
+				#if($_parameter.trend20 == "total")
+                  AND M.PART_CD      = 'ALL'
+                #else
+                  AND M.PART_CD != 'ALL'
+               	GROUP BY M.COMPANY_CD, M.BU_CD, M.DIV_CD, M.TEAM_CD, M.PART_CD
+                #end
+			) A
+		    FOR JSON AUTO
+		) TREND20
+	</select>
+	
+	<select id="chart16Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart16Select ]  [ TREND21 ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+	            SELECT dbo.UFN_GET_TRANSLATE('lbl', 'trend21Chart', @{GV_LANG})    "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND21'
+			) A
+	       	FOR JSON AUTO
+		) TREND21
+	</select>
+	
+	<select id="chart17Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart17Select ]  [ 자재준비율 ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	(
+#if($_parameter.proTypeTotal != "total")	      	 
+	            SELECT W.PROCUR_TYPE "code"
+	                 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+	                     	WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+	                     	ELSE B.CODE_NM
+	                    END AS "name"
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"			
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'PROCUR_TYPE'
+	              AND B.CODE_CD  = W.PROCUR_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND03'
+	              AND W.PROCUR_TYPE  != 'ALL'
+	            #if($_parameter.prepAvail == "prep")
+				  AND W.MEAS_CD = 'PREP_RATE'
+				#else
+				  AND W.MEAS_CD = 'AVAIL_RATE'
+				#end
+				GROUP BY W.PROCUR_TYPE, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+				<!-- UNION ALL
+				SELECT W.PROCUR_TYPE "code"
+	                 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+	                     	WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+	                     	ELSE B.CODE_NM
+	                    END + ' Target'  AS "name"
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.TARGET_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"	
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'PROCUR_TYPE'
+	              AND B.CODE_CD  = W.PROCUR_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND03'
+	              AND W.PROCUR_TYPE  != 'ALL'
+	            #if($_parameter.prepAvail == "prep")
+				  AND W.MEAS_CD = 'PREP_RATE'
+				#else
+				  AND W.MEAS_CD = 'AVAIL_RATE'
+				#end
+				GROUP BY W.PROCUR_TYPE, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN -->
+#else
+				SELECT 'total' "code"
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG})    "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND03'
+				  AND W.PROCUR_TYPE  = 'ALL'
+				#if($_parameter.prepAvail == "prep")
+				  AND W.MEAS_CD = 'PREP_RATE'
+				#else
+				  AND W.MEAS_CD = 'AVAIL_RATE'
+				#end
+	            <!-- UNION ALL
+	            SELECT 'total' "code"
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) + ' Target'  "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.TARGET_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND03'
+	              AND W.PROCUR_TYPE  = 'ALL'
+	            #if($_parameter.prepAvail == "prep")
+				  AND W.MEAS_CD = 'PREP_RATE'
+				#else
+				  AND W.MEAS_CD = 'AVAIL_RATE'
+				#end   -->
+#end
+			) A
+			FOR JSON AUTO
+		) ITEM
+	</select>
+	
+	<select id="chart18Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart18Select ]  [ CAPA ] ******/
+		SELECT 
+		(
+			SELECT A.*
+		    FROM 
+		    (
+#if($_parameter.chart18ProTypeTotal != "total")	    
+	#if($_parameter.chart18WeekMonth == "week")
+				SELECT W.PROCUR_TYPE "code"
+	                 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+	                     	WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+	                     	ELSE B.CODE_NM
+	                    END AS "name"
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"			
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'PROCUR_TYPE'
+	              AND B.CODE_CD  = W.PROCUR_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND17'
+	              AND W.PROCUR_TYPE  != 'ALL'
+				GROUP BY W.PROCUR_TYPE, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+	
+	#else
+				SELECT W.PROCUR_TYPE "code"
+	                 , CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+	                     	WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+	                     	ELSE B.CODE_NM
+	                    END AS "name"
+					, JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"			
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'PROCUR_TYPE'
+	              AND B.CODE_CD  = W.PROCUR_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND30'
+	              AND W.PROCUR_TYPE  != 'ALL'
+				GROUP BY W.PROCUR_TYPE, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+	#end
+#else
+	#if($_parameter.chart18WeekMonth == "week")
+				SELECT 'total' "code"
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) AS "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.week)
+	                 + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND17'
+				  AND W.PROCUR_TYPE  = 'ALL'
+				GROUP BY W.MEAS_CD	
+	#else
+				SELECT 'total' "code"
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) AS "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND30'
+				  AND W.PROCUR_TYPE  = 'ALL'
+				GROUP BY W.MEAS_CD	
+	#end
+#end
+			) A
+		    FOR JSON AUTO
+		) CAPA
+		<!-- SELECT 
+		(
+			SELECT A.*
+		    FROM 
+		    (
+		    	SELECT DASHBOARD_ID "code"
+                     , dbo.UFN_GET_TRANSLATE('lbl', 'trend17Chart', @{GV_LANG}) "name"
+                     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.week)
+                     + CAST (SUM (CASE TREND_WEEK WHEN '$bucketMap.PRE_YEARWEEK' THEN RESULT_VALUE ELSE 0 END) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+                     #end AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_WEEKLY
+                WHERE DASHBOARD_ID = 'DB_TREND17'
+                  AND COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                GROUP BY DASHBOARD_ID
+			) A
+		    FOR JSON AUTO
+		) CAPA -->
+	</select>
+	
+	<select id="chart19Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart19Select ]  [ WIP ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.wip != "total")
+	            SELECT ROUTING_ID    "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND10'
+	            GROUP BY ROUTING_ID
+#else 
+	            SELECT dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND10'
+#end
+			) A
+	       	FOR JSON AUTO
+		) WIP
+	
+	</select>
+	
+	
+	<select id="chart20Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart20Select ]  [ 재공비율 ] ******/
+		SELECT 
+		(
+			SELECT TT.*
+		    FROM 
+		    (
+#if($_parameter.wipRt != "total")
+                SELECT T.ROUTING_ID "name"
+                     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                     + CAST(ROUND(SUM(CASE T.TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN T.RESULT_VALUE ELSE 0 END),1) AS NVARCHAR(30))
+                     + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end 
+                     #end
+                     AS "data"
+				FROM 
+				(
+					SELECT A.TREND_MONTH
+                            , A.ROUTING_ID
+                            , CASE WHEN SUM(A.RESULT_VALUE_15) <![CDATA[>]]> 0 
+                                   THEN SUM(A.RESULT_VALUE_10) / SUM(A.RESULT_VALUE_15) * 100
+                                   ELSE 0
+                              END AS RESULT_VALUE
+					FROM 
+					(
+                    	SELECT TREND_MONTH
+                                   , ROUTING_ID
+                                   , CASE WHEN DASHBOARD_ID = 'DB_TREND10' THEN RESULT_VALUE ELSE 0 END AS RESULT_VALUE_10
+                                   , CASE WHEN DASHBOARD_ID = 'DB_TREND15' THEN RESULT_VALUE ELSE 0 END AS RESULT_VALUE_15
+						FROM TB_KPI_DASHBOARD_TREND_MONTHLY
+                              WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                AND BU_CD      = @{GV_BU_CD}
+                                AND DASHBOARD_ID IN ('DB_TREND10','DB_TREND15')
+					) A
+                    GROUP BY A.TREND_MONTH, A.ROUTING_ID
+				) T
+                GROUP BY T.ROUTING_ID
+#else
+				SELECT dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+				     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                     + CAST(ROUND(SUM(CASE T.TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN T.RESULT_VALUE ELSE 0 END),1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end 
+                     #end
+                     AS "data"
+				FROM 
+				(
+			        SELECT A.TREND_MONTH
+			             , CASE WHEN SUM(A.RESULT_VALUE_15) <![CDATA[>]]> 0 
+			                    THEN SUM(A.RESULT_VALUE_10) / SUM(A.RESULT_VALUE_15) * 100
+			                    ELSE 0
+			               END AS RESULT_VALUE
+					FROM 
+					(
+			        	SELECT TREND_MONTH
+		                     , ROUTING_ID
+		                     , CASE WHEN DASHBOARD_ID = 'DB_TREND10' THEN RESULT_VALUE ELSE 0 END AS RESULT_VALUE_10
+		                     , CASE WHEN DASHBOARD_ID = 'DB_TREND15' THEN RESULT_VALUE ELSE 0 END AS RESULT_VALUE_15
+						FROM TB_KPI_DASHBOARD_TREND_MONTHLY
+		                WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                          AND BU_CD      = @{GV_BU_CD}
+		                  AND DASHBOARD_ID IN ('DB_TREND10','DB_TREND15')
+					) A
+			        GROUP BY A.TREND_MONTH
+				) T
+#end
+			) TT
+		    FOR JSON AUTO
+		) WIP_RT
+	</select>
+	
+	<select id="chart21Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart21Select ]  [ TREND22 ] ******/
+		SELECT 
+		(
+			SELECT A.*
+		    FROM 
+		    (
+                SELECT DASHBOARD_ID "code"
+                     , dbo.UFN_GET_TRANSLATE('lbl', 'trend22Chart', @{GV_LANG}) "name"
+                     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                     + CAST ( ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) 
+                     + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+                     #end AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY
+                WHERE DASHBOARD_ID = 'DB_TREND22'
+                  AND COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                #if($_parameter.trend22 == "M2")
+                  AND MEAS_CD = 'OVER_D60_AMT'
+                #elseif($_parameter.trend22 == "M6")
+                  AND MEAS_CD = 'OVER_D180_AMT'
+                #else
+                  AND MEAS_CD = 'OVER_D365_AMT'
+				#end
+                GROUP BY DASHBOARD_ID
+			) A
+           	FOR JSON AUTO
+		) TREND22
+	</select>
+	
+	<select id="chart22Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.purchaseTrend.chart22Select ]  [ AGING_TREND ] ******/
+		SELECT ISNULL((
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.agingTrendInv == "item")
+	            SELECT W.ITEM_TYPE    "code"
+	                 , CASE 
+	                     WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+	                     WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+	                     ELSE B.CODE_NM
+	                   END       AS "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST ( ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'ITEM_TYPE'
+	              AND B.CODE_CD  = W.ITEM_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND06'
+	              AND W.MEAS_CD = @{agingTrendMeasCd}
+	              AND W.ITEM_TYPE IS NOT NULL
+	            GROUP BY W.ITEM_TYPE, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+#elseif($_parameter.agingTrendInv == "procure")
+				SELECT W.PROCUR_TYPE    "code"
+	                 , CASE 
+	                     WHEN UPPER(@{GV_LANG}) = 'KO' AND B.CODE_NM_KR != '' THEN ISNULL (B.CODE_NM_KR, B.CODE_NM)
+	                     WHEN UPPER(@{GV_LANG}) = 'CN' AND B.CODE_NM_CN != '' THEN ISNULL (B.CODE_NM_CN, B.CODE_NM)
+	                     ELSE B.CODE_NM
+	                   END       AS "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST ( ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+	               ON B.GROUP_CD = 'PROCUR_TYPE'
+	              AND B.CODE_CD  = W.PROCUR_TYPE
+	              AND B.USE_FLAG = 'Y'
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND06'
+	              AND W.MEAS_CD = @{agingTrendMeasCd}
+	              AND W.PROCUR_TYPE IS NOT NULL
+	            GROUP BY W.PROCUR_TYPE, B.CODE_NM, B.CODE_NM_KR, B.CODE_NM_CN
+#elseif($_parameter.agingTrendInv == "total") 
+	            SELECT 'total' "code"
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST ( ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.PRE_YEARMONTH' THEN W.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY W WITH(NOLOCK)
+	            WHERE W.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND W.BU_CD        = @{GV_BU_CD}
+	              AND W.DASHBOARD_ID = 'DB_TREND06'
+	              AND W.ITEM_TYPE IS NOT NULL
+	              AND W.MEAS_CD = @{agingTrendMeasCd}
+#end
+			) A
+	       FOR JSON AUTO
+		), '') AGING_TREND
+	</select>
+	
+	<select id="chart23Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart23Select ]  [ TREND23 ] ******/
+		SELECT 
+		(
+			SELECT A.*
+			FROM 
+			(
+                SELECT 
+                	#if($_parameter.chart23Radio == "total")
+                	   M.DASHBOARD_ID "code"
+	                 , dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                #elseif($_parameter.chart23Radio == "cust")
+					   M.REP_CUST_GROUP_CD  "code"
+	                 , B.REP_CUST_GROUP_NM  "name"
+					#elseif($_parameter.chart23Radio == "prod")
+					   B.PROD_CATE "code"
+         			 , MC.CODE_NM "name"
+	                #end
+                     , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+                     + CAST (ROUND(SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30))
+                     + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+                    #end AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+                LEFT JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+                  ON M.COMPANY_CD        = B.COMPANY_CD
+                 AND M.BU_CD             = B.BU_CD
+                 AND M.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+                 AND B.USE_FLAG          = 'Y'
+				#if($_parameter.chart23Radio == "prod")
+				INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+    			   ON MC.BU_CD = B.BU_CD
+   				  AND MC.GROUP_CD = 'PROD_CATE'
+   				  AND MC.CODE_CD = B.PROD_CATE
+				#end
+                WHERE M.COMPANY_CD        = @{GV_COMPANY_CD}
+                  AND M.BU_CD             = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID      = 'DB_TREND23'
+                  AND M.REP_CUST_GROUP_CD != 'ALL'
+				#if($_parameter.chart23Radio == "total")
+				GROUP BY M.DASHBOARD_ID
+	            #elseif($_parameter.chart23Radio == "cust")
+				GROUP BY M.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+				#elseif($_parameter.chart23Radio == "prod")
+				GROUP BY B.PROD_CATE, MC.CODE_NM
+	            #end                  
+			) A
+		    FOR JSON AUTO
+		) TREND23
+		<!-- SELECT 
+		(
+			SELECT A.*
+			FROM 
+			(
+                SELECT M.REP_CUST_GROUP_CD  "code"
+                     , B.REP_CUST_GROUP_NM  "name"
+                     , JSON_QUERY( '[' 
+                     #foreach($bucketMap in $_parameter.month)
+                     + CAST (ROUND(SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30))
+                     + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end
+                     #end AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+                LEFT JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+                  ON M.COMPANY_CD        = B.COMPANY_CD
+                 AND M.BU_CD             = B.BU_CD
+                 AND M.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+                 AND B.USE_FLAG          = 'Y'
+                WHERE M.COMPANY_CD        = @{GV_COMPANY_CD}
+                  AND M.BU_CD             = @{GV_BU_CD}
+                  AND M.DASHBOARD_ID      = 'DB_TREND23'
+                  AND M.REP_CUST_GROUP_CD != 'ALL'
+                GROUP BY M.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+			) A
+		    FOR JSON AUTO
+		) TREND23 -->
+	</select>
+	
+	<select id="chart24Select"  parameterType="map" resultType="map">
+		/****** [ dashboard.snopTrend.chart24Select ]  [ SALES ] ******/
+	    SELECT 
+	    (
+	    	SELECT A.*
+	      	FROM 
+	      	( 
+#if($_parameter.chart24_type != "total")
+	            SELECT M.REP_CUST_GROUP_CD  "code"
+	                 , B.REP_CUST_GROUP_NM  "name"
+	                 , JSON_QUERY( '[' 
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            INNER JOIN TB_MST_REP_CUST_GROUP B WITH(NOLOCK)
+	               ON M.COMPANY_CD        = B.COMPANY_CD
+	              AND M.BU_CD             = B.BU_CD
+	              AND M.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+	              AND B.USE_FLAG          = 'Y'
+	            WHERE M.COMPANY_CD        = @{GV_COMPANY_CD}
+	              AND M.BU_CD             = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID      = 'DB_TREND24'
+	            GROUP BY M.REP_CUST_GROUP_CD, B.REP_CUST_GROUP_NM
+#else
+	            SELECT dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG}) "name"
+	                 , JSON_QUERY( '['
+					#foreach($bucketMap in $_parameter.month)
+	                 + CAST (ROUND (SUM (CASE TREND_MONTH WHEN '$bucketMap.YEARMONTH' THEN M.RESULT_VALUE ELSE 0 END) / @{unit}, 1) AS NVARCHAR(30)) + #if($_parameter.month.size() > $foreach.count) ',' #else ']') #end  
+					#end
+	                  AS "data"
+				FROM TB_KPI_DASHBOARD_TREND_MONTHLY M WITH(NOLOCK)
+	            WHERE M.COMPANY_CD   = @{GV_COMPANY_CD}
+	              AND M.BU_CD        = @{GV_BU_CD}
+	              AND M.DASHBOARD_ID = 'DB_TREND24'
+#end
+			) A
+			FOR JSON AUTO
+		) SALES
+	
+	</select>
+	
+</mapper>

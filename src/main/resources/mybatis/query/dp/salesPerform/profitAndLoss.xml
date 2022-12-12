@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+
+	<select id="profitAndLossListSelect" parameterType="map" resultType="map">
+    	/****** [ dp.salesPerform.profitAndLossListSelect ] ******/
+	    SELECT B1.COMPANY_CD
+	         , B1.BU_CD
+	         , B1.ITEM_CD
+	         , B1.ITEM_NM
+	         , B1.CUST_GROUP_CD
+	         , B1.CUST_GROUP_NM
+	         , B2.YEARMONTH
+	         , B2.MAT_KRW AS MAT_KRW
+	         , B2.LABOR_KRW AS LABOR_KRW
+	         , B2.EXP_KRW AS EXP_KRW
+	         , B2.OUT_SRC_KRW AS OUT_SRC_KRW
+	         , B2.PUR_PRICE_KRW AS PUR_PRICE_KRW
+	         , B2.SGNA_KRW AS SGNA_KRW
+	    FROM
+	    (
+			SELECT A1.COMPANY_CD
+			     , A1.BU_CD
+			     , A1.ITEM_CD
+			     , A2.ITEM_NM
+			     , A3.CUST_GROUP_CD
+			     , A3.CUST_GROUP_NM
+			FROM TB_MAP_ITEM_CUST_GROUP A1 WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM A2 WITH(NOLOCK) 
+			   ON A1.COMPANY_CD = A2.COMPANY_CD
+			  AND A1.BU_CD = A2.BU_CD 
+			  AND A1.ITEM_CD = A2.ITEM_CD
+			INNER JOIN TB_MST_CUSTOMER A3 WITH(NOLOCK)
+			   ON A1.COMPANY_CD = A3.COMPANY_CD
+			  AND A1.BU_CD = A3.BU_CD
+			  AND A1.CUST_GROUP_CD = A3.CUST_CD 
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.VALID_FLAG = 'Y'
+			  AND A3.CUST_GROUP_CD IS NOT NULL
+		) B1
+		LEFT OUTER JOIN
+		(
+			SELECT COMPANY_CD
+			     , BU_CD 
+			     , ITEM_CD
+			     , CUST_GROUP_CD
+			     , YEARMONTH
+			     , MAT_KRW
+			     , LABOR_KRW
+			     , EXP_KRW
+			     , OUT_SRC_KRW
+			     , PUR_PRICE_KRW
+			     , SGNA_KRW
+			FROM TB_DYN_MONTHLY_COSTG WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND YEARMONTH = @{fromMonth}
+			  AND DEL_FLAG = 'N'
+		) B2
+		ON B1.COMPANY_CD = B2.COMPANY_CD
+		AND B1.BU_CD = B2.BU_CD
+		AND B1.CUST_GROUP_CD = B2.CUST_GROUP_CD
+		AND B1.ITEM_CD = B2.ITEM_CD
+		#if($_parameter.buCd and $_parameter.buCd != "ALL")
+			WHERE B1.BU_CD IN ('$_parameter.buCd.replace(",","','")')
+		#end
+		ORDER BY BU_CD, CUST_GROUP_CD, CUST_GROUP_NM, ITEM_CD, ITEM_NM
+	</select>
+	
+	<update id="profitAndLossListUpdate" parameterType="map">
+		/****** [ dp.salesPerform.profitAndLossListUpdate ] ******/
+		
+		BEGIN
+			DECLARE @P_COMPANY_CD NVARCHAR(5) = @{GV_COMPANY_CD};
+			DECLARE @P_YEAR_MONTH NVARCHAR(6) = @{yearMonth};
+			
+			#foreach($rowMap in $_parameter.rowList)
+				#set($paramState = "$rowMap.state")
+				#if($paramState == "deleted")
+					UPDATE TB_DYN_MONTHLY_COSTG
+					   SET DEL_FLAG = 'Y'
+					WHERE COMPANY_CD = @P_COMPANY_CD
+					  AND BU_CD = '$rowMap.BU_CD'
+					  AND ITEM_CD = '$rowMap.ITEM_CD'
+					  AND CUST_GROUP_CD = '$rowMap.CUST_GROUP_CD'
+					  AND YEARMONTH = @P_YEAR_MONTH
+					;  
+				#end
+			#end
+				
+			MERGE INTO TB_DYN_MONTHLY_COSTG A
+			USING
+			(
+				#foreach($rowMap in $_parameter.rowList)
+				#set($paramState = "$rowMap.state")
+					
+				#if($paramState == "updated" || $paramState == "inserted")
+					SELECT @P_COMPANY_CD AS COMPANY_CD
+					     , '$rowMap.BU_CD' AS BU_CD
+					     , '$rowMap.ITEM_CD' AS ITEM_CD
+					     , '$rowMap.CUST_GROUP_CD' AS CUST_GROUP_CD
+					     , @P_YEAR_MONTH AS YEARMONTH
+					     , #if($rowMap.get("MAT_KRW"))
+					     	$rowMap.get("MAT_KRW") 
+					       #else NULL 
+					       #end AS MAT_KRW
+					     , #if($rowMap.get("LABOR_KRW"))
+					     	$rowMap.get("LABOR_KRW") 
+					       #else NULL 
+					       #end AS LABOR_KRW
+					     , #if($rowMap.get("EXP_KRW"))
+					     	$rowMap.get("EXP_KRW") 
+					       #else NULL 
+					       #end AS EXP_KRW
+					     , #if($rowMap.get("OUT_SRC_KRW"))
+					     	$rowMap.get("OUT_SRC_KRW") 
+					       #else NULL 
+					       #end AS OUT_SRC_KRW
+					     , #if($rowMap.get("PUR_PRICE_KRW"))
+					     	$rowMap.get("PUR_PRICE_KRW") 
+					       #else NULL 
+					       #end AS PUR_PRICE_KRW
+					     , #if($rowMap.get("SGNA_KRW"))
+					     	$rowMap.get("SGNA_KRW") 
+					       #else NULL 
+					       #end AS SGNA_KRW
+					#if($_parameter.rowList.size() > $foreach.count) UNION ALL #end
+				#end
+				#end
+			) B
+			ON
+			(
+				A.COMPANY_CD = B.COMPANY_CD
+			  AND A.BU_CD = B.BU_CD
+			  AND A.ITEM_CD = B.ITEM_CD
+			  AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+			  AND A.YEARMONTH = B.YEARMONTH
+			)
+			WHEN MATCHED THEN
+			UPDATE SET
+				MAT_KRW = B.MAT_KRW
+			  , LABOR_KRW = B.LABOR_KRW
+			  , EXP_KRW = B.EXP_KRW
+			  , OUT_SRC_KRW = B.OUT_SRC_KRW
+			  , PUR_PRICE_KRW = B.PUR_PRICE_KRW 
+			  , SGNA_KRW = B.SGNA_KRW
+			  , DEL_FLAG = 'N'
+			  , UPDATE_ID = @{GV_USER_ID}
+			  , UPDATE_DTTM = DBO.UFN_GETDATE()
+			WHEN NOT MATCHED THEN
+			INSERT
+			(
+				COMPANY_CD
+			  , BU_CD
+			  , ITEM_CD
+			  , CUST_GROUP_CD
+			  , YEARMONTH
+			  , MAT_KRW
+			  , LABOR_KRW
+			  , EXP_KRW
+			  , OUT_SRC_KRW
+			  , PUR_PRICE_KRW
+			  , SGNA_KRW
+			  , DEL_FLAG
+			  , CREATE_ID
+			  , CREATE_DTTM
+			)VALUES(
+				B.COMPANY_CD
+			  , B.BU_CD
+			  , B.ITEM_CD
+			  , B.CUST_GROUP_CD
+			  , B.YEARMONTH
+			  , B.MAT_KRW
+			  , B.LABOR_KRW
+			  , B.EXP_KRW
+			  , B.OUT_SRC_KRW
+			  , B.PUR_PRICE_KRW
+			  , B.SGNA_KRW
+			  , 'N'
+			  , @{GV_USER_ID}
+			  , DBO.UFN_GETDATE()
+			);
+
+			BEGIN
+				#foreach($buCdArryParam in $_parameter.buCdArry)
+					EXECUTE dbo.USP_TB_KPI_MONTHLY_PL_SIMUL_UPDATE @P_COMPANY_CD, '$buCdArryParam', @P_YEAR_MONTH;
+					EXEC dbo.USP_TB_KPI_BSC_UPDATE @P_COMPANY_CD, '$buCdArryParam', 'BSC_KPI4', @P_YEAR_MONTH;
+				#end
+			END;
+			
+		END;
+	</update>
+	
+	
+</mapper>

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	<select id="basePortionMeaSelect" parameterType="map" resultType="map">
+		/****** [ asp.static.basePortionMeaSelect ] ******/
+		SELECT CODE_CD AS CD
+		     , ATTB_1_CD AS NM
+		     , SORT
+		     , 'Y' AS MAND_FLAG
+		     , 'N' AS DEFAULT_FLAG
+		     , 'N' AS MAPPING_FLAG
+		     , MAX(CODE_CD) OVER() AS USER_FLAG
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE BU_CD = @{GV_BU_CD}
+		  AND GROUP_CD = 'PROD_PART'
+		  AND USE_FLAG = 'Y'
+		  AND ATTB_2_CD IS NOT NULL
+		ORDER BY SORT
+	</select>
+	
+	<select id="basePortionSelect" parameterType="map" resultType="map">
+		/****** [ asp.static.basePortionSelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT MR.COMPANY_CD
+	             , MR.BU_CD
+	             , MR.PLANT_CD
+	             , MR.RESOURCE_CD
+	             , MC2.CODE_CD AS PROD_PART_CD
+	             , MC2.CODE_NM AS PROD_PART_NM
+	             , MWC.WC_CD
+	             , MWC.WC_NM
+	             , MR.RESOURCE_NM
+	             , MR.CAMPUS_CD
+	             , MC3.CODE_NM AS CAMPUS_NM
+	             , DRP.PROD_PART
+	             , DRP.PORTION
+			FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+		    INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+		       ON MWC.COMPANY_CD = MR.COMPANY_CD
+			  AND MWC.BU_CD = MR.BU_CD
+		      AND MWC.PLANT_CD = MR.PLANT_CD
+		      AND MWC.WC_CD = MR.WC_CD
+		       AND MWC.COMM_FLAG = 'Y'
+		    INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		       ON MC1.BU_CD = MWC.BU_CD
+		      AND MC1.GROUP_CD = 'PROD_L2'
+		      AND MC1.CODE_CD = MWC.ROUTING_ID
+		    INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		       ON MC2.BU_CD = MC1.BU_CD
+		      AND MC2.GROUP_CD = 'PROD_PART'
+		      AND MC2.CODE_CD = MC1.ATTB_2_CD
+		    INNER JOIN 
+		    (
+				SELECT BU_CD
+				     , GROUP_CD
+				     , CODE_CD
+				     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+				            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+				            ELSE CODE_NM
+				       END AS CODE_NM
+				     , SORT
+				     , USE_FLAG
+				FROM TB_MST_CODE WITH(NOLOCK)
+			) MC3
+			ON MC3.BU_CD = MR.BU_CD
+		    AND MC3.GROUP_CD = 'CAMPUS_CD'
+		    AND MC3.CODE_CD = MR.CAMPUS_CD
+		    LEFT OUTER JOIN TB_MST_RESOURCE_PORTION DRP WITH(NOLOCK)
+		      ON DRP.COMPANY_CD = MR.COMPANY_CD
+		     AND DRP.BU_CD = MR.BU_CD
+		     AND DRP.PLANT_CD = MR.PLANT_CD
+		     AND DRP.RESOURCE_CD = MR.RESOURCE_CD
+			WHERE MR.RESOURCE_TYPE = 'M'
+		      AND MR.USE_FLAG = 'Y'
+		)
+		SELECT TT.*
+		FROM 
+		(
+			SELECT NULL AS TMP_COL
+				<include refid="include.getCdDimTotal"/>
+	            <include refid="include.getGrpLvlId"/>
+	             , T.COMPANY_CD
+	             , T.BU_CD
+	             , T.PLANT_CD
+	            #foreach($meaMap in $_parameter.meaList)
+	             , SUM(CASE WHEN T.PROD_PART = '$meaMap.CD' THEN T.PORTION ELSE NULL END) AS $meaMap.CD
+	            #end
+			FROM 
+			(
+		    	SELECT A.COMPANY_CD
+                     , A.BU_CD
+                     , A.PLANT_CD
+                     , ISNULL(A.RESOURCE_CD, ' ') AS RESOURCE_CD
+                     , ISNULL(A.RESOURCE_CD, ' ') AS RESOURCE_CD_NM
+                     , ISNULL(A.RESOURCE_NM, ' ') AS RESOURCE_NM
+                     , ISNULL(A.RESOURCE_NM, ' ') AS RESOURCE_NM_NM
+                     , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD
+                     , ISNULL(A.PROD_PART_CD, ' ') AS PROD_PART_CD_NM
+                     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+                     , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+                     , ISNULL(A.WC_CD, ' ') AS WC_CD
+                     , ISNULL(A.WC_CD, ' ') AS WC_CD_NM
+                     , ISNULL(A.WC_NM, ' ') AS WC_NM
+                     , ISNULL(A.WC_NM, ' ') AS WC_NM_NM
+                     , ISNULL(A.CAMPUS_CD, ' ') AS CAMPUS_CD
+                     , ISNULL(A.CAMPUS_CD, ' ') AS CAMPUS_CD_NM
+                     , ISNULL(A.CAMPUS_NM, ' ') AS CAMPUS_NM
+                     , ISNULL(A.CAMPUS_NM, ' ') AS CAMPUS_NM_NM
+                     , A.PROD_PART
+                     , A.PORTION
+				FROM W_MAIN A
+		        WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND A.BU_CD = @{GV_BU_CD}
+				#if($_parameter.prodPart and $_parameter.prodPart != "")
+		          AND A.PROD_PART_CD IN ('$_parameter.prodPart.replace(",","','")')
+		        #end
+		        #if($_parameter.workplaces and $_parameter.workplaces != "")
+		          AND A.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+		        #end
+			) T
+		    GROUP BY ROLLUP(<include refid="include.getCdRollup"/>), T.COMPANY_CD, T.BU_CD, T.PLANT_CD
+		) TT
+		WHERE TT.GRP_LVL_ID = 0
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		 , TT.$dimMap.DIM_CD
+		#end
+	</select>
+	
+	<insert id="basePortionMerge" parameterType="map">
+		/****** [ asp.static.commFacilityMerge ] ******/
+		MERGE TB_MST_RESOURCE_PORTION A
+		USING 
+		(
+			SELECT @{COMPANY_CD} AS COMPANY_CD
+		         , @{BU_CD} AS BU_CD
+		         , @{PLANT_CD} AS PLANT_CD
+		         , @{RESOURCE_CD} AS RESOURCE_CD
+		         , @{PROD_PART} AS PROD_PART
+		) B
+		ON 
+		(
+			A.COMPANY_CD  = B.COMPANY_CD
+		    AND A.BU_CD       = B.BU_CD
+		    AND A.PLANT_CD    = B.PLANT_CD
+		    AND A.RESOURCE_CD = B.RESOURCE_CD
+		    AND A.PROD_PART   = B.PROD_PART
+		)
+		WHEN MATCHED THEN
+		UPDATE
+		   SET UPDATE_ID   = @{GV_USER_ID}
+		     , UPDATE_DTTM = dbo.UFN_GETDATE()
+			#if($_parameter.PORTION and $_parameter.PORTION != "")
+		     , PORTION     = @{PORTION}
+		    #else
+		     , PORTION     = NULL
+		    #end
+		WHEN NOT MATCHED THEN
+		INSERT 
+		(
+			COMPANY_CD
+          , BU_CD
+          , PLANT_CD
+          , RESOURCE_CD
+          , PROD_PART
+          , PORTION
+          , CREATE_ID
+          , CREATE_DTTM
+		)VALUES(
+			B.COMPANY_CD
+          , B.BU_CD
+          , B.PLANT_CD
+          , B.RESOURCE_CD
+          , B.PROD_PART
+		#if($_parameter.PORTION and $_parameter.PORTION != "")
+          , @{PORTION}
+        #else
+          , NULL
+        #end
+          , @{GV_USER_ID}
+          , dbo.UFN_GETDATE()       
+       )
+		;
+	</insert>
+	
+	<select id="basePortionExcelSqlSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.basePortionExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	</select>
+	
+	
+</mapper>

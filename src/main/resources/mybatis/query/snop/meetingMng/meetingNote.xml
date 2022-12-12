@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="meetingNote">
+
+	<select id="isSCMTeamSelect" parameterType="map" resultType="map">
+	/*** meetingNote.isSCMTeamSelect ***/
+	/*  삭제시 사용자가 SCM팀 권한을 가지고 있는지 여부를 확인하기 위함  */
+
+	with USER_ROLE AS(
+		select *
+		from TB_MAP_USER_ROLE
+	where USER_ID = @{USER_ID})
+
+	SELECT COUNT(*)AS isSCM
+	FROM USER_ROLE
+	WHERE ROLE_CD = 'GOCQT0001'
+	
+	/* GOCQT0001: SCM팀 ROLE CODE */
+	
+	</select>
+
+		<select id="isAdminSelect" parameterType="map" resultType="map">
+	/*** meetingNote.isAdminSelect ***/
+	/*  삭제시 사용자가 ADMIN 권한을 가지고 있는지 여부를 확인하기 위함  */
+
+	with USER_ROLE AS(
+		select *
+		from TB_MAP_USER_ROLE
+	where USER_ID = @{USER_ID})
+
+	SELECT COUNT(*)AS isADMIN
+	FROM USER_ROLE
+	WHERE ROLE_CD = 'ADMINDP0001'
+	
+	/* ADMINDP0001: ADMIN ROLE CODE */
+	
+	</select>
+
+	
+	<select id="meetingNoteListSelect" parameterType="map" resultType="map">
+		
+
+	/*** meetingNote.meetingNoteListSelect ***/
+	 SELECT 
+	 KM.COMPANY_CD AS COMPANY_CD
+	 , KM.BU_CD AS BU_CD
+	 , KM.CREATE_ID AS CREATE_ID
+	 , KM.CREATE_DTTM AS CREATE_DTTM
+	 , KM.UPDATE_DTTM AS UPDATE_DTTM
+	 , KM.MINUTES_ID AS MINUTES_ID
+	 , dbo.UFN_GET_USER_NAME(KM.UPDATE_ID) AS UPDATE_ID
+     , MC.CODE_CD AS TEAM_CD 
+     , dbo.UFN_GET_USER_NAME(KM.USER_ID) AS USER_ID
+     , KM.USER_ID AS USER_ID_TEMP
+     , KM.TITLE AS TITLE
+     , KM.[CONTENT] AS CONTENT
+     <!-- , KM.MINUTES_DATE AS MINUTES_DATE -->
+     , CONVERT(VARCHAR(30), CAST(KM.MINUTES_DATE AS DATE), 23) MINUTES_DATE
+     , KM.REMARK AS REMARK
+     , KM.FILE_NO AS FILE_NO
+     , CF.FILE_NM_ORG AS FILE_NM_ORG
+  	 FROM TB_KPI_MINUTES KM WITH(NOLOCK)
+ 	 INNER JOIN TB_MST_USER MU WITH(NOLOCK)
+     ON MU.USER_ID = KM.CREATE_ID
+ 	 INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+     ON MC.BU_CD = KM.BU_CD
+     AND MC.GROUP_CD = 'TEAM_CD'
+     AND MC.CODE_CD = KM.TEAM_CD
+     OUTER APPLY (
+              SELECT TOP 1 CF.FILE_NM_ORG
+                FROM TB_COMM_FILE CF WITH(NOLOCK)
+               WHERE CF.FILE_NO = KM.FILE_NO
+               	AND DEL_FLAG != 'Y'
+			  AND CF.FILE_NM_ORG LIKE '%'+ @{txtSearchReqmt}+'%' 
+				ORDER BY CF.FILE_SEQ
+             ) CF
+ 	 WHERE KM.COMPANY_CD = @{GV_COMPANY_CD}
+     AND KM.BU_CD = @{GV_BU_CD}
+     AND KM.DEL_FLAG != 'Y'
+    #if($_parameter.txtMeetingNoteId and $_parameter.txtMeetingNoteId !="" ) 
+		AND   KM.MINUTES_ID  LIKE '%'+ @{txtMeetingNoteId}+'%'
+	#end 
+	#if($_parameter.txtMeetingTitle and $_parameter.txtMeetingTitle !="" ) 
+		AND  KM.TITLE   LIKE '%'+ @{txtMeetingTitle}+'%'
+	#end 
+	#if($_parameter.txtContent and $_parameter.txtContent !="" ) 
+		AND   KM.[CONTENT]  LIKE '%'+ @{txtContent}+'%'
+	#end 
+	#if($_parameter.team and $_parameter.team !="" ) 
+		
+		AND   MC.CODE_CD IN ('$_parameter.team.replace(",","','")')
+	#end 
+	#if($_parameter.manager_nm and $_parameter.manager_nm !="" ) 
+		
+		AND  (KM.USER_ID LIKE '%' + @{manager_nm}+ '%'  OR  KM.CREATE_ID  LIKE '%' + @{manager_nm}+ '%'  )
+	
+	#end 
+	#if($_parameter.txtSearchReqmt and $_parameter.txtSearchReqmt !="" ) 
+		AND   (KM.TITLE  LIKE '%'+ @{txtSearchReqmt}+'%'
+		OR  KM.[CONTENT] LIKE '%'+ @{txtSearchReqmt}+'%'
+		OR KM.REMARK LIKE '%'+ @{txtSearchReqmt}+'%'
+		OR CF.FILE_NM_ORG LIKE '%'+ @{txtSearchReqmt}+'%'
+		)
+	#end 
+	AND CONVERT(VARCHAR,KM.CREATE_DTTM,112) BETWEEN @{fromCal} AND @{toCal} 
+	ORDER BY KM.CREATE_DTTM DESC
+
+
+
+	</select>
+	
+	
+	
+	
+	<update id="meetingNoteListInsert" parameterType="map">
+		/****** [ meetingNote.meetingNoteListInsert ] ******/
+		/* TB_KPI_MINUTES PRIMARY KEY:COMPANY_CD, BU_CD, MINUTES_ID   */
+    BEGIN 
+    
+		DECLARE @P_MINUTES_ID  nvarchar(9)
+		DECLARE @P_REMARK    nvarchar(MAX)
+		
+		SET @P_MINUTES_ID = (SELECT dbo.UFN_GET_MINUTES_ID())
+		SET @P_REMARK   = @{REMARK}
+		
+	    INSERT INTO TB_KPI_MINUTES (
+	            COMPANY_CD
+	          , BU_CD
+	          , MINUTES_ID
+	          , TEAM_CD
+	          , USER_ID      /* FIELD 이름은 USER_ID이지만 들어가야하는 값은 USER_NM이어야 한다.   */
+	          , TITLE
+	          , CONTENT
+	          , MINUTES_DATE
+	          , REMARK
+	          , FILE_NO
+	          , CREATE_ID
+	          , CREATE_DTTM
+	          , UPDATE_ID
+	          , UPDATE_DTTM 
+	          , DEL_FLAG
+	    ) VALUES (
+	            ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+	          , ISNULL(@{BU_CD},@{GV_BU_CD})
+	          , @P_MINUTES_ID
+	          , @{TEAM_CD}
+	          , @{USER_ID_TEMP}
+	          , @{TITLE}
+	          , @{CONTENT}
+	          , REPLACE (@{MINUTES_DATE}, '-', '')
+	          , @{REMARK}
+	          , @{FILE_NO}
+	          , @{CREATE_ID}
+	          , DBO.UFN_GETDATE()
+	          , @{USER_ID_TEMP}
+	          , DBO.UFN_GETDATE()
+	          , ISNULL(@{DEL_FLAG}, 'N')
+	    );
+    END;
+    
+	</update>
+	
+	
+	<update id="meetingNoteListUpdate" parameterType="map">
+    /****** [ meetingNote.meetingNoteListUpdate ] ******/
+    /* TB_KPI_MINUTES PRIMARY KEY:COMPANY_CD, BU_CD, MINUTES_ID   */
+    UPDATE TB_KPI_MINUTES
+       SET TEAM_CD     		 = @{TEAM_CD}
+         , USER_ID           = @{USER_ID_TEMP}
+         , TITLE		     = @{TITLE}
+         , CONTENT     		 = @{CONTENT}
+         , MINUTES_DATE      = REPLACE (@{MINUTES_DATE}, '-', '')
+         , REMARK    		 = @{REMARK}
+         , FILE_NO     		 = @{FILE_NO}
+         , UPDATE_ID 	     = @{UPDATE_ID_TEMP}
+         , UPDATE_DTTM  = DBO.UFN_GETDATE()
+    
+     WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}
+       AND MINUTES_ID   = @{MINUTES_ID}
+    </update>
+	
+	
+	<update id="meetingNoteListDelete" parameterType="map">
+    /****** [ meetingNote.meetingNoteListDelete ] ******/
+    
+    UPDATE TB_KPI_MINUTES
+     SET DEL_FLAG = 'Y'
+     	, UPDATE_ID 	     = @{UPDATE_ID_TEMP}
+         , UPDATE_DTTM  = DBO.UFN_GETDATE()
+     
+     
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}	
+       AND MINUTES_ID     = @{MINUTES_ID}
+   
+    </update>
+	
+	
+	<update id="meetingNoteListFileNoUpdate" parameterType="map">
+	/****** [ meetingNote.meetingNoteListFileNoUpdate ] ******/
+	/* TB_KPI_MINUTES PRIMARY KEY:COMPANY_CD, BU_CD, MINUTES_ID   */
+	
+	UPDATE TB_KPI_MINUTES
+	SET FILE_NO = @{FILE_NO}
+	WHERE COMPANY_CD = @{COMPANY_CD}
+	 AND BU_CD = ISNULL(@{BU_CD},@{GV_BU_CD})
+	  AND MINUTES_ID   = @{MINUTES_ID}
+	</update>
+	
+	
+</mapper>

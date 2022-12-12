@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="planResultDetailSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.planResultDetailSelect ] ******/
+		WITH W_CODE AS 
+		(
+		    SELECT A.CODE_CD AS MEAS_CD
+		         , CASE WHEN @{GV_LANG} = 'ko' THEN A.CODE_NM_KR
+		                WHEN @{GV_LANG} = 'cn' THEN A.CODE_NM_CN
+		                ELSE A.CODE_NM
+		           END AS MEAS_NM
+		         , A.ATTB_1_CD AS UOM_CD
+		         , (
+		            SELECT CASE WHEN @{GV_LANG} = 'ko' THEN B.CODE_NM_KR
+		                        WHEN @{GV_LANG} = 'cn' THEN B.CODE_NM_CN
+		                        ELSE B.CODE_NM
+		                   END AS CODE_NM
+		              FROM TB_MST_CODE B WITH(NOLOCK)
+		             WHERE B.GROUP_CD = 'UOM_CD'
+		               AND B.CODE_CD = A.ATTB_1_CD
+		           ) AS UOM_NM
+		         , A.SORT
+			FROM TB_MST_CODE A WITH(NOLOCK)
+		    WHERE A.BU_CD = @{GV_BU_CD}
+		      AND A.GROUP_CD = 'APS_PLAN_RESULT_CATEGORY'
+		      AND A.USE_FLAG = 'Y'
+		),
+		W_PLAN_VERSION AS
+		(
+			SELECT A1.COMPANY_CD
+			     , A1.BU_CD
+			     , A1.PLAN_TYPE_CD
+			     , A1.PLAN_ID
+			     , A1.WO_RELEASE_WEEK
+			     , A2.PROD_PART
+			     , A2.VERSION_ID
+			     , A2.PLAN_OPTION
+			     , A2.BAL_WEEK
+			     , A2.PRIORITY_OPTION
+			FROM TB_MST_PLAN_VERSION A1 WITH(NOLOCK)
+			INNER JOIN TB_MST_PLAN_VERSION_SUB A2 WITH(NOLOCK)
+			   ON A1.COMPANY_CD = A2.COMPANY_CD
+			  AND A1.BU_CD = A2.BU_CD
+			  AND A1.PLAN_TYPE_CD = A2.PLAN_TYPE_CD
+			  AND A1.PLAN_ID = A2.PLAN_ID
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.PLAN_TYPE_CD = 'MP'
+			  AND A1.PLAN_ID = @{planId}
+		),
+		W_MAIN AS 
+		(
+		    SELECT APR.PLAN_ID
+		         , APR.VERSION_ID
+		         , APR.COMPANY_CD
+		         , APR.BU_CD
+		         , APR.PROD_PART
+		         , MC2.CODE_NM AS PROD_PART_NM
+		         , APR.ROUTING_ID
+		         , APR.MEAS_CD
+		         , MC1.MEAS_NM
+		         , MC1.UOM_CD
+		         , MC1.UOM_NM
+		         , APR.YEARWEEK
+		         , APR.VALUE
+		         , MC2.SORT
+		         , MC1.SORT AS CODE_SORT
+			FROM TB_HIS_APS_PLAN_RESULT APR WITH(NOLOCK)
+		    INNER JOIN W_CODE MC1
+		       ON APR.MEAS_CD = MC1.MEAS_CD
+		    INNER JOIN 
+		    (
+		    	SELECT BU_CD
+                     , GROUP_CD
+                     , CODE_CD
+                     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                           WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                           ELSE CODE_NM
+                        END AS CODE_NM
+                     , SORT
+				FROM TB_MST_CODE WITH(NOLOCK)
+                WHERE BU_CD = @{GV_BU_CD}
+                  AND GROUP_CD = 'PROD_PART'
+                  AND USE_FLAG = 'Y'
+			) MC2 
+		    ON MC2.BU_CD   = APR.BU_CD
+		    AND MC2.CODE_CD = APR.PROD_PART
+		)
+		SELECT T.COMPANY_CD
+		     , T.BU_CD
+		     , T.PLAN_ID
+		     , T.PROD_PART
+		     , T.MEAS_CD
+		     , T.UOM_CD
+		     , T.PROD_PART_NM
+		     , T.PROD_PART_NM_NM
+		     , T.VERSION_ID
+		     , T.VERSION_ID_NM
+		     , T.MEAS_NM
+		     , T.MEAS_NM_NM
+		     , T.UOM_NM
+		     , T.UOM_NM_NM
+		     , T.ROUTING_ID
+		     , T.ROUTING_ID_NM
+		     , T.WO_RELEASE_WEEK
+		     , T.WO_RELEASE_WEEK_NM
+		     , T.PLAN_OPTION
+		     , T.PLAN_OPTION_NM
+		     , T.BAL_WEEK
+		     , T.BAL_WEEK_NM
+		     , T.PRIORITY_OPTION
+		     , T.PRIORITY_OPTION_NM
+			#foreach($bucketMap in $_parameter.bucketList)
+		     , CASE WHEN T.UOM_CD = 'HR'  THEN ROUND(SUM(CASE WHEN '$bucketMap.BUCKET_VAL' = T.YEARWEEK THEN T.VALUE ELSE NULL END) / 3600, 1)
+		     		WHEN T.UOM_CD = 'HMW' THEN ROUND(SUM(CASE WHEN '$bucketMap.BUCKET_VAL' = T.YEARWEEK THEN T.VALUE ELSE NULL END) / 100000000, 2)
+		     		ELSE SUM(CASE WHEN '$bucketMap.BUCKET_VAL' = T.YEARWEEK THEN T.VALUE ELSE NULL END)
+		       END AS $bucketMap.BUCKET_ID
+		    #end
+		FROM 
+		(
+	        SELECT A.COMPANY_CD
+	             , A.BU_CD
+	             , A.PLAN_ID
+	             , A.PROD_PART
+	             , A.MEAS_CD
+	             , A.UOM_CD
+	             , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM
+	             , ISNULL(A.PROD_PART_NM, ' ') AS PROD_PART_NM_NM
+	             , ISNULL(A.VERSION_ID, ' ') AS VERSION_ID
+	             , ISNULL(A.VERSION_ID, ' ') AS VERSION_ID_NM
+	             , ISNULL(A.MEAS_NM, ' ') AS MEAS_NM
+	             , ISNULL(A.MEAS_NM, ' ') AS MEAS_NM_NM
+	             , ISNULL(A.UOM_NM, ' ') AS UOM_NM
+	             , ISNULL(A.UOM_NM, ' ') AS UOM_NM_NM
+	             , ISNULL(A.ROUTING_ID, ' ') AS ROUTING_ID
+	             , ISNULL(A.ROUTING_ID, ' ') AS ROUTING_ID_NM
+	             , CASE WHEN @{GV_LANG} = 'ko' THEN C.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN C.CODE_NM_CN
+                        ELSE C.CODE_NM
+                    END BAL_WEEK
+     			 , CASE WHEN @{GV_LANG} = 'ko' THEN C.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN C.CODE_NM_CN
+                        ELSE C.CODE_NM
+                    END BAL_WEEK_NM
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN D.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN D.CODE_NM_CN
+                        ELSE D.CODE_NM
+                    END PRIORITY_OPTION
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN D.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN D.CODE_NM_CN
+                        ELSE D.CODE_NM
+                    END PRIORITY_OPTION_NM
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN E.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN E.CODE_NM_CN
+                        ELSE E.CODE_NM
+                    END WO_RELEASE_WEEK
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN E.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN E.CODE_NM_CN
+                        ELSE E.CODE_NM
+                    END WO_RELEASE_WEEK_NM
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN F.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN F.CODE_NM_CN
+                        ELSE F.CODE_NM
+                    END PLAN_OPTION
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN F.CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN F.CODE_NM_CN
+                        ELSE F.CODE_NM
+                    END PLAN_OPTION_NM
+	             , A.YEARWEEK
+	             , A.VALUE
+	             , A.SORT
+	             , A.CODE_SORT
+			FROM W_MAIN A
+			INNER JOIN W_PLAN_VERSION B
+			   ON A.PLAN_ID = B.PLAN_ID
+			  AND A.VERSION_ID = B.VERSION_ID
+			  AND A.PROD_PART = B.PROD_PART
+			  AND A.COMPANY_CD = B.COMPANY_CD
+			  AND A.BU_CD = B.BU_CD
+			LEFT OUTER JOIN TB_MST_CODE C WITH(NOLOCK)
+			  ON B.BU_CD = C.BU_CD
+			 AND B.BAL_WEEK = C.CODE_CD
+			 AND C.GROUP_CD = 'CB_BAL_WEEK'
+			 AND C.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE D WITH(NOLOCK)
+			  ON B.BU_CD = D.BU_CD
+			 AND B.PRIORITY_OPTION = D.CODE_CD
+			 AND D.GROUP_CD = 'CB_PRIORITY_OPTION'
+			 AND D.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE E WITH(NOLOCK)
+			  ON B.BU_CD = E.BU_CD
+			 AND B.WO_RELEASE_WEEK = E.CODE_CD
+			 AND E.GROUP_CD = 'CB_WO_RELEASE_WEEK'
+			 AND E.USE_FLAG = 'Y' 
+			LEFT OUTER JOIN TB_MST_CODE F WITH(NOLOCK)
+			  ON B.BU_CD = F.BU_CD
+			 AND B.PLAN_OPTION = F.CODE_CD
+			 AND F.GROUP_CD = 'CB_PLAN_OPTION'
+			 AND F.USE_FLAG = 'Y'
+	        WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	          AND A.BU_CD = @{GV_BU_CD}
+	          AND A.ROUTING_ID != 'ALL'
+	        #if($_parameter.planId and $_parameter.planId != "")
+	          AND A.PLAN_ID = @{planId}
+	        #end
+	        #if($_parameter.prodPart and $_parameter.prodPart != "")
+	          AND A.PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+	        #end
+	        #if($_parameter.versionId and $_parameter.versionId != "")
+	          AND A.VERSION_ID IN ('$_parameter.versionId.replace(",","','")')
+	        #end
+	        #if($_parameter.category and $_parameter.category != "")
+	          AND A.MEAS_CD IN ('$_parameter.category.replace(",","','")')
+			#end
+		) T
+		GROUP BY T.COMPANY_CD, T.BU_CD, T.PLAN_ID, T.PROD_PART, T.MEAS_CD, T.UOM_CD
+		     , T.PROD_PART_NM, T.PROD_PART_NM_NM, T.VERSION_ID, T.VERSION_ID_NM
+		     , T.MEAS_NM, T.MEAS_NM_NM, T.UOM_NM, T.UOM_NM_NM, T.SORT, T.ROUTING_ID, T.ROUTING_ID_NM
+		     , T.WO_RELEASE_WEEK, T.PLAN_OPTION, T.BAL_WEEK, T.PRIORITY_OPTION
+			 , T.WO_RELEASE_WEEK_NM, T.PLAN_OPTION_NM, T.BAL_WEEK_NM, T.PRIORITY_OPTION_NM, T.CODE_SORT
+		ORDER BY T.SORT, T.VERSION_ID, T.CODE_SORT, T.ROUTING_ID
+	</select>
+	
+	<select id="planResultDetailExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ aps.planResult.planResultDetailExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+</mapper>

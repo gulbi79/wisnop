@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	<select id="roleMngSelect" parameterType="map" resultType="map">
+		/****** [ admin.roleMngSelect ] ******/
+	    SELECT BU_CD
+	         , ROLE_CD
+	         , ROLE_NM
+	         , ROLE_DESC
+	         , USE_FLAG
+	    FROM TB_MST_ROLE WITH(NOLOCK)
+	    WHERE USE_FLAG = 'Y'
+	      AND BU_CD = @{SEARCH_BU}
+	    ORDER BY ROLE_NM
+	</select>
+	
+	<insert id="roleMngInsert" parameterType="map">
+		/****** [ admin.roleMngInsert ] ******/
+	    INSERT INTO TB_MST_ROLE 
+	    (
+            BU_CD
+          , ROLE_CD
+          , ROLE_NM
+          , ROLE_DESC
+          , USE_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+	    ) VALUES (
+    	    @{BU_CD}
+    	  , @{ROLE_CD}
+          , @{ROLE_NM}
+          , @{ROLE_DESC}               
+    	  , 'Y'   
+    	  , @{GV_USER_ID}     
+    	  , DBO.UFN_GETDATE()   
+    	  , @{GV_USER_ID}       
+    	  , DBO.UFN_GETDATE()     
+	    )
+	</insert>
+	
+	<update id="roleMngUpdate" parameterType="map">
+		/****** [ admin.roleMngUpdate ] ******/
+		UPDATE TB_MST_ROLE 
+		SET ROLE_NM     = @{ROLE_NM}
+		  , ROLE_DESC   = @{ROLE_DESC}
+		  , USE_FLAG    = @{USE_FLAG}
+		  , UPDATE_ID   = @{GV_USER_ID}
+		  , UPDATE_DTTM = DBO.UFN_GETDATE() 
+		WHERE BU_CD   = @{BU_CD}
+		  AND ROLE_CD = @{ROLE_CD}
+	</update>
+	
+	<delete id="roleMngDelete" parameterType="map">
+		/****** [ admin.roleMngDelete ] ******/
+		BEGIN
+			-- ROLE 삭제
+			DELETE FROM TB_MST_ROLE
+			WHERE BU_CD   = @{BU_CD}
+			  AND ROLE_CD = @{ROLE_CD}
+			;
+			
+			-- USER ROLE 삭제
+			DELETE FROM TB_MAP_USER_ROLE
+			WHERE BU_CD = @{BU_CD}
+			  AND ROLE_CD = @{ROLE_CD}
+	
+			-- USER MENU ROLE 삭제
+			DELETE FROM TB_MAP_ROLE_MENU_ACTION
+			WHERE COMPANY_CD = @{SEARCH_COMPANY}
+			  AND BU_CD      = @{BU_CD}
+			  AND ROLE_CD    = @{ROLE_CD}
+		END;
+	</delete>
+	
+	<select id="roleMngMenuSelect" parameterType="map" resultType="map">
+		/****** [ admin.roleMngMenuSelect ] ******/
+		<include refid="include.menuData"/>
+		, W_ACTION AS 
+		(
+		    <include refid="include.includeMenuAction"/>
+	    )
+		SELECT <include refid="include.menuDataSelColumn"/>
+		     , dbo.UFN_SPLIT(A.PATH,2,'|') AS LEVEL1_CD
+	         , dbo.UFN_SPLIT(A.PATH,3,'|') AS LEVEL2_CD
+	         , dbo.UFN_SPLIT(A.PATH,4,'|') AS LEVEL3_CD
+	         , dbo.UFN_SPLIT(A.PATH,5,'|') AS LEVEL4_CD
+	         , dbo.UFN_SPLIT(A.NM_PATH,2,'|') AS LEVEL1_NM
+	         , dbo.UFN_SPLIT(A.NM_PATH,3,'|') AS LEVEL2_NM
+	         , dbo.UFN_SPLIT(A.NM_PATH,4,'|') AS LEVEL3_NM
+	         , dbo.UFN_SPLIT(A.NM_PATH,5,'|') AS LEVEL4_NM
+	         , @{SEARCH_ROLE_CD} AS ROLE_CD
+	         , B.SEARCH_ACTION
+	         , B.SAVE_ACTION
+	         , B.SQL_ACTION
+	         , B.EXCEL_ACTION
+	    FROM CTE A
+	    LEFT JOIN W_ACTION B
+	      ON B.MENU_CD_ACTION = A.MENU_CD
+	    WHERE A.MENU_LVL IN (3,4) /*메뉴 최하위 레벨*/
+	    ORDER BY A.ROOT_SORT
+	</select>
+	
+	<update id="roleMngMenuActionUpdate" parameterType="map">
+	/****** [ admin.roleMngMenuActionUpdate ] ******/
+	BEGIN
+		DECLARE @SEARCH_DB 		nvarchar(1)
+		DECLARE @SAVE_DB 		nvarchar(1)
+		DECLARE @SQL_DB 		nvarchar(1)
+		DECLARE @EXCEL_DB 		nvarchar(1)
+		#if($_parameter.SEARCH_COMPANY_CD and $_parameter.SEARCH_COMPANY_CD != "")
+		DECLARE @COMPANY_CD 	nvarchar(10) = @{SEARCH_COMPANY_CD}
+		#else
+		DECLARE @COMPANY_CD 	nvarchar(10) = @{GV_COMPANY_CD}
+		#end
+		#if($_parameter.SEARCH_BU_CD and $_parameter.SEARCH_BU_CD != "")
+		DECLARE @BU_CD 	nvarchar(10) = @{SEARCH_BU_CD}
+		#else
+		DECLARE @BU_CD 	nvarchar(10) = @{GV_BU_CD}
+		#end
+	
+		SELECT @SEARCH_DB = ISNULL(MAX(CASE WHEN ACTION_CD = 'SEARCH' THEN 'Y' END),'N')
+             , @SAVE_DB   = ISNULL(MAX(CASE WHEN ACTION_CD = 'SAVE'   THEN 'Y' END),'N')
+             , @SQL_DB    = ISNULL(MAX(CASE WHEN ACTION_CD = 'SQL'    THEN 'Y' END),'N')
+             , @EXCEL_DB  = ISNULL(MAX(CASE WHEN ACTION_CD = 'EXCEL'  THEN 'Y' END),'N')
+		FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		WHERE COMPANY_CD = @COMPANY_CD
+		  AND BU_CD      = @BU_CD
+		  AND ROLE_CD    = @{ROLE_CD}
+		  AND MENU_CD    = @{MENU_CD}
+		;
+	
+		-- SEARCH -----------------------------------------
+		IF(@SEARCH_DB = 'Y' AND @{SEARCH_ACTION} = 'N')
+			BEGIN
+				DELETE FROM TB_MAP_ROLE_MENU_ACTION
+				WHERE COMPANY_CD = @COMPANY_CD
+	              AND BU_CD      = @BU_CD
+	              AND ROLE_CD    = @{ROLE_CD}
+	              AND MENU_CD    = @{MENU_CD}
+	              AND ACTION_CD  = 'SEARCH'
+				;
+			END;
+		ELSE IF(@SEARCH_DB != 'Y' AND @{SEARCH_ACTION} = 'Y')
+			BEGIN
+				INSERT INTO TB_MAP_ROLE_MENU_ACTION 
+				(
+					COMPANY_CD
+	              , BU_CD
+	              , ROLE_CD
+	              , MENU_CD
+	              , ACTION_CD
+	              , USE_FLAG
+	              , CREATE_ID
+	              , CREATE_DTTM
+	              , UPDATE_ID
+	              , UPDATE_DTTM
+				) VALUES (
+					@COMPANY_CD
+	              , @BU_CD
+	              , @{ROLE_CD}
+	              , @{MENU_CD}
+	              , 'SEARCH'
+	              , 'Y'
+	              , @{GV_USER_ID}     
+	    	      , DBO.UFN_GETDATE()     
+	    	      , @{GV_USER_ID}       
+	    	      , DBO.UFN_GETDATE()
+				);
+			END;
+
+		-- SAVE -----------------------------------------
+		IF(@SAVE_DB = 'Y' AND @{SAVE_ACTION} = 'N')
+			BEGIN
+				DELETE FROM TB_MAP_ROLE_MENU_ACTION
+				WHERE COMPANY_CD = @COMPANY_CD
+	              AND BU_CD      = @BU_CD
+	              AND ROLE_CD    = @{ROLE_CD}
+	              AND MENU_CD    = @{MENU_CD}
+	              AND ACTION_CD  = 'SAVE'
+				;
+			END;
+		ELSE IF(@SAVE_DB != 'Y' AND @{SAVE_ACTION} = 'Y')
+			BEGIN
+				INSERT INTO TB_MAP_ROLE_MENU_ACTION 
+				(
+					COMPANY_CD
+	              , BU_CD
+	              , ROLE_CD
+	              , MENU_CD
+	              , ACTION_CD
+	              , USE_FLAG
+	              , CREATE_ID
+	              , CREATE_DTTM
+	              , UPDATE_ID
+	              , UPDATE_DTTM
+				) VALUES (
+					@COMPANY_CD
+	              , @BU_CD
+	              , @{ROLE_CD}
+	              , @{MENU_CD}
+	              , 'SAVE'
+	              , 'Y'
+	              , @{GV_USER_ID}     
+	    	      , DBO.UFN_GETDATE()     
+	    	      , @{GV_USER_ID}       
+	    	      , DBO.UFN_GETDATE()
+				);
+			END;
+
+		-- SQL -----------------------------------------
+		IF(@SQL_DB = 'Y' AND @{SQL_ACTION} = 'N')
+			BEGIN
+				DELETE FROM TB_MAP_ROLE_MENU_ACTION
+				WHERE COMPANY_CD = @COMPANY_CD
+	              AND BU_CD      = @BU_CD
+	              AND ROLE_CD    = @{ROLE_CD}
+	              AND MENU_CD    = @{MENU_CD}
+	              AND ACTION_CD  = 'SQL'
+				;
+			END;
+		ELSE IF(@SQL_DB != 'Y' AND @{SQL_ACTION} = 'Y')
+			BEGIN
+				INSERT INTO TB_MAP_ROLE_MENU_ACTION 
+				(
+					COMPANY_CD
+	              , BU_CD
+	              , ROLE_CD
+	              , MENU_CD
+	              , ACTION_CD
+	              , USE_FLAG
+	              , CREATE_ID
+	              , CREATE_DTTM
+	              , UPDATE_ID
+	              , UPDATE_DTTM
+				) VALUES (
+					@COMPANY_CD
+	              , @BU_CD
+	              , @{ROLE_CD}
+	              , @{MENU_CD}
+	              , 'SQL'
+	              , 'Y'
+	              , @{GV_USER_ID}     
+	    	      , DBO.UFN_GETDATE()     
+	    	      , @{GV_USER_ID}       
+	    	      , DBO.UFN_GETDATE()
+				);
+			END;
+
+		-- EXCEL -----------------------------------------
+		IF(@EXCEL_DB = 'Y' AND @{EXCEL_ACTION} = 'N')
+			BEGIN
+				DELETE FROM TB_MAP_ROLE_MENU_ACTION
+				WHERE COMPANY_CD = @COMPANY_CD
+	              AND BU_CD      = @BU_CD
+	              AND ROLE_CD    = @{ROLE_CD}
+	              AND MENU_CD    = @{MENU_CD}
+	              AND ACTION_CD  = 'EXCEL'
+				;
+			END;
+		ELSE IF(@EXCEL_DB != 'Y' AND @{EXCEL_ACTION} = 'Y')
+			BEGIN
+				INSERT INTO TB_MAP_ROLE_MENU_ACTION 
+				(
+					COMPANY_CD
+	              , BU_CD
+	              , ROLE_CD
+	              , MENU_CD
+	              , ACTION_CD
+	              , USE_FLAG
+	              , CREATE_ID
+	              , CREATE_DTTM
+	              , UPDATE_ID
+	              , UPDATE_DTTM
+				) VALUES (
+					@COMPANY_CD
+	              , @BU_CD
+	              , @{ROLE_CD}
+	              , @{MENU_CD}
+	              , 'EXCEL'
+	              , 'Y'
+	              , @{GV_USER_ID}     
+	    	      , DBO.UFN_GETDATE()     
+	    	      , @{GV_USER_ID}       
+	    	      , DBO.UFN_GETDATE()
+				);
+			END;
+		END;
+	</update>
+
+</mapper>

@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.popup">
+
+	<select id="reptCustGroupMgmtSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.reptCustGroupMgmtSelect ] ******/
+		SELECT A.REP_CUST_GROUP_CD
+		     , A.REP_CUST_GROUP_NM
+		     , COUNT(B.CUST_GROUP_CD) AS CUST_GROUP_CNT
+		     , A.SORT
+		     , A.CUST_CATE
+		     , A.PROD_CATE
+		     , A.SGNA_RATE
+		     , A.EXCEPT_YN
+		     , A.USE_FLAG
+		     , CONVERT(VARCHAR(19), A.CREATE_DTTM, 120) AS CREATE_DTTM
+		     , A.CREATE_ID
+		     , CONVERT(VARCHAR(19), A.UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , A.UPDATE_ID
+		     , A.PRIORITY_TEL
+		     , A.PRIORITY_LAM
+		     , A.PRIORITY_DIF
+		FROM TB_MST_REP_CUST_GROUP A WITH (NOLOCK)
+		LEFT OUTER JOIN TB_MST_CUST_GROUP B WITH (NOLOCK)
+		  ON A.COMPANY_CD = B.COMPANY_CD
+		 AND A.BU_CD = B.BU_CD
+		 AND A.REP_CUST_GROUP_CD = B.REP_CUST_GROUP_CD
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD      = @{GV_BU_CD}
+		#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+		   AND (A.REP_CUST_GROUP_CD LIKE '%' + @{reptCustGroup} + '%'
+		    OR A.REP_CUST_GROUP_NM LIKE '%' + @{reptCustGroup} + '%')
+		#end
+		GROUP BY A.REP_CUST_GROUP_CD, A.REP_CUST_GROUP_NM, A.SORT, A.CUST_CATE, A.PROD_CATE, A.SGNA_RATE, A.EXCEPT_YN, A.USE_FLAG, A.CREATE_DTTM, A.CREATE_ID
+		     , A.UPDATE_DTTM, A.UPDATE_ID, A.PRIORITY_TEL, A.PRIORITY_LAM, A.PRIORITY_DIF
+		ORDER BY A.REP_CUST_GROUP_CD ASC
+	</select>
+	
+	<sql id="reptCustGroupMgmtMaxSeq">
+		SELECT ISNULL(CONVERT(INT, SUBSTRING(MAX(REP_CUST_GROUP_CD), 4, 6)), 0) + 1 AS MAX_SEQ
+	  	FROM TB_MST_REP_CUST_GROUP WITH (NOLOCK)
+	 	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	      AND BU_CD = @{GV_BU_CD}
+	</sql>
+	
+	<select id="reptCustGroupMgmtMaxSeqSelect" parameterType="map" resultType="map">
+	/****** [ master.popup.reptCustGroupMgmtMaxSeqSelect ] ******/
+	<include refid="master.popup.reptCustGroupMgmtMaxSeq"/>
+	</select>
+
+	<update id="reptCustGroupMgmtInsert" parameterType="map">
+	/****** [ master.popup.reptCustGroupMgmtInsert ] ******/
+	INSERT INTO TB_MST_REP_CUST_GROUP (
+		  COMPANY_CD
+		, BU_CD
+		, REP_CUST_GROUP_CD
+		, REP_CUST_GROUP_NM
+		, CUST_CATE
+		, PROD_CATE
+		, PRIORITY_TEL
+		, PRIORITY_LAM
+		, PRIORITY_DIF
+		, SGNA_RATE
+		, EXCEPT_YN
+		, SORT
+		, USE_FLAG
+		, CREATE_ID
+		, CREATE_DTTM
+		, UPDATE_ID
+		, UPDATE_DTTM
+	) VALUES (
+		  @{GV_COMPANY_CD}
+		, @{GV_BU_CD}
+		, (SELECT 'RCG' + REPLICATE('0', 3 - LEN(CONVERT(VARCHAR(3), MAX_SEQ))) + CONVERT(VARCHAR(3), MAX_SEQ) AS REP_CUST_GROUP_CD_NEW
+		     FROM (
+	         <include refid="master.popup.reptCustGroupMgmtMaxSeq"/>
+	         ) MAX_TB
+		)
+		, LTRIM(RTRIM(@{REP_CUST_GROUP_NM}))
+		, @{CUST_CATE}
+		, @{PROD_CATE}
+		, @{PRIORITY_TEL}
+		, @{PRIORITY_LAM}
+		, @{PRIORITY_DIF}
+		, @{SGNA_RATE}
+		, @{EXCEPT_YN}
+		, @{SORT}
+		, @{USE_FLAG}
+		, @{GV_USER_ID}
+		, DBO.UFN_GETDATE()
+		, @{GV_USER_ID}
+		, DBO.UFN_GETDATE()
+	)
+	</update>
+	
+	<update id="reptCustGroupMgmtUpdate" parameterType="map">
+	/****** [ master.popup.reptCustGroupMgmtUpdate ] ******/
+	BEGIN
+	
+	    UPDATE TB_MST_REP_CUST_GROUP
+	       SET REP_CUST_GROUP_NM = LTRIM(RTRIM(@{REP_CUST_GROUP_NM}))
+	         , CUST_CATE         = @{CUST_CATE}
+	         , PROD_CATE         = @{PROD_CATE}
+	         , PRIORITY_TEL      = @{PRIORITY_TEL}
+			 , PRIORITY_LAM		 = @{PRIORITY_LAM}
+			 , PRIORITY_DIF		 = @{PRIORITY_DIF}
+	         , SGNA_RATE         = @{SGNA_RATE}
+	         , EXCEPT_YN         = @{EXCEPT_YN}
+	         , SORT              = @{SORT}
+	         , USE_FLAG          = @{USE_FLAG}
+	         , UPDATE_ID         = @{GV_USER_ID}
+	         , UPDATE_DTTM       = DBO.UFN_GETDATE()
+	     WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+	       AND BU_CD             = @{GV_BU_CD}
+	       AND REP_CUST_GROUP_CD = @{REP_CUST_GROUP_CD}
+	       ;
+	       
+	    UPDATE TB_MST_CUSTOMER
+	       SET REP_CUST_GROUP_NM = LTRIM(RTRIM(@{REP_CUST_GROUP_NM}))
+	         , CUST_LVL2_NM      = LTRIM(RTRIM(@{REP_CUST_GROUP_NM}))
+	     WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+	       AND BU_CD             = @{GV_BU_CD}
+	       AND REP_CUST_GROUP_CD = @{REP_CUST_GROUP_CD}
+	       ;
+	END
+	</update>
+	
+	<delete id="reptCustGroupMgmtDelete" parameterType="map">
+		/****** [ master.popup.custGroupDelete ] ******/
+		DELETE FROM TB_MST_REP_CUST_GROUP
+		WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		  AND BU_CD             = @{GV_BU_CD}
+		  AND REP_CUST_GROUP_CD = @{REP_CUST_GROUP_CD}
+	</delete>
+	
+	<select id="reptCustGroupMgmtExistPkInsert" parameterType="map" resultType="int">
+		/****** [ master.popup.reptCustGroupMgmtExistPkInsert ] ******/
+		SELECT COUNT(*)
+		FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND REPLACE(REP_CUST_GROUP_NM, ' ', '') = REPLACE(@{REP_CUST_GROUP_NM}, ' ', '')
+	</select>
+	
+	<select id="reptCustGroupMgmtExistPkUpdate" parameterType="map" resultType="int">
+		/****** [ master.popup.reptCustGroupMgmtExistPkUpdate ] ******/
+		SELECT COUNT(*)
+		 FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD         = @{GV_COMPANY_CD}
+		  AND BU_CD              = @{GV_BU_CD}
+		  AND REP_CUST_GROUP_CD != @{REP_CUST_GROUP_CD}
+		  AND REPLACE(REP_CUST_GROUP_NM, ' ', '') = REPLACE(@{REP_CUST_GROUP_NM}, ' ', '')
+	</select>
+	
+	<select id="reptCustGroupMgmtExistPkDelete" parameterType="map" resultType="int">
+		/****** [ master.popup.reptCustGroupMgmtExistPkDelete ] ******/
+		SELECT COUNT(*)
+		FROM TB_MST_CUST_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		  AND BU_CD             = @{GV_BU_CD}
+		  AND REP_CUST_GROUP_CD = @{REP_CUST_GROUP_CD}
+	</select>
+
+    <select id="reptCustGroupMgmtExcelSqlSelect" parameterType="map" resultType="map">
+        /****** [ master.popup.reptCustGroupMgmtExcelSqlSelect ] ******/
+        SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+        , A2.ACTION_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+                 , ACTION_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD = @{popUpMenuCd}
+              AND ACTION_CD IN ('EXCEL','SQL')
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+        , A2.ACTION_CD
+    </select>
+
+
+</mapper>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.popup">
+
+	<select id="custGroupSelectionSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.custGroupSelectionSelect ] ******/
+		SELECT A.REP_CUST_CD
+		     , D.CUST_NM AS REP_CUST_NM
+		FROM TB_MST_REP_CUST A WITH(NOLOCK)
+		INNER JOIN TB_MST_CUSTOMER D WITH (NOLOCK)
+		   ON A.COMPANY_CD  = D.COMPANY_CD
+		  AND A.BU_CD       = D.BU_CD
+		  AND A.REP_CUST_CD = D.CUST_CD
+		  AND D.VALID_FLAG  = 'Y'
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD      = @{GV_BU_CD}
+		  AND A.VALID_FLAG = 'Y'
+		#if($_parameter.reptCust and $_parameter.reptCust != "")
+		  AND (A.REP_CUST_CD LIKE '%' + @{reptCust} + '%'
+		   OR D.CUST_NM     LIKE '%' + @{reptCust} + '%')
+		#end
+		  AND NOT EXISTS (
+		      				SELECT 1
+		        			FROM TB_MST_CUST_GROUP B WITH(NOLOCK)
+		       				WHERE A.COMPANY_CD  = B.COMPANY_CD
+		         		 	  AND A.BU_CD       = B.BU_CD
+		         			  AND A.REP_CUST_CD = B.CUST_GROUP_CD
+					     )
+		ORDER BY A.REP_CUST_CD ASC
+	</select>
+
+</mapper>

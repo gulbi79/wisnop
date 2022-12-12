@@ -1,0 +1,901 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="weeklySupPlanVersionSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.weeklySupPlanVersionSelect ] ******/
+		SELECT DISTINCT VERSION_ID AS CODE_CD
+		     , VERSION_ID AS CODE_NM
+		     , CUT_OFF_FLAG
+		     , VERSION_TYPE_CD
+		     #if($_parameter.selectYn == "Y")
+		     , PROD_PART AS UPPER_CD
+		     #end
+		FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND PLAN_ID    = @{planId}
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+		  AND PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+		#end
+		ORDER BY VERSION_ID
+	</select>
+	
+	<select id="weeklySupPlanSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.weeklySupPlanSelect ] ******/
+		BEGIN
+		
+		#foreach($dimMap in $_parameter.dimList)
+			#if($dimMap.DIM_CD == "TEL_CNC") #set($dim_TEL_CNC = "Y")
+			#elseif($dimMap.DIM_CD == "TEL_MCT") #set($dim_TEL_MCT = "Y")
+			#elseif($dimMap.DIM_CD == "LAM_CNC") #set($dim_LAM_CNC = "Y")
+			#elseif($dimMap.DIM_CD == "LAM_MCT") #set($dim_LAM_MCT = "Y")
+			#elseif($dimMap.DIM_CD == "DIFF_CNC") #set($dim_DIFF_CNC = "Y")
+			#elseif($dimMap.DIM_CD == "DIFF_MCT") #set($dim_DIFF_MCT = "Y")
+			#end
+		#end
+		
+			WITH W_DATA AS 
+			(
+			    SELECT HAPPW.COMPANY_CD
+			         , HAPPW.BU_CD
+			         , HAPPW.PLAN_ID
+			         , HAPPW.VERSION_ID
+			         , HAPPW.PROD_PART AS PROD_PART_CD
+			         , MC2.CODE_NM AS PROD_PART
+			         , HAPPW.ITEM_CD
+			         , MI.ITEM_NM
+			         , MC3.CODE_NM AS PROCUR_TYPE
+			         , MI.SPEC
+			         , MC4.CODE_NM AS ITEM_GRADE
+			         , MC5.CODE_NM AS ITEM_TYPE_NM
+			         , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) AS SALES_PRICE_KRW
+			         , MIP.ROUTING_ID
+			         , MC.CUST_NM AS REP_CUST_NM
+			         , MC.CUST_GROUP_NM
+			         , MC.REP_CUST_GROUP_NM
+			         , MI.ITEM_GROUP_CD
+			         , MIG.ITEM_GROUP_NM
+			         , MIP.SS_QTY
+			         , MI.CPFR_YN
+			         , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+			         , HAPPW.MEAS_CD
+			         
+			         #if($_parameter.monthlyWeekly == "WEEK")
+			         	, HAPPW.YEARWEEK
+			         #else
+			         	, MCAL.YEARMONTH_STD
+			         #end
+			         
+			         
+			         #if($_parameter.monthlyWeekly == "WEEK")
+			         	, HAPPW.[VALUE]
+			         #else
+			         	, SUM(CASE WHEN HAPPW.MEAS_CD = 'CALC_BOH_QTY' THEN CASE WHEN HAPPW.YEARWEEK = MCAL.START_WEEK THEN HAPPW.[VALUE] END
+                       WHEN HAPPW.MEAS_CD = 'AP2_SP_REMAIN' THEN CASE WHEN HAPPW.YEARWEEK = MCAL.END_WEEK THEN HAPPW.[VALUE] END
+                       ELSE HAPPW.[VALUE]
+                       END) AS VALUE
+			         #end	
+			         	
+			        #if($dim_TEL_CNC == "Y")
+			         ,  TCC.CODE_NM AS TEL_CNC
+                    #end
+			        #if($dim_TEL_MCT == "Y")
+			         ,  TMC.CODE_NM AS TEL_MCT
+                    #end
+			        #if($dim_LAM_CNC == "Y")
+			         , LCC.CODE_NM AS LAM_CNC
+			        #end
+			        #if($dim_LAM_MCT == "Y")
+			         , LMC.CODE_NM AS LAM_MCT
+			        #end
+			        #if($dim_DIFF_CNC == "Y")
+			         , DCC.CODE_NM AS DIFF_CNC
+			        #end
+			        #if($dim_DIFF_MCT == "Y")
+			         , DMC.CODE_NM AS DIFF_MCT
+			        #end
+				FROM TB_HIS_APS_PROD_PSI_WEEKLY HAPPW WITH(NOLOCK)
+				#if($dim_TEL_CNC == "Y")
+				LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP TC WITH(NOLOCK)
+				  ON TC.COMPANY_CD = HAPPW.COMPANY_CD
+			     AND TC.BU_CD = HAPPW.BU_CD
+			     AND TC.ITEM_CD = HAPPW.ITEM_CD
+			     AND TC.PROD_GROUP = 'TEL_CNC'
+			     AND TC.DEL_FLAG = 'N' 
+			    LEFT OUTER JOIN TB_MST_CODE TCC WITH(NOLOCK)
+			      ON TCC.BU_CD = TC.BU_CD
+			     AND TCC.CODE_CD = TC.PROD_GROUP_DET
+			     AND TCC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			     AND TCC.USE_FLAG = 'Y'
+			    #end
+			    #if($dim_TEL_MCT == "Y")
+				LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP TM WITH(NOLOCK)
+				  ON TM.COMPANY_CD = HAPPW.COMPANY_CD
+			     AND TM.BU_CD = HAPPW.BU_CD
+			     AND TM.ITEM_CD = HAPPW.ITEM_CD
+			     AND TM.PROD_GROUP = 'TEL_MCT'
+			     AND TM.DEL_FLAG = 'N' 
+			    LEFT OUTER JOIN TB_MST_CODE TMC WITH(NOLOCK)
+			      ON TMC.BU_CD = TM.BU_CD
+			     AND TMC.CODE_CD = TM.PROD_GROUP_DET
+			     AND TMC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			     AND TMC.USE_FLAG = 'Y'
+			    #end
+				#if($dim_LAM_CNC == "Y")
+				LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP LC WITH(NOLOCK)
+				  ON LC.COMPANY_CD = HAPPW.COMPANY_CD
+			     AND LC.BU_CD = HAPPW.BU_CD
+			     AND LC.ITEM_CD = HAPPW.ITEM_CD
+			     AND LC.PROD_GROUP = 'LAM_CNC'
+			     AND LC.DEL_FLAG = 'N' 
+			    LEFT OUTER JOIN TB_MST_CODE LCC WITH(NOLOCK)
+			      ON LCC.BU_CD = LC.BU_CD
+			     AND LCC.CODE_CD = LC.PROD_GROUP_DET
+			     AND LCC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			     AND LCC.USE_FLAG = 'Y'
+			    #end
+				#if($dim_LAM_MCT == "Y")
+				LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP LM WITH(NOLOCK)
+				  ON LM.COMPANY_CD = HAPPW.COMPANY_CD
+			     AND LM.BU_CD = HAPPW.BU_CD
+			     AND LM.ITEM_CD = HAPPW.ITEM_CD
+			     AND LM.PROD_GROUP = 'LAM_MCT'
+			     AND LM.DEL_FLAG = 'N' 
+			    LEFT OUTER JOIN TB_MST_CODE LMC WITH(NOLOCK)
+			      ON LMC.BU_CD = LM.BU_CD
+			     AND LMC.CODE_CD = LM.PROD_GROUP_DET
+			     AND LMC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			     AND LMC.USE_FLAG = 'Y'
+			    #end
+				#if($dim_DIFF_CNC == "Y")
+				LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP DC WITH(NOLOCK)
+				  ON DC.COMPANY_CD = HAPPW.COMPANY_CD
+			     AND DC.BU_CD = HAPPW.BU_CD
+			     AND DC.ITEM_CD = HAPPW.ITEM_CD
+			     AND DC.PROD_GROUP = 'DIFF_CNC'
+			     AND DC.DEL_FLAG = 'N' 
+			    LEFT OUTER JOIN TB_MST_CODE DCC WITH(NOLOCK)
+			      ON DCC.BU_CD = DC.BU_CD
+			     AND DCC.CODE_CD = DC.PROD_GROUP_DET
+			     AND DCC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			     AND DCC.USE_FLAG = 'Y'
+			    #end
+				#if($dim_DIFF_MCT == "Y")
+				LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP DM WITH(NOLOCK)
+				  ON DM.COMPANY_CD = HAPPW.COMPANY_CD
+			     AND DM.BU_CD = HAPPW.BU_CD
+			     AND DM.ITEM_CD = HAPPW.ITEM_CD
+			     AND DM.PROD_GROUP = 'DIFF_MCT'
+			     AND DM.DEL_FLAG = 'N' 
+			    LEFT OUTER JOIN TB_MST_CODE DMC WITH(NOLOCK)
+			      ON DMC.BU_CD = DM.BU_CD
+			     AND DMC.CODE_CD = DM.PROD_GROUP_DET
+			     AND DMC.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+			     AND DMC.USE_FLAG = 'Y'
+			    #end
+			    INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+			       ON MI.COMPANY_CD = HAPPW.COMPANY_CD
+			      AND MI.BU_CD = HAPPW.BU_CD
+			      AND MI.ITEM_CD = HAPPW.ITEM_CD
+			    INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			       ON MIP.COMPANY_CD = MI.COMPANY_CD
+			      AND MIP.BU_CD = MI.BU_CD
+			      AND MIP.PLANT_CD = 'WF01'
+			      AND MIP.ITEM_CD = MI.ITEM_CD
+			     #if($_parameter.monthlyWeekly == "WEEK") 
+			      
+			     #else
+			       INNER JOIN (
+                      SELECT DISTINCT MCAL.YEARMONTH_STD
+                           , MCAL.YEARWEEK
+                           , MIN(MCAL.YEARWEEK) OVER(PARTITION BY MCAL.YEARMONTH_STD) AS START_WEEK
+                           , MAX(MCAL.YEARWEEK) OVER(PARTITION BY MCAL.YEARMONTH_STD) AS END_WEEK
+                        FROM TB_MST_CALENDAR MCAL WITH(NOLOCK)
+                       WHERE MCAL.YEARWEEK BETWEEN @{fromWeek} AND (
+												 
+												 SELECT MAX(YEARWEEK) AS YEARWEEK
+												 FROM TB_MST_CALENDAR MC1 WITH(NOLOCK)
+											   WHERE MC1.YEARMONTH_STD= @{toMon}
+											   GROUP BY MC1.YEARMONTH_STD)
+                     ) MCAL
+           		 ON MCAL.YEARWEEK = HAPPW.YEARWEEK
+			    #end  
+			      
+			      
+			    LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+			      ON MC.COMPANY_CD = MI.COMPANY_CD
+			     AND MC.BU_CD = MI.BU_CD
+			     AND MC.CUST_CD = MI.REP_CUST_CD
+			    LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+			      ON MICG.COMPANY_CD = MI.COMPANY_CD
+			     AND MICG.BU_CD = MI.BU_CD
+			     AND MICG.ITEM_CD = MI.ITEM_CD
+			     AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+			    LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+			      ON MIG.COMPANY_CD = MI.COMPANY_CD
+			     AND MIG.BU_CD = MI.BU_CD
+			     AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+			    LEFT OUTER JOIN 
+			    (
+					SELECT BU_CD
+                         , GROUP_CD
+                         , CODE_CD
+                         , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                         , SORT
+                         , USE_FLAG
+					FROM TB_MST_CODE WITH(NOLOCK)
+				) MC1
+			    ON MC1.BU_CD = MIP.BU_CD
+			    AND MC1.GROUP_CD = 'CL_SL_CD'
+			    AND MC1.CODE_CD = MIP.RCPT_SL_CD
+			    AND MC1.USE_FLAG = 'Y'
+				LEFT OUTER JOIN 
+				(
+			    	SELECT BU_CD
+                         , GROUP_CD
+                         , CODE_CD
+                         , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                         , SORT
+                         , USE_FLAG
+					FROM TB_MST_CODE WITH(NOLOCK)
+				) MC2
+				ON MC2.BU_CD = HAPPW.BU_CD
+			    AND MC2.GROUP_CD = 'PROD_PART'
+			    AND MC2.CODE_CD = HAPPW.PROD_PART
+			    AND MC2.USE_FLAG = 'Y'
+				LEFT OUTER JOIN 
+				(
+			    	SELECT BU_CD
+                         , GROUP_CD
+                         , CODE_CD
+                         , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                         , SORT
+                         , USE_FLAG
+                      FROM TB_MST_CODE WITH(NOLOCK)
+				) MC3
+			    ON MC3.BU_CD = 'ALL'
+			    AND MC3.GROUP_CD = 'PROCUR_TYPE'
+			    AND MC3.CODE_CD = MIP.PROCUR_TYPE
+			    AND MC3.USE_FLAG = 'Y'
+			    LEFT OUTER JOIN 
+			    (
+					SELECT BU_CD
+                         , GROUP_CD
+                         , CODE_CD
+                         , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                         , SORT
+                         , USE_FLAG
+                	FROM TB_MST_CODE WITH(NOLOCK)
+				) MC4
+			    ON MC4.BU_CD = 'ALL'
+			    AND MC4.GROUP_CD = 'ITEM_GRADE'
+			    AND MC4.CODE_CD = MI.ITEM_GRADE
+			    AND MC4.USE_FLAG = 'Y'
+			    LEFT OUTER JOIN 
+			    (
+			    	SELECT BU_CD
+                         , GROUP_CD
+                         , CODE_CD
+                         , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                ELSE CODE_NM
+                           END AS CODE_NM
+                         , SORT
+                         , USE_FLAG
+					FROM TB_MST_CODE WITH(NOLOCK)
+				) MC5
+			    ON MC5.BU_CD = 'ALL'
+			    AND MC5.GROUP_CD = 'ITEM_TYPE'
+			    AND MC5.CODE_CD = MI.ITEM_TYPE
+			    AND MC5.USE_FLAG = 'Y'
+				WHERE HAPPW.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND HAPPW.BU_CD = @{GV_BU_CD}
+				  AND HAPPW.PLAN_ID = @{planId}
+				#if($_parameter.prodPart and $_parameter.prodPart != "")
+				  AND HAPPW.PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+				#end
+				#if($_parameter.versionId and $_parameter.versionId != "")
+				  AND HAPPW.VERSION_ID IN ('$_parameter.versionId.replace(",","','")')
+				#end
+				#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+				  AND MC.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+				#end
+				#if($_parameter.route and $_parameter.route != "")
+				  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+				#end
+				#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+				  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+				#end
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+				  AND HAPPW.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+				#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+				  AND (HAPPW.ITEM_CD LIKE '%' + @{item_nm} + '%' OR MI.ITEM_NM LIKE '%' + @{item_nm} + '%')
+				#end
+				#if($_parameter.itemType and $_parameter.itemType != "")
+				  AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+	  			#end
+	  			#if($_parameter.monthlyWeekly == "WEEK")
+			      AND HAPPW.YEARWEEK  BETWEEN @{fromWeek} AND @{toWeek}
+			    #else
+			      AND HAPPW.YEARWEEK  BETWEEN @{fromWeek} AND 
+			      (
+					 SELECT MAX(YEARWEEK) AS YEARWEEK
+					 FROM TB_MST_CALENDAR MC1 WITH(NOLOCK)
+					 WHERE MC1.YEARMONTH_STD=  @{toMon} 
+					 GROUP BY MC1.YEARMONTH_STD
+			 	 )
+	           #end
+			    
+			    #if($_parameter.monthlyWeekly == "WEEK")
+			    	
+			    #else
+			      GROUP BY HAPPW.COMPANY_CD
+                  , HAPPW.BU_CD
+                  , HAPPW.PLAN_ID
+                  , HAPPW.VERSION_ID
+                  , HAPPW.PROD_PART 
+                  , MC2.CODE_NM 
+                  , HAPPW.ITEM_CD
+                  , MI.ITEM_NM
+                  , MC3.CODE_NM 
+                  , MI.SPEC
+                  , MC4.CODE_NM 
+                  , MC5.CODE_NM 
+                  , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) 
+                  , MIP.ROUTING_ID
+                  , MC.CUST_NM 
+                  , MC.CUST_GROUP_NM
+                  , MC.REP_CUST_GROUP_NM
+                  , MI.ITEM_GROUP_CD
+                  , MIG.ITEM_GROUP_NM
+                  , MIP.SS_QTY
+                  , MI.CPFR_YN
+                  , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END 
+                  , HAPPW.MEAS_CD
+                  , MCAL.YEARMONTH_STD
+                  
+                  
+                    #if($dim_TEL_CNC == "Y")
+			       	 , TCC.CODE_NM
+                    #end
+			        #if($dim_TEL_MCT == "Y")
+			         , TMC.CODE_NM
+                    #end
+			        #if($dim_LAM_CNC == "Y")
+			         , LCC.CODE_NM
+ 			        #end
+			        #if($dim_LAM_MCT == "Y")
+			         , LMC.CODE_NM
+                    #end
+			        #if($dim_DIFF_CNC == "Y")
+			         , DCC.CODE_NM
+                    #end
+			        #if($dim_DIFF_MCT == "Y")
+			         , DMC.CODE_NM
+                    #end
+                  
+                  
+			    #end  
+			),
+			W_REMAIN AS 
+			(
+				SELECT HAPPW.COMPANY_CD
+					 , HAPPW.BU_CD
+					 , HAPPW.PLAN_ID
+				   	 , HAPPW.PROD_PART
+				 	 , HAPPW.VERSION_ID
+					 , HAPPW.ITEM_CD
+					 
+					 #if($_parameter.monthlyWeekly == "WEEK")
+					 
+					 	 , MC.YEARWEEK
+					 #else
+					 	 , MC.YEARMONTH_STD
+					 #end
+						
+					 #if($_parameter.monthlyWeekly == "WEEK")	 
+					 	 , HAPPW.[VALUE]
+					 #else
+						 , SUM(CASE WHEN HAPPW.MEAS_CD = 'AP2_SP_REMAIN' THEN CASE WHEN HAPPW.YEARWEEK = MC1.YEARWEEK THEN HAPPW.[VALUE] END
+                       ELSE HAPPW.[VALUE]
+	                 	  END) AS VALUE
+					 #end	
+				
+				FROM TB_HIS_APS_PROD_PSI_WEEKLY HAPPW WITH(NOLOCK)
+				#if($_parameter.monthlyWeekly == "WEEK")
+					
+				#else
+				INNER JOIN (
+	                    SELECT MC1.YEARMONTH_STD, MAX(YEARWEEK) AS YEARWEEK
+	                      FROM TB_MST_CALENDAR MC1 WITH(NOLOCK)
+	                     WHERE MC1.YEARWEEK BETWEEN @{fromWeek} AND 
+												
+							 (
+								 SELECT MAX(YEARWEEK) AS YEARWEEK
+								 FROM TB_MST_CALENDAR MC1 WITH(NOLOCK)
+								 WHERE MC1.YEARMONTH_STD= @{toMon}
+								 GROUP BY MC1.YEARMONTH_STD
+							 )
+	
+	                     GROUP BY MC1.YEARMONTH_STD
+	                   ) MC1
+	            ON MC1.YEARWEEK = HAPPW.YEARWEEK
+				#end
+				
+				CROSS APPLY 
+				(
+					 SELECT TOP 1 MC.YEARWEEK
+					 #if($_parameter.monthlyWeekly == "WEEK")
+					 
+					 #else
+					 , MC.YEARMONTH_STD
+					 #end
+					 
+					 FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+					 
+					 #if($_parameter.monthlyWeekly == "WEEK")
+					 	WHERE MC.YEARWEEK <![CDATA[>]]> HAPPW.YEARWEEK
+					 #else
+					 	WHERE MC.YEARMONTH_STD <![CDATA[>]]> MC1.YEARMONTH_STD
+					 #end
+					 
+					 ORDER BY MC.YYYYMMDD
+				) MC
+				
+				
+				WHERE HAPPW.MEAS_CD = 'AP2_SP_REMAIN'
+				  AND HAPPW.COMPANY_CD = @{GV_COMPANY_CD}
+			      AND HAPPW.BU_CD = @{GV_BU_CD}
+			      AND HAPPW.PLAN_ID = @{planId}
+		      	#if($_parameter.prodPart and $_parameter.prodPart != "")
+		      	  AND HAPPW.PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+		      	#end
+				#if($_parameter.versionId and $_parameter.versionId != "")
+				  AND HAPPW.VERSION_ID IN ('$_parameter.versionId.replace(",","','")')
+				#end
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+				  AND HAPPW.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+				#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+				  AND (HAPPW.ITEM_CD LIKE '%' + @{item_nm} + '%')
+				#end
+				
+				#if($_parameter.monthlyWeekly == "WEEK")
+				  AND MC.YEARWEEK  BETWEEN @{fromWeek} AND @{toWeek}
+				#else
+					 GROUP BY HAPPW.COMPANY_CD
+	                , HAPPW.BU_CD
+	                , HAPPW.PLAN_ID
+	                   , HAPPW.PROD_PART
+	                 , HAPPW.VERSION_ID
+	                , HAPPW.ITEM_CD
+		            , MC.YEARMONTH_STD
+				#end
+	        ),
+			W_MEASURE AS 
+			(
+				SELECT CATEGORY_CD
+				     , CATEGORY_NM
+				     , CATEGORY_IDX 
+			    FROM 
+			    (
+			       	SELECT NULL AS CATEGORY_CD
+			       	     , NULL AS CATEGORY_NM
+			       	     , NULL AS CATEGORY_IDX
+					#foreach( $meaMap in $_parameter.meaList )
+			           UNION ALL 
+			           SELECT '$meaMap.CD'
+			                , '$meaMap.NM'
+			                , $velocityCount 
+					#end
+				) A
+			    WHERE CATEGORY_CD IS NOT NULL
+			),
+			W_COL AS 
+			(
+			    SELECT T1.COMPANY_CD
+			         , T1.BU_CD
+			         , T1.PLAN_ID
+			         , T1.VERSION_ID
+			         , T1.PROD_PART_CD
+			         , T1.PROD_PART
+			         , T1.ITEM_CD
+			         , T1.ITEM_NM
+			         , T1.PROCUR_TYPE
+			         , T1.SPEC
+			         , T1.ITEM_GRADE
+			         , T1.ITEM_TYPE_NM
+			         , T1.SALES_PRICE_KRW
+			         , T1.ROUTING_ID
+			         , T1.REP_CUST_NM
+			         , T1.CUST_GROUP_NM
+			         , T1.REP_CUST_GROUP_NM
+			         , T1.ITEM_GROUP_CD
+			         , T1.ITEM_GROUP_NM
+			         , T1.SS_QTY
+			         , T1.CPFR_YN
+			         , T1.CLEANING_YN
+			    
+			         #if($_parameter.monthlyWeekly == "WEEK")
+			        	 , T1.YEARWEEK
+					 #else
+					 	 , T1.YEARMONTH_STD
+					 #end
+					 
+					
+					#foreach( $meaMap in $_parameter.meaList )
+			         , CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VALUE ELSE NULL END ${meaMap.CD}
+			        #end
+			        #foreach( $meaMap in $_parameter.meaList )
+			        	#if($velocityCount > 1)
+							+ ISNULL(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VALUE ELSE NULL END), 0)
+						#else
+							, ISNULL(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VALUE ELSE NULL END), 0)
+						#end
+			        #end OMIT_FLAG
+			        
+			         , CASE WHEN T1.MEAS_CD = 'AP2_SP' THEN T1.VALUE ELSE NULL END AP2_SP_HD
+			         , CASE WHEN T1.MEAS_CD = 'SP_QTY' THEN T1.VALUE ELSE NULL END SP_QTY_HD
+			        
+			        	
+			        
+			        
+			        #if($dim_TEL_CNC == "Y")
+			         , TEL_CNC
+			        #end
+			        #if($dim_TEL_MCT == "Y")
+			         , TEL_MCT
+			        #end
+			        #if($dim_LAM_CNC == "Y")
+			         , LAM_CNC
+			        #end
+			        #if($dim_LAM_MCT == "Y")
+			         , LAM_MCT
+			        #end
+			        #if($dim_DIFF_CNC == "Y")
+			         , DIFF_CNC
+			        #end
+			        #if($dim_DIFF_MCT == "Y")
+			         , DIFF_MCT
+			        #end
+				FROM W_DATA T1
+			),
+			W_MAIN AS 
+			(
+			    SELECT T1.COMPANY_CD
+			         , T1.BU_CD
+			         , T1.PLAN_ID
+			         , T1.VERSION_ID
+			         , T1.PROD_PART_CD
+			         , T1.PROD_PART
+			         , T1.ITEM_CD
+			         , T1.ITEM_NM
+			         , T1.PROCUR_TYPE
+			         , T1.SPEC
+			         , T1.ITEM_GRADE
+			         , T1.ITEM_TYPE_NM
+			         , T1.SALES_PRICE_KRW
+			         , T1.ROUTING_ID
+			         , T1.REP_CUST_NM
+			         , T1.CUST_GROUP_NM
+			         , T1.REP_CUST_GROUP_NM
+			         , T1.ITEM_GROUP_CD
+			         , T1.ITEM_GROUP_NM
+			         , T1.SS_QTY
+			         , T1.CPFR_YN
+			         , T1.CLEANING_YN
+			         
+			         #if($_parameter.monthlyWeekly == "WEEK")
+			        	 , T1.YEARWEEK
+			         #else
+			             , T1.YEARMONTH_STD
+			         #end
+			        
+			        #if($dim_TEL_CNC == "Y")
+			         , T1.TEL_CNC
+			        #end
+			        #if($dim_TEL_MCT == "Y")
+			         , T1.TEL_MCT
+			        #end
+			        #if($dim_LAM_CNC == "Y")
+			         , T1.LAM_CNC
+			        #end
+			        #if($dim_LAM_MCT == "Y")
+			         , T1.LAM_MCT
+			        #end
+			        #if($dim_DIFF_CNC == "Y")
+			         , T1.DIFF_CNC
+			        #end
+			        #if($dim_DIFF_MCT == "Y")
+			         , T1.DIFF_MCT
+			        #end
+			         , T2.CATEGORY_CD
+			         , T2.CATEGORY_NM
+			         , T2.CATEGORY_IDX
+			         , CASE T2.CATEGORY_CD #foreach( $meaMap in $_parameter.meaList )
+			                               WHEN '${meaMap.CD}' THEN SUM(T1.${meaMap.CD})
+			                               #end
+			           END AS VALUE
+			        , SUM(T1.AP2_SP_HD) AS AP2_SP
+			       	, SUM(T1.SP_QTY_HD) AS SP_QTY
+			       
+			         , SUM(T1.OMIT_FLAG) AS OMIT_FLAG
+				FROM W_COL T1
+			    CROSS JOIN W_MEASURE T2
+			    GROUP BY T1.COMPANY_CD, T1.BU_CD, T1.PLAN_ID, T1.VERSION_ID, T1.PROD_PART_CD, T1.PROD_PART, T1.ITEM_CD, T1.ITEM_NM, T1.PROCUR_TYPE
+			         , T1.SPEC, T1.ITEM_GRADE, T1.ITEM_TYPE_NM, T1.SALES_PRICE_KRW, T1.ROUTING_ID, T1.REP_CUST_NM, T1.CUST_GROUP_NM, T1.REP_CUST_GROUP_NM, T1.ITEM_GROUP_CD
+			         , T1.ITEM_GROUP_NM, T1.SS_QTY, T1.CPFR_YN, T1.CLEANING_YN,
+			         #if($_parameter.monthlyWeekly == "WEEK")
+			         T1.YEARWEEK
+			         #else
+			         T1.YEARMONTH_STD
+			         #end
+			         , T2.CATEGORY_CD, T2.CATEGORY_NM, T2.CATEGORY_IDX
+			        
+			        
+			        #if($dim_TEL_CNC == "Y")
+			         , T1.TEL_CNC
+			        #end
+			        #if($dim_TEL_MCT == "Y")
+			         , T1.TEL_MCT
+			        #end
+			        #if($dim_LAM_CNC == "Y")
+			         , T1.LAM_CNC
+			        #end
+			        #if($dim_LAM_MCT == "Y")
+			         , T1.LAM_MCT
+			        #end
+			        #if($dim_DIFF_CNC == "Y")
+			         , T1.DIFF_CNC
+			        #end
+			        #if($dim_DIFF_MCT == "Y")
+			         , T1.DIFF_MCT
+			        #end
+			)
+			
+			SELECT NULL AS TMP_COL
+			     <include refid="include.getDimTotal"/>
+			     , TTT.GRP_LVL_ID
+			     , TTT.CATEGORY_CD
+			     , TTT.CATEGORY_NM
+			     , TTT.CATEGORY_IDX
+			     
+				#set($strInBucket = "")
+				#set($strTempBucket = "")
+				#set($strAP2_SP = "")
+				#set($strSP_QTY = "")
+			
+				#foreach( $bucketMap in $_parameter.bucketList )
+			     
+			    #if($bucketMap.TOT_TYPE != "MT") 
+			     , CASE WHEN TTT.CATEGORY_CD = 'FILL_RATE'
+			           	
+			        	
+			           	THEN CASE WHEN ROUND((TTT.${bucketMap.CD}_SP_QTY / NULLIF(TTT.${bucketMap.CD}_AP2_SP,0))*100 , 1) <![CDATA[>=]]> 100.0 THEN 100.0
+			                      ELSE ROUND((TTT.${bucketMap.CD}_SP_QTY / NULLIF(TTT.${bucketMap.CD}_AP2_SP,0))*100 , 1)
+			                  END
+			        
+			                  
+			            ELSE TTT.$bucketMap.CD
+			        END $bucketMap.CD
+			        
+			    #set($strInBucket = $strInBucket + "," + $bucketMap.CD)
+			    #set($strTempBucket = $bucketMap.CD)
+				#set($strAP2_SP = $strAP2_SP  + "," + $bucketMap.CD + "_AP2_SP")
+				#set($strSP_QTY = $strSP_QTY + "," + $bucketMap.CD + "_SP_QTY") 
+			     
+			    #else  
+			    
+			     
+			         , CASE WHEN TTT.CATEGORY_CD = 'FILL_RATE'
+			           	THEN CASE WHEN ROUND((((0 + ISNULL($strSP_QTY.substring(1).replace(",",",0)+ISNULL("),0))) / NULLIF( (0 + ISNULL($strAP2_SP.substring(1).replace(",",",0)+ISNULL("),0)),0)) * 100, 1) <![CDATA[>=]]> 100.0 THEN 100.0
+			                      ELSE ROUND((((0 + ISNULL($strSP_QTY.substring(1).replace(",",",0)+ISNULL("),0))) / NULLIF( (0 + ISNULL($strAP2_SP.substring(1).replace(",",",0)+ISNULL("),0)),0)) * 100, 1)
+			                  END
+			           WHEN TTT.CATEGORY_CD = 'CALC_BOH_QTY'
+                               THEN  ISNULL($strTempBucket,0)
+                       WHEN TTT.CATEGORY_CD = 'AP2_SP_REMAIN'
+                               THEN  ISNULL($strTempBucket,0)
+                       ELSE 
+			              
+			             ISNULL($strInBucket.substring(1).replace(",",",0)+ISNULL("),0)
+			             
+			        END $bucketMap.CD
+			      
+			    
+			    
+			    
+			    	#set($strInBucket = "")
+			    	#set($strTempBucket = "")
+					#set($strAP2_SP = "")
+			    	#set($strSP_QTY = "")
+			    
+			        
+			    #end
+			    #end
+			    
+			    
+			    
+			    
+			    
+			    #foreach($bucketMap in $_parameter.bucketList)
+			    #if($bucketMap.TOT_TYPE != "MT")
+					#if($velocityCount > 1)
+					 + ISNULL(TTT.${bucketMap.CD}_OMIT_FLAG, 0)
+					#else
+					 , ISNULL(TTT.${bucketMap.CD}_OMIT_FLAG, 0)
+					#end
+				#end
+				#end AS OMIT_FLAG
+			FROM 
+			(
+				SELECT NULL AS TMP_COL
+					#foreach( $dimMap in $_parameter.dimList )
+				     , TT.$dimMap.DIM_CD
+				     , MAX(TT.${dimMap.DIM_CD}_NM) AS ${dimMap.DIM_CD}_NM
+				    #end
+				    #foreach( $bucketMap in $_parameter.bucketList )
+				    #if($bucketMap.TOT_TYPE != "MT")
+				     , SUM(TT.$bucketMap.CD) AS $bucketMap.CD
+				     , SUM(TT.${bucketMap.CD}_OMIT_FLAG) AS ${bucketMap.CD}_OMIT_FLAG
+				     , SUM(TT.${bucketMap.CD}_AP2_SP) AS ${bucketMap.CD}_AP2_SP
+                     , SUM(TT.${bucketMap.CD}_SP_QTY) AS ${bucketMap.CD}_SP_QTY
+					 
+				     
+				    #end
+				    #end
+				     , TT.CATEGORY_CD
+				     , TT.CATEGORY_NM
+				     , TT.CATEGORY_IDX
+				    <include refid="include.getGrpLvlId"/>
+				FROM 
+				(
+			        SELECT NULL AS TMP_COL
+			             , T.COMPANY_CD
+			             , T.BU_CD
+			             , T.PLAN_ID
+			             , ISNULL(T.VERSION_ID, ' ') AS VERSION_ID
+			             , ISNULL(T.VERSION_ID, ' ') AS VERSION_ID_NM
+			             , T.PROD_PART_CD
+			             , ISNULL(T.PROD_PART, ' ') AS PROD_PART
+			             , ISNULL(T.PROD_PART, ' ') AS PROD_PART_NM
+			             , ISNULL(T.ITEM_CD, ' ') AS ITEM_CD
+			             , ISNULL(T.ITEM_CD, ' ') AS ITEM_CD_NM
+			             , ISNULL(T.ITEM_NM, ' ') AS ITEM_NM
+			             , ISNULL(T.ITEM_NM, ' ') AS ITEM_NM_NM
+			             , ISNULL(T.PROCUR_TYPE, ' ') AS PROCUR_TYPE
+			             , ISNULL(T.PROCUR_TYPE, ' ') AS PROCUR_TYPE_NM
+			             , ISNULL(T.SPEC, ' ') AS SPEC
+			             , ISNULL(T.SPEC, ' ') AS SPEC_NM
+			             , ISNULL(T.ITEM_GRADE, ' ') AS ITEM_GRADE
+			             , ISNULL(T.ITEM_GRADE, ' ') AS ITEM_GRADE_NM
+			             , ISNULL(T.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+			             , ISNULL(T.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+			             , ISNULL(CONVERT(VARCHAR, T.SALES_PRICE_KRW), ' ') AS SALES_PRICE_KRW
+			             , ISNULL(CONVERT(VARCHAR, T.SALES_PRICE_KRW), ' ') AS SALES_PRICE_KRW_NM
+			             , ISNULL(T.ROUTING_ID, ' ') AS ROUTING_ID
+			             , ISNULL(T.ROUTING_ID, ' ') AS ROUTING_ID_NM
+			             , ISNULL(T.REP_CUST_NM, ' ') AS REP_CUST_NM
+			             , ISNULL(T.REP_CUST_NM, ' ') AS REP_CUST_NM_NM
+			             , ISNULL(T.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+			             , ISNULL(T.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+			             , ISNULL(T.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+			             , ISNULL(T.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+			             , ISNULL(T.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			             , ISNULL(T.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			             , ISNULL(T.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			             , ISNULL(T.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			             , ISNULL(CONVERT(VARCHAR, T.SS_QTY), ' ') AS SS_QTY
+			             , ISNULL(CONVERT(VARCHAR, T.SS_QTY), ' ') AS SS_QTY_NM
+			             , ISNULL(T.CPFR_YN, ' ') AS CPFR_YN
+			             , ISNULL(T.CPFR_YN, ' ') AS CPFR_YN_NM
+			             , ISNULL(T.CLEANING_YN, ' ') AS CLEANING_YN
+			             , ISNULL(T.CLEANING_YN, ' ') AS CLEANING_YN_NM
+			            #if($dim_TEL_CNC == "Y")
+				         , ISNULL(T.TEL_CNC, ' ') AS TEL_CNC
+				         , ISNULL(T.TEL_CNC, ' ') AS TEL_CNC_NM
+				        #end
+				        #if($dim_TEL_MCT == "Y")
+				         , ISNULL(T.TEL_MCT, ' ') AS TEL_MCT
+				         , ISNULL(T.TEL_MCT, ' ') AS TEL_MCT_NM
+				        #end
+				        #if($dim_LAM_CNC == "Y")
+				         , ISNULL(T.LAM_CNC, ' ') AS LAM_CNC
+				         , ISNULL(T.LAM_CNC, ' ') AS LAM_CNC_NM
+				        #end
+				        #if($dim_LAM_MCT == "Y")
+				         , ISNULL(T.LAM_MCT, ' ') AS LAM_MCT
+				         , ISNULL(T.LAM_MCT, ' ') AS LAM_MCT_NM
+				        #end
+				        #if($dim_DIFF_CNC == "Y")
+				         , ISNULL(T.DIFF_CNC, ' ') AS DIFF_CNC
+				         , ISNULL(T.DIFF_CNC, ' ') AS DIFF_CNC_NM
+				        #end
+				        #if($dim_DIFF_MCT == "Y")
+				         , ISNULL(T.DIFF_MCT, ' ') AS DIFF_MCT
+				         , ISNULL(T.DIFF_MCT, ' ') AS DIFF_MCT_NM
+				        #end
+			             , T.CATEGORY_CD
+			             , T.CATEGORY_NM
+			             , T.CATEGORY_IDX
+						#foreach( $bucketMap in $_parameter.bucketList )
+						#if($bucketMap.TOT_TYPE != "MT")
+			             	#if($_parameter.monthlyWeekly == "WEEK")
+				             , SUM(CASE WHEN T.YEARWEEK = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.VALUE, 0) ELSE NULL END) AS $bucketMap.CD
+				             , SUM(CASE WHEN T.YEARWEEK = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.OMIT_FLAG, 0) ELSE NULL END) AS ${bucketMap.CD}_OMIT_FLAG
+				             , SUM(CASE WHEN T.YEARWEEK = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.AP2_SP, 0) + ISNULL(R1.VALUE, 0) ELSE NULL END) AS ${bucketMap.CD}_AP2_SP
+			             	#else
+			             	 , SUM(CASE WHEN T.YEARMONTH_STD = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.VALUE, 0) ELSE NULL END) AS $bucketMap.CD
+				             , SUM(CASE WHEN T.YEARMONTH_STD = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.OMIT_FLAG, 0) ELSE NULL END) AS ${bucketMap.CD}_OMIT_FLAG
+				             , SUM(CASE WHEN T.YEARMONTH_STD = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.AP2_SP, 0) + ISNULL(R1.VALUE, 0) ELSE NULL END) AS ${bucketMap.CD}_AP2_SP
+			             	#end
+			             
+			             
+				            #if($_parameter.monthlyWeekly == "WEEK")
+				            	 , SUM(CASE WHEN T.YEARWEEK = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.SP_QTY, 0) ELSE NULL END) AS ${bucketMap.CD}_SP_QTY
+				            #else
+				            	 , SUM(CASE WHEN T.YEARMONTH_STD = '$bucketMap.BUCKET_VAL' THEN ISNULL(T.SP_QTY, 0) ELSE NULL END) AS ${bucketMap.CD}_SP_QTY
+				            	 
+				            #end
+			            #end
+			            #end
+					FROM W_MAIN T
+			        LEFT OUTER JOIN W_REMAIN R1
+	               	  ON R1.COMPANY_CD = T.COMPANY_CD
+	                 AND R1.BU_CD = T.BU_CD
+	                 AND R1.PLAN_ID = T.PLAN_ID
+	                 AND R1.PROD_PART = T.PROD_PART
+	                 AND R1.VERSION_ID = T.VERSION_ID
+	                 AND R1.ITEM_CD = T.ITEM_CD
+	                 
+	                 #if($_parameter.monthlyWeekly == "WEEK")
+	                	 AND R1.YEARWEEK = T.YEARWEEK
+			         #else
+			            AND R1.YEARMONTH_STD = T.YEARMONTH_STD
+			         #end
+			        
+			        GROUP BY T.COMPANY_CD, T.BU_CD, T.PLAN_ID, T.VERSION_ID, T.PROD_PART_CD, T.PROD_PART, T.ITEM_CD, T.ITEM_NM
+				         , T.PROCUR_TYPE, T.SPEC, T.ITEM_GRADE, T.ITEM_TYPE_NM, T.SALES_PRICE_KRW, T.ROUTING_ID, T.REP_CUST_NM
+				         , T.CUST_GROUP_NM, T.REP_CUST_GROUP_NM, T.ITEM_GROUP_CD, T.ITEM_GROUP_NM, T.SS_QTY, T.CPFR_YN
+				         , T.CLEANING_YN, T.CATEGORY_CD, T.CATEGORY_NM, T.CATEGORY_IDX
+				        #if($dim_TEL_CNC == "Y")
+				         , T.TEL_CNC
+				        #end
+				        #if($dim_TEL_MCT == "Y")
+				         , T.TEL_MCT
+				        #end
+				        #if($dim_LAM_CNC == "Y")
+				         , T.LAM_CNC
+				        #end
+				        #if($dim_LAM_MCT == "Y")
+				         , T.LAM_MCT
+				        #end
+				        #if($dim_DIFF_CNC == "Y")
+				         , T.DIFF_CNC
+				        #end
+				        #if($dim_DIFF_MCT == "Y")
+				         , T.DIFF_MCT
+				        #end
+				) TT
+				WHERE 1 = 1
+				GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), TT.CATEGORY_CD, TT.CATEGORY_NM, TT.CATEGORY_IDX
+			) TTT
+			ORDER BY TTT.TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+		     , TTT.$dimMap.DIM_CD
+		    #end
+		     , TTT.CATEGORY_IDX
+		END;
+	</select>
+</mapper>

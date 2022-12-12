@@ -1,0 +1,49 @@
+server:
+  port: 8080
+  shutdown: graceful
+  servlet:
+    session:
+      timeout: 120m
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource1:
+    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+    jdbc-url: jdbc:log4jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
+    username: WIQ-TEST-SQL
+    password: WIxptmxmDB55%%66^^
+  datasource2:
+#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+#    jdbc-url: ENC(F569Wb4PMcSPZlENgatqPK4jD1a6m77m3qdL/E3kTnVwZ/ob8vt2fWqe6bg8kiAw5oYcw8wIt6JHorSy8z6Nmg==)
+    driver-class-name: oracle.jdbc.OracleDriver
+    jdbc-url: ENC(lbev09K62wfWB4gPZuxVBzdgG4WVN5vB8Uru7jhweYq4/qU1L05JHB6mGBnV9B1d7v63Ak9CM5g=)
+    username: ENC(qTbbqN2iMpvPD6PPfQeELA==)
+    password: ENC(nDW5tU9l95j7PBy1d+JW/A==)
+  devtools:
+    livereload:
+        enabled: true
+  thymeleaf:
+    prefix: classpath:templates/
+    suffix: .html
+    cache: false
+    view-names: thymeleaf/*
+  mvc:
+    view:
+      prefix: /WEB-INF/view/
+      suffix: .jsp
+    static-path-pattern: /static/**
+props:
+  SERVER_FILE_PATH: /home/wonikadmin/system_attach/snop_dev/upload
+  SERVER_FILE_MAX: 52428800
+  PDF_FILE_PATH: /home/wonikadmin/system_attach/snop_dev/pdf
+  WEB_PATH: https://snop-test.wonikqnc.com
+  PDF_VIEWER: /pdfjs/web/viewer.html
+  devMode: DEV
+  realgridLic: realgridjs-lic
+  realgridjs: realgridjs_eval.1.1.39.min
+  realgridapi: realgridjs-api.1.1.39
+

@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.purchase">
+	<update id="properCrtraMoveListUpdate" parameterType="map">
+		/****** [ snop.properCrtraMoveListUpdate ] ******/
+		UPDATE TB_DYN_PROD_ORDER
+		   SET REMARK = @{REMARK}
+		     , UPDATE_ID = @{GV_USER_ID}
+	         , UPDATE_DTTM = DBO.UFN_GETDATE()    
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	      AND BU_CD = @{GV_BU_CD}
+		  AND PROD_ORDER_NO = @{PROD_ORDER_NO}
+		  AND ITEM_CD = @{ITEM_CD}
+		  AND CHILD_ITEM_CD = @{CHILD_ITEM_CD}
+	</update>
+	
+	
+	<select id="properCrtraMoveListSelect" parameterType="map" resultType="map">
+		/****** [ snop.properCrtraMoveListSelect ] ******/
+		WITH W_PROD_ORDER AS 
+		(
+			SELECT C1.COMPANY_CD
+			     , C1.BU_CD
+			     , C1.PROD_ORDER_NO
+			     , C1.ITEM_CD
+			     , C1.CHILD_ITEM_CD
+			     , C1.REQ_QTY
+			     , SUM(C1.REQ_QTY) OVER(PARTITION BY C1.COMPANY_CD, C1.BU_CD, C1.CHILD_ITEM_CD, C2.STANDARD_DATE ORDER BY C1.RELEASE_DATE, C1.PROD_ORDER_NO) AS ACC_REQ_QTY
+			     , C1.CONFIRM_QTY
+			     , C1.RELEASE_DATE
+			     , C2.STANDARD_DATE
+			     , C1.MAT_WAIT_DATE
+			     , C1.CONFIRM_DATE
+			     , C1.REMARK
+			     , CASE WHEN C1.CONFIRM_DATE IS NOT NULL THEN C1.CONFIRM_DATE
+                        ELSE DBO.UFN_GETDATE()
+                    END CONFIRM_DATE_CACL
+			     , CASE WHEN C1.CONFIRM_DATE IS NOT NULL 
+			            THEN DATEDIFF(DD, CONVERT(DATETIME, C2.STANDARD_DATE), CONVERT(DATETIME, C1.CONFIRM_DATE))
+			            ELSE DATEDIFF(DD, CONVERT(DATETIME, C2.STANDARD_DATE), CONVERT(DATETIME, DBO.UFN_GETDATE()))
+			        END DIFF
+			FROM TB_DYN_PROD_ORDER C1 WITH(NOLOCK) 
+			CROSS APPLY (
+
+
+        SELECT B1.YYYYMMDD,
+                B1.DAY_NM,
+                /* 210506 이큰산 : 사내반제품 추가
+                            사내반제품은 기준일 = 작지발행일+1 이므로, 원자재와(+2일) 사내반제품 구분 */
+                CASE WHEN B1.ONE_DAY_OFF_FLAG <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.ONE_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.TWO_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.THREE_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG + B1.FOUR_DAY_OFF_FLAG <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.FOUR_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG + B1.FOUR_DAY_OFF_FLAG + B1.FIVE_DAY_OFF_FLAG <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.FIVE_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG + B1.FOUR_DAY_OFF_FLAG + B1.FIVE_DAY_OFF_FLAG + B1.SIX_DAY_OFF_FLAG <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.SIX_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG + B1.FOUR_DAY_OFF_FLAG + B1.FIVE_DAY_OFF_FLAG + B1.SIX_DAY_OFF_FLAG + B1.SEVEN_DAY_OFF_FLAG <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.SEVEN_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG + B1.FOUR_DAY_OFF_FLAG + B1.FIVE_DAY_OFF_FLAG + B1.SIX_DAY_OFF_FLAG + B1.SEVEN_DAY_OFF_FLAG + B1.EIGHT_DAY <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.EIGHT_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG + B1.FOUR_DAY_OFF_FLAG + B1.FIVE_DAY_OFF_FLAG + B1.SIX_DAY_OFF_FLAG + B1.SEVEN_DAY_OFF_FLAG + B1.EIGHT_DAY + B1.NINE_DAY <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.NINE_DAY
+                 WHEN B1.ONE_DAY_OFF_FLAG + B1.TWO_DAY_OFF_FLAG + B1.THREE_DAY_OFF_FLAG + B1.FOUR_DAY_OFF_FLAG + B1.FIVE_DAY_OFF_FLAG + B1.SIX_DAY_OFF_FLAG + B1.SEVEN_DAY_OFF_FLAG + B1.EIGHT_DAY + B1.NINE_DAY + B1.TEN_DAY <![CDATA[>=]]> (CASE WHEN B1.PROCUR_TYPE = 'MH' THEN 1 ELSE 2 END) THEN B1.TEN_DAY END STANDARD_DATE
+                 FROM (
+                 
+                        SELECT A1.YYYYMMDD,
+                                A1.DAY_NM,
+                                MIP.PROCUR_TYPE,
+                                CONVERT(VARCHAR, DATEADD(day, 1, A1.YYYYMMDD), 112) AS ONE_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 2, A1.YYYYMMDD), 112) AS TWO_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 3, A1.YYYYMMDD), 112) AS THREE_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 4, A1.YYYYMMDD), 112) AS FOUR_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 5, A1.YYYYMMDD), 112) AS FIVE_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 6, A1.YYYYMMDD), 112) AS SIX_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 7, A1.YYYYMMDD), 112) AS SEVEN_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 8, A1.YYYYMMDD), 112) AS EIGHT_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 9, A1.YYYYMMDD), 112) AS NINE_DAY,
+                                CONVERT(VARCHAR, DATEADD(day, 10, A1.YYYYMMDD), 112) AS TEN_DAY,
+                                (
+                                 SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                 FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                 WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 1, A1.YYYYMMDD), 112)
+                                ) AS ONE_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 2, A1.YYYYMMDD), 112)
+                                ) AS TWO_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 3, A1.YYYYMMDD), 112)
+                                ) AS THREE_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 4, A1.YYYYMMDD), 112)
+                                ) AS FOUR_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 5, A1.YYYYMMDD), 112)
+                                ) AS FIVE_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 6, A1.YYYYMMDD), 112)
+                                ) AS SIX_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 7, A1.YYYYMMDD), 112)
+                                ) AS SEVEN_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 8, A1.YYYYMMDD), 112)
+                                ) AS EIGHT_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 9, A1.YYYYMMDD), 112)
+                                ) AS NINE_DAY_OFF_FLAG,
+                                (
+                                SELECT CASE WHEN DAY_OFF_FLAG = '0.5' THEN 0 ELSE DAY_OFF_FLAG END
+                                FROM TB_MST_CALENDAR WITH (NOLOCK)
+                                WHERE YYYYMMDD = CONVERT(NVARCHAR, DATEADD(DAY, 10, A1.YYYYMMDD), 112)
+                                ) AS TEN_DAY_OFF_FLAG
+                            FROM TB_MST_CALENDAR A1 WITH (NOLOCK)
+                        , TB_MST_ITEM_PLANT MIP WITH (NOLOCK)
+                            WHERE YYYYMMDD = C1.RELEASE_DATE
+                                AND MIP.ITEM_CD = C1.CHILD_ITEM_CD
+                                AND MIP.COMPANY_CD = C1.COMPANY_CD
+                                AND MIP.BU_CD = C1.BU_CD
+                                AND MIP.PLANT_CD = 'WF01'
+            ) B1
+
+
+        ) C2
+        WHERE C1.COMPANY_CD = @{GV_COMPANY_CD} 
+        AND C1.BU_CD        = @{GV_BU_CD} 
+        AND C1.DEL_FLAG     = 'N' 
+        AND C2.STANDARD_DATE <![CDATA[>=]]> @{fromCal}
+        AND C2.STANDARD_DATE <![CDATA[<=]]> @{toCal}
+			
+			
+		), 
+		W_DYN_INVENTORY AS 
+		(
+			SELECT COMPANY_CD
+	             , BU_CD
+	             , ITEM_CD
+	             , INV_DATE
+	             , SUM(INV_QTY) AS INV_QTY
+	             , SUM(STK_ON_INSP_QTY) AS STK_ON_INSP_QTY
+	             , SUM(CC_QTY) AS CC_QTY
+			FROM 
+			(
+            	SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , INV_DATE
+                     , INV_QTY
+                     , 0 AS STK_ON_INSP_QTY
+                     , CC_QTY
+				FROM UV_DYN_INVENTORY WITH(NOLOCK)
+                WHERE PLANT_CD = 'WF01'
+                  AND INV_DATE <![CDATA[>=]]> @{fromCal}
+                  AND INV_DATE <![CDATA[<=]]> @{toCal}
+                  AND SL_CD IN ('M01', 'WB01')
+                UNION ALL
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , ITEM_CD
+                     , INV_DATE
+                     , 0 AS INV_QTY
+                     , QTY AS STK_ON_INSP_QTY
+                     , 0 AS CC_QTY
+				FROM TB_DYN_INVENTORY_INSP WITH(NOLOCK)
+                WHERE INV_DATE <![CDATA[>=]]> @{fromCal}
+                  AND INV_DATE <![CDATA[<=]]> @{toCal}
+			) A
+          	GROUP BY COMPANY_CD, BU_CD, ITEM_CD, INV_DATE
+		)
+		SELECT TMP_COL
+			 #foreach($dimMap in $_parameter.dimList)
+		  	 , ${dimMap.DIM_CD}_NM, $dimMap.DIM_CD 
+			 #end
+			 , GRP_LVL_ID
+			 , REQ_QTY
+			 , CONFIRM_QTY
+			 , INV_QTY
+			 , STK_ON_INSP_QTY
+			 , CC_QTY
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE RELEASE_DATE END RELEASE_DATE  
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE STANDARD_DATE END STANDARD_DATE  
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE MAT_WAIT_DATE END MAT_WAIT_DATE  
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE CONFIRM_DATE END CONFIRM_DATE  
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE CONFIRM_DATE_CACL END CONFIRM_DATE_CACL  
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE DIFF END DIFF  
+			 , OBEY
+			 , EXCEPTION
+			 , NO_OBEY
+			 , CASE WHEN GRP_LVL_ID != 0 THEN NULL ELSE REMARK END REMARK  
+			 , PERCENTAGE
+		FROM
+		(
+			SELECT NULL AS TMP_COL
+		    	   <include refid="include.getCdDimTotal"/>
+		    	   <include refid="include.getGrpLvlId"/>
+			     , SUM(REQ_QTY) AS REQ_QTY
+			     , SUM(CONFIRM_QTY) AS CONFIRM_QTY
+			     , SUM(INV_QTY) AS INV_QTY
+			     , SUM(STK_ON_INSP_QTY) AS STK_ON_INSP_QTY
+			     , SUM(CC_QTY) AS CC_QTY
+			     , CONVERT(VARCHAR, CONVERT(DATETIME, MAX(RELEASE_DATE)), 102) AS RELEASE_DATE
+			     , CONVERT(VARCHAR, CONVERT(DATETIME, MAX(STANDARD_DATE)), 102) AS STANDARD_DATE
+			     , CONVERT(VARCHAR, CONVERT(DATETIME, MAX(MAT_WAIT_DATE)), 102) AS MAT_WAIT_DATE
+			     , CONVERT(VARCHAR, CONVERT(DATETIME, MAX(CONFIRM_DATE)), 102) AS CONFIRM_DATE
+			     , CONVERT(VARCHAR, CONVERT(DATETIME, MAX(CONFIRM_DATE_CACL)), 102) AS CONFIRM_DATE_CACL
+			     , CASE WHEN MAX(CONFIRM_DATE_CACL) IS NULL THEN '' ELSE CONVERT(VARCHAR, MAX(DIFF)) END DIFF   
+			     , SUM(OBEY) AS OBEY
+			     , SUM(EXCEPTION) AS EXCEPTION
+			     , SUM(NO_OBEY) AS NO_OBEY
+			     , MAX(REMARK) AS REMARK
+			     , ROUND(AVG(CAST(PERCENTAGE AS decimal(8,4))), 0) AS PERCENTAGE
+			FROM
+			(
+				SELECT T1.COMPANY_CD
+				     , T1.BU_CD
+				     , ISNULL(T1.PROD_ORDER_NO, ' ') AS PROD_ORDER_NO
+					 , ISNULL(T1.PROD_ORDER_NO, ' ') AS PROD_ORDER_NO_NM
+				     , ISNULL(T1.ITEM_CD, ' ') AS ITEM_CD
+				     , ISNULL(T1.ITEM_CD, ' ') AS ITEM_CD_NM 
+				     , ISNULL(T1.CHILD_ITEM_CD, ' ') AS CHILD_ITEM_CD 
+				     , ISNULL(T1.CHILD_ITEM_CD, ' ') AS CHILD_ITEM_CD_NM 
+				     , T1.REQ_QTY
+				     , T1.CONFIRM_QTY
+				     , T8.INV_QTY 
+				     , T8.STK_ON_INSP_QTY 
+				     , T8.CC_QTY 
+				     , T1.RELEASE_DATE
+				     , T1.STANDARD_DATE
+				     , T1.MAT_WAIT_DATE
+				     , T1.CONFIRM_DATE
+				     , T1.CONFIRM_DATE_CACL
+				     , T1.DIFF   
+				     , T1.REMARK
+				     , ISNULL(T2.ITEM_NM, ' ') AS ITEM_NM
+				     , ISNULL(T2.ITEM_NM, ' ') AS ITEM_NM_NM
+				     , ISNULL(T2.SPEC, ' ') AS SPEC
+				     , ISNULL(T2.SPEC, ' ') AS SPEC_NM
+				     , ISNULL(T3.ITEM_NM, ' ') AS CHILD_ITEM_NM
+				     , ISNULL(T3.ITEM_NM, ' ') AS CHILD_ITEM_NM_NM
+				     , ISNULL(T3.SPEC, ' ') AS CHILD_SPEC
+				     , ISNULL(T3.SPEC, ' ') AS CHILD_SPEC_NM
+				     , ISNULL(T4.ROUTING_ID, ' ') AS ROUTING_ID
+					 , ISNULL(T4.ROUTING_ID, ' ') AS ROUTING_ID_NM
+					 , ISNULL(T5.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+					 , ISNULL(T5.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+				     , ISNULL(T5.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+					 , ISNULL(T5.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+					 
+					 , ISNULL(CASE WHEN 'KO' = UPPER(@{GV_LANG}) THEN MC1.CODE_NM_KR
+					        	   WHEN 'CN' = UPPER(@{GV_LANG}) THEN MC1.CODE_NM_CN
+					        	   ELSE MC1.CODE_NM
+					    	  END, ' ') AS PROCUR_TYPE
+					 , ISNULL(CASE WHEN 'KO' = UPPER(@{GV_LANG}) THEN MC1.CODE_NM_KR
+					        	   WHEN 'CN' = UPPER(@{GV_LANG}) THEN MC1.CODE_NM_CN
+					        	   ELSE MC1.CODE_NM
+					    	   END, ' ') AS PROCUR_TYPE_NM
+					    	   
+					 -- 20210524 김수호 추가, 조달구분 (자품목):자재코드 기준 조달구분
+					 ---------------------------------------------------------------   	   
+					 , ISNULL(CASE WHEN 'KO' = UPPER(@{GV_LANG}) THEN MC2.CODE_NM_KR
+                                   WHEN 'CN' = UPPER(@{GV_LANG}) THEN MC2.CODE_NM_CN
+                                   ELSE MC2.CODE_NM
+                              END, ' ') AS CHILD_ITEM_PROCUR_TYPE
+                     , ISNULL(CASE WHEN 'KO' = UPPER(@{GV_LANG}) THEN MC2.CODE_NM_KR
+                                   WHEN 'CN' = UPPER(@{GV_LANG}) THEN MC2.CODE_NM_CN
+                                   ELSE MC2.CODE_NM
+                               END, ' ') AS CHILD_ITEM_PROCUR_TYPE_NM   	   
+					 ---------------------------------------------------------------   	   
+					    	   
+					 -- 20210524 김수호 추가, 품목유형 (자품목):자재코드기준 품목유형
+                     ---------------------------------------------------------------
+                     , ISNULL(T3.ITEM_TYPE, ' ') AS CHILD_ITEM_TYPE_CD
+                     , ISNULL(T3.ITEM_TYPE, ' ') AS CHILD_ITEM_TYPE_CD_NM                   
+                     ---------------------------------------------------------------   	   
+					 
+					 -- 20210524 김수호 추가, 품목그룹 (자품목):자재코드기준 품목그룹
+                     ---------------------------------------------------------------
+                     , ISNULL(T3.ITEM_GROUP_CD, ' ') AS CHILD_ITEM_GROUP_CD
+                     , ISNULL(T3.ITEM_GROUP_CD, ' ') AS CHILD_ITEM_GROUP_CD_NM                     
+                     ---------------------------------------------------------------       
+                     
+					 
+					 
+					    	   
+					    	   
+					 , 'EA' AS UOM_CD
+					 , 'EA' AS UOM_CD_NM
+					 , CASE WHEN T1.CONFIRM_DATE IS NOT NULL AND T1.DIFF <![CDATA[<=]]> 0 THEN 1 ELSE 0 END OBEY
+                 	 
+                 	 , CASE WHEN (T1.CONFIRM_DATE IS NULL OR T1.DIFF <![CDATA[>]]> 0) AND T1.ACC_REQ_QTY <![CDATA[>]]> ISNULL(T8.INV_QTY, 0) + ISNULL(T8.STK_ON_INSP_QTY, 0) + ISNULL(T8.CC_QTY, 0) THEN 1 
+                 	 --20221014  김수호 수정, ITSM #130, 현업요청 사항 : 자재 코드 CTF 준수율 집계 제외요청 FROM 김영락
+                 	   	    WHEN T1.CHILD_ITEM_CD LIKE '%CTF%' THEN 1 
+                 	   	    ELSE 0
+                 	 ----------------------------------------------------------------------------
+                 	 END EXCEPTION
+                 	 
+                 	 , CASE WHEN (T1.CONFIRM_DATE IS NULL OR T1.DIFF <![CDATA[>]]> 0) AND T1.ACC_REQ_QTY <![CDATA[<=]]> ISNULL(T8.INV_QTY, 0) + ISNULL(T8.STK_ON_INSP_QTY, 0) + ISNULL(T8.CC_QTY, 0) THEN 1 ELSE 0 END NO_OBEY
+                 	 
+                 	 --20221014  김수호 수정, ITSM #130, 현업요청 사항 : 자재 코드 CTF 준수율 집계 제외요청 FROM 김영락
+                 	 , 	CASE WHEN T1.CHILD_ITEM_CD LIKE '%CTF%' THEN NULL  
+                 	 ----------------------------------------------------------------------------	
+                 	        WHEN T1.CONFIRM_DATE IS NOT NULL AND T1.DIFF <![CDATA[<=]]> 0 THEN 100
+                            WHEN (T1.CONFIRM_DATE IS NULL OR T1.DIFF <![CDATA[>]]> 0) AND T1.ACC_REQ_QTY <![CDATA[>]]> ISNULL(T8.INV_QTY, 0) + ISNULL(T8.STK_ON_INSP_QTY, 0) + ISNULL(T8.CC_QTY, 0) THEN NULL
+                            WHEN (T1.CONFIRM_DATE IS NULL OR T1.DIFF <![CDATA[>]]> 0) AND T1.ACC_REQ_QTY <![CDATA[<=]]> ISNULL(T8.INV_QTY, 0) + ISNULL(T8.STK_ON_INSP_QTY, 0) + ISNULL(T8.CC_QTY, 0) THEN 0
+                            ELSE NULL
+                       END PERCENTAGE
+				FROM W_PROD_ORDER T1
+				LEFT OUTER JOIN TB_MST_ITEM T2 WITH(NOLOCK)
+				  ON T1.COMPANY_CD = T2.COMPANY_CD
+				 AND T1.BU_CD = T2.BU_CD
+				 AND T1.ITEM_CD = T2.ITEM_CD
+				
+				----------------------------------------------------
+				LEFT OUTER JOIN TB_MST_ITEM T3 WITH(NOLOCK)
+				  ON T1.COMPANY_CD = T3.COMPANY_CD
+				 AND T1.BU_CD = T3.BU_CD
+				 AND T1.CHILD_ITEM_CD = T3.ITEM_CD
+				----------------------------------------------------
+				
+				LEFT OUTER JOIN TB_MST_ITEM_PLANT T4 WITH(NOLOCK)
+				  ON T1.COMPANY_CD = T4.COMPANY_CD
+				 AND T1.BU_CD = T4.BU_CD
+				 AND T1.ITEM_CD = T4.ITEM_CD
+				
+				---------------------------------------------------- 
+				LEFT OUTER JOIN TB_MST_ITEM_PLANT T6 WITH(NOLOCK)
+				  ON T1.COMPANY_CD = T6.COMPANY_CD
+				 AND T1.BU_CD = T6.BU_CD
+				 AND T1.CHILD_ITEM_CD = T6.ITEM_CD
+				----------------------------------------------------
+				
+				LEFT OUTER JOIN TB_MST_CUSTOMER T5 WITH(NOLOCK)
+			      ON T1.COMPANY_CD = T5.COMPANY_CD
+			     AND T1.BU_CD = T5.BU_CD
+			     AND T2.REP_CUST_CD = T5.CUST_CD
+			    LEFT OUTER JOIN TB_MST_ITEM_GROUP T7 WITH(NOLOCK)
+		          ON T1.COMPANY_CD = T7.COMPANY_CD
+		         AND T1.BU_CD = T7.BU_CD
+		         AND T2.ITEM_GROUP_CD = T7.ITEM_GROUP_CD
+		        LEFT OUTER JOIN W_DYN_INVENTORY T8 
+		          ON T1.COMPANY_CD = T8.COMPANY_CD
+			     AND T1.BU_CD = T8.BU_CD
+		         AND T1.CHILD_ITEM_CD = T8.ITEM_CD
+		         AND T1.STANDARD_DATE = T8.INV_DATE
+				LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			      ON MC1.BU_CD = 'ALL'
+			   	 AND MC1.GROUP_CD = 'PROCUR_TYPE'
+			   	 AND MC1.CODE_CD = T4.PROCUR_TYPE
+			   	 AND MC1.USE_FLAG = 'Y' 
+				
+				--20210524 김수호 추가
+				-----------------------------------------------------------------
+				
+                LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK) 
+                ON MC1.BU_CD = 'ALL'
+                AND MC2.GROUP_CD = 'PROCUR_TYPE'
+                AND MC2.CODE_CD = T6.PROCUR_TYPE
+                AND MC2.USE_FLAG = 'Y'    
+            
+            	-----------------------------------------------------------------
+				WHERE T3.ITEM_TYPE IN ('20', '30')
+				  AND T4.PLANT_CD = 'WF01'
+				  AND T6.PLANT_CD = 'WF01'
+				  AND T6.RCPT_SL_CD IN( 'M01','WB01')
+				#if($_parameter.item_cd and $_parameter.item_cd != "")
+					AND T1.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+				#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+				    AND (T1.ITEM_CD LIKE '%'+@{item_nm}+'%' OR T2.ITEM_NM LIKE '%'+@{item_nm}+'%')
+				#end
+				#if($_parameter.materialsCode_cd and $_parameter.materialsCode_cd != "")
+					AND T1.CHILD_ITEM_CD IN ('$_parameter.materialsCode_cd.replace(",","','")')
+				#elseif($_parameter.materialsCode_nm and $_parameter.materialsCode_nm != "")
+				    AND (T1.CHILD_ITEM_CD LIKE '%'+@{materialsCode_nm}+'%' OR T3.ITEM_NM LIKE '%'+@{materialsCode_nm}+'%')
+				#end
+				#if($_parameter.prodOrderNo_cd and $_parameter.prodOrderNo_cd != "")
+					AND T1.PROD_ORDER_NO IN ('$_parameter.prodOrderNo_cd.replace(",","','")')
+				#elseif($_parameter.prodOrderNo_nm and $_parameter.prodOrderNo_nm != "")
+				    AND (T1.PROD_ORDER_NO LIKE '%'+@{prodOrderNo_nm}+'%' OR T1.PROD_ORDER_NO LIKE '%'+@{prodOrderNo_nm}+'%')
+				#end
+				#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+				    AND T2.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+				#end 
+				
+				
+				--20210524 김수호 추가,  품목그룹 (자품목):자재코드기준 품목그룹
+                ------------------------------------------------------------------------
+                #if($_parameter.itemGroupChild and $_parameter.itemGroupChild != "")
+                    AND T3.ITEM_GROUP_CD IN ('$_parameter.itemGroupChild.replace(",","','")')
+                #end 
+                ------------------------------------------------------------------------
+                
+				
+				
+				#if($_parameter.itemType and $_parameter.itemType != "")
+				   	AND T2.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+				#end
+				
+				
+				--20210524 김수호 추가, 품목유형 (자품목):자재코드기준 품목유형
+                ------------------------------------------------------------------------
+                #if($_parameter.itemTypeChild and $_parameter.itemTypeChild != "")
+                    AND T3.ITEM_TYPE IN ('$_parameter.itemTypeChild.replace(",","','")')
+                #end
+                ------------------------------------------------------------------------
+                
+				
+				#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+					AND T7.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+				#end
+				
+				
+				#if($_parameter.procurType and $_parameter.procurType != "")
+					AND T4.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+				#end 
+				
+				--20210524 김수호 추가, 조달구분 (자품목):자재코드 기준 조달구분
+                ------------------------------------------------------------------------
+				#if($_parameter.procurTypeChild and $_parameter.procurTypeChild != "")
+                    AND T6.PROCUR_TYPE IN ('$_parameter.procurTypeChild.replace(",","','")')
+                #end
+				------------------------------------------------------------------------
+			) U1
+			#if($_parameter.obeyYn and $_parameter.obeyYn != "")
+				WHERE $_parameter.obeyYn = 1
+			#end 
+			GROUP BY ROLLUP(<include refid="include.getCdRollup"/>)
+		) Z1
+		ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    	, Z1.$dimMap.DIM_CD
+		#end
+		
+	</select>
+	
+	
+	
+	
+	
+	
+	
+</mapper>

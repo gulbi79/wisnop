@@ -1,0 +1,790 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.purchase">
+
+	<select id="bucketAgingSelect" parameterType="map" resultType="map">
+		/****** [ snop.agingInventory.bucketAgingSelect ] ******/
+		#foreach($bucketMap in $_parameter.param)
+			#if($velocityCount > 1)
+				UNION ALL
+		 	#end
+				SELECT '$bucketMap.cd' AS BUCKET_ID
+				     , '$bucketMap.cd' AS CD
+				     , '$bucketMap.nm' AS BUCKET_VAL
+				     , '$bucketMap.nm' AS NM
+				     , 'MM' AS BUCKET_TYPE
+				     , 'ROOT' AS ROOT_CD
+				     , 'group' AS TYPE
+		#end
+	</select>
+
+	<select id="agingInventoryListSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.agingInventoryListSelect ] ******/
+		/*
+		#set($dynamicMonthArray = [0..$_parameter.monthCnt])
+		*/
+		#set($dynamicMonthArray = [0..12])
+		
+		
+		BEGIN
+		
+		DECLARE @V_PLAN_ID NVARCHAR(8);
+		DECLARE @V_START_WEEK NVARCHAR(6);
+		DECLARE @V_YYYYMMDD NVARCHAR(8);
+		DECLARE @V_FROM_MON NVARCHAR(6);
+		DECLARE @V_TO_MON NVARCHAR(8);
+		DECLARE @TOP_ITEM_PLAN_ID NVARCHAR(8);
+		
+		
+		DECLARE @V_CURRENT_DATE     DATETIME,
+                @V_CUR_DATE         NVARCHAR(8);
+        
+        SET @V_CURRENT_DATE = DBO.UFN_GETDATE();
+        SET @V_CUR_DATE = CONVERT(NVARCHAR, @V_CURRENT_DATE, 112);
+		
+		
+		SELECT TOP 1 @TOP_ITEM_PLAN_ID = PLAN_ID
+          FROM TB_MST_PLAN_VERSION WITH (NOLOCK)
+         WHERE COMPANY_CD = @{GV_COMPANY_CD}
+           AND BU_CD = @{GV_BU_CD}
+           AND PLAN_TYPE_CD = 'MP'
+           AND CUT_OFF_FLAG = 'N'
+         ORDER BY START_WEEK DESC
+		
+		
+		
+		
+		SELECT @V_PLAN_ID = PLAN_ID
+			,@V_START_WEEK = START_WEEK
+			,@V_YYYYMMDD = YYYYMMDD
+			,@V_FROM_MON = FROM_MON
+			,@V_TO_MON = TO_MON
+		FROM (
+			SELECT TOP 1 MPV.PLAN_ID
+				,MPV.START_WEEK
+				,MC.YYYYMMDD
+				,MC.YEARMONTH AS FROM_MON
+				,SUBSTRING(CONVERT(VARCHAR, DATEADD(MM, 12, CONVERT(DATETIME, MC.YEARMONTH + '01')), 112), 1, 6) AS TO_MON
+			FROM TB_MST_PLAN_VERSION MPV WITH (NOLOCK)
+			/* 210113 이큰산 - ON 조건절 변경 (기존 수요일 -> 조회월 중 마지막 주차 기준으로 변경) */
+			INNER JOIN TB_MST_CALENDAR MC WITH (NOLOCK) ON MC.YEARWEEK = MPV.START_WEEK AND MC.YYYYMMDD LIKE @{fromMon}+'%' ---- AND MC.DAY_NM = 'WED'
+			
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+				AND BU_CD =  @{GV_BU_CD}
+				AND PLAN_TYPE_CD = 'DP_W'
+				AND RELEASE_FLAG = 'Y'
+			ORDER BY START_WEEK DESC
+			) A;
+			
+		WITH W_BOM
+		AS (
+			SELECT COMPANY_CD
+				,BU_CD
+				,PLANT_CD
+				,PARENT_BOM_NO
+				,PARENT_ITEM_CD AS ITEM_CD
+				,PARENT_ITEM_CD
+				,CHILD_ITEM_CD
+				,CHILD_ITEM_QTY
+				,1 AS SORT
+			FROM TB_MST_BOM WITH (NOLOCK)
+			
+			UNION ALL
+			
+			SELECT A.COMPANY_CD
+				,A.BU_CD
+				,A.PLANT_CD
+				,A.PARENT_BOM_NO
+				,B.ITEM_CD
+				,A.PARENT_ITEM_CD
+				,A.CHILD_ITEM_CD
+				,CAST(B.CHILD_ITEM_QTY * A.CHILD_ITEM_QTY AS NUMERIC(21, 6)) AS CHILD_ITEM_QTY
+				,B.SORT + 1 AS SORT
+			FROM TB_MST_BOM A WITH (NOLOCK)
+			INNER JOIN W_BOM B ON B.COMPANY_CD = A.COMPANY_CD
+				AND B.BU_CD = A.BU_CD
+				AND B.PLANT_CD = A.PLANT_CD
+				AND B.PARENT_BOM_NO = A.PARENT_BOM_NO
+				AND B.CHILD_ITEM_CD = A.PARENT_ITEM_CD
+			)
+			,W_FUTURE_ORG_DATA
+		AS (
+			SELECT B1.COMPANY_CD
+				,B1.BU_CD
+				,B1.ITEM_CD
+				,B1.YEARWEEK
+				,B1.YEARMONTH
+				,SUM(B1.QTY) AS QTY
+			FROM (
+				SELECT A1.*
+					,A2.YEARMONTH
+				FROM (
+					SELECT T1.COMPANY_CD
+						,T1.BU_CD
+						,T1.ITEM_CD
+						,T1.YEARPWEEK AS YEARWEEK
+						,T1.QTY
+					FROM TB_HIS_SALES_PLAN T1 WITH (NOLOCK)
+					WHERE T1.COMPANY_CD = @{GV_COMPANY_CD}
+						AND T1.BU_CD = @{GV_BU_CD}
+						AND T1.PLAN_ID = @V_PLAN_ID
+						AND T1.MEAS_CD = 'AP2_SP'
+						AND T1.YEARWEEK <![CDATA[>]]> @V_START_WEEK
+					) A1
+				INNER JOIN (
+					SELECT YEARPWEEK
+						,YEARMONTH
+					FROM TB_MST_CALENDAR WITH (NOLOCK)
+					WHERE YEARMONTH <![CDATA[>=]]> @V_FROM_MON
+						AND YEARMONTH <![CDATA[<=]]> @V_TO_MON
+						AND YYYYMMDD <![CDATA[>=]]> @V_YYYYMMDD
+					GROUP BY YEARPWEEK
+						,YEARMONTH
+					) A2 ON A1.YEARWEEK = A2.YEARPWEEK
+				
+				UNION ALL
+				
+				SELECT A1.*
+					,A2.YEARMONTH
+				FROM (
+					SELECT COMPANY_CD
+						,BU_CD
+						,ITEM_CD
+						,PI_WEEK AS YEARWEEK
+						,QTY
+					FROM TB_DYN_MRP_LATEST WITH (NOLOCK)
+					WHERE COMPANY_CD = @{GV_COMPANY_CD}
+						AND BU_CD = @{GV_BU_CD}
+						AND PLANT_CD = 'WF01'
+					) A1
+				INNER JOIN (
+					SELECT YEARWEEK AS YEARWEEK
+						,YEARMONTH_STD AS YEARMONTH
+					FROM TB_MST_CALENDAR WITH (NOLOCK)
+					WHERE YEARMONTH_STD <![CDATA[>=]]> @V_FROM_MON
+						AND YEARMONTH_STD <![CDATA[<=]]> @V_TO_MON
+						AND YYYYMMDD <![CDATA[>=]]> @V_YYYYMMDD
+					GROUP BY YEARWEEK
+						,YEARMONTH_STD
+					) A2 ON A1.YEARWEEK = A2.YEARWEEK
+				) B1
+			GROUP BY B1.COMPANY_CD
+				,B1.BU_CD
+				,B1.ITEM_CD
+				,B1.YEARWEEK
+				,B1.YEARMONTH
+			)
+			,W_FUTURE_BOM
+		AS (
+			SELECT C.COMPANY_CD
+				,C.BU_CD
+				,C.ITEM_CD
+				
+				
+				#foreach($i in $dynamicMonthArray)
+					
+					#if($velocityCount == 1)
+						
+						#if($velocityCount == $_parameter.monthCnt)
+							,SUM(CASE 
+								WHEN C.YEARMONTH <![CDATA[>=]]> @V_FROM_MON 
+									THEN QTY
+								END) M${i}_QTY
+						#else
+							,SUM(CASE 
+								WHEN C.YEARMONTH = @V_FROM_MON 
+									THEN QTY
+								END) M${i}_QTY
+						#end
+						
+					#elseif($velocityCount == 4)
+						#if($velocityCount == $_parameter.monthCnt)
+							,SUM(CASE 
+								WHEN C.YEARMONTH <![CDATA[>=]]> LEFT(CONVERT(VARCHAR, DATEADD(mm, ${i}, @V_FROM_MON + '01'), 112), 6)
+									THEN QTY
+								END) M${i}_OVER_QTY
+						#else
+							,SUM(CASE 
+								WHEN C.YEARMONTH = LEFT(CONVERT(VARCHAR, DATEADD(mm, ${i}, @V_FROM_MON + '01'), 112), 6)
+									THEN QTY
+								END) M${i}_OVER_QTY
+						
+						#end
+					
+					#else
+						#if($velocityCount == $_parameter.monthCnt)
+							,SUM(CASE 
+								WHEN C.YEARMONTH <![CDATA[>=]]> LEFT(CONVERT(VARCHAR, DATEADD(mm, ${i}, @V_FROM_MON + '01'), 112), 6)
+									THEN QTY
+								END) M${i}_QTY
+						#else
+							,SUM(CASE 
+								WHEN C.YEARMONTH = LEFT(CONVERT(VARCHAR, DATEADD(mm, ${i}, @V_FROM_MON + '01'), 112), 6)
+									THEN QTY
+								END) M${i}_QTY
+							
+						#end
+					#end
+					
+					#if($velocityCount == $_parameter.monthCnt)
+						#break;
+					#end
+				#end
+				
+				
+				
+					FROM (
+				SELECT A.COMPANY_CD
+					,A.BU_CD
+					,A.ITEM_CD
+					,A.QTY
+					,A.YEARWEEK
+					,A.YEARMONTH
+				FROM W_FUTURE_ORG_DATA A WITH (NOLOCK)
+				
+				UNION ALL
+				
+				SELECT A.COMPANY_CD
+					,A.BU_CD
+					,B.CHILD_ITEM_CD AS ITEM_CD
+					,A.QTY * B.CHILD_ITEM_QTY AS WEEK_REMAIN_QTY
+					,A.YEARWEEK
+					,A.YEARMONTH
+				FROM W_FUTURE_ORG_DATA A WITH (NOLOCK)
+				INNER JOIN W_BOM B WITH (NOLOCK) ON B.COMPANY_CD = A.COMPANY_CD
+					AND B.BU_CD = A.BU_CD
+					AND B.ITEM_CD = A.ITEM_CD
+					AND EXISTS (
+						SELECT 1
+						FROM TB_MST_ITEM_PLANT MIP WITH (NOLOCK)
+						WHERE MIP.COMPANY_CD = B.COMPANY_CD
+							AND MIP.BU_CD = B.BU_CD
+							AND MIP.PLANT_CD = B.PLANT_CD
+							AND MIP.ITEM_CD = B.CHILD_ITEM_CD
+							
+							#if($_parameter.procurType and $_parameter.procurType != "")
+                        		AND MIP.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")')
+  							#end
+						
+							--AND MIP.PROCUR_TYPE = 'MH'   /*  UI 조달 PARAMETER 동적 적용필요  */ 
+						)
+				) C
+			GROUP BY C.COMPANY_CD
+				,C.BU_CD
+				,C.ITEM_CD
+			)
+		
+		
+		SELECT B.*
+			#if($_parameter.rdoAqType == "QTY")
+		   	 , ROUND(B.ONE_MONTH_QTY / NULLIF(B.TOTAL_QTY, 0) * 100, 1) AS ONE_MONTH_RATE
+		     , ROUND(B.THREE_MONTH_QTY / NULLIF(B.TOTAL_QTY, 0) * 100, 1) AS THREE_MONTH_RATE
+	         , ROUND(B.SIX_MONTH_QTY / NULLIF(B.TOTAL_QTY, 0) * 100, 1) AS SIX_MONTH_RATE
+	         , ROUND(B.NINE_MONTH_QTY / NULLIF(B.TOTAL_QTY, 0) * 100, 1) AS NINE_MONTH_RATE
+	         , ROUND(B.TWELVE_MONTH_QTY / NULLIF(B.TOTAL_QTY, 0) * 100, 1) AS TWELVE_MONTH_RATE
+	         , ROUND(B.ONE_YEAR_OVER_QTY / NULLIF(B.TOTAL_QTY, 0) * 100, 1) AS ONE_YEAR_OVER_RATE
+	        #else
+	         , ROUND(B.ONE_MONTH_AMT / NULLIF(B.TOTAL_AMT, 0) * 100, 1) AS ONE_MONTH_RATE
+		     , ROUND(B.THREE_MONTH_AMT / NULLIF(B.TOTAL_AMT, 0) * 100, 1) AS THREE_MONTH_RATE
+	         , ROUND(B.SIX_MONTH_AMT / NULLIF(B.TOTAL_AMT, 0) * 100, 1) AS SIX_MONTH_RATE
+	         , ROUND(B.NINE_MONTH_AMT / NULLIF(B.TOTAL_AMT, 0) * 100, 1) AS NINE_MONTH_RATE
+	         , ROUND(B.TWELVE_MONTH_AMT / NULLIF(B.TOTAL_AMT, 0) * 100, 1) AS TWELVE_MONTH_RATE
+	         , ROUND(B.ONE_YEAR_OVER_AMT / NULLIF(B.TOTAL_AMT, 0) * 100, 1) AS ONE_YEAR_OVER_RATE
+	        #end
+	        , CASE WHEN GRP_LVL_ID = 0 THEN 'Y' ELSE 'N' END TOP_ITEM
+	        , CASE WHEN GRP_LVL_ID = 0 THEN 'Y' ELSE 'N' END HISTORY
+	     	/* 201201 이큰산 추가 */
+			,C3.REASON_FOR_OCCURRENCE AS REASON_FOR_OCCURRENCE		-- 발생사유 코드
+			,C3.REMARKS_COMMON 	      AS REMARKS_COMMON			  	-- REMARK
+			,C3.REMARKS_SALES 		  AS REMARKS_SALES				-- REMARK(영업)
+			
+			
+			
+			--20210412 김수호
+			--현업 요청으로 날짜데이터+TEXT동시입력가능하게 수정
+			--GRID 처리일정 CALENDAR 필요없음 FROM 현업
+			,C3.SCHED_DT 			  AS SCHED_DT					-- 처리일정
+		
+		FROM
+		(
+			SELECT NULL AS TMP_COL
+	    	<include refid="include.getCdDimTotal"/>
+	    	<include refid="include.getGrpLvlId"/>
+	    	     , SUM(ONE_MONTH_BEFORE_INV_AMT) AS ONE_MONTH_BEFORE_INV_AMT
+	    	     , SUM(TWO_MONTH_BEFORE_INV_AMT) AS TWO_MONTH_BEFORE_INV_AMT
+	    	     , SUM(ONE_MONTH_BEFORE_INV_QTY) AS ONE_MONTH_BEFORE_INV_QTY
+	    	     , SUM(TWO_MONTH_BEFORE_INV_QTY) AS TWO_MONTH_BEFORE_INV_QTY
+	    	     , SUM(INV_AMT) AS INV_AMT
+	    	     , SUM(INV_QTY) AS INV_QTY
+				#if($_parameter.rdoAqType == "QTY")
+	    	     , SUM(ONE_MONTH) AS ONE_MONTH_QTY
+		    	 , SUM(THREE_MONTH) AS THREE_MONTH_QTY
+		    	 , SUM(SIX_MONTH) AS SIX_MONTH_QTY
+		    	 , SUM(NINE_MONTH) AS NINE_MONTH_QTY
+		    	 , SUM(TWELVE_MONTH) AS TWELVE_MONTH_QTY
+		    	 , SUM(ONE_YEAR_OVER) AS ONE_YEAR_OVER_QTY
+		    	 , SUM(ONE_MONTH) + SUM(THREE_MONTH) + SUM(SIX_MONTH)
+		    	 + SUM(NINE_MONTH) + SUM(TWELVE_MONTH) + SUM(ONE_YEAR_OVER) AS TOTAL_QTY
+	    	    #else
+	    	     , SUM(ONE_MONTH_AMT) AS ONE_MONTH_AMT
+		    	 , SUM(THREE_MONTH_AMT) AS THREE_MONTH_AMT
+		    	 , SUM(SIX_MONTH_AMT) AS SIX_MONTH_AMT
+		    	 , SUM(NINE_MONTH_AMT) AS NINE_MONTH_AMT
+		    	 , SUM(TWELVE_MONTH_AMT) AS TWELVE_MONTH_AMT
+		    	 , SUM(ONE_YEAR_OVER_AMT) AS ONE_YEAR_OVER_AMT
+		    	 , SUM(ONE_MONTH_AMT) + SUM(THREE_MONTH_AMT) + SUM(SIX_MONTH_AMT)
+		    	 + SUM(NINE_MONTH_AMT) + SUM(TWELVE_MONTH_AMT) + SUM(ONE_YEAR_OVER_AMT) AS TOTAL_AMT   
+	    	    #end
+	    		, @TOP_ITEM_PLAN_ID AS PLAN_ID
+    	    	, A.YEARMONTH		AS 	YEARMONTH
+    	    	, A.COMPANY_CD
+    	    	, A.BU_CD
+    	    	, A.PLANT_CD
+	    	    	#foreach($i in $dynamicMonthArray)
+						
+						#if($velocityCount == 4)
+							,SUM(M${i}_OVER_QTY) AS M${i}_OVER_QTY 
+						
+						#else
+						
+							,SUM(M${i}_QTY) 	 AS M${i}_QTY 
+						#end
+						
+						#if($velocityCount == $_parameter.monthCnt)
+							#break;
+						#end
+					#end
+				, SUM(M01_WB01_QTY) AS M01_WB01_QTY
+				, SUM(WI01_QTY)	    AS WI01_QTY
+	    	FROM     
+	    	(
+				SELECT C1.COMPANY_CD
+			         , C1.BU_CD
+			         , C1.PLANT_CD
+			         , C1.YEARMONTH
+			         , ISNULL(C2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+				     , ISNULL(C2.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+				     , ISNULL(C2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+				     , ISNULL(C2.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			         , ISNULL(C2.ITEM_CD, ' ') AS ITEM_CD
+				     , ISNULL(C2.ITEM_CD, ' ') AS ITEM_CD_NM
+				     , ISNULL(C2.ITEM_NM, ' ') AS ITEM_NM
+				     , ISNULL(C2.ITEM_NM, ' ') AS ITEM_NM_NM
+				     , ISNULL(C2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+				     , ISNULL(C2.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+				     , ISNULL(C2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+				     , ISNULL(C2.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+				     , ISNULL(C2.SPEC, ' ') AS SPEC
+				     , ISNULL(C2.SPEC, ' ') AS SPEC_NM
+				     , ISNULL(C2.DRAW_NO, ' ') AS DRAW_NO
+				     , ISNULL(C2.DRAW_NO, ' ') AS DRAW_NO_NM
+				     , ISNULL(C2.UOM_CD, ' ') AS UOM_CD
+				     , ISNULL(C2.UOM_CD, ' ') AS UOM_CD_NM
+				     , ISNULL(C2.ROUTING_ID, ' ') AS ROUTING_ID
+				     , ISNULL(C2.ROUTING_ID, ' ') AS ROUTING_ID_NM
+				     , ISNULL(C2.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+				     , ISNULL(C2.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+				     , ISNULL(C2.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+				     , ISNULL(C2.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+				     , ISNULL(C2.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+				     , ISNULL(C2.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+				     , ISNULL(C2.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+				     , ISNULL(C2.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+				     , ISNULL(C2.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+				     , ISNULL(C2.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+				     , ISNULL(C2.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+				     , ISNULL(C2.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+				     , ISNULL(C2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD
+				     , ISNULL(C2.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM
+				     , ISNULL(C2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM
+				     , ISNULL(C2.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+				     , C1.ONE_MONTH_BEFORE_INV_QTY
+					 , C1.TWO_MONTH_BEFORE_INV_QTY
+					 , C1.INV_QTY
+					 , C1.ONE_MONTH
+			         , C1.THREE_MONTH
+			         , C1.SIX_MONTH
+			         , C1.NINE_MONTH
+			         , C1.TWELVE_MONTH
+			         , C1.ONE_YEAR_OVER
+					#if($_parameter.unitPrice == "COST")
+				     , C1.ONE_MONTH_BEFORE_INV_AMT
+					 , C1.TWO_MONTH_BEFORE_INV_AMT
+			         , C1.INV_AMT
+			         , C1.ONE_MONTH_AMT
+			         , C1.THREE_MONTH_AMT
+			         , C1.SIX_MONTH_AMT
+			         , C1.NINE_MONTH_AMT
+			         , C1.TWELVE_MONTH_AMT
+			         , C1.ONE_YEAR_OVER_AMT
+					#else
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.ONE_MONTH_BEFORE_INV_QTY, 0) ELSE ISNULL(C1.ONE_MONTH_BEFORE_INV_AMT, 0) END ONE_MONTH_BEFORE_INV_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.TWO_MONTH_BEFORE_INV_QTY, 0) ELSE ISNULL(C1.TWO_MONTH_BEFORE_INV_AMT, 0) END TWO_MONTH_BEFORE_INV_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.INV_QTY, 0) ELSE ISNULL(C1.INV_AMT, 0) END INV_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.ONE_MONTH, 0) ELSE ISNULL(C1.ONE_MONTH_AMT, 0) END ONE_MONTH_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.THREE_MONTH, 0) ELSE ISNULL(C1.THREE_MONTH_AMT, 0) END THREE_MONTH_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.SIX_MONTH, 0) ELSE ISNULL(C1.SIX_MONTH_AMT, 0) END SIX_MONTH_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.NINE_MONTH, 0) ELSE ISNULL(C1.NINE_MONTH_AMT, 0) END NINE_MONTH_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.TWELVE_MONTH, 0) ELSE ISNULL(C1.TWELVE_MONTH_AMT, 0) END TWELVE_MONTH_AMT
+				     , CASE WHEN C2.SALES_PRICE_KRW <![CDATA[>]]> 0 THEN C2.SALES_PRICE_KRW * ISNULL(C1.ONE_YEAR_OVER, 0) ELSE ISNULL(C1.ONE_YEAR_OVER_AMT, 0) END ONE_YEAR_OVER_AMT
+				    #end
+				    #foreach($i in $dynamicMonthArray)
+						
+						#if($velocityCount == 4)
+							,C4.M${i}_OVER_QTY AS M${i}_OVER_QTY 
+						
+						#else
+						
+							,C4.M${i}_QTY 	   AS M${i}_QTY
+						#end
+						
+						#if($velocityCount == $_parameter.monthCnt)
+							#break;
+						#end
+					#end	   
+					 , DIA.M01_WB01_QTY   AS M01_WB01_QTY
+                     , DIA.WI01_QTY       AS WI01_QTY 
+				 
+				FROM
+				(
+					SELECT B1.*
+					     , B2.M1_QTY + B2.M2_QTY + B2.M3_QTY + B2.M4_QTY + B2.M5_QTY + B2.M6_QTY 
+					       + B2.M7_QTY + B2.M8_QTY + B2.M9_QTY + B2.M10_QTY + B2.M11_QTY + B2.M12_QTY + B2.Y1_QTY + B2.OVER_Y2_QTY AS ONE_MONTH_BEFORE_INV_QTY
+						 , B2.SALES_PRICE * (B2.M1_QTY + B2.M2_QTY + B2.M3_QTY + B2.M4_QTY + B2.M5_QTY + B2.M6_QTY 
+					       + B2.M7_QTY + B2.M8_QTY + B2.M9_QTY + B2.M10_QTY + B2.M11_QTY + B2.M12_QTY + B2.Y1_QTY + B2.OVER_Y2_QTY) AS ONE_MONTH_BEFORE_INV_AMT	
+						 , B3.M1_QTY + B3.M2_QTY + B3.M3_QTY + B3.M4_QTY + B3.M5_QTY + B3.M6_QTY 
+					       + B3.M7_QTY + B3.M8_QTY + B3.M9_QTY + B3.M10_QTY + B3.M11_QTY + B3.M12_QTY + B3.Y1_QTY + B3.OVER_Y2_QTY AS TWO_MONTH_BEFORE_INV_QTY
+						 , B3.SALES_PRICE * (B3.M1_QTY + B3.M2_QTY + B3.M3_QTY + B3.M4_QTY + B3.M5_QTY + B3.M6_QTY 
+					       + B3.M7_QTY + B3.M8_QTY + B3.M9_QTY + B3.M10_QTY + B3.M11_QTY + B3.M12_QTY + B3.Y1_QTY + B3.OVER_Y2_QTY) AS TWO_MONTH_BEFORE_INV_AMT		
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+					    	 , A1.BU_CD
+					         , A1.PLANT_CD
+					         , A1.ITEM_CD
+					         , A1.YEARMONTH
+					         , LEFT(CONVERT(VARCHAR, DATEADD(mm, -1, A1.YEARMONTH + '01'), 112), 6) AS ONE_MONTH_BEFORE
+					         , LEFT(CONVERT(VARCHAR, DATEADD(mm, -2, A1.YEARMONTH + '01'), 112), 6) AS TWO_MONTH_BEFORE     
+					         , A1.SALES_PRICE
+					         , A1.M1_QTY + A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY AS INV_QTY
+					         , A1.SALES_PRICE * (A1.M1_QTY + A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) AS INV_AMT  
+							#if($_parameter.cumulative == "N")
+					         , A1.M1_QTY AS ONE_MONTH
+					         , A1.M2_QTY + A1.M3_QTY AS THREE_MONTH
+					         , A1.M4_QTY + A1.M5_QTY + A1.M6_QTY AS SIX_MONTH
+					         , A1.M7_QTY + A1.M8_QTY + A1.M9_QTY AS NINE_MONTH
+					         , A1.M10_QTY + A1.M11_QTY + A1.M12_QTY AS TWELVE_MONTH
+					         , A1.Y1_QTY + A1.OVER_Y2_QTY AS ONE_YEAR_OVER
+					         , A1.SALES_PRICE * A1.M1_QTY AS ONE_MONTH_AMT 
+					       	 , A1.SALES_PRICE * (A1.M2_QTY + A1.M3_QTY) AS THREE_MONTH_AMT
+					       	 , A1.SALES_PRICE * (A1.M4_QTY + A1.M5_QTY + A1.M6_QTY) AS SIX_MONTH_AMT
+					       	 , A1.SALES_PRICE * (A1.M7_QTY + A1.M8_QTY + A1.M9_QTY) AS NINE_MONTH_AMT
+					       	 , A1.SALES_PRICE * (A1.M10_QTY + A1.M11_QTY + A1.M12_QTY) AS TWELVE_MONTH_AMT
+					       	 , A1.SALES_PRICE * (A1.Y1_QTY + A1.OVER_Y2_QTY) AS ONE_YEAR_OVER_AMT
+					        #else
+					         , A1.M1_QTY + A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY AS ONE_MONTH
+					         , A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY AS THREE_MONTH  
+					         , A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY AS SIX_MONTH
+					         , A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY AS NINE_MONTH  
+					         , A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY AS TWELVE_MONTH
+					         , A1.Y1_QTY + A1.OVER_Y2_QTY AS ONE_YEAR_OVER
+					         , A1.SALES_PRICE * (A1.M1_QTY + A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) AS ONE_MONTH_AMT
+					         , A1.SALES_PRICE * (A1.M2_QTY + A1.M3_QTY + A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) AS THREE_MONTH_AMT
+					         , A1.SALES_PRICE * (A1.M4_QTY + A1.M5_QTY + A1.M6_QTY 
+					           + A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) AS SIX_MONTH_AMT
+					         , A1.SALES_PRICE * (A1.M7_QTY + A1.M8_QTY + A1.M9_QTY + A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) AS NINE_MONTH_AMT
+					         , A1.SALES_PRICE * (A1.M10_QTY + A1.M11_QTY + A1.M12_QTY + A1.Y1_QTY + A1.OVER_Y2_QTY) AS TWELVE_MONTH_AMT
+					         , A1.SALES_PRICE * (A1.Y1_QTY + A1.OVER_Y2_QTY) AS ONE_YEAR_OVER_AMT
+					        #end   
+						FROM TB_DYN_INVENTORY_AGING A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.YEARMONTH = @{fromMon}
+					) B1
+					LEFT OUTER JOIN TB_DYN_INVENTORY_AGING B2 WITH(NOLOCK)
+					  ON B1.COMPANY_CD = B2.COMPANY_CD
+					 AND B1.BU_CD = B2.BU_CD
+					 AND B1.PLANT_CD = B2.PLANT_CD
+					 AND B1.ITEM_CD = B2.ITEM_CD
+					 AND B1.ONE_MONTH_BEFORE = B2.YEARMONTH
+					LEFT OUTER JOIN TB_DYN_INVENTORY_AGING B3 WITH(NOLOCK)
+					  ON B1.COMPANY_CD = B3.COMPANY_CD
+					 AND B1.BU_CD = B3.BU_CD
+					 AND B1.PLANT_CD = B3.PLANT_CD
+					 AND B1.ITEM_CD = B3.ITEM_CD
+					 AND B1.TWO_MONTH_BEFORE = B3.YEARMONTH
+				) C1
+				INNER JOIN
+				( 
+					<include refid="snop.common.t_itemCust" />
+				) C2
+				ON C1.COMPANY_CD = C2.COMPANY_CD
+				AND C1.BU_CD = C2.BU_CD
+				AND C1.ITEM_CD = C2.ITEM_CD
+				#if($_parameter.itemType and $_parameter.itemType != "")
+				  AND C2.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+				#end
+				LEFT JOIN W_FUTURE_BOM C4 WITH (NOLOCK) 
+				ON C1.COMPANY_CD = C4.COMPANY_CD
+					AND C1.BU_CD = C4.BU_CD
+					AND C1.ITEM_CD = C4.ITEM_CD
+				
+				-- 20210427  김수호 VOC193번 컬럼추가
+				----------------------------------------------------	
+			    
+			    
+			    LEFT OUTER JOIN 
+                (
+                                         
+                               SELECT DI.COMPANY_CD AS COMPANY_CD
+                               , DI.BU_CD           AS BU_CD
+                               , DI.PLANT_CD        AS PLANT_CD
+                               , DI.ITEM_CD         AS ITEM_CD
+                               
+                               , SUM(CASE WHEN DI.SL_CD  IN ('M01','WB01') THEN DI.INV_QTY END)    OVER( PARTITION BY DI.COMPANY_CD, DI.BU_CD, DI.PLANT_CD, DI.ITEM_CD, DI.SL_CD, DI.INV_DATE)  AS M01_WB01_QTY
+                               
+                               , SUM(CASE WHEN DI.SL_CD  IN ('WI01') THEN DI.INV_QTY END)          OVER (PARTITION BY DI.COMPANY_CD, DI.BU_CD, DI.PLANT_CD, DI.ITEM_CD, DI.SL_CD, DI.INV_DATE)  AS WI01_QTY
+                               
+                               FROM(
+                               
+                                               
+                                                SELECT DI.COMPANY_CD
+                                                         , DI.BU_CD
+                                                         , DI.ITEM_CD
+                                                         , DI.INV_DATE
+                                                         , DI.INV_QTY
+	                                                     , DI.PLANT_CD
+	                                                     , DI.SL_CD
+	                                            FROM TB_DYN_INVENTORY DI WITH(NOLOCK)
+	                                            WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+                                                AND DI.BU_CD =  @{GV_BU_CD}
+                                                AND DI.PLANT_CD = 'WF01'
+                                                AND DI.INV_DATE = @V_CUR_DATE
+                                                AND DI.SL_CD IN ('M01','WB01','WI01')    
+                                                
+                               ) DI
+                               WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+                               AND DI.BU_CD = @{GV_BU_CD}
+                               AND DI.PLANT_CD = 'WF01'
+                               AND DI.INV_DATE = @V_CUR_DATE
+                               
+                               
+                               
+                ) DIA
+                
+                ON C1.COMPANY_CD = DIA.COMPANY_CD
+                AND C1.BU_CD     = DIA.BU_CD
+                AND C1.ITEM_CD   = DIA.ITEM_CD
+				
+	           
+	
+				----------------------------------------------------	
+					
+			) A
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>),YEARMONTH,COMPANY_CD,BU_CD,PLANT_CD
+		) B
+		/* 201201 이큰산 추가
+		: 발생사유, 처리일정, 상세정보(영업), REMARKS, 미래수요(AP2) 추가 */
+		LEFT JOIN TB_DYN_INVENTORY_AGING_ADD_INFO C3 WITH (NOLOCK) 
+		ON B.COMPANY_CD = C3.COMPANY_CD
+			AND B.BU_CD = C3.BU_CD
+			AND B.PLANT_CD = C3.PLANT_CD
+			AND B.ITEM_CD = C3.ITEM_CD
+			AND B.YEARMONTH = C3.YEARMONTH
+		
+	    ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    	, B.$dimMap.DIM_CD
+		#end
+		
+		
+		END;
+		
+	</select>
+	
+	<select id="agingInventoryAddInfoHistoryListSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.agingInventoryAddInfoHistoryListSelect ] ******/
+		
+		SELECT ITEM_CD
+		,LEFT(CONVERT(varchar, CONVERT(DATETIME,IAAI.YEARMONTH+'01'),23),7) YEARMONTH  /*YYYY-MM  */
+		,CASE WHEN 'ko' = @{GV_LANG} then CODE_NM_KR
+		 WHEN 'cn' = @{GV_LANG} then CODE_NM_CN
+		 else CODE_NM
+		 END REASON_FOR_OCCURRENCE
+		,IAAI.SCHED_DT    /*YYYY-MM  */
+		,REMARKS_SALES
+		,REMARKS_COMMON
+		FROM TB_DYN_INVENTORY_AGING_ADD_INFO IAAI WITH(NOLOCK)
+		LEFT JOIN TB_MST_CODE MC WITH(NOLOCK)
+		ON IAAI.BU_CD = MC.BU_CD
+		AND IAAI.REASON_FOR_OCCURRENCE = MC.CODE_CD
+		AND MC.GROUP_CD = 'M_LONG_TERM_INV_REASON'
+		WHERE IAAI.COMPANY_CD = @{GV_COMPANY_CD}
+		AND IAAI.BU_CD = @{GV_BU_CD}
+		AND IAAI.ITEM_CD = @{itemCd}
+		
+	</select>
+	
+	<update id="agingInventoryAddInfoHistoryListUpdate" parameterType="map">
+	/****** [ supply.purchase.agingInventoryAddInfoHistoryListUpdate ] ******/
+		
+			UPDATE TB_DYN_INVENTORY_AGING_ADD_INFO
+			SET REASON_FOR_OCCURRENCE =  NULLIF(@{REASON_FOR_OCCURRENCE},'')
+			   , SCHED_DT 			=  @{SCHED_DT}
+			   , REMARKS_SALES 		=  @{REMARKS_SALES}
+			   , REMARKS_COMMON 	=  @{REMARKS_COMMON}
+			   , UPDATE_ID 			=  @{UPDATE_ID}
+			   , UPDATE_DTTM 		=  DBO.UFN_GETDATE()
+			WHERE COMPANY_CD		=	@{GV_COMPANY_CD}
+					AND BU_CD 		=	@{GV_BU_CD}
+					AND PLANT_CD  	=   'WF01'
+					AND ITEM_CD 	=   @{ITEM_CD}
+					AND YEARMONTH   =   @{YEARMONTH}
+	</update>
+	
+	
+	
+	<select id="agingInventoryTopItemListYearSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.agingInventoryTopItemListYearSelect ] ******/
+		SELECT LEFT(CONVERT (NVARCHAR (30), DATEADD (YEAR, -1, CONVERT(DATETIME, YEAR + '0101')), 112), 4) + 'Y' AS LAST_YEAR
+		     , YEAR + 'Y' AS CUR_YEAR
+		FROM TB_MST_CALENDAR
+		WHERE YEARWEEK = 
+		(
+		  SELECT APS_START_WEEK
+		  FROM TB_MST_PLAN_VERSION
+		  WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		    AND BU_CD = @{GV_BU_CD}
+		    AND PLAN_TYPE_CD = 'MP'
+		    AND PLAN_ID = @{planId}
+		)
+		  AND DAY_NM = 'THU'
+	</select>
+	
+	<select id="agingInventoryTopItemListSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.agingInventoryTopItemListSelect ] ******/
+		DECLARE @V_CUR_YEAR         NVARCHAR(4),
+		        @V_LAST_YEAR        NVARCHAR(4),
+		        @V_CUR_DATE         NVARCHAR(8)
+			
+		         
+		SET @V_CUR_DATE = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+		
+		SELECT @V_CUR_YEAR = YEAR
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+		 WHERE YYYYMMDD = @V_CUR_DATE
+		
+		SELECT TOP 1 @V_LAST_YEAR = YEAR
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+		 WHERE YEAR <![CDATA[<]]> @V_CUR_YEAR
+		 ORDER BY YYYYMMDD DESC;
+		
+		WITH BOM AS
+		(
+				SELECT A.COMPANY_CD
+						 , A.BU_CD
+						 , A.PLANT_CD
+						 , A.PARENT_BOM_NO
+						 , A.CHILD_ITEM_CD AS ITEM_CD
+						 , A.PARENT_ITEM_CD
+						 , A.CHILD_ITEM_CD
+						 , A.CHILD_ITEM_QTY
+						 , 1 AS SORT
+					FROM TB_MST_BOM A
+				 UNION ALL
+				SELECT A.COMPANY_CD
+						 , A.BU_CD
+						 , A.PLANT_CD
+						 , A.PARENT_BOM_NO
+						 , B.ITEM_CD
+						 , A.PARENT_ITEM_CD
+						 , A.CHILD_ITEM_CD
+						 , CAST(A.CHILD_ITEM_QTY * B.CHILD_ITEM_QTY AS NUMERIC(21, 6)) AS CHILD_ITEM_QTY
+						 , B.SORT + 1 AS SORT
+					FROM TB_MST_BOM A
+				 INNER JOIN BOM B
+					  ON B.COMPANY_CD = A.COMPANY_CD
+					 AND B.BU_CD = A.BU_CD
+					 AND B.PLANT_CD = A.PLANT_CD
+					 AND B.PARENT_BOM_NO = A.PARENT_BOM_NO
+					 AND B.PARENT_ITEM_CD = A.CHILD_ITEM_CD
+		)    
+		
+		
+		SELECT MI.ITEM_CD
+				 , MI.SPEC
+				 , MC2.REP_CUST_GROUP_NM
+				 , A.PARENT_ITEM_CD
+				 , MI2.SPEC AS PARENT_SPEC
+				 , A.CHILD_ITEM_QTY
+				 , SUM(CASE WHEN MC.YEAR = @V_LAST_YEAR THEN PR.QTY ELSE 0 END) AS PARENT_LAST_YEAR_QTY
+				 , SUM(CASE WHEN MC.YEAR = @V_CUR_YEAR THEN PR.QTY ELSE 0 END) AS PARENT_CUR_YEAR_QTY
+				 , SUM(CASE WHEN MC.YEAR = @V_LAST_YEAR THEN PR.QTY ELSE 0 END) * A.CHILD_ITEM_QTY AS CHILD_LAST_YEAR_QTY
+				 , SUM(CASE WHEN MC.YEAR = @V_CUR_YEAR THEN PR.QTY ELSE 0 END) * A.CHILD_ITEM_QTY AS CHILD_CUR_YEAR_QTY
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+		 INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				ON MIP.COMPANY_CD = MI.COMPANY_CD
+			 AND MIP.BU_CD = MI.BU_CD
+			 AND MIP.PLANT_CD = 'WF01'
+			 AND MIP.ITEM_CD = MI.ITEM_CD
+		 INNER JOIN (
+		            SELECT A.COMPANY_CD
+		                 , A.BU_CD
+		                 , A.PLANT_CD
+		                 , A.PARENT_BOM_NO
+		                 , A.ITEM_CD
+		                 , A.PARENT_ITEM_CD
+		                 , SUM(A.CHILD_ITEM_QTY) AS CHILD_ITEM_QTY
+									FROM BOM A
+								 GROUP BY A.COMPANY_CD
+										 , A.BU_CD
+										 , A.PLANT_CD
+										 , A.PARENT_BOM_NO
+										 , A.ITEM_CD
+										 , A.PARENT_ITEM_CD
+		          ) A
+		  ON A.COMPANY_CD = MI.COMPANY_CD
+		  AND A.BU_CD = MI.BU_CD
+		  AND A.PLANT_CD = 'WF01'
+		  AND A.ITEM_CD = MI.ITEM_CD
+		INNER JOIN UV_PROD_RESULT PR WITH(NOLOCK)
+		  ON PR.COMPANY_CD = A.COMPANY_CD
+		  AND PR.BU_CD = A.BU_CD
+		  AND PR.PLANT_CD = A.PLANT_CD
+		  AND PR.ITEM_CD = A.PARENT_ITEM_CD
+		INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+		  ON MC.YYYYMMDD = PR.PROD_DATE
+		INNER JOIN TB_MST_ITEM MI2 WITH(NOLOCK)
+		  ON A.COMPANY_CD = MI2.COMPANY_CD
+			AND A.BU_CD = MI2.BU_CD
+			AND A.PARENT_ITEM_CD = MI2.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC2 WITH(NOLOCK)
+			ON MC2.COMPANY_CD = MI2.COMPANY_CD
+		 AND MC2.BU_CD = MI2.BU_CD
+		 AND MC2.CUST_CD = MI2.REP_CUST_CD
+		WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND MI.BU_CD = @{GV_BU_CD}
+		  AND (MI.ITEM_TYPE = '30' OR (MI.ITEM_TYPE = '20' AND MIP.PROCUR_TYPE = 'OH'))
+			AND MI.ITEM_CD = @{itemCd}
+		GROUP BY MI.ITEM_CD
+				, MI.SPEC
+				, MC2.REP_CUST_GROUP_NM
+		    , A.PARENT_ITEM_CD
+				, MI2.SPEC
+		    , A.CHILD_ITEM_QTY
+		ORDER BY PARENT_ITEM_CD
+
+	</select>
+	
+	
+	
+</mapper>

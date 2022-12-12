@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.snop">
+
+	<select id="chart1Select"  parameterType="map" resultType="map">
+	<![CDATA[
+	/****** [ dashboard.snop.chart1Select ]  [ Claim ] ******/
+	SELECT A.CLAIM_RATE
+	     , A.CLAIM_QTY_M
+	     , A.CLAIM_QTY_Y
+	     , CASE WHEN A.CLAIM_RATE <= B.ATTB_1_CD THEN 'green_f'
+	            ELSE 'red_f'
+	       END AS CHART_C
+	FROM TB_KPI_DASHBOARD_CLAIM A WITH(NOLOCK)
+	LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	   ON B.GROUP_CD = 'DASHBOARD_ID'
+	  AND B.CODE_CD  = 'DB_KPI18'
+	  AND B.USE_FLAG = 'Y'
+	  AND B.BU_CD    = A.BU_CD
+	WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	  AND A.BU_CD      = @{GV_BU_CD}
+	]]>
+	</select>
+
+	<select id="defectivesChartSelect"  parameterType="map" resultType="map">
+		/****** [ dashboard.snop.defectivesChartSelect ]  [ 불량률 ] ******/
+		SELECT B.PROD_PART
+		     , ISNULL(B. DEFECT_QTY / NULLIF(B.LOT_SIZE, 0) * 100, 0)  AS DEF_RATE
+		FROM TB_KPI_DASHBOARD_DEF_RATE B WITH(NOLOCK)
+		WHERE B.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND B.BU_CD      = @{GV_BU_CD}
+	</select>
+
+	<select id="chart3Select"  parameterType="map" resultType="map">
+	<![CDATA[
+	/****** [ dashboard.snop.chart3Select ]  [  ] ******/
+	SELECT MEAS_CD
+	     , MEAS_NM
+	     , ISNULL(CHART_1, 0) AS CHART_1
+	     , ISNULL(CHART_2, 0) AS CHART_2
+	     , CHART_C
+	     , CASE WHEN ISNULL(CHART_2,0) <= 0 THEN ''
+	            ELSE '+'
+	       END AS CHART_P
+	     , CHART_C_SUB
+	FROM 
+	(
+	    -- 자재 준비율 ----------------------------------
+	    SELECT 'CHART1' AS MEAS_CD
+	         , '자재 준비율' AS MEAS_NM
+	         , A.LAST_WEEK_PREP_RATE                             AS CHART_1
+	         , ISNULL(A.LAST_WEEK_PREP_RATE,0) - ISNULL(A.BEF_LAST_WEEK_PREP_RATE,0) AS CHART_2
+	         , CASE WHEN A.LAST_WEEK_PREP_RATE >= B.ATTB_1_CD THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(ISNULL(A.LAST_WEEK_PREP_RATE,0) - ISNULL(A.BEF_LAST_WEEK_PREP_RATE,0),0) > 0 THEN 'green_f'
+	                WHEN ROUND(ISNULL(A.LAST_WEEK_PREP_RATE,0) - ISNULL(A.BEF_LAST_WEEK_PREP_RATE,0),0) < 0 THEN 'red_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_MAT_PREP_RATE A WITH(NOLOCK)
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI09'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      
+	    -- 제품 재고 ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART2' AS MEAS_CD
+	         , '제품 재고' AS MEAS_NM
+	         , SUM(A.BOH_AMT_D)               AS CHART_1
+	         , SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) AS CHART_2
+	         , CASE WHEN SUM(A.BOH_AMT_D) <= MAX(B.ATTB_1_CD) THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) / 100000000,0) > 0 THEN 'red_f'
+	                WHEN ROUND(SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) / 100000000,0) < 0 THEN 'green_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_INV A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI21'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.ITEM_TYPE IN ('10', '50')
+	      AND A.MEAS_CD = 'PRICE'
+	      
+	    -- 자재 재고 ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART3' AS MEAS_CD
+	         , '자재 재고' AS MEAS_NM
+	         , SUM(A.BOH_AMT_D)               AS CHART_1
+	         , SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) AS CHART_2
+	         , CASE WHEN SUM(A.BOH_AMT_D) <= MAX(B.ATTB_1_CD) THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) / 100000000,0) > 0 THEN 'red_f'
+	                WHEN ROUND(SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) / 100000000,0) < 0 THEN 'green_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_INV A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI22'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.ITEM_TYPE IN ('20', '30')
+	      AND A.MEAS_CD = 'PRICE'
+	      
+	    -- Aging(제품, 180일이상) ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART4' AS MEAS_CD
+	         , 'Aging(제품, 180일이상)' AS MEAS_NM
+	         , SUM(A.CUR_OVER_M6_AMT)                      AS CHART_1
+	         , SUM(ISNULL(A.CUR_OVER_M6_AMT,0) - ISNULL(A.LAST_OVER_M6_AMT,0)) AS CHART_2
+	         , CASE WHEN SUM(A.CUR_OVER_M6_AMT) <= MAX(B.ATTB_1_CD) THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(SUM(ISNULL(A.CUR_OVER_M6_AMT,0) - ISNULL(A.LAST_OVER_M6_AMT,0)) / 100000000,0) > 0 THEN 'red_f'
+	                WHEN ROUND(SUM(ISNULL(A.CUR_OVER_M6_AMT,0) - ISNULL(A.LAST_OVER_M6_AMT,0)) / 100000000,0) < 0 THEN 'green_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_INV_AGE A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI23'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.ITEM_TYPE IN ('10', '50')
+	      
+	    -- Aging(자재, 180일이상) ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART5' AS MEAS_CD
+	         , 'Aging(자재, 180일이상)' AS MEAS_NM
+	         , SUM(A.CUR_OVER_M6_AMT)                      AS CHART_1
+	         , SUM(ISNULL(A.CUR_OVER_M6_AMT,0) - ISNULL(A.LAST_OVER_M6_AMT,0)) AS CHART_2
+	         , CASE WHEN SUM(A.CUR_OVER_M6_AMT) <= MAX(B.ATTB_1_CD) THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(SUM(ISNULL(A.CUR_OVER_M6_AMT,0) - ISNULL(A.LAST_OVER_M6_AMT,0)) / 100000000,0) > 0 THEN 'red_f'
+	                WHEN ROUND(SUM(ISNULL(A.CUR_OVER_M6_AMT,0) - ISNULL(A.LAST_OVER_M6_AMT,0)) / 100000000,0) < 0 THEN 'green_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_INV_AGE A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI24'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.ITEM_TYPE IN ('20', '30')
+	      
+	    -- 판매 준수율(W) ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART6' AS MEAS_CD
+	         , '판매 준수율(W)' AS MEAS_NM
+	         , A.LAST_COMP_RATE                        AS CHART_1
+	         , ISNULL(A.LAST_COMP_RATE,0) - ISNULL(A.BEF_LAST_COMP_RATE,0) AS CHART_2
+	         , CASE WHEN A.LAST_COMP_RATE >= B.ATTB_1_CD THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(ISNULL(A.LAST_COMP_RATE,0) - ISNULL(A.BEF_LAST_COMP_RATE,0),0) > 0 THEN 'green_f'
+	                WHEN ROUND(ISNULL(A.LAST_COMP_RATE,0) - ISNULL(A.BEF_LAST_COMP_RATE,0),0) < 0 THEN 'red_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_SALES_COMP A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI26'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      
+	    -- 판매 적중률(M) ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART7' AS MEAS_CD
+	         , '판매 적중률(M)' AS MEAS_NM
+	         , A.LAST_HIT_RATE                       AS CHART_1
+	         , ISNULL(A.LAST_HIT_RATE,0) - ISNULL(A.BEF_LAST_HIT_RATE,0) AS CHART_2
+	         , CASE WHEN A.LAST_HIT_RATE >= B.ATTB_1_CD THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(ISNULL(A.LAST_HIT_RATE,0) - ISNULL(A.BEF_LAST_HIT_RATE,0),0) > 0 THEN 'green_f'
+	                WHEN ROUND(ISNULL(A.LAST_HIT_RATE,0) - ISNULL(A.BEF_LAST_HIT_RATE,0),0) < 0 THEN 'red_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_SALES_HIT A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI27'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      
+	    -- 달성률(M+3) ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART8' AS MEAS_CD
+	         , '달성률(M+3)' AS MEAS_NM
+	         , A.LAST_ACHIE_RATE                         AS CHART_1
+	         , ISNULL(A.LAST_ACHIE_RATE,0) - ISNULL(A.BEF_LAST_ACHIE_RATE,0) AS CHART_2
+	         , CASE WHEN A.LAST_ACHIE_RATE >= B.ATTB_1_CD THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(ISNULL(A.LAST_ACHIE_RATE,0) - ISNULL(A.BEF_LAST_ACHIE_RATE,0),0) > 0 THEN 'green_f'
+	                WHEN ROUND(ISNULL(A.LAST_ACHIE_RATE,0) - ISNULL(A.BEF_LAST_ACHIE_RATE,0),0) < 0 THEN 'red_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_SALES_ACHIE A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI28'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      
+	    -- 생산 준수율(W) ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART9' AS MEAS_CD
+	         , '생산 준수율(W)' AS MEAS_NM
+	         , A.LAST_COMP_RATE                        AS CHART_1
+	         , ISNULL(A.LAST_COMP_RATE,0) - ISNULL(A.BEF_LAST_COMP_RATE,0) AS CHART_2
+	         , CASE WHEN A.LAST_COMP_RATE >= B.ATTB_1_CD THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(ISNULL(A.LAST_COMP_RATE,0) - ISNULL(A.BEF_LAST_COMP_RATE,0),0) > 0 THEN 'green_f'
+	                WHEN ROUND(ISNULL(A.LAST_COMP_RATE,0) - ISNULL(A.BEF_LAST_COMP_RATE,0),0) < 0 THEN 'red_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_PROD_COMP A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI30'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      
+	    -- 재공 금액 ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART10' AS MEAS_CD
+	         , '재공 금액' AS MEAS_NM
+	         , SUM(A.BOH_AMT_D)               AS CHART_1
+	         , SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) AS CHART_2
+	         , CASE WHEN SUM(A.BOH_AMT_D) <= MAX(B.ATTB_1_CD) THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND(SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) / 100000000,0) > 0 THEN 'red_f'
+	                WHEN ROUND(SUM(ISNULL(A.BOH_AMT_D,0) - ISNULL(A.BOH_AMT_W,0)) / 100000000,0) < 0 THEN 'green_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_WIP A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI31'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+	      
+	    -- Aging(재공, 60일이상) ----------------------------------
+	    UNION ALL
+	    SELECT 'CHART11' AS MEAS_CD
+	         , 'Aging(재공, 60일이상)' AS MEAS_NM
+	         , A.CUR_OVER_D60_AMT                       AS CHART_1
+	         , ISNULL(A.CUR_OVER_D60_AMT,0) - ISNULL(A.LAST_OVER_D60_AMT,0) AS CHART_2
+	         , CASE WHEN A.CUR_OVER_D60_AMT <= B.ATTB_1_CD THEN 'green_f'
+	                ELSE 'red_f'
+	           END AS CHART_C
+	         , CASE WHEN ROUND((ISNULL(A.CUR_OVER_D60_AMT,0) - ISNULL(A.LAST_OVER_D60_AMT,0)) / 100000000,0) > 0 THEN 'red_f'
+	                WHEN ROUND((ISNULL(A.CUR_OVER_D60_AMT,0) - ISNULL(A.LAST_OVER_D60_AMT,0)) / 100000000,0) < 0 THEN 'green_f'
+	                ELSE 'gray_f'
+	           END AS CHART_C_SUB
+	    FROM TB_KPI_DASHBOARD_WIP_AGE A WITH(NOLOCK) 
+	    LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+	       ON B.GROUP_CD = 'DASHBOARD_ID'
+	      AND B.CODE_CD  = 'DB_KPI32'
+	      AND B.USE_FLAG = 'Y'
+	      AND B.BU_CD    = A.BU_CD
+	    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+	      AND A.BU_CD      = @{GV_BU_CD}
+
+		-- 공급능력지수 ----------------------------------
+		UNION ALL
+		SELECT 'CHART12' AS MEAS_CD
+		     , '공급능력지수' AS MEAS_NM
+		     , A.LAST_SUPPLY_CAPA_RATE AS CHART_1
+		     , ISNULL(A.LAST_SUPPLY_CAPA_RATE,0) - ISNULL(A.BEF_LAST_SUPPLY_CAPA_RATE,0) AS CHART_2
+		     , CASE WHEN A.LAST_SUPPLY_CAPA_RATE >= B.ATTB_1_CD THEN 'green_f'
+		            ELSE 'red_f'
+		       END AS CHART_C
+		     , CASE WHEN ROUND(ISNULL(A.LAST_SUPPLY_CAPA_RATE,0) - ISNULL(A.BEF_LAST_SUPPLY_CAPA_RATE,0),0) > 0 THEN 'green_f'
+		            WHEN ROUND(ISNULL(A.LAST_SUPPLY_CAPA_RATE,0) - ISNULL(A.BEF_LAST_SUPPLY_CAPA_RATE,0),0) < 0 THEN 'red_f'
+		            ELSE 'gray_f'
+		       END AS CHART_C_SUB
+		  FROM TB_KPI_DASHBOARD_SUPPLY_CAPA A WITH(NOLOCK) 
+		  LEFT JOIN TB_MST_CODE B WITH(NOLOCK)
+		    ON B.GROUP_CD = 'DASHBOARD_ID'
+		   AND B.CODE_CD  = 'DB_KPI33'
+		   AND B.USE_FLAG = 'Y'
+		   AND B.BU_CD    = A.BU_CD
+		 WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		   AND A.BU_CD      = @{GV_BU_CD}
+	) A
+	]]>
+	</select>
+	
+	<select id="chart4Select"  parameterType="map" resultType="map">
+	/****** [ dashboard.snop.chart4Select ]  [ 판매금액 ] ******/
+	WITH W_TMP AS (
+	    SELECT MIN(YEARPWEEK) AS YEARWEEK_S
+	         , MAX(YEARPWEEK) AS YEARWEEK_E
+		FROM TB_KPI_DASHBOARD_SALES_WEEKLY WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+	)
+	, W_WEEK AS (
+	    SELECT A.YEARPWEEK AS YEARWEEK
+	    FROM TB_MST_CALENDAR A WITH(NOLOCK)
+	    INNER JOIN W_TMP B
+	       ON A.YEARPWEEK BETWEEN B.YEARWEEK_S AND B.YEARWEEK_E
+	    GROUP BY A.YEARPWEEK
+	)
+	, W_MEAS AS (
+	    SELECT 'SALES_RESULT' AS MEAS_CD, dbo.UFN_GET_TRANSLATE('lbl', 'weekPerforChart', @{GV_LANG}) AS MEAS_NM, 0 MEAS_IDX
+	    UNION ALL SELECT 'SALES_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'weekPlanChart', @{GV_LANG}), 1
+	    UNION ALL SELECT 'ACTION_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'monthPlanChart', @{GV_LANG}), 2
+	)
+	SELECT B.YEARWEEK
+	     , A.MEAS_CD
+	     , A.MEAS_NM
+	     , A.MEAS_IDX
+	     , C.AMT
+	FROM W_MEAS A
+	CROSS JOIN W_WEEK B
+	LEFT JOIN TB_KPI_DASHBOARD_SALES_WEEKLY C WITH(NOLOCK)
+	   ON C.COMPANY_CD = @{GV_COMPANY_CD}
+	  AND C.BU_CD      = @{GV_BU_CD}
+	  AND C.MEAS_CD    = A.MEAS_CD
+	  AND C.YEARPWEEK  = B.YEARWEEK
+	ORDER BY B.YEARWEEK DESC
+	       , A.MEAS_IDX
+	</select>
+	
+	<select id="chart4TotalSelect"  parameterType="map" resultType="map">
+	/****** [ dashboard.snop.chart4TotalSelect ]  [ 판매금액토탈 ] ******/
+	WITH W_TMP AS (
+	    SELECT MIN(YEARPWEEK) AS YEARWEEK_S
+	         , MAX(YEARPWEEK) AS YEARWEEK_E
+		FROM TB_KPI_DASHBOARD_SALES_WEEKLY WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+	)
+	, W_WEEK AS (
+	    SELECT A.YEARPWEEK AS YEARWEEK
+	    FROM TB_MST_CALENDAR A WITH(NOLOCK)
+	    INNER JOIN W_TMP B
+	       ON A.YEARPWEEK BETWEEN B.YEARWEEK_S AND B.YEARWEEK_E
+	    GROUP BY A.YEARPWEEK
+	)
+	, W_MEAS AS (
+	    SELECT 'SALES_RESULT' AS MEAS_CD, dbo.UFN_GET_TRANSLATE('lbl', 'weekPerforChart', @{GV_LANG}) AS MEAS_NM, 0 MEAS_IDX
+	    UNION ALL SELECT 'SALES_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'weekPlanChart', @{GV_LANG}), 1
+	    UNION ALL SELECT 'ACTION_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'monthPlanChart', @{GV_LANG}), 2
+	)
+	SELECT A.MEAS_CD
+	     , A.MEAS_NM
+	     , A.MEAS_IDX
+	     , SUM(C.AMT) AS TOTAL_AMT
+	FROM W_MEAS A
+	CROSS JOIN W_WEEK B
+	LEFT JOIN TB_KPI_DASHBOARD_SALES_WEEKLY C WITH(NOLOCK)
+	   ON C.COMPANY_CD = @{GV_COMPANY_CD}
+	  AND C.BU_CD      = @{GV_BU_CD}
+	  AND C.MEAS_CD    = A.MEAS_CD
+	  AND C.YEARPWEEK  = B.YEARWEEK
+	GROUP BY A.MEAS_CD, A.MEAS_NM, A.MEAS_IDX
+	ORDER BY A.MEAS_IDX
+	</select>
+
+	<select id="chart5Select"  parameterType="map" resultType="map">
+	/****** [ dashboard.snop.chart5Select ]  [ 생산금액 ] ******/
+	WITH W_TMP AS (
+	    SELECT MIN(YEARPWEEK) AS YEARWEEK_S
+	         , MAX(YEARPWEEK) AS YEARWEEK_E
+		FROM TB_KPI_DASHBOARD_PROD_WEEKLY WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+	)
+	, W_WEEK AS (
+	    SELECT A.YEARPWEEK AS YEARWEEK
+	    FROM TB_MST_CALENDAR A WITH(NOLOCK)
+	    INNER JOIN W_TMP B
+	       ON A.YEARPWEEK BETWEEN B.YEARWEEK_S AND B.YEARWEEK_E
+	    GROUP BY A.YEARPWEEK
+	)
+	, W_MEAS AS (
+	    SELECT 'PROD_RESULT' AS MEAS_CD, dbo.UFN_GET_TRANSLATE('lbl', 'weekPerforChart', @{GV_LANG}) AS MEAS_NM, 0 MEAS_IDX
+	    UNION ALL SELECT 'WEEKLY_PROD_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'weekPlanChart', @{GV_LANG}), 1
+	    UNION ALL SELECT 'MONTHLY_PROD_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'monthPlanChart', @{GV_LANG}), 2
+	)
+	SELECT B.YEARWEEK
+	     , A.MEAS_CD
+	     , A.MEAS_NM
+	     , A.MEAS_IDX
+	     , C.AMT
+	FROM W_MEAS A
+	CROSS JOIN W_WEEK B
+	LEFT JOIN TB_KPI_DASHBOARD_PROD_WEEKLY C WITH(NOLOCK)
+	   ON C.COMPANY_CD = @{GV_COMPANY_CD}
+	  AND C.BU_CD      = @{GV_BU_CD}
+	  AND C.MEAS_CD    = A.MEAS_CD
+	  AND C.YEARPWEEK  = B.YEARWEEK
+	ORDER BY B.YEARWEEK DESC
+	       , A.MEAS_IDX
+	</select>
+	
+	<select id="chart5TotalSelect"  parameterType="map" resultType="map">
+	/****** [ dashboard.snop.chart5TotalSelect ]  [ 생산금액 ] ******/
+	WITH W_TMP AS (
+	    SELECT MIN(YEARPWEEK) AS YEARWEEK_S
+	         , MAX(YEARPWEEK) AS YEARWEEK_E
+		FROM TB_KPI_DASHBOARD_PROD_WEEKLY WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+	)
+	, W_WEEK AS (
+	    SELECT A.YEARPWEEK AS YEARWEEK
+	    FROM TB_MST_CALENDAR A WITH(NOLOCK)
+	    INNER JOIN W_TMP B
+	       ON A.YEARPWEEK BETWEEN B.YEARWEEK_S AND B.YEARWEEK_E
+	    GROUP BY A.YEARPWEEK
+	)
+	, W_MEAS AS (
+	    SELECT 'PROD_RESULT' AS MEAS_CD, dbo.UFN_GET_TRANSLATE('lbl', 'weekPerforChart', @{GV_LANG}) AS MEAS_NM, 0 MEAS_IDX
+	    UNION ALL SELECT 'WEEKLY_PROD_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'weekPlanChart', @{GV_LANG}), 1
+	    UNION ALL SELECT 'MONTHLY_PROD_PLAN', dbo.UFN_GET_TRANSLATE('lbl', 'monthPlanChart', @{GV_LANG}), 2
+	)
+	SELECT A.MEAS_CD
+	     , A.MEAS_NM
+	     , A.MEAS_IDX
+	     , SUM(C.AMT) AS TOTAL_AMT
+	FROM W_MEAS A
+	CROSS JOIN W_WEEK B
+	LEFT JOIN TB_KPI_DASHBOARD_PROD_WEEKLY C WITH(NOLOCK)
+	   ON C.COMPANY_CD = @{GV_COMPANY_CD}
+	  AND C.BU_CD      = @{GV_BU_CD}
+	  AND C.MEAS_CD    = A.MEAS_CD
+	  AND C.YEARPWEEK  = B.YEARWEEK
+	GROUP BY A.MEAS_CD, A.MEAS_NM, A.MEAS_IDX
+	ORDER BY A.MEAS_IDX
+	</select>
+
+</mapper>

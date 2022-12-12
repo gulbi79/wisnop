@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.planResult">
+	<select id="planIdPeggingSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.planIdPeggingSelect ] ******/
+		SELECT B1.*
+		     , B1.PLAN_ID AS CODE_CD
+		     , B1.PLAN_ID AS CODE_NM
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_START_WEEK AND DAY_NM = 'SUN') AS START_DAY         
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_END_WEEK AND DAY_NM = 'SAT') AS END_DAY
+		     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.APS_CLOSE_WEEK AND DAY_NM = 'SAT') AS CLOSE_DAY
+		FROM
+		(
+		  	SELECT PLAN_ID
+		         , APS_START_WEEK
+		         , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 14, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.APS_START_WEEK AND DAY_NM = 'SUN')) AS APS_END_WEEK
+		         , APS_END_WEEK AS APS_CLOSE_WEEK       
+		  	FROM TB_MST_PLAN_VERSION A1 WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND PLAN_TYPE_CD = 'MP'
+		) B1
+		ORDER BY B1.APS_START_WEEK DESC
+	</select>			
+	
+	<select id="planVersionPeggingSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.planVersionPeggingSelect ] ******/
+		SELECT VERSION_ID AS CODE_CD
+		     , VERSION_ID AS CODE_NM
+		     , CUT_OFF_FLAG
+		     , VERSION_TYPE_CD
+		FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND PLAN_ID = @{planId}
+		  AND PROD_PART = @{prodPart}
+		ORDER BY SEQ DESC
+	</select>
+	
+	<select id="routingIdPeggingSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.routingIdPeggingSelect ] ******/
+		SELECT A2.ROUTING_ID AS CODE_CD
+		     , A2.ROUTING_ID AS CODE_NM
+		FROM TB_HIS_APS_PLAN_PEGGING A1 WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM_PLANT A2 WITH(NOLOCK)
+		   ON A1.COMPANY_CD = A2.COMPANY_CD
+		  AND A1.BU_CD = A2.BU_CD
+		  AND A1.ITEM_CD = A2.ITEM_CD
+		  AND A2.PLANT_CD = 'WF01'
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A1.BU_CD = @{GV_BU_CD}
+		  AND A1.PLAN_ID = @{planId}
+		  AND A1.PROD_PART = @{prodPart}
+		  AND A1.VERSION_ID = @{planVersion}
+		GROUP BY A2.ROUTING_ID
+	</select>
+
+	<select id="planPeggingListSelect" parameterType="map" resultType="map">
+		/****** [ aps.planResult.planPeggingListSelect ] ******/
+		SELECT CASE WHEN 'ko' = @{GV_LANG} THEN MC6.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC6.CODE_NM_CN
+		            ELSE MC6.CODE_NM
+		       END AS PROD_PART_NM
+		     , HAPP.VERSION_ID AS VERSION_ID_NM
+		     , HAPP.DEMAND_ID AS DEMAND_ID2_NM
+			#if($_parameter.planTypeCd == "MP")
+			 , HAD.SP_WEEK AS SP_WEEK_NM
+             , HAD.SP_QTY AS PROD_SP_QTY_NM
+			#elseif($_parameter.planTypeCd == "FP")
+			 , HAD.PLAN_WEEK AS SP_WEEK_NM
+			 , HAD.PLAN_QTY AS PROD_SP_QTY_NM
+			#end 
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+		            ELSE MC2.CODE_NM
+		       END APS_DEMAND_TYPE_NM
+		     , HAPP.PRIORITY AS AP_PRIORITY_NM
+		     , HAPP.ITEM_CD AS ITEM_CD_NM
+		     , MI.ITEM_NM AS ITEM_NM_NM
+		     , MI.ITEM_GROUP_CD AS ITEM_GROUP_CD_NM
+		     
+		     ---- 201229 이큰산 변경
+			 --, (CASE WHEN ISNULL(HAPP.PROD_ORDER_NO, '') = '' THEN MIP.ROUTING_ID ELSE MRO.ROUTING_ID END) AS ROUTING_ID_NM
+		     , (CASE WHEN ISNULL(HAPP.PROD_ORDER_NO, '') = '' THEN MRO.ROUTING_ID ELSE MRO.ROUTING_ID END) AS ROUTING_ID_NM
+		     ----------------------
+		     
+		     , HAPP.ORDER_ID AS ORDER_ID_NM
+		     
+		     ---- 201229 이큰산 변경
+			 , (CASE WHEN ISNULL(HAPP.PROD_ORDER_NO , '') = '' THEN HAPP.ROUTING_NO ELSE MRO.ROUTING_NO END) AS ROUTING_NO_NM
+		     ----------------------
+		     
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+		            ELSE MC3.CODE_NM
+		       END PROCUR_TYPE_NM
+		     , HAPP.PROD_ORDER_NO AS PROD_ORDER_NO_PE_NM
+		     , HAPP.PARENT_PROD_ORDER_NO AS PARENT_PROD_ORDER_NO_PE_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC7.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC7.CODE_NM_CN
+		            ELSE MC7.CODE_NM
+		       END JOB_TYPE_NM
+		     , HAPP.OPERATION_NO AS OPERATION_NO_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+		            ELSE MC1.CODE_NM
+		       END JOB_NM_NM
+		     , HAPP.MAT_ITEM_CD AS MAT_ITEM_CD_NM
+		     , ROUND(HAPP.JC_TIME / 3600.0, 2) AS JC_TIME_NM
+		     , HAPP.PRE_COMPLETION_DTTM AS PRE_COMPLETION_DTTM_NM 
+		     , CASE WHEN HAPP.STATUS = 'SKIP' THEN NULL ELSE HAPP.START_DTTM END START_DTTM_NM
+		     , CASE WHEN HAPP.STATUS = 'SKIP' THEN NULL ELSE HAPP.END_DTTM END END_DTTM_NM		     
+			 , HAPP.COMPLETION_DTTM AS COMPLETION_DTTM_NM
+			 , ROUND(DATEDIFF(MI, HAPP.PRE_COMPLETION_DTTM, HAPP.START_DTTM) / 60.0 / 24.0, 1) AS WAIT_DAYS_NM
+		     , HAPP.STATUS AS STATUS_NM
+		     , HAPP.QTY AS PROD_QTY_NM
+		     , MWC.WC_NM AS WC_NM_PE_NM
+		     , ISNULL(MR.RESOURCE_NM, HAPP.RESOURCE_CD) AS RESOURCE_NM_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC8.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC8.CODE_NM_CN
+		            ELSE MC8.CODE_NM
+		       END WORKER_GROUP_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+		            ELSE MC4.CODE_NM
+		       END CAMPUS_CD_NM
+		     , CASE WHEN HAPP.CAMPUS_DISTRIBUTION = 'Y' THEN HAPP.START_DTTM END AS CAMPUS_DISTRIBUTION_NM
+		     , MWC.WC_MGR_NM AS WC_MGR_NM
+		     , MIP.FIXED_MRP_QTY AS FIXED_MRP_QTY_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+		            WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+		            ELSE MC5.CODE_NM
+		       END PROD_GROUP_DET_NM
+		     , ROUND(ISNULL(MRO.WAIT_TIME, ISNULL(MFR.WAIT_TIME, 0)) / 3600.0, 2) AS WAIT_TIME_NM
+		     , ROUND((ISNULL(MRO.FIRST_TIME, ISNULL(MFR.FIRST_TIME, 0)) + ISNULL(MRO.RUN_TIME, ISNULL(MFR.RUN_TIME, 0)) + ISNULL(MRO.AFTER_TIME, ISNULL(MFR.AFTER_TIME, 0))) / 3600.0, 2)  AS WORK_TIME_NM
+		     , ROUND(ISNULL(MRO.MOVE_TIME, ISNULL(MFR.MOVE_TIME, 0)) / 3600.0, 2) AS MOVE_TIME_NM  
+		     , CASE WHEN HAPP.PROD_ORDER_NO IS NULL THEN MRO.MAIN_WORKER 
+		     		ELSE DPOD.MAIN_WORKER 
+		       END AS MAIN_WORKER_NM
+		     , CASE WHEN HAPP.PROD_ORDER_NO IS NULL THEN MRO.LOT_SIZE 
+		     		ELSE DPOD.LOT_SIZE 
+    		   END AS LOT_SIZE_NM
+		     , MI.KEY_MAT_YN AS KEY_MAT_YN_NM
+		     , MI.KEY_MAT_LT AS KEY_MAT_LT_NM
+		     , MR.OVEN_AREA AS OVEN_AREA_NM
+		     , MR.RESOURCE_EFF_RATE AS RESOURCE_EFF_RATE_NM
+		     , HAPP.SEMI_ITEM_CD
+		     , HAPP.SEMI_ITEM_CD AS SEMI_ITEM_CD_NM
+		     , MI.SPEC AS SPEC_NM
+		     , MRO.OUT_LOT_SIZE
+		     , MRO.OUT_LOT_SIZE AS OUT_LOT_SIZE_NM
+		     , HAPP.RESOURCE_PRIORITY
+		     , HAPP.RESOURCE_PRIORITY AS RESOURCE_PRIORITY_NM
+		     , HAPP.LOT_PROD_ORDER_NO AS LOT_PROD_ORDER_NO_NM
+		     , CASE WHEN MC9.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN_NM
+			 , HAD.ADJ_PRIORITY AS ADJ_PRIORITY2_NM
+			#if($_parameter.planTypeCd == "MP") 
+			 , HADWA.WIP_PRIORITY AS WIP_PRIORITY_NM 
+			#else
+			 , NULL AS WIP_PRIORITY_NM
+			#end
+		     , ROUND(ISNULL(MRO.OFFSET_TIME, 0) / 3600.0, 2) AS OFFSET_TIME
+		     , ROUND(ISNULL(MRO.OFFSET_TIME, 0) / 3600.0, 2) AS OFFSET_TIME_NM
+		     , CASE WHEN HAPP.PROD_ORDER_NO IS NULL THEN MRO.TOTAL_WORKER 
+		     		ELSE DPOD.TOTAL_WORKER 
+		       END AS TOTAL_WORKER
+		     , CASE WHEN HAPP.PROD_ORDER_NO IS NULL THEN MRO.TOTAL_WORKER 
+		     		ELSE DPOD.TOTAL_WORKER 
+		       END AS TOTAL_WORKER_NM
+		FROM TB_HIS_APS_PLAN_PEGGING HAPP WITH(NOLOCK)
+  		LEFT OUTER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+	      ON MI.COMPANY_CD = HAPP.COMPANY_CD
+	     AND MI.BU_CD = HAPP.BU_CD
+	     AND MI.ITEM_CD = HAPP.ITEM_CD
+	  	LEFT OUTER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+	      ON MIP.COMPANY_CD = MI.COMPANY_CD
+	     AND MIP.BU_CD = MI.BU_CD
+	     AND MIP.PLANT_CD = 'WF01'
+	     AND MIP.ITEM_CD = MI.ITEM_CD
+	  	LEFT OUTER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+	      ON MWC.COMPANY_CD = HAPP.COMPANY_CD
+	     AND MWC.BU_CD = HAPP.BU_CD
+	     AND MWC.WC_CD = HAPP.WC_CD
+	     AND MWC.PLANT_CD = 'WF01'
+	  	LEFT OUTER JOIN TB_MST_RESOURCE MR WITH(NOLOCK)
+	      ON MR.COMPANY_CD = HAPP.COMPANY_CD
+	     AND MR.BU_CD = HAPP.BU_CD
+	     AND MR.RESOURCE_CD = HAPP.RESOURCE_CD
+	     AND MR.PLANT_CD = 'WF01'
+	  	
+	  	
+	   	LEFT OUTER JOIN TB_MST_FQC_ROUTING MFR WITH(NOLOCK)
+          ON MFR.COMPANY_CD = HAPP.COMPANY_CD
+         AND MFR.BU_CD = HAPP.BU_CD
+         AND MFR.ITEM_CD = HAPP.ITEM_CD
+         AND MFR.OPERATION_NO = HAPP.OPERATION_NO
+         AND MFR.USE_FLAG = 'Y'  
+	    
+	    LEFT OUTER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+	      ON DPOD.COMPANY_CD = HAPP.COMPANY_CD
+	     AND DPOD.BU_CD = HAPP.BU_CD
+	     AND DPOD.PROD_ORDER_NO = HAPP.PROD_ORDER_NO
+	     AND DPOD.OPERATION_NO = HAPP.OPERATION_NO
+	    LEFT OUTER JOIN TB_DYN_PROD_ORDER_HDR	DPOH WITH(NOLOCK)
+		ON DPOH.COMPANY_CD = HAPP.COMPANY_CD
+		AND DPOH.BU_CD = HAPP.BU_CD
+		AND DPOH.PROD_ORDER_NO = HAPP.PROD_ORDER_NO
+		LEFT OUTER JOIN TB_MST_ROUTING MRO WITH(NOLOCK)
+	      ON MRO.COMPANY_CD = HAPP.COMPANY_CD
+	     AND MRO.BU_CD = HAPP.BU_CD
+	     AND MRO.PLANT_CD = 'WF01'
+	     AND MRO.ITEM_CD = HAPP.ITEM_CD
+	     AND MRO.ROUTING_NO = (CASE WHEN ISNULL(HAPP.PROD_ORDER_NO, '') = '' THEN HAPP.ROUTING_NO ELSE DPOH.ROUTING_NO END)
+	     AND MRO.OPERATION_NO = HAPP.OPERATION_NO
+	   	#if($_parameter.planTypeCd == "MP")
+	   	LEFT OUTER JOIN TB_HIS_APS_DEMAND HAD WITH(NOLOCK)
+	   	#elseif($_parameter.planTypeCd == "FP")
+	   	LEFT OUTER JOIN TB_HIS_APS_DEMAND_DAILY HAD WITH(NOLOCK)
+	   	#end 
+          ON HAD.PLAN_ID = HAPP.PLAN_ID
+         AND HAD.COMPANY_CD = HAPP.COMPANY_CD
+         AND HAD.BU_CD = HAPP.BU_CD
+         AND HAD.PROD_PART = HAPP.PROD_PART
+         AND HAD.DEMAND_ID = HAPP.DEMAND_ID
+		#if($_parameter.planTypeCd == "MP")
+	   	 AND HAD.VERSION_TYPE_CD = @{versionTypeCd}
+	   	LEFT OUTER JOIN 
+		(
+			SELECT HADWA.PLAN_ID
+                 , HADWA.COMPANY_CD
+                 , HADWA.BU_CD
+                 , HADWA.PROD_PART
+                 , HADWA.PROD_ORDER_NO
+                 , MIN(HADWA.WIP_PRIORITY) AS WIP_PRIORITY
+			FROM TB_HIS_APS_DEMAND_WIP_ALLOC HADWA WITH(NOLOCK)
+            WHERE HADWA.PLAN_ID = @{planId}
+              AND HADWA.COMPANY_CD = @{GV_COMPANY_CD}
+              AND HADWA.BU_CD = @{GV_BU_CD}
+              AND HADWA.PROD_PART = @{prodPart}
+              AND HADWA.VERSION_TYPE_CD = @{versionTypeCd}
+            GROUP BY HADWA.PLAN_ID, HADWA.COMPANY_CD, HADWA.BU_CD, HADWA.PROD_PART, HADWA.PROD_ORDER_NO
+		) HADWA
+        ON HADWA.PLAN_ID = HAPP.PLAN_ID
+        AND HADWA.COMPANY_CD = HAPP.COMPANY_CD
+        AND HADWA.BU_CD = HAPP.BU_CD
+        AND HADWA.PROD_PART = HAPP.PROD_PART
+        AND HADWA.PROD_ORDER_NO = HAPP.PROD_ORDER_NO
+		#end
+		LEFT OUTER JOIN 
+	  	(
+			SELECT BU_CD
+		         , GROUP_CD
+		         , CODE_CD
+		         , CODE_NM
+		         , CODE_NM_KR
+		         , CODE_NM_CN
+		         , USE_FLAG
+		         , ATTB_5_CD
+		         , ATTB_6_CD
+		         , ATTB_7_CD
+		         , ATTB_8_CD
+		  	FROM TB_MST_CODE WITH(NOLOCK)
+		  	WHERE GROUP_CD = 'ROUTE_CD'
+		      AND USE_FLAG = 'Y'
+		  	UNION ALL
+		  	SELECT BU_CD
+		         , GROUP_CD
+		         , CODE_CD
+		         , CODE_NM
+		         , CODE_NM_KR
+		         , CODE_NM_CN
+		         , USE_FLAG
+		         , ATTB_5_CD
+		         , ATTB_6_CD
+		         , ATTB_7_CD
+		         , ATTB_8_CD
+		  	FROM TB_MST_CODE WITH(NOLOCK)
+		  	WHERE GROUP_CD = 'FQC_ROUTE_CD'
+		      AND USE_FLAG = 'Y'
+	  	) MC1 
+	    ON MC1.BU_CD = HAPP.BU_CD
+	    AND MC1.CODE_CD = HAPP.JOB_CD
+	    AND MC1.USE_FLAG = 'Y'
+	  	LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+	      ON MIPG.COMPANY_CD = HAPP.COMPANY_CD
+	     AND MIPG.BU_CD = HAPP.BU_CD
+	     AND MIPG.ITEM_CD = HAPP.ITEM_CD
+	     AND MIPG.DEL_FLAG = 'N' 
+	    #if($_parameter.prodPart == "TEL")
+		 AND MIPG.PROD_GROUP = MC1.ATTB_5_CD
+		#elseif($_parameter.prodPart == "LAM")
+		 AND MIPG.PROD_GROUP = MC1.ATTB_6_CD
+		#elseif($_parameter.prodPart == "DIFFUSION")
+		 AND MIPG.PROD_GROUP = MC1.ATTB_7_CD
+		#elseif($_parameter.prodPart == "MATERIAL")
+		 AND MIPG.PROD_GROUP = MC1.ATTB_8_CD
+		#end 		 
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+	      ON MC2.BU_CD = HAPP.BU_CD
+	     AND MC2.GROUP_CD = 'APS_DEMAND_TYPE'
+	     AND MC2.CODE_CD = HAPP.APS_DEMAND_TYPE
+	     AND MC2.USE_FLAG = 'Y'
+	    LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+	      ON MC3.BU_CD = 'ALL'
+	     AND MC3.GROUP_CD = 'PROCUR_TYPE'
+	     AND MC3.CODE_CD = MIP.PROCUR_TYPE
+	     AND MC3.USE_FLAG = 'Y'  
+	    LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+	      ON MC4.BU_CD = MIP.BU_CD
+	     AND MC4.GROUP_CD = 'CAMPUS_CD'
+	     AND MC4.CODE_CD = HAPP.CAMPUS_CD
+	     AND MC4.USE_FLAG = 'Y' 
+		LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+	      ON MC5.BU_CD = MIP.BU_CD
+	     AND MC5.GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+	     AND MC5.CODE_CD = MIPG.PROD_GROUP_DET
+	     AND MC5.USE_FLAG = 'Y' 
+		LEFT OUTER JOIN TB_MST_CODE MC6 WITH(NOLOCK)
+	      ON MC6.BU_CD = HAPP.BU_CD
+	     AND MC6.GROUP_CD = 'PROD_PART'
+	     AND MC6.CODE_CD = HAPP.PROD_PART
+	     AND MC6.USE_FLAG = 'Y' 
+		LEFT OUTER JOIN TB_MST_CODE MC7 WITH(NOLOCK)
+	      ON MC7.BU_CD = HAPP.BU_CD
+	     AND MC7.GROUP_CD = 'ROUTE_TYPE_CD'
+	     AND MC7.CODE_CD = HAPP.JOB_TYPE
+	     AND MC7.USE_FLAG = 'Y' 
+	    LEFT OUTER JOIN TB_MST_CODE MC8 WITH(NOLOCK)
+	      ON MC8.BU_CD = HAPP.BU_CD
+	     AND MC8.GROUP_CD = 'WORKER_GROUP'
+	     AND MC8.CODE_CD = HAPP.WORKER_GROUP
+	     AND MC8.USE_FLAG = 'Y'
+	    LEFT OUTER JOIN TB_MST_CODE MC9 WITH(NOLOCK)
+ 		  ON MC9.BU_CD = MIP.BU_CD
+		 AND MC9.GROUP_CD = 'CL_SL_CD'
+		 AND MC9.CODE_CD = MIP.RCPT_SL_CD
+		 AND MC9.USE_FLAG = 'Y'   
+ 		WHERE HAPP.PLAN_ID = @{planId}
+          AND HAPP.VERSION_ID = @{planVersion}
+          AND HAPP.COMPANY_CD = @{GV_COMPANY_CD}
+          AND HAPP.BU_CD = @{GV_BU_CD}
+          AND HAPP.PROD_PART = @{prodPart}
+ 		  AND CONVERT(NVARCHAR, HAPP.START_DTTM, 112) BETWEEN @{fromCal} AND @{toCal}
+ 		#if($_parameter.priority and $_parameter.priority != "")
+		  AND HAPP.PRIORITY = @{priority}
+		#end
+		#if($_parameter.demandId and $_parameter.demandId != "")
+		  AND HAPP.DEMAND_ID = @{demandId}
+		#end
+		#if($_parameter.prodOrderNo and $_parameter.prodOrderNo != "")
+		  AND HAPP.PROD_ORDER_NO IN ('$_parameter.prodOrderNo.replace(",","','")')
+		#end
+		#if($_parameter.jobCd and $_parameter.jobCd != "")
+	      AND (
+				CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+		             WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+		             ELSE MC1.CODE_NM
+		         END LIKE '%'+@{jobCd}+'%'
+		      )
+	  	#end
+		#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+          AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  		#end	
+  		#if($_parameter.route and $_parameter.route != "")
+	      AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+	  	#end
+	  	#if($_parameter.item_cd and $_parameter.item_cd != "")
+		  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		#end
+ 		ORDER BY MC6.CODE_NM, HAPP.VERSION_ID, HAPP.DEMAND_ID, CONVERT(NUMERIC, HAPP.ORDER_ID), HAPP.ITEM_CD, CONVERT(NUMERIC, HAPP.OPERATION_NO), START_DTTM DESC	
+		
+	</select>
+	
+</mapper>

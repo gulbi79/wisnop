@@ -1,0 +1,1323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.meetingMng">
+	
+	
+	<select id="isSCMTeamAdminQCSelect" parameterType="map" resultType="map">
+	/*** meetingNote.isSCMTeamSelect ***/
+	/* 사용자가 SCM팀 권한을 가지고 있는지 여부를 확인하기 위함  */
+	/*  사용자가 ADMIN 권한을 가지고 있는지 여부를 확인하기 위함  */
+	/*  사용자가 QC(품질혁신) 권한을 가지고 있는지 여부를 확인하기 위함  */
+	
+	BEGIN
+	
+	with USER_ROLE AS(
+		select *
+		from TB_MAP_USER_ROLE
+	where USER_ID = @{USER_ID})
+
+	/* GOCQT0001: SCM팀 ROLE CODE */
+	/* ADMINDP0001: ADMIN ROLE CODE */
+	/* QCT0001: QC ROLE CODE */
+	
+	
+	
+	SELECT COUNT(*) AS isSCMTeamAdminQC
+	FROM USER_ROLE
+	WHERE ROLE_CD = 'QCT0001'
+	OR ROLE_CD = 'ADMINDP0001'
+	OR ROLE_CD = 'GOCQT0001'
+	
+	END;
+	
+	</select>
+
+	
+	
+	<insert id="PjtMemMerge" parameterType="map">
+		/****** [ snop.meetingMng.PjtMemMerge ] ******/
+		BEGIN
+		
+		UPDATE TB_KPI_PJT_MEM
+		SET  DEL_FLAG =  'Y'
+		WHERE COMPANY_CD  = ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD})
+		    AND BU_CD 	  =	ISNULL(@{BU_CD},@{GV_BU_CD})
+		    AND PJT_NO 	  =	@{PROJECT_NO}
+ 		
+ 		#foreach($dimMap in $_parameter.pjtMemList)
+	 		
+			MERGE TB_KPI_PJT_MEM AS A
+			USING 
+			(
+				SELECT ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD}) AS COMPANY_CD
+			     	 , ISNULL(@{BU_CD},@{GV_BU_CD}) AS BU_CD
+			     	 , @{PROJECT_NO}       AS PJT_NO
+			     	 , '$dimMap.pjtMem'    AS USER_ID
+			) B
+			ON 
+			(
+				A.COMPANY_CD  = B.COMPANY_CD   
+			   	AND A.BU_CD   = B.BU_CD   
+				AND A.PJT_NO = B.PJT_NO
+				AND A.USER_ID = B.USER_ID  
+			)   
+			WHEN MATCHED THEN
+			UPDATE 
+			SET  A.BU_CD     =  @{BU_CD_ID}
+			   , A.DEL_FLAG  =  'N'
+			   , A.UPDATE_ID =   @{UPDATE_ID}
+			   , A.UPDATE_DTTM = DBO.UFN_GETDATE()
+			WHEN NOT MATCHED THEN
+			INSERT 
+			(
+				COMPANY_CD
+			  , BU_CD
+			  , PJT_NO
+			  , USER_ID
+			  , DEL_FLAG         
+			  , CREATE_ID        
+			  , CREATE_DTTM          
+			  , UPDATE_ID    
+			  , UPDATE_DTTM
+			) VALUES (
+				B.COMPANY_CD
+			  , @{BU_CD_ID}
+			  , B.PJT_NO
+			  , B.USER_ID
+			  , 'N'
+			  , @{CREATE_ID}
+			  , DBO.UFN_GETDATE()
+			  , @{UPDATE_ID}
+			  , DBO.UFN_GETDATE()
+			); 
+			
+		
+			
+			
+		#end
+		
+		END;
+	</insert>
+	
+	
+	<insert id="PjtRegMemMerge" parameterType="map">
+		/****** [ snop.meetingMng.PjtRegMemMerge ] ******/
+		
+		
+		BEGIN
+		
+		UPDATE TB_KPI_PJT_REG_MEM
+		SET  DEL_FLAG =  'Y'
+		WHERE COMPANY_CD  = ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD})
+		    AND BU_CD 	  =	ISNULL(@{BU_CD},@{GV_BU_CD})
+		    AND PJT_NO 	  =	@{PROJECT_NO}
+ 		
+ 		#foreach($dimMap in $_parameter.pjtRegMemList)
+	 		
+			MERGE TB_KPI_PJT_REG_MEM AS A
+			USING 
+			(
+				SELECT ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD}) AS COMPANY_CD
+			     	 , ISNULL(@{BU_CD},@{GV_BU_CD}) AS BU_CD
+			     	 , @{PROJECT_NO}       AS PJT_NO
+			     	 , '$dimMap.pjtRegMem'    AS USER_ID
+			) B
+			ON 
+			(
+				A.COMPANY_CD  = B.COMPANY_CD   
+			   	AND A.BU_CD   = B.BU_CD   
+				AND A.PJT_NO = B.PJT_NO
+				AND A.USER_ID = B.USER_ID  
+			)   
+			WHEN MATCHED THEN
+			UPDATE 
+			
+			SET A.BU_CD      =   @{BU_CD_ID}
+			   , A.DEL_FLAG  =  'N'
+			   , A.UPDATE_ID =   @{UPDATE_ID}
+			   , A.UPDATE_DTTM = DBO.UFN_GETDATE()
+			WHEN NOT MATCHED THEN
+			INSERT 
+			(
+				COMPANY_CD
+			  , BU_CD
+			  , PJT_NO
+			  , USER_ID
+			  , DEL_FLAG         
+			  , CREATE_ID        
+			  , CREATE_DTTM          
+			  , UPDATE_ID    
+			  , UPDATE_DTTM
+			) VALUES (
+				B.COMPANY_CD
+			  , @{BU_CD_ID}
+			  , B.PJT_NO
+			  , B.USER_ID
+			  , 'N'
+			  , @{CREATE_ID}
+			  , DBO.UFN_GETDATE()
+			  , @{UPDATE_ID}
+			  , DBO.UFN_GETDATE()
+			); 
+		#end
+		
+		END;
+		
+		
+	</insert>
+	
+	
+	<!-- 프로젝트관리(projectMng) 시작 -->
+	<select id="projectMngSelect" parameterType="map" resultType="map">
+	/****** [ snop.meetingMng.projectMngSelect ] ******/
+	
+	
+	
+   WITH TEMP AS (
+
+	   SELECT 
+	      KP.COMPANY_CD AS COMPANY_CD
+		 , KP.BU_CD AS BU_CD
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC1.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC1.CODE_NM_CN
+	            ELSE MC1.CODE_NM 
+	       		END								AS PJT_CATE
+		 , KP.PJT_CATE AS PJT_CATE_CD  /* 추가  */ 
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC2.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC2.CODE_NM_CN
+	            ELSE MC2.CODE_NM 
+	       		END 							AS PJT_TYPE
+	     , KP.PJT_TYPE                          AS PJT_TYPE_CD
+	     , KP.PJT_NO 							AS PROJECT_NO
+		 , KP.PRT_PJT_NO						AS PRT_PJT_NO
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC8.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC8.CODE_NM_CN
+	            ELSE MC8.CODE_NM 
+	       END AS DIV_CD
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC4.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC4.CODE_NM_CN
+	     		ELSE MC4.CODE_NM 
+	       END AS TEAM_CD
+	     , DBO.UFN_GET_USER_NAME(KP.PJT_MNG)    AS PJT_MNGER
+	     , (SELECT STUFF((SELECT ',' + dbo.UFN_GET_USER_NAME(KPM.USER_ID)
+	                        FROM TB_KPI_PJT_MEM KPM WITH(NOLOCK)
+	                       WHERE KPM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPM.BU_CD = KP.BU_CD
+	                         AND KPM.PJT_NO = KP.PRT_PJT_NO
+	                         AND KPM.DEL_FLAG = KP.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS PJT_MEM
+	                       
+	       
+	     , (SELECT STUFF((SELECT ',' + dbo.UFN_GET_USER_NAME(KPRM.USER_ID)
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PRT_PJT_NO
+	                         AND KPRM.DEL_FLAG = KP.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS REGISTER_MNGER
+	     , KP.PJT_NM AS PJT_NM
+	     , CONVERT(VARCHAR(30), CAST(KP.REG_DATE AS DATE), 23)   AS REG_DATE
+	     , CONVERT(VARCHAR(30), CAST(KP.START_DATE AS DATE), 23) AS START_DATE
+	     , CONVERT(VARCHAR(30), CAST(KP.CLOSE_DATE AS DATE), 23) AS CLOSE_DATE
+	     , MC5.CODE_NM 		AS PJT_STATUS_CD
+	     , KP.PURPOSE 		AS PURPOSE
+	     , KP.GOAL     		AS GOAL
+	     , KP.PROCESS  		AS PROCESS
+	     , KP.PROGRESS		AS PROGRESS
+	     , KP.PERFORMANCE	AS PERFORMANCE
+	     , KP.REMARK		AS REMARK
+	     , KP.FILE_NO		AS FILE_NO
+	     , CF.FILE_NM_ORG   AS FILE_NM_ORG
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC6.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC6.CODE_NM_CN
+	            ELSE MC6.CODE_NM 
+	       		END AS OPEN_YN
+	     , dbo.UFN_GET_USER_NAME(KP.CREATE_ID)     AS CREATE_ID
+	     , KP.CREATE_DTTM   AS CREATE_DTTM
+	     , KP.OPEN_YN   	AS OPEN_YN_CD
+	     , PJT_MNG AS PJT_MNG_ID
+	     , (SELECT STUFF((SELECT ',' + KPM.USER_ID
+	                        FROM TB_KPI_PJT_MEM KPM WITH(NOLOCK)
+	                       WHERE KPM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPM.BU_CD = KP.BU_CD
+	                         AND KPM.PJT_NO = KP.PRT_PJT_NO
+	                         AND KPM.DEL_FLAG = KP.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS PJT_MEM_ID
+	                       
+	       
+	     , (SELECT STUFF((SELECT ',' + KPRM.USER_ID
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PRT_PJT_NO
+	                         AND KPRM.DEL_FLAG = KP.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS REGISTER_MNGER_ID
+	     
+	  FROM TB_KPI_PJT KP WITH(NOLOCK)
+	  INNER JOIN TB_MST_CODE MC7 WITH(NOLOCK)
+	    ON MC7.BU_CD = KP.BU_CD
+	   AND MC7.GROUP_CD = 'TEAM_CD'
+	   AND MC7.CODE_CD = KP.TEAM_CD
+	  INNER JOIN TB_MST_CODE MC8
+	    ON MC8.BU_CD = MC7.BU_CD
+	   AND MC8.GROUP_CD = 'DIV_CD'
+	   AND MC8.CODE_CD = MC7.ATTB_4_CD
+		
+	  LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+	    ON MC1.BU_CD = KP.BU_CD
+	   AND MC1.GROUP_CD = 'PJT_CATE'
+	   AND MC1.CODE_CD = KP.PJT_CATE
+	  LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+	    ON MC2.BU_CD = KP.BU_CD
+	   AND MC2.GROUP_CD = 'PJT_TYPE'
+	   AND MC2.CODE_CD = KP.PJT_TYPE
+	  LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+	    ON MC4.BU_CD = KP.BU_CD
+	   AND MC4.GROUP_CD = 'TEAM_CD'
+	   AND MC4.CODE_CD = KP.TEAM_CD
+	  LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+	    ON MC5.BU_CD = KP.BU_CD
+	   AND MC5.GROUP_CD = 'PJT_STATUS_CD'
+	   AND MC5.CODE_CD = KP.PJT_STATUS_CD
+	  LEFT OUTER JOIN TB_MST_CODE MC6 WITH(NOLOCK)
+	    ON MC6.BU_CD = 'ALL'
+	   AND MC6.GROUP_CD = 'OPEN_YN'
+	   AND MC6.CODE_CD = KP.OPEN_YN
+	  OUTER APPLY (
+              SELECT TOP 1 CF.FILE_NM_ORG
+                 FROM TB_COMM_FILE CF WITH(NOLOCK)
+              	 WHERE CF.FILE_NO = KP.FILE_NO
+              	 AND DEL_FLAG != 'Y' 
+              	 ORDER BY CF.FILE_SEQ
+             ) CF
+	   
+	 WHERE KP.COMPANY_CD = ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD})
+   
+   AND KP.DEL_FLAG = 'N'
+                         		 
+	   #if($_parameter.projectNM and $_parameter.projectNM !="")
+
+   		AND KP.PJT_NM LIKE '%' + @{projectNM} + '%'
+   #end
+   #if($_parameter.projectNO and $_parameter.projectNO !="")
+
+   		AND KP.PJT_NO LIKE '%' + @{projectNO} + '%'
+   #end
+   #if($_parameter.salesOrgL3Name and $_parameter.salesOrgL3Name !="" ) 
+		
+		AND   MC8.CODE_CD IN ('$_parameter.salesOrgL3Name.replace(",","','")')
+   #end
+   #if($_parameter.team and $_parameter.team !="" ) 
+
+		AND   MC4.CODE_CD IN ('$_parameter.team.replace(",","','")')
+   #end
+   #if($_parameter.projectType and $_parameter.projectType !="") 
+
+   		AND   KP.PJT_TYPE IN ('$_parameter.projectType.replace(",","','")')
+   #end
+   #if($_parameter.processStatus and $_parameter.processStatus !="" ) 
+		
+		AND   MC5.CODE_CD IN ('$_parameter.processStatus.replace(",","','")')
+   #end
+  	
+  	    AND CONVERT(VARCHAR,KP.REG_DATE,112) BETWEEN @{fromCal} AND @{toCal}
+  	    
+  #if($_parameter.searchCriteria==0)
+  
+  		AND KP.OPEN_YN IN ('Y','N') 
+  #end
+	)
+	
+	
+
+
+   ,TEMP_UPPER_MENU_CD_ADDED AS(
+   
+   SELECT TEMP.*
+   , CASE WHEN TEMP.PROJECT_NO = TEMP.PRT_PJT_NO THEN ' ' ELSE TEMP.PRT_PJT_NO END UPPER_MENU_CD
+   , TEMP.PROJECT_NO AS MENU_CD
+   , CASE WHEN TEMP.PJT_CATE_CD = 'PJT' AND TEMP.PJT_TYPE_CD != 'PROH'  THEN CAST(RIGHT(TEMP.PROJECT_NO,3) AS int)
+          WHEN TEMP.PJT_CATE_CD = 'PJT' AND TEMP.PJT_TYPE_CD = 'PROH'  THEN CAST(RIGHT(TEMP.PROJECT_NO,2) AS int)
+     ELSE CAST(RIGHT(TEMP.PROJECT_NO,2) AS int) END SORT
+   FROM TEMP
+   )
+
+
+   ,CTE(COMPANY_CD
+		, BU_CD
+		, UPPER_MENU_CD
+		, MENU_CD
+		, SORT
+		, ROOT_SORT
+		, TREE_PATH
+		, PJT_CATE
+		, PJT_CATE_CD
+			, PJT_TYPE
+			, PROJECT_NO
+			, DIV_CD
+			, TEAM_CD
+			, PJT_MNGER
+			, PJT_MEM
+			, REGISTER_MNGER
+			, PJT_NM
+			, REG_DATE
+			, START_DATE
+			, CLOSE_DATE
+			, PJT_STATUS_CD
+			, PURPOSE
+			, GOAL
+			, PROCESS
+			, PROGRESS
+			, PERFORMANCE
+			, REMARK
+			, FILE_NM_ORG
+			, FILE_NO
+			, OPEN_YN
+			, OPEN_YN_CD
+			, PRT_PJT_NO
+			, CREATE_ID
+			, CREATE_DTTM
+			 , PJT_MNG_ID
+      , PJT_MEM_ID
+      , REGISTER_MNGER_ID
+			) AS(
+		SELECT COMPANY_CD
+			, BU_CD
+			, UPPER_MENU_CD
+			, MENU_CD
+			, SORT
+			, CONVERT(VARCHAR(100),''+dbo.UFN_LPAD(SORT,3,'0')) AS ROOT_SORT
+			, CONVERT(VARCHAR(100),''+REPLACE(MENU_CD,'.','||'),3) AS TREE_PATH
+			, PJT_CATE
+			, PJT_CATE_CD
+			, PJT_TYPE
+			, PROJECT_NO
+			, DIV_CD
+			, TEAM_CD
+			, PJT_MNGER
+			, PJT_MEM
+			, REGISTER_MNGER
+			, PJT_NM
+			, REG_DATE
+			, START_DATE
+			, CLOSE_DATE
+			, PJT_STATUS_CD
+			, PURPOSE
+			, GOAL
+			, PROCESS
+			, PROGRESS
+			, PERFORMANCE
+			, REMARK
+			, FILE_NM_ORG
+			, FILE_NO
+			, OPEN_YN
+			, OPEN_YN_CD
+			, PRT_PJT_NO
+			, CREATE_ID
+			, CREATE_DTTM
+			, PJT_MNG_ID
+     		, PJT_MEM_ID
+      , REGISTER_MNGER_ID
+		FROM TEMP_UPPER_MENU_CD_ADDED WITH(NOLOCK)
+		WHERE ISNULL(UPPER_MENU_CD,' ') = ' '
+    	  AND COMPANY_CD = ISNULL(@{COMPANY_CD},@{GV_COMPANY_CD})
+   
+    	UNION ALL
+		SELECT A.COMPANY_CD
+    	     , A.BU_CD
+    		 , A.UPPER_MENU_CD
+    	     , A.MENU_CD
+			 , A.SORT
+			 
+			, CONVERT(VARCHAR(100),B.ROOT_SORT+CONVERT(VARCHAR(100),dbo.UFN_LPAD(A.SORT,3,'0'))) AS ROOT_SORT
+    		 , CONVERT(VARCHAR(100),B.TREE_PATH+'.'+CONVERT(VARCHAR(100),REPLACE(A.MENU_CD,'.','||'),3)) AS TREE_PATH
+			 , A.PJT_CATE
+			 , A.PJT_CATE_CD
+			, A.PJT_TYPE
+			, A.PROJECT_NO
+			, A.DIV_CD
+			, A.TEAM_CD
+			, A.PJT_MNGER
+			, A.PJT_MEM
+			, A.REGISTER_MNGER
+			, A.PJT_NM
+			, A.REG_DATE
+			, A.START_DATE
+			, A.CLOSE_DATE
+			, A.PJT_STATUS_CD
+			, A.PURPOSE
+			, A.GOAL
+			, A.PROCESS
+			, A.PROGRESS
+			, A.PERFORMANCE
+			, A.REMARK
+			, A.FILE_NM_ORG
+			, A.FILE_NO
+			, A.OPEN_YN
+			, A.OPEN_YN_CD
+			, A.PRT_PJT_NO
+			, A.CREATE_ID
+			, A.CREATE_DTTM
+			, A.PJT_MNG_ID
+      		, A.PJT_MEM_ID
+      		, A.REGISTER_MNGER_ID
+    	FROM TEMP_UPPER_MENU_CD_ADDED A WITH(NOLOCK)
+		    , CTE B
+			WHERE A.COMPANY_CD    = B.COMPANY_CD
+    	  AND A.BU_CD         = B.BU_CD
+    	  AND A.UPPER_MENU_CD = B.MENU_CD)
+		
+		
+		 SELECT 
+		  TREE_PATH
+		  , SORT
+		  , ROOT_SORT
+		  , COMPANY_CD
+		  , BU_CD
+		  , UPPER_MENU_CD
+		  , MENU_CD
+		  , PJT_CATE
+		  , PJT_CATE_CD
+		  , PJT_TYPE
+		  , PROJECT_NO
+		  , DIV_CD
+		  , TEAM_CD
+		  , PJT_MNGER
+		  , PJT_MEM
+		  , REGISTER_MNGER
+		  , PJT_NM
+		  , REG_DATE
+			, START_DATE
+			, CLOSE_DATE
+			, PJT_STATUS_CD
+			, PURPOSE
+			, GOAL
+			, PROCESS
+			, PROGRESS
+			, PERFORMANCE
+			, REMARK
+			, FILE_NM_ORG
+			, FILE_NO
+			, OPEN_YN
+			, OPEN_YN_CD
+			, PRT_PJT_NO
+			, CREATE_ID
+			, CREATE_DTTM	   	
+			, PJT_MNG_ID
+     		, PJT_MEM_ID
+      		, REGISTER_MNGER_ID
+	    FROM CTE
+	    #if($_parameter.searchCriteria==1)
+	    	WHERE 1=1
+		AND (PJT_MNG_ID = @{USER_ID} OR PJT_MEM_ID  LIKE '%'+@{USER_ID}+'%' OR  REGISTER_MNGER_ID  LIKE '%'+@{USER_ID}+'%' OR OPEN_YN_CD = 'Y')
+		
+	    #end
+	 ORDER BY PRT_PJT_NO DESC, ROOT_SORT ASC
+	
+	
+
+	</select>
+	
+	
+	
+	
+	<!-- 프로젝트등록(projectAdd) 시작-->
+	<select id="projectAddSelect" parameterType="map" resultType="map">
+	/****** [ snop.meetingMng.projectAddSelect ] ******/
+	  WITH TEMP AS(
+	   SELECT KP.COMPANY_CD                  AS  COMPANY_CD
+	   	 , KP.BU_CD 					     AS BU_CD
+	   	 , KP.BU_CD                          AS BU_CD_ID
+	   	 , KP.PJT_CATE						 AS PJT_CATE
+	   	 , KP.PRT_PJT_NO					 AS PRT_PJT_NO
+	   	 , dbo.UFN_GET_USER_NAME(KP.CREATE_ID)     AS CREATE_ID_NM
+	   	 , KP.CREATE_ID                      AS CREATE_ID
+	   	 , KP.CREATE_DTTM 					 AS CREATE_DTTM
+	   	 , CASE WHEN 'ko'=@{GV_LANG} THEN MC2.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC2.CODE_NM_CN
+	            ELSE MC2.CODE_NM 
+	       		END 							AS PJT_TYPE
+	     , KP.PJT_NO 					     AS PROJECT_NO
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC8.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC8.CODE_NM_CN
+	            ELSE MC8.CODE_NM 
+	       END AS DIV_CD
+	     , MC8.CODE_CD AS DIV_CD_CD
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC4.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC4.CODE_NM_CN
+	     		ELSE MC4.CODE_NM 
+	       END AS TEAM_CD
+	     , MC4.CODE_CD AS TEAM_CD_CD
+	     
+	     , DBO.UFN_GET_USER_NAME(KP.PJT_MNG) AS PJT_MNGER
+	    
+	     , (SELECT STUFF((SELECT ',' + dbo.UFN_GET_USER_NAME(KPM.USER_ID)
+	                        FROM TB_KPI_PJT_MEM KPM WITH(NOLOCK)
+	                       WHERE KPM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPM.BU_CD = KP.BU_CD
+	                         AND KPM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS PJT_MEM
+	     , (SELECT STUFF((SELECT ',' + dbo.UFN_GET_USER_NAME(KPRM.USER_ID)
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPRM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS REGISTER_MNGER
+	     , KP.PJT_NM 		AS PJT_NM
+	     , CONVERT(VARCHAR(30), CAST(KP.REG_DATE AS DATE), 23) 		AS REG_DATE  
+	     , CONVERT(VARCHAR(30), CAST(KP.START_DATE AS DATE), 23)	AS START_DATE   
+	     , CONVERT(VARCHAR(30), CAST(KP.CLOSE_DATE AS DATE), 23)	AS CLOSE_DATE   
+	     , MC5.CODE_NM 		AS PJT_STATUS_CD
+	     , MC5.CODE_CD      AS PJT_STATUS_CD_CD
+	     , 'POPUP BUTTON'	AS PROCESS_MNG_REG 
+	     , KP.FILE_NO 		AS FILE_NO
+	     , CF.FILE_NM_ORG   AS FILE_NM_ORG
+	     , KP.PURPOSE 		AS PURPOSE
+	     , KP.GOAL 			AS GOAL
+	     , KP.PROGRESS 		AS PROGRESS
+	     , KP.PERFORMANCE 	AS PERFORMANCE
+	     , KP.REMARK 		AS REMARK
+	     , CASE WHEN 'ko'=@{GV_LANG} THEN MC6.CODE_NM_KR
+	            WHEN 'cn'=@{GV_LANG} THEN MC6.CODE_NM_CN
+	            ELSE MC6.CODE_NM 
+	       		END AS OPEN_YN
+	     , KP.OPEN_YN    	AS OPEN_YN_CD
+	     , KP.PJT_TYPE   	AS PJT_TYPE_ID
+	     , KP.PJT_TYPE   	AS PJT_TYPE_ID_TEMP
+	     , MC8.CODE_CD		AS DIV_CD_ID
+	     , MC8.CODE_CD		AS DIV_CD_ID_TEMP
+	     , KP.TEAM_CD 		AS TEAM_CD_ID
+	     , KP.TEAM_CD 		AS TEAM_CD_ID_TEMP
+	     , KP.PJT_MNG       AS PJT_MNGER_ID
+	     , KP.PJT_MNG       AS PJT_MNGER_ID_TEMP
+	     , KP.PJT_STATUS_CD	AS PJT_STATUS_CD_ID
+	     , KP.PJT_STATUS_CD	AS PJT_STATUS_CD_ID_TEMP
+	     
+	     , MC6.CODE_CD   	AS OPEN_YN_ID
+	     
+	     , (SELECT STUFF((SELECT ',' + KPM.USER_ID
+	                        FROM TB_KPI_PJT_MEM KPM WITH(NOLOCK)
+	                       WHERE KPM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPM.BU_CD = KP.BU_CD
+	                         AND KPM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS PJT_MEM_ID
+	     , (SELECT STUFF((SELECT ',' + KPM.USER_ID
+	                        FROM TB_KPI_PJT_MEM KPM WITH(NOLOCK)
+	                       WHERE KPM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPM.BU_CD = KP.BU_CD
+	                         AND KPM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS PJT_MEM_ID_TEMP
+	                         
+	     , (SELECT STUFF((SELECT ',' + KPM.USER_ID
+	                        FROM TB_KPI_PJT_MEM KPM WITH(NOLOCK)
+	                       WHERE KPM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPM.BU_CD = KP.BU_CD
+	                         AND KPM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS PJT_MEM_ID_COMM                    
+	                         
+	                         
+	     , (SELECT STUFF((SELECT ',' + KPRM.USER_ID
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPRM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS REGISTER_MNGER_ID
+	     , (SELECT STUFF((SELECT ',' + KPRM.USER_ID
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPRM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS REGISTER_MNGER_ID_COMM 
+	     , (SELECT STUFF((SELECT ',' + KPRM.USER_ID
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PJT_NO
+	                         AND KP.DEL_FLAG = KPRM.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) AS REGISTER_MNGER_ID_TEMP
+	  FROM TB_KPI_PJT KP WITH(NOLOCK)
+	  LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+	    ON MC2.BU_CD = KP.BU_CD
+	   AND MC2.GROUP_CD = 'PJT_TYPE'
+	   AND MC2.CODE_CD = KP.PJT_TYPE
+	  INNER JOIN TB_MST_CODE MC7 WITH(NOLOCK)
+	    ON MC7.BU_CD = KP.BU_CD
+	   AND MC7.GROUP_CD = 'TEAM_CD'
+	   AND MC7.CODE_CD = KP.TEAM_CD
+	  INNER JOIN TB_MST_CODE MC8
+	    ON MC8.BU_CD = MC7.BU_CD
+	   AND MC8.GROUP_CD = 'DIV_CD'
+	   AND MC8.CODE_CD = MC7.ATTB_4_CD 
+	  
+	  LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+	    ON MC4.BU_CD = KP.BU_CD
+	   AND MC4.GROUP_CD = 'TEAM_CD'
+	   AND MC4.CODE_CD = KP.TEAM_CD
+	  LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+	    ON MC5.BU_CD = KP.BU_CD
+	   AND MC5.GROUP_CD = 'PJT_STATUS_CD'
+	   AND MC5.CODE_CD = KP.PJT_STATUS_CD
+	  LEFT OUTER JOIN TB_MST_CODE MC6 WITH(NOLOCK)
+	    ON MC6.BU_CD = 'ALL'
+	   AND MC6.GROUP_CD = 'OPEN_YN'
+	   AND MC6.CODE_CD = KP.OPEN_YN
+	   OUTER APPLY (
+              SELECT TOP 1 CF.FILE_NM_ORG
+                 FROM TB_COMM_FILE CF WITH(NOLOCK)
+              	 WHERE CF.FILE_NO = KP.FILE_NO
+              	 AND DEL_FLAG != 'Y'
+              	 ORDER BY CF.FILE_SEQ
+             ) CF
+	   
+	 WHERE KP.COMPANY_CD = @{GV_COMPANY_CD}
+	   AND KP.PJT_CATE = 'PJT'  
+	   AND KP.DEL_FLAG = 'N'
+   
+
+   
+   )
+   
+   SELECT TEMP.*
+   FROM TEMP
+   WHERE 1=1
+
+   #if($_parameter.projectNm and $_parameter.projectNm !="")
+
+   		AND PJT_NM LIKE '%' + @{projectNm} + '%'
+   #end
+   #if($_parameter.projectNO and $_parameter.projectNO !="")
+
+   		AND PROJECT_NO LIKE '%' + @{projectNO} + '%'
+   #end
+   #if($_parameter.divName and $_parameter.divName !="" ) 
+		
+		AND   DIV_CD_CD IN ('$_parameter.divName.replace(",","','")')
+   #end
+   #if($_parameter.teamNm and $_parameter.teamNm !="" ) 
+
+		AND   TEAM_CD_CD IN ('$_parameter.teamNm.replace(",","','")')
+   #end
+   #if($_parameter.projectManager and $_parameter.projectManager !="")
+
+   		AND (PJT_MNGER_ID LIKE '%' + @{projectManager} + '%' OR PJT_MNGER LIKE '%' + @{projectManager} + '%')
+   #end
+   #if($_parameter.progressStatus and $_parameter.progressStatus !="" ) 
+		
+		AND   PJT_STATUS_CD_CD IN ('$_parameter.progressStatus.replace(",","','")')
+   #end	
+   AND CONVERT(VARCHAR,REG_DATE,112) BETWEEN @{fromCal} AND @{toCal} 
+   
+   
+   
+  #if($_parameter.searchCriteria==0)
+  
+  		AND OPEN_YN_CD IN ('Y','N') 
+  #end
+   
+
+   
+  #if($_parameter.searchCriteria==1)
+	   
+		AND (PJT_MNGER_ID = @{USER_ID} OR PJT_MEM_ID_TEMP  LIKE '%'+@{USER_ID}+'%' OR  REGISTER_MNGER_ID_TEMP  LIKE '%'+@{USER_ID}+'%' OR OPEN_YN_CD = 'Y')
+  #end
+   
+   
+   ORDER BY CREATE_DTTM DESC
+	   
+   
+	   
+	   
+	</select>
+	
+	
+
+	
+	
+	<select id="ProjectAddEmpPopupSelect" parameterType="map" resultType="map">
+		/****** [ snop.meetingMng.ProjectAddEmpPopupSelect] ******/
+		
+		
+		SELECT A.USER_ID
+		     , A.USER_NM
+		     , A.DEPT_CD
+		     , B.DEPT_NM
+		FROM TB_MST_USER A WITH(NOLOCK)
+		LEFT JOIN TB_MST_DEPT B WITH(NOLOCK)
+		  ON B.DEPT_CD    = A.DEPT_CD
+		 AND B.COMPANY_CD = @{GV_COMPANY_CD}
+		WHERE 1 = 1
+		#if($_parameter.USER_NM and $_parameter.USER_NM != "")
+		  AND (A.USER_ID LIKE '%' + REPLACE(@{USER_NM},'_','[_]') + '%'
+		    OR A.USER_NM LIKE '%' + REPLACE(@{USER_NM},'_','[_]') + '%')
+		#end
+		#if($_parameter.CHK_DATA and $_parameter.CHK_DATA != "")
+		  AND A.USER_ID NOT IN ('$_parameter.CHK_DATA.replace(",","','")')
+		#end
+		ORDER BY
+		#if($_parameter.INIT_DATA and $_parameter.INIT_DATA != "")
+			CASE WHEN A.USER_ID IN ('$_parameter.INIT_DATA.replace(",","','")') THEN 0 ELSE 1 END,
+		#end
+		  A.USER_ID, A.USER_NM
+	</select>
+	
+	
+	<insert id="projectAddInsert" parameterType="map">
+	<![CDATA[
+    
+    BEGIN 
+        DECLARE @PJT_TYPE_ID nvarchar(12)
+		
+		DECLARE @P_PJT_NO  nvarchar(12)
+		DECLARE @P_PRT_PJT_NO  nvarchar(12)
+		
+		SET @PJT_TYPE_ID = @{PJT_TYPE_ID};
+				
+	    SET @P_PJT_NO = (SELECT DBO.UFN_GET_PJT_NO())
+        SET @P_PRT_PJT_NO = @P_PJT_NO
+       	
+		
+	    INSERT INTO TB_KPI_PJT (
+                COMPANY_CD
+              , BU_CD
+              , PJT_CATE
+              , PJT_TYPE
+              , PJT_NO
+                    
+              , TEAM_CD
+              , PJT_MNG
+              , PJT_NM
+              , REG_DATE
+              , START_DATE
+              , CLOSE_DATE
+              , PJT_STATUS_CD
+              , FILE_NO
+              , PURPOSE
+              , GOAL
+              , PROGRESS
+              , PERFORMANCE
+              , REMARK
+              , OPEN_YN
+              , PRT_PJT_NO
+              , DEL_FLAG
+              , CREATE_ID
+              , CREATE_DTTM
+              , UPDATE_ID
+              , UPDATE_DTTM 
+        ) VALUES (
+              ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+              , ISNULL(@{BU_CD_ID},@{GV_BU_CD})
+              , 'PJT'
+              , @{PJT_TYPE_ID}
+              , CASE WHEN @PJT_TYPE_ID = 'PROH' THEN @{PROJECT_NO}
+                ELSE 
+                    @P_PJT_NO
+                END
+                
+              , @{TEAM_CD_ID}
+              , @{PJT_MNGER_ID}
+              , @{PJT_NM}
+              , REPLACE(@{REG_DATE},'-','')
+              , REPLACE(@{START_DATE},'-','')
+              , REPLACE(@{CLOSE_DATE},'-','')
+              , @{PJT_STATUS_CD_ID}
+              , @{FILE_NO}
+              , @{PURPOSE}
+              , @{GOAL}
+              , @{PROGRESS}
+              , @{PERFORMANCE}
+              , @{REMARK}
+              , @{OPEN_YN_ID}
+              
+              , CASE WHEN @PJT_TYPE_ID = 'PROH' THEN @{PROJECT_NO}
+                ELSE 
+                    @P_PJT_NO
+                END
+                              
+              , ISNULL(@{DEL_FLAG}, 'N')
+              , @{CREATE_ID}
+              , DBO.UFN_GETDATE()
+              , @{UPDATE_ID}
+              , DBO.UFN_GETDATE()
+        );
+	  
+	    
+			
+			
+	  #foreach($dimMap in $_parameter.pjtMemList)
+		  
+		 INSERT INTO TB_KPI_PJT_MEM (
+			COMPANY_CD
+		  , BU_CD
+		  , PJT_NO
+		  , USER_ID
+		  , DEL_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		  , UPDATE_ID
+		  , UPDATE_DTTM
+	 
+		 )
+		 
+		 VALUES(
+		 	ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+		 , ISNULL(@{BU_CD_ID},@{GV_BU_CD})
+		
+		 , CASE WHEN @PJT_TYPE_ID = 'PROH' THEN @{PROJECT_NO}
+                ELSE 
+                    @P_PJT_NO
+                END
+		 
+		 , '$dimMap.pjtMem'
+		 , ISNULL(@{DEL_FLAG}, 'N')
+		 ,  @{CREATE_ID}
+		 , DBO.UFN_GETDATE()
+		 , @{UPDATE_ID}
+		 , DBO.UFN_GETDATE()
+		 
+		 );
+	 #end
+	
+	 #foreach($dimMap in $_parameter.pjtRegMemList)
+	  
+		 INSERT INTO TB_KPI_PJT_REG_MEM (
+			COMPANY_CD
+		  , BU_CD
+		  , PJT_NO
+		  , USER_ID
+		  , DEL_FLAG
+		  , CREATE_ID
+		  , CREATE_DTTM
+		  , UPDATE_ID
+		  , UPDATE_DTTM
+	 
+		 )
+		 
+		 VALUES(
+		 	ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+		 , ISNULL(@{BU_CD_ID},@{GV_BU_CD})
+		 
+		 , CASE WHEN @PJT_TYPE_ID = 'PROH' THEN @{PROJECT_NO}
+                ELSE 
+                    @P_PJT_NO
+                END
+                
+		 , '$dimMap.pjtRegMem'
+		 , ISNULL(@{DEL_FLAG}, 'N')
+		 ,  @{CREATE_ID}
+		 , DBO.UFN_GETDATE()
+		 , @{UPDATE_ID}
+		 , DBO.UFN_GETDATE()
+		 
+		 );
+	 #end
+	
+	   
+    END;
+    
+    ]]>
+	</insert>
+	
+	
+	<update id="projectAddUpdate" parameterType="map">
+    /****** [  snop.meetingMng.projectAddUpdate ] ******/
+    /* TB_KPI_PJT PRIMARY KEY:COMPANY_CD, BU_CD, PJT_NO  */
+  	/*
+  		TB_KPI_PJT_MEM,
+  		TB_KPI_PJT_REG_MEM 테이블의 경우, 
+  		
+  		FRONT-END: 이전 MEMBER LIST 데이터와 비교하여 기존에 없던 MEMBER를 전달
+  		(추가되었거나, 제외되엇거나, 제외후 다시 추가 된 MEMBER)
+  		
+  		BACK-END: FRONT-END에서 넘어온 MEMBER 인자에 대해 DB에 존재하는지 존재안하는지 확인 후,
+  		존재안하면, INSERT 구문 수행
+  		존재한다면, 제외인지(DEL_FLAG:N->Y), 다시추가인지(DEL_FLAG:Y->N) UPDATE문 수행
+  		
+  	*/
+  
+  
+  	 BEGIN
+  
+  
+  	 UPDATE TB_KPI_PJT 
+     SET 		
+	           PJT_TYPE       =  @{PJT_TYPE_ID}
+	          , BU_CD         = @{BU_CD_ID} 
+	          , TEAM_CD 	  = @{TEAM_CD_ID}
+	          , PJT_MNG		  = @{PJT_MNGER_ID}
+	          , PJT_NM		  = @{PJT_NM}
+	          , REG_DATE	  = REPLACE(@{REG_DATE},'-','')
+	          , START_DATE	  = REPLACE(@{START_DATE},'-','')
+	          , CLOSE_DATE	  = REPLACE(@{CLOSE_DATE},'-','')
+	          , PJT_STATUS_CD = @{PJT_STATUS_CD_ID}
+	          , FILE_NO		  = @{FILE_NO}
+	          , PURPOSE		  = @{PURPOSE}
+	          , GOAL		  = @{GOAL}
+	          , PROGRESS	  = @{PROGRESS}
+	          , PERFORMANCE   = @{PERFORMANCE}
+	          , REMARK   	  = @{REMARK}
+	          , OPEN_YN   	  = @{OPEN_YN_ID}
+	          , UPDATE_ID	  = @{UPDATE_ID}
+	          , UPDATE_DTTM	  =  DBO.UFN_GETDATE()
+	          
+  	 WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}
+       AND PJT_NO       = @{PROJECT_NO}
+  	
+  	
+	UPDATE TB_KPI_PJT 
+  	SET  BU_CD        = @{BU_CD_ID}
+  	   , TEAM_CD       = @{TEAM_CD_ID}
+  	   , OPEN_YN   	  = @{OPEN_YN_ID}
+  	   , UPDATE_ID	  = @{UPDATE_ID}
+  	   , UPDATE_DTTM	  =  DBO.UFN_GETDATE()
+  	   
+  	 WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}
+       AND PRT_PJT_NO       = @{PROJECT_NO}
+  	
+  	
+  	
+  	
+  	UPDATE TB_KPI_PJT 
+  	SET  BU_CD        = @{BU_CD_ID}
+  	   , TEAM_CD       = @{TEAM_CD_ID}
+  	   , PJT_STATUS_CD   = @{PJT_STATUS_CD_ID}
+  	   , UPDATE_ID	  = @{UPDATE_ID}
+  	   , UPDATE_DTTM	  =  DBO.UFN_GETDATE()
+  	 
+  	 WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}
+       AND PRT_PJT_NO       = @{PROJECT_NO}
+  	
+  	END;
+  
+  
+    </update>
+	
+	
+	
+	
+	
+	
+	<update id="projectAddDelete" parameterType="map">
+    /****** [ snop.meetingMng.projectAddDelete ] ******/
+   
+   
+   /*
+   	해당 프로젝트 삭제시 해당프로젝트를 참조하는 과정관리들까지 모두 삭제 처리
+   */ 
+    BEGIN
+    
+     UPDATE TB_KPI_PJT
+     SET DEL_FLAG = 'Y'
+         ,UPDATE_ID = @{UPDATE_ID}
+         ,UPDATE_DTTM =DBO.UFN_GETDATE()
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}	
+       AND PJT_NO	    = @{PROJECT_NO}
+   
+   
+   	 UPDATE TB_KPI_PJT 
+     SET 		
+	   
+	   DEL_FLAG = 'Y'
+	   ,UPDATE_ID = @{UPDATE_ID}
+	   ,UPDATE_DTTM =DBO.UFN_GETDATE()       
+       WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}
+       AND PJT_NO      	LIKE '%'+@{PROJECT_NO}+'%'
+       AND PJT_CATE     = 'PRC'
+  		
+  	
+    
+    
+   	  UPDATE TB_KPI_PJT_MEM
+     SET DEL_FLAG = 'Y'
+    	 ,UPDATE_ID = @{UPDATE_ID}
+     	 ,UPDATE_DTTM =DBO.UFN_GETDATE()
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}	
+       AND PJT_NO	    = @{PROJECT_NO}
+    
+    
+   	UPDATE TB_KPI_PJT_REG_MEM
+     SET DEL_FLAG = 'Y'
+     ,UPDATE_ID = @{UPDATE_ID}
+     ,UPDATE_DTTM =DBO.UFN_GETDATE()
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}	
+       AND PJT_NO	    = @{PROJECT_NO}
+    
+    
+   
+   END;
+   
+    </update>
+	
+	
+	<update id="projectAddFileNoUpdate" parameterType="map">
+	/****** [ snop.meetingMng.projectAddFileNoUpdate ] ******/
+	/* TB_KPI_PJT PRIMARY KEY:COMPANY_CD, BU_CD, PJT_NO    */
+	UPDATE TB_KPI_PJT
+	SET FILE_NO = @{FILE_NO}
+	WHERE COMPANY_CD = @{COMPANY_CD}
+	 AND BU_CD = ISNULL(@{BU_CD},@{GV_BU_CD})
+	  AND PJT_NO   = @{PJT_NO}
+	</update>
+	
+	
+	<update id="processAddFileNoUpdate" parameterType="map">
+	/****** [ snop.meetingMng.processAddFileNoUpdate ] ******/
+	/* TB_KPI_PJT PRIMARY KEY:COMPANY_CD, BU_CD, PJT_NO    */
+	UPDATE TB_KPI_PJT
+	SET FILE_NO = @{FILE_NO}
+	WHERE COMPANY_CD = @{COMPANY_CD}
+	 AND BU_CD = ISNULL(@{BU_CD},@{GV_BU_CD})
+	  AND PJT_NO   = @{PJT_NO}
+	</update>
+	
+	
+	
+	<!-- 과정관리(processAdd) 시작-->
+	<select id="processAddSelect" parameterType="map" resultType="map">
+	/****** [ snop.meetingMng.processAddSelect ] ******/
+   
+     BEGIN 
+    
+	   	SELECT KP.COMPANY_CD 							   		AS COMPANY_CD
+	     , KP.BU_CD										   		AS BU_CD
+	     , KP.PRT_PJT_NO								   		AS PRT_PJT_NO
+	     , (SELECT STUFF((SELECT ',' + dbo.UFN_GET_USER_NAME(KPRM.USER_ID)
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PRT_PJT_NO
+	                         AND KPRM.DEL_FLAG = KP.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) 		AS REGISTER_MNGER
+	     , KP.PJT_NM									   		AS PJT_NM
+	     , KP.PRT_PJT_NO									   	AS PROJECT_NO
+	     , KP.PROCESS									   		AS PROCESS
+	     , CONVERT(VARCHAR(30), CAST(KP.REG_DATE AS DATE), 23)  AS REG_DATE      
+	     , KP.FILE_NO                                      		AS FILE_NO
+	     , CF.FILE_NM_ORG 								   		AS FILE_NM_ORG
+	     , KP.PROGRESS									   		AS PROGRESS
+	     , KP.PERFORMANCE								   		AS PERFORMANCE
+	     , KP.REMARK									   		AS REMARK
+	     , KP.PJT_CATE 											AS PJT_CATE
+	     , KP.PJT_NO                                            AS PROJECT_SUB_NO  								   		
+	     , (SELECT STUFF((SELECT ',' + KPRM.USER_ID
+	                        FROM TB_KPI_PJT_REG_MEM KPRM WITH(NOLOCK)
+	                       WHERE KPRM.COMPANY_CD = KP.COMPANY_CD
+	                         AND KPRM.BU_CD = KP.BU_CD
+	                         AND KPRM.PJT_NO = KP.PRT_PJT_NO
+	                         AND KPRM.DEL_FLAG = KP.DEL_FLAG
+	                         FOR XML PATH('')), 1, 1, '')) 		AS REGISTER_MNGER_ID
+	  FROM TB_KPI_PJT KP WITH(NOLOCK)
+	  OUTER APPLY (
+              SELECT TOP 1 CF.FILE_NM_ORG
+                 FROM TB_COMM_FILE CF WITH(NOLOCK)
+              	 WHERE CF.FILE_NO = KP.FILE_NO
+              	 AND DEL_FLAG != 'Y'
+              	 ORDER BY CF.FILE_SEQ
+             ) CF
+	   
+	 WHERE KP.COMPANY_CD = @{GV_COMPANY_CD}
+	   AND KP.PJT_CATE = 'PRC'
+	   AND KP.DEL_FLAG = 'N'
+	   AND KP.PRT_PJT_NO = @{projectNO} -- 프로젝트 등록 팝업에서 선택한 PJT_NO
+   
+   END;
+	
+	</select>
+	
+	<insert id="processAddInsert" parameterType="map">
+	/****** [ snop.meetingMng.processAddInsert ] ******/
+	/* TB_KPI_PJT PK:
+	
+	COMPANY_CD,
+	BU_CD,
+	PJT_NO
+	
+	*/
+    <![CDATA[
+   
+    
+    BEGIN 
+    DECLARE @PJT_TYPE_ID nvarchar(12)
+	SET @PJT_TYPE_ID = @{PJT_TYPE};
+		
+	    INSERT INTO TB_KPI_PJT (
+	            COMPANY_CD    
+	          , BU_CD
+			  , PJT_CATE
+			  , PJT_NO   
+			  , PJT_NM
+			  , PRT_PJT_NO
+			  , PROCESS
+			  , REG_DATE
+			  , FILE_NO
+			  , PROGRESS
+			  , PERFORMANCE
+			  , REMARK
+			  , PJT_TYPE
+			  , OPEN_YN
+			  , DEL_FLAG
+			  , CREATE_ID
+			  , CREATE_DTTM
+			  , UPDATE_ID
+			  , UPDATE_DTTM
+			  , PJT_MNG
+			  , START_DATE
+			  , CLOSE_DATE
+			  
+			  , TEAM_CD
+			  , PJT_STATUS_CD
+		
+	    ) VALUES (
+	          ISNULL(@{COMPANY_CD}, @{GV_COMPANY_CD})
+	          , ISNULL(@{BU_CD},@{GV_BU_CD})
+	          , 'PRC'
+	          
+	          
+	          , CASE WHEN @PJT_TYPE_ID = 'PROH' THEN @{PROJECT_SUB_NO}
+                ELSE 
+                    DBO.UFN_GET_PRC_PJT_NO(@{PRT_PJT_NO})
+                END
+	          
+	          
+	          , @{PJT_NM}
+	          , @{PROJECT_NO}
+	          , @{PROCESS}
+	          , REPLACE(@{REG_DATE},'-','')
+	          , @{FILE_NO}
+	          , @{PROGRESS}
+	          , @{PERFORMANCE}
+	          , @{REMARK}
+	          , @{PJT_TYPE}  
+	          , @{OPEN_YN} 
+	          , ISNULL(@{DEL_FLAG}, 'N')
+	          , @{CREATE_ID}
+	          , DBO.UFN_GETDATE()
+	          , @{UPDATE_ID}
+	          , DBO.UFN_GETDATE()
+	          , @{PJT_MNGER}
+	          , REPLACE(@{START_DATE},'-','')
+	          , REPLACE(@{CLOSE_DATE},'-','')
+	          
+	          , @{TEAM_CD}
+	          , @{PJT_STATUS_CD}
+	          
+	    );
+	    
+    END;
+    
+      ]]>
+	</insert>
+	
+	
+	<update id="processAddUpdate" parameterType="map">
+    /****** [  snop.meetingMng.processAddUpdate ] ******/
+    /* PRIMARY KEY:
+    
+    COMPANY_CD,
+    BU_CD,
+    PJT_NO
+    */
+  
+    UPDATE TB_KPI_PJT 
+    SET PROCESS       	= @{PROCESS}
+      , REG_DATE		= REPLACE (@{REG_DATE}, '-', '')
+      , FILE_NO			= @{FILE_NO}
+      , PROGRESS		= @{PROGRESS}
+      , PERFORMANCE		= @{PERFORMANCE}
+      , REMARK			= @{REMARK}
+      , UPDATE_ID		= @{UPDATE_ID}
+      , UPDATE_DTTM		= DBO.UFN_GETDATE()
+    
+  	 WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}
+       AND PJT_NO       = @{PROJECT_SUB_NO}
+  
+    </update>
+	
+	
+	<update id="processAddDelete" parameterType="map">
+    /****** [ snop.meetingMng.processAddDelete ] ******/
+    
+     UPDATE TB_KPI_PJT
+     SET DEL_FLAG = 'Y'
+  	  , UPDATE_ID		= @{UPDATE_ID}
+      , UPDATE_DTTM		= DBO.UFN_GETDATE() 
+     WHERE COMPANY_CD   = @{COMPANY_CD}
+       AND BU_CD 		= @{BU_CD}	
+       AND PJT_NO	    = @{PROJECT_SUB_NO}
+   
+    </update>
+	
+	
+	<!-- USER 팀명 선택에 따른 본부명 실시간 셋팅 위한 QUERY -->
+	<select id="divNmSelect" parameterType="map" resultType="map">
+	/****** [ snop.meetingMng.divNmSelect ] ******/
+	
+		
+	WITH TB_TEAM_CD  AS (
+		SELECT BU_CD,CODE_CD,CODE_NM_KR,ATTB_4_CD
+		FROM TB_MST_CODE
+		WHERE GROUP_CD = 'TEAM_CD'
+	) ,
+	 TB_DIV_CD AS(
+		SELECT BU_CD,CODE_CD,CODE_NM,CODE_NM_KR,CODE_NM_CN
+  		FROM TB_MST_CODE
+		WHERE GROUP_CD = 'DIV_CD' 
+	) ,
+	 TEMP AS(
+	
+		SELECT A.ATTB_4_CD
+		, A.BU_CD AS BU_CD
+		, A.CODE_CD AS TEAM_CD
+		, A.CODE_NM_KR AS TEAM_CD_NM
+		, B.CODE_CD AS DIV_CD
+		, B.CODE_NM AS DIV_NM
+		, B.CODE_NM_CN AS DIV_NM_CN
+		, B.CODE_NM_KR AS DIV_NM_KR
+		
+		FROM TB_TEAM_CD A
+		INNER JOIN TB_DIV_CD B
+		ON A.ATTB_4_CD = B.CODE_CD
+		AND A.BU_CD = B.BU_CD
+	)
+	SELECT  BU_CD, TEAM_CD
+	,  CASE WHEN 'ko'='ko' THEN T.DIV_NM_KR
+			WHEN 'cn'='ko' THEN T.DIV_NM_CN
+			ELSE T.DIV_NM END AS DIV_NM
+	FROM TEMP T
+	WHERE TEAM_CD = @{selectedTeamCd}
+	AND BU_CD = @{bu_cd}
+	
+			
+	</select>
+	
+	
+	<select id="breakingLimitPKValidationSelect" parameterType="map" resultType="map">
+    /****** [ snop.meetingMng.breakingLimitPKListSelect ] ******/
+    
+    SELECT COUNT(*) AS PROJECT_NO_EXIST_CNT
+    FROM TB_KPI_PJT
+    WHERE PJT_NO  = @{PROJECT_SUB_NO}
+    AND COMPANY_CD = @{GV_COMPANY_CD}
+    
+    
+    
+    </select>
+	
+	
+	
+</mapper>

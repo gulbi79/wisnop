@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+	
+	<select id="bucketLamMonth1Select" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.bucketLamMonth1Select ] ******/
+	    SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'LATELY' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'lang1', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+		UNION ALL
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'FUTURE' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'lang2', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE   
+	</select>
+	
+	<select id="bucketLamMonth2Select" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.bucketLamMonth2Select ] ******/
+	    SELECT 'LATELY_' + YEARMONTH AS BUCKET_ID
+		     , YEARMONTH AS BUCKET_VAL
+		     , 'LATELY_' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARMONTH ASC)) AS CD
+		     , 'M' + YEARMONTH AS NM
+		     , 'LATELY' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARMONTH BETWEEN LEFT(CONVERT(VARCHAR, DATEADD(MONTH, -7, CONVERT(DATETIME, @{fromMonth} + '01')), 112), 6) AND @{fromMonth}
+    	GROUP BY YEARMONTH
+    	UNION ALL
+    	 SELECT 'FUTURE_' + YEARMONTH AS BUCKET_ID
+		     , YEARMONTH AS BUCKET_VAL
+		     , 'FUTURE_' + CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY YEARMONTH ASC)) AS CD
+		     , 'M' + YEARMONTH AS NM
+		     , 'FUTURE' AS ROOT_CD
+		     , NULL AS TYPE
+		     , NULL AS TOT_TYPE
+		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		WHERE YEARMONTH BETWEEN @{fromMonth} AND LEFT(CONVERT(VARCHAR, DATEADD(MONTH, 3, CONVERT(DATETIME, @{fromMonth} + '01')), 112), 6)
+    	GROUP BY YEARMONTH
+	</select>
+
+	<select id="lamSalesTrendMonthlySelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.lamSalesTrendMonthlySelect ] ******/
+	    SELECT NULL AS TMP_COL
+			<include refid="include.getCdDimTotal"/>
+			<include refid="include.getGrpLvlId"/>
+			#foreach($bucketMap in $_parameter.bucketList)
+			 , SUM($bucketMap.CD) AS $bucketMap.CD
+			#end
+			 , AVG(PAST_3_MONTH) AS PAST_3_MONTH
+			 , AVG(FUTURE_3_MONTH) AS FUTURE_3_MONTH
+			 , AVG(PAST_FUTURE_3_MONTH) AS PAST_FUTURE_3_MONTH
+	    FROM
+	    (
+		    SELECT ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD
+		         , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(MI.SPEC, ' ') AS SPEC
+			     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+			     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO
+			     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO_NM
+			     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			     , ISNULL(CAST (MICG.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+				 , ISNULL(CAST (MICG.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+				#foreach($bucketMap in $_parameter.bucketList)
+				 , $bucketMap.CD AS $bucketMap.CD
+			    #end
+			     , (ISNULL(LATELY_6, 0) + ISNULL(LATELY_7, 0) + ISNULL(LATELY_8, 0)) / 3 AS PAST_3_MONTH
+			     , (ISNULL(FUTURE_1, 0) + ISNULL(FUTURE_2, 0) + ISNULL(FUTURE_3, 0)) / 3 AS FUTURE_3_MONTH
+			     , (ISNULL(LATELY_6, 0) + ISNULL(LATELY_7, 0) + ISNULL(LATELY_8, 0) + ISNULL(FUTURE_1, 0) + ISNULL(FUTURE_2, 0) + ISNULL(FUTURE_3, 0)) / 6 AS PAST_FUTURE_3_MONTH
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+			INNER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+			   ON MC.COMPANY_CD = MI.COMPANY_CD
+			  AND MC.BU_CD = MI.BU_CD
+			  AND MC.CUST_CD = MI.REP_CUST_CD
+			  AND MC.REP_CUST_GROUP_CD = 'RCG003'
+			LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+			  ON MIG.COMPANY_CD = MI.COMPANY_CD
+			 AND MIG.BU_CD = MI.BU_CD
+			 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+			LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+			  ON MICG.COMPANY_CD = MI.COMPANY_CD
+			 AND MICG.BU_CD = MI.BU_CD
+			 AND MICG.ITEM_CD = MI.ITEM_CD
+			 AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+			LEFT OUTER JOIN 
+			(
+				SELECT DBO.COMPANY_CD
+	                 , DBO.BU_CD
+	                 , DBO.ITEM_CD
+	                 , MCU.CUST_GROUP_CD
+					#foreach($bucketMap in $_parameter.bucketList)
+					#set($paramMon = "$bucketMap.BUCKET_VAL")
+					#if($bucketMap.ROOT_CD.indexOf("LATELY") != -1)
+					 , SUM(CASE WHEN MC.YEARMONTH = '$paramMon' THEN DBO.QTY END) AS $bucketMap.CD
+					#end
+					#end
+				FROM TB_DYN_BILL_ORDER DBO WITH(NOLOCK)
+	            INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+	               ON MC.YYYYMMDD = DBO.BILL_DATE
+	              AND MC.YEARMONTH BETWEEN LEFT(CONVERT(VARCHAR, DATEADD(MONTH, -7, CONVERT(DATETIME, @{fromMon} + '01')), 112), 6) AND @{fromMon}
+	            INNER JOIN TB_MST_CUSTOMER MCU WITH(NOLOCK)
+	               ON MCU.COMPANY_CD = DBO.COMPANY_CD
+	              AND MCU.BU_CD = DBO.BU_CD
+	              AND MCU.CUST_CD = DBO.CUST_CD
+	            WHERE DBO.COMPANY_CD = @{GV_COMPANY_CD}
+	              AND DBO.BU_CD = @{GV_BU_CD}
+	              AND DBO.DEL_FLAG = 'N'
+	              AND DBO.BILL_TO_PARTY IN ('30038', '10485')
+	            GROUP BY DBO.COMPANY_CD, DBO.BU_CD, DBO.ITEM_CD, MCU.CUST_GROUP_CD
+			) DBO
+			ON DBO.COMPANY_CD = MI.COMPANY_CD
+			AND DBO.BU_CD = MI.BU_CD
+			AND DBO.ITEM_CD = MI.ITEM_CD
+			AND DBO.CUST_GROUP_CD = MC.CUST_GROUP_CD
+			LEFT OUTER JOIN 
+			(
+				SELECT HAP.COMPANY_CD
+	                 , HAP.BU_CD
+	                 , HAP.ITEM_CD
+	                 , HAP.CUST_GROUP_CD
+					#foreach($bucketMap in $_parameter.bucketList)
+					#set($paramMon = "$bucketMap.BUCKET_VAL")
+					#if($bucketMap.ROOT_CD.indexOf("FUTURE") != -1)
+					 , SUM(CASE WHEN MC.YEARMONTH = '$paramMon' THEN HAP.QTY END) AS $bucketMap.CD
+					#end
+					#end
+				FROM TB_HIS_ACTION_PLAN HAP WITH(NOLOCK)
+	            INNER JOIN 
+	            (
+	            	SELECT DISTINCT MC.YEARMONTH
+	                	 , MC.YEARPWEEK
+					FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+	                WHERE MC.YEARMONTH BETWEEN @{fromMon} AND LEFT(CONVERT(VARCHAR, DATEADD(MONTH, 3, CONVERT(DATETIME, @{fromMon} + '01')), 112), 6)
+				) MC
+	            ON MC.YEARPWEEK = HAP.YEARPWEEK
+	            WHERE HAP.PLAN_ID = (
+										SELECT PLAN_ID
+									  	FROM TB_MST_PLAN_VERSION
+									 	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+									   	  AND BU_CD = @{GV_BU_CD}
+									   	  AND PLAN_TYPE_CD = 'DP_M'
+									   	  AND START_MONTH = @{fromMon}
+						            )
+	              AND HAP.COMPANY_CD = @{GV_COMPANY_CD}
+	              AND HAP.BU_CD = @{GV_BU_CD}
+	              AND HAP.MEAS_CD = 'AP2_SP'
+	            GROUP BY HAP.COMPANY_CD, HAP.BU_CD, HAP.ITEM_CD, HAP.CUST_GROUP_CD
+			) HAP
+			ON HAP.COMPANY_CD = MI.COMPANY_CD
+			AND HAP.BU_CD = MI.BU_CD
+			AND HAP.ITEM_CD = MI.ITEM_CD
+			AND HAP.CUST_GROUP_CD = MC.CUST_GROUP_CD
+			WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MI.BU_CD = @{GV_BU_CD}
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+       		  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+  			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       		  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+  			#end
+  			#if($_parameter.spec and $_parameter.spec != "")
+			  AND (MI.SPEC LIKE '%'+@{spec}+'%')
+			#end
+		) A
+		GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+	   	ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		  , A.$dimMap.DIM_CD
+		#end  
+	</select>
+	
+	<select id="bucketLamMonthSummary1Select" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.bucketLamMonthSummary1Select ] ******/
+	    SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'Q1' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'q1', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+		UNION ALL
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'Q2' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'q2', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE   
+		UNION ALL
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'Q3' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'q3', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+		UNION ALL
+		SELECT '' AS BUCKET_ID
+		     , '' AS BUCKET_VAL
+		     , 'Q4' AS CD
+		     , dbo.UFN_GET_TRANSLATE('lbl', 'q4', @{GV_LANG}) AS NM
+		     , '' AS ROOT_CD
+		     , 'group' AS TYPE
+		     , NULL AS TOT_TYPE
+	</select>
+	
+	<select id="bucketLamMonthSummary2Select" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.bucketLamMonthSummary2Select ] ******/
+	    SELECT *
+		FROM
+		(
+			SELECT 'M' + MONTH AS CD
+			     , 'M' + MONTH AS NM
+			     , 'Q' + QUARTER AS ROOT_CD
+			     , MONTH AS BUCKET_VAL
+			     , NULL AS TYPE
+			     , NULL AS TOT_TYPE
+			FROM  TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YYYYMMDD BETWEEN @{fromDate} AND @{toDate}
+			GROUP BY YEAR, HALF, QUARTER, YEARMONTH, MONTH
+			UNION ALL
+			SELECT 'Q' + QUARTER AS CD
+			     , 'Quart. Total' AS NM
+			     , 'Q' + QUARTER  AS ROOT_CD
+			     , NULL AS BUCKET_VAL
+			     , NULL AS TYPE
+			     , 'MT' AS TOT_TYPE
+			FROM TB_MST_CALENDAR WITH(NOLOCK)
+			WHERE YYYYMMDD BETWEEN @{fromDate} AND @{toDate} 
+			GROUP BY YEAR, HALF, QUARTER
+		) A
+		ORDER BY ROOT_CD, TOT_TYPE
+	</select>
+	
+	<select id="lamSalesTrendMonthlySummarySelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.lamSalesTrendMonthlySummarySelect ] ******/
+	    SELECT *
+	    FROM
+	    (
+		    SELECT NULL AS TMP_COL
+				<include refid="include.getDimTotal"/>
+				, GRP_LVL_ID
+				#set($strTotal = "")
+				#foreach($bucketMap in $_parameter.bucketList)
+				#if($bucketMap.CD.indexOf("Q") == -1)
+				 , $bucketMap.CD AS $bucketMap.CD
+				#set($strTotal = $strTotal + "," +$bucketMap.CD)
+				#else
+				 , ISNULL($strTotal.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+				#set($strTotal = "")
+				#end
+				#end
+				 , 0		
+				#foreach($bucketMap in $_parameter.bucketList)
+				#if($bucketMap.CD.indexOf("Q") == -1)
+				 + ISNULL($bucketMap.CD, 0) 
+				#end
+				#end
+				AS TOTAL
+		    FROM
+		    (
+				SELECT MC.[YEAR] AS YEAR
+					 , MC.[YEAR] AS YEAR_NM
+				     , DBO.CUST_CD AS CUST_CD
+				     , DBO.CUST_CD AS CUST_CD_NM
+				     , MBP.BP_NM AS BP_NM
+				     , MBP.BP_NM AS BP_NM_NM
+				    <include refid="include.getGrpLvlId"/>
+					#foreach($bucketMap in $_parameter.bucketList)
+					#set($paramMon = "$bucketMap.BUCKET_VAL")
+					#if($bucketMap.CD.indexOf("Q") == -1)
+					#if($_parameter.qtyAmt == "qty")
+					 , SUM(CASE WHEN MC.MONTH = '$paramMon' THEN DBO.QTY END) AS $bucketMap.CD
+					#elseif($_parameter.qtyAmt == "amt")
+					 , SUM(CASE WHEN MC.MONTH = '$paramMon' THEN DBO.AMT_KRW END) AS $bucketMap.CD
+					#end
+					#end
+					#end
+				  FROM TB_DYN_BILL_ORDER DBO WITH(NOLOCK)
+				 INNER JOIN TB_MST_BIZ_PARTNER MBP WITH(NOLOCK)
+				    ON MBP.COMPANY_CD = DBO.COMPANY_CD
+				   AND MBP.BU_CD = DBO.BU_CD
+				   AND MBP.BP_CD = DBO.CUST_CD
+				 INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+				    ON MC.YYYYMMDD = DBO.BILL_DATE
+				   AND MC.YEAR IN (@{year}, LEFT(CONVERT(VARCHAR, DATEADD(YEAR, -1, CONVERT(DATETIME, @{year} + '0101')), 112), 4), LEFT(CONVERT(VARCHAR, DATEADD(YEAR, -2, CONVERT(DATETIME, @{year} + '0101')), 112), 4))
+				 WHERE DBO.COMPANY_CD = @{GV_COMPANY_CD}
+				   AND DBO.BU_CD = @{GV_BU_CD}
+				   AND DBO.DEL_FLAG = 'N'
+				   AND DBO.BILL_TO_PARTY IN ('30038', '10485')
+				 GROUP BY ROLLUP ((MC.[YEAR]), (DBO.CUST_CD, MBP.BP_NM))
+			) A
+		) B
+		WHERE B.YEAR IS NOT NULL
+		ORDER BY B.[YEAR], B.GRP_LVL_ID, B.CUST_CD
+	</select>
+	
+	<select id="lamSalesTrendMonthlySummaryExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ dp.salesPerform.lamSalesTrendMonthlySummaryExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+	
+	
+	
+
+</mapper>

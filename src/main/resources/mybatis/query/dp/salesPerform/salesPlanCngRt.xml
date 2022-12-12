@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+
+    <select id="salesPlanCngRtSelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.salesPlanCngRtSelect ] ******/
+	    #set( $weekArr = [16..1] )
+	    #set( $weekArrCom = [15..1] )
+		BEGIN
+	
+		    DECLARE @CH_VAR NVARCHAR(200) = dbo.UFN_GET_TRANSLATE('lbl', 'variationRate', @{GV_LANG});
+		    
+		    <include refid="snop.common.w_cust" />
+		    ,
+		    T AS
+			(
+			    SELECT 'W-1' AS MEAS_CD
+			         , 1 AS SORT
+			    UNION ALL
+			    SELECT 'W-2' AS MEAS_CD
+			         , 2 AS SORT
+			    UNION ALL
+			    SELECT 'W-3' AS MEAS_CD
+			         , 3 AS SORT
+			    UNION ALL
+			    SELECT 'W-4' AS MEAS_CD
+			         , 4 AS SORT
+			    UNION ALL
+			    SELECT 'W-5' AS MEAS_CD
+			         , 5 AS SORT
+			    UNION ALL
+			    SELECT 'W-6' AS MEAS_CD
+			         , 6 AS SORT
+			    UNION ALL
+			    SELECT 'W-7' AS MEAS_CD
+			         , 7 AS SORT
+			    UNION ALL
+			    SELECT 'W-8' AS MEAS_CD
+			         , 8 AS SORT
+			    UNION ALL
+			    SELECT 'W-9' AS MEAS_CD
+			         , 9 AS SORT
+			    UNION ALL
+			    SELECT 'W-10' AS MEAS_CD
+			         , 10 AS SORT
+			    UNION ALL
+			    SELECT 'W-11' AS MEAS_CD
+			         , 11 AS SORT
+			    UNION ALL
+			    SELECT 'W-12' AS MEAS_CD
+			         , 12 AS SORT
+			    UNION ALL
+			    SELECT 'W-13' AS MEAS_CD
+			         , 13 AS SORT
+			    UNION ALL
+			    SELECT 'W-14' AS MEAS_CD
+			         , 14 AS SORT
+			    UNION ALL
+			    SELECT 'W-15' AS MEAS_CD
+			         , 15 AS SORT
+			    UNION ALL
+			    SELECT 'W-16' AS MEAS_CD
+			         , 16 AS SORT
+			)
+			SELECT NULL AS TMP_COL
+			    <include refid="include.getCdDimTotal"/>
+		    	<include refid="include.getGrpLvlId"/>
+		     	, SUM(CASE WHEN A.MEAS_CD IN ('W-1', 'W-2', 'W-3') THEN A.CHG_CNT ELSE 0 END)
+				/ NULLIF(CONVERT(FLOAT, CASE WHEN SUM(CASE WHEN A.MEAS_CD IN ('W-1', 'W-2', 'W-3', 'W-4') THEN A.WEEK_CNT ELSE 0 END) - 1 <![CDATA[<]]> 0 THEN 0
+		            						 ELSE SUM(CASE WHEN A.MEAS_CD IN ('W-1', 'W-2', 'W-3', 'W-4') THEN A.WEEK_CNT ELSE 0 END) - 1
+		       							 END), 0) * 100 AS FIRST_WEEK_PER
+		     	, SUM(CASE WHEN A.MEAS_CD IN ('W-13', 'W-14', 'W-15') THEN A.CHG_CNT ELSE 0 END)
+				/ NULLIF(CONVERT(FLOAT, CASE WHEN SUM(CASE WHEN A.MEAS_CD IN ('W-13', 'W-14', 'W-15', 'W-16') THEN A.WEEK_CNT ELSE 0 END) - 1 <![CDATA[<]]> 0 THEN 0
+		          							 ELSE SUM(CASE WHEN A.MEAS_CD IN ('W-13', 'W-14', 'W-15', 'W-16') THEN A.WEEK_CNT ELSE 0 END) - 1
+		       							END), 0) * 100 AS LAST_WEEK_PER
+		     	, SUM(A.CHG_CNT)
+		       	/ NULLIF(CONVERT(FLOAT, CASE WHEN SUM(A.WEEK_CNT) - 1 <![CDATA[<]]> 0 THEN 0 ELSE SUM(A.WEEK_CNT) - 1
+		       							 END), 0) * 100 AS TOTAL_WEEK_PER
+		     
+		     	, SUM(A.RS_QTY) AS RS_QTY
+		     	, MIN(A.PL_QTY) AS MIN_PL_QTY
+		     	, MAX(A.PL_QTY) AS MAX_PL_QTY
+		     	, AVG(A.PL_QTY) AS AVG_PL_QTY
+		     	, STDEV(A.PL_QTY) AS STDEV_PL_QTY
+		     	#foreach($bucketMap in $_parameter.bucketList)
+				#set($paramWeek = "$bucketMap.WEEK_VAL")
+				, SUM(CASE WHEN A.MEAS_CD = '$paramWeek' THEN A.PL_QTY END) AS $bucketMap.CD
+				#end
+			FROM 
+			(
+				SELECT A.*
+					 , CASE WHEN LEAD(A.PL_QTY) OVER(PARTITION BY A.COMPANY_CD, A.BU_CD, A.CUST_GROUP_CD, A.ITEM_CD ORDER BY A.SORT) IS NULL THEN 0
+		                    WHEN ISNULL(A.PL_QTY, 0) = LEAD(A.PL_QTY) OVER(PARTITION BY A.COMPANY_CD, A.BU_CD, A.CUST_GROUP_CD, A.ITEM_CD ORDER BY A.SORT) THEN 0
+		                    ELSE 1
+		               END AS CHG_CNT
+				FROM
+				(
+					SELECT CT.COMPANY_CD
+				         , CT.BU_CD
+				         , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+				         , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+				         , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+				         , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+				         , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID
+				         , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+				         , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+				         , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+				         , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+				         , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+				         , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+				         , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+				         , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+				         , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+				         , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+				         , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+				         , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+				         , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+				         , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD
+				         , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD_NM
+				         , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM
+				         , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM_NM
+				         , ISNULL (CT.SPEC, ' ')              AS SPEC
+				         , ISNULL (CT.SPEC, ' ')              AS SPEC_NM
+				         , ISNULL (CT.MFG_LT, ' ')            AS MFG_LT
+				         , ISNULL (CT.MFG_LT, ' ')            AS MFG_LT_NM
+				         , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO
+				         , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO_NM
+				         , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+				         , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+				         , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+				         , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+				         , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+				         , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+				         , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+				         , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+				         , CT.SALES_PRICE_KRW
+				         , PL.YEARWEEK
+				         , BB.MEAS_CD
+				         , BB.SORT
+				         , CASE WHEN SUM(ISNULL(PL.QTY, 0)) OVER(PARTITION BY CT.COMPANY_CD, CT.BU_CD, CT.CUST_GROUP_CD, CT.ITEM_CD ORDER BY BB.SORT DESC) = 0 THEN NULL
+				                ELSE ISNULL(PL.QTY, 0)
+				           END AS PL_QTY
+				         , CASE WHEN SUM(ISNULL(PL.QTY, 0)) OVER(PARTITION BY CT.COMPANY_CD, CT.BU_CD, CT.CUST_GROUP_CD, CT.ITEM_CD ORDER BY BB.SORT DESC) = 0 THEN 0
+				                ELSE 1
+				           END AS WEEK_CNT
+				         , CASE WHEN ROW_NUMBER() OVER(PARTITION BY CT.COMPANY_CD, CT.BU_CD, CT.ITEM_CD, CT.CUST_GROUP_CD ORDER BY BB.MEAS_CD) = 1 THEN ISNULL(DR.QTY, 0) END RS_QTY
+					FROM W_CUST CT
+				    CROSS JOIN T BB 
+				    LEFT OUTER JOIN
+				    (
+				    	SELECT C.COMPANY_CD
+				    	     , C.BU_CD
+				    	     , C.ITEM_CD
+				    	     , C.CUST_GROUP_CD
+				    	     , C.MEAS_CD
+				    	     , SUM(ISNULL(C.QTY, 0)) AS QTY
+				    	     , MAX(C.YEARWEEK) AS YEARWEEK
+				        FROM TB_KPI_SALES_PLAN_CHG C WITH(NOLOCK)
+				       	WHERE C.YEARWEEK = @{fromWeek}
+				       	GROUP BY C.COMPANY_CD, C.BU_CD, C.ITEM_CD, C.CUST_GROUP_CD, C.MEAS_CD
+				    ) PL
+				    ON PL.COMPANY_CD = CT.COMPANY_CD
+				    AND PL.BU_CD = CT.BU_CD
+				    AND PL.CUST_GROUP_CD = CT.CUST_GROUP_CD
+				    AND PL.ITEM_CD = CT.ITEM_CD
+				    AND PL.MEAS_CD = BB.MEAS_CD
+				    LEFT OUTER JOIN
+			        (
+			        	SELECT B1.COMPANY_CD
+			        	     , B1.BU_CD
+			        	     , B1.ITEM_CD
+			        	     , B2.CUST_GROUP_CD
+			        	     , SUM(B1.QTY) AS QTY
+				        FROM
+				        (
+							SELECT COMPANY_CD
+				                 , BU_CD
+				                 , ITEM_CD
+				                 , CUST_CD
+				                 , SUM(QTY) AS QTY
+				            FROM TB_DYN_SALES_RESULT WITH(NOLOCK)
+				            WHERE SALES_DATE BETWEEN @{swFromDate} AND @{swToDate}
+				              AND PLANT_CD = 'WF01'
+				              AND DEL_FLAG = 'N'
+				              AND CPFR_FLAG != 'Y'
+				            GROUP BY COMPANY_CD, BU_CD, ITEM_CD, CUST_CD
+			            ) B1
+			            INNER JOIN
+			            (
+							SELECT COMPANY_CD
+		                         , BU_CD
+		                         , CUST_CD
+		                         , CUST_GROUP_CD
+		                    FROM TB_MST_CUSTOMER WITH(NOLOCK)
+			            ) B2
+	                    ON B1.COMPANY_CD = B2.COMPANY_CD
+	                    AND B1.BU_CD = B2.BU_CD
+	                    AND B1.CUST_CD = B2.CUST_CD
+		                GROUP BY B1.COMPANY_CD, B1.BU_CD, B1.ITEM_CD, B2.CUST_GROUP_CD
+			        ) DR
+			        ON CT.COMPANY_CD       = DR.COMPANY_CD 
+				      AND CT.BU_CD         = DR.BU_CD
+				      AND CT.ITEM_CD       = DR.ITEM_CD
+				      AND CT.CUST_GROUP_CD = DR.CUST_GROUP_CD
+				    WHERE CT.COMPANY_CD = @{GV_COMPANY_CD}
+				      AND CT.BU_CD      = @{GV_BU_CD}
+					#if($_parameter.item_cd and $_parameter.item_cd != "")
+					  AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+					#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+					  AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+					#end
+					#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+					  AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+					#end
+					#if($_parameter.route and $_parameter.route != "")
+					  AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+					#end
+					#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+					  AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+					#end
+					#if($_parameter.custGroup and $_parameter.custGroup != "")
+					  AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+					#end
+				) A
+			) A
+		 	GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+		  	ORDER BY TMP_COL
+			#foreach($dimMap in $_parameter.dimList)
+			, A.$dimMap.DIM_CD
+			#end   
+		END;
+    </select>
+
+</mapper>

@@ -1,0 +1,963 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+    <select id="workerGroupProdPlanPlanIdSelect" parameterType="map" resultType="map">
+        /****** [ aps.dynamic.workerGroupProdPlanPlanIdSelect ] ******/
+        SELECT B1.*
+             , B1.PLAN_ID AS CODE_CD
+             , B1.PLAN_ID AS CODE_NM
+             , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.START_WEEK AND DAY_NM = 'SUN') AS START_DAY         
+             , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = B1.START_WEEK AND DAY_NM = 'SAT') AS END_DAY
+        FROM
+        (
+            SELECT PLAN_ID
+                 , START_WEEK
+                 , (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = (SELECT CONVERT(NVARCHAR, DATEADD(DAY, 7, YYYYMMDD), 112) AS YYYYMMDD FROM TB_MST_CALENDAR WHERE YEARWEEK = A1.START_WEEK AND DAY_NM = 'SUN')) AS END_WEEK
+            FROM TB_MST_PLAN_VERSION A1 WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'MP'
+              AND RELEASE_FLAG = 'Y'
+        ) B1
+        ORDER BY B1.START_WEEK DESC
+    </select>
+    
+    <select id="workerGroupProdPlanWorkplacesSelect" parameterType="map" resultType="map">
+        /****** [ aps.dynamic.workerGroupProdPlanWorkplacesSelect ] ******/
+        SELECT A.WC_CD AS CODE_CD
+             , A.WC_NM AS CODE_NM
+             , B.ATTB_2_CD AS PROD_PART
+        FROM TB_MST_WORK_CENTER A WITH(NOLOCK)
+        INNER JOIN TB_MST_CODE B WITH(NOLOCK)
+           ON A.ROUTING_ID = B.CODE_CD
+          AND B.GROUP_CD = 'PROD_L2'
+          AND B.USE_FLAG = 'Y'
+        WHERE A.WC_MGR = 'L'
+          AND A.FIREWORK_YN = 'Y'
+          AND B.ATTB_2_CD = @{prodPart}
+          AND EXISTS (
+                        SELECT 1
+                        FROM TB_MST_CODE C WITH(NOLOCK)
+                        WHERE C.BU_CD = A.BU_CD
+                          AND C.GROUP_CD = 'WORKER_GROUP'
+                          AND C.ATTB_2_CD = A.WC_CD
+                          AND C.USE_FLAG = 'Y'
+                     )
+        UNION ALL
+        SELECT 'NONE' AS WC_CD
+             , 'NONE' AS WC_NM
+             , @{prodPart} AS PROD_PART
+    </select>
+    
+    <select id="workerGroupProdPlanWorkerGroupSelect" parameterType="map" resultType="map">
+        /****** [ aps.dynamic.workerGroupProdPlanWorkerGroupSelect ] ******/
+        SELECT A.CODE_CD
+             , A.CODE_NM
+             , A.CODE_NM_KR
+             , A.CODE_NM_CN
+        FROM TB_MST_CODE A WITH(NOLOCK)
+        WHERE A.GROUP_CD = 'WORKER_GROUP'
+          AND A.ATTB_1_CD = @{prodPart}
+          AND A.USE_FLAG = 'Y'
+        UNION ALL
+        SELECT A.CODE_CD
+             , A.CODE_NM
+             , A.CODE_NM_KR
+             , A.CODE_NM_CN
+        FROM TB_MST_CODE A WITH(NOLOCK)
+        WHERE A.BU_CD = @{GV_BU_CD}
+          AND A.GROUP_CD = 'WORKER_GROUP'
+          AND A.CODE_CD = 'NONE'
+          AND A.USE_FLAG = 'Y'
+    </select>
+
+    <select id="workerGroupProdPlanSelect" parameterType="map" resultType="map">
+        /****** [ aps.dynamic.workerGroupProdPlanSelect ] ******/
+        BEGIN
+        
+            DECLARE @V_VERSION_ID_MP NVARCHAR(20)
+                  , @V_PLAN_ID_FP NVARCHAR(8)
+                  , @V_VERSION_ID_FP NVARCHAR(20)
+                  , @V_BEFORE_WEEK_THU NVARCHAR(8)
+                  , @V_BEFORE_WEEK_SAT NVARCHAR(8)
+            ;
+                  
+            SELECT @V_BEFORE_WEEK_THU = CONVERT(VARCHAR, (DATEADD(DAY, -7, A1.YYYYMMDD)), 112)
+                 , @V_BEFORE_WEEK_SAT = CONVERT(VARCHAR, (DATEADD(DAY, -5, A1.YYYYMMDD)), 112)
+            FROM TB_MST_CALENDAR A1 WITH(NOLOCK)
+            WHERE YEARWEEK = @{startWeek}
+              AND DAY_NM ='THU'
+            ;
+            
+            SELECT @V_VERSION_ID_MP = MAX(VERSION_ID)
+            FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'MP'
+              AND PLAN_ID = @{planId}
+              AND VERSION_TYPE_CD = 'F'
+            ;
+            
+            SELECT TOP 1 @V_PLAN_ID_FP = PLAN_ID
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'FP'
+              AND RELEASE_FLAG = 'Y'
+            ORDER BY APS_START_DATE DESC
+            ;
+             
+            SELECT @V_VERSION_ID_FP = MAX(VERSION_ID)
+            FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'FP'
+              AND PLAN_ID = @V_PLAN_ID_FP
+              AND VERSION_TYPE_CD = 'F'
+            ;
+              
+            SELECT ISNULL(DPOHD.PROD_PART, ISNULL(HAPP.PROD_PART, DI.PROD_PART)) AS PROD_PART
+                 , ISNULL(DPOHD.PROD_PART, ISNULL(HAPP.PROD_PART, DI.PROD_PART)) AS PROD_PART_NM
+                 , MC.ATTB_2_CD AS WC_CD
+                 , MC.ATTB_2_CD AS WC_CD_NM
+                 , ISNULL(MWC.WC_NM, 'NONE') AS WC_NM
+                 , ISNULL(MWC.WC_NM, 'NONE') AS WC_NM_NM
+                 , MC.CODE_CD AS WORKER_GROUP_CD
+                 , MC.CODE_NM AS WORKER_GROUP
+                 , MC.CODE_NM AS WORKER_GROUP_NM
+                 , DPOHD.REMAIN_QTY
+                 , HAPP.PLAN_QTY_W1
+                 , ROUND(HAPP.PLAN_QTY_W1 / NULLIF(DPOHD.REMAIN_QTY, 0) * 100, 1) AS RATE_W1
+                 , DI2.PRE_PROD
+                 , DI.QTY_D1
+                 , DI.QTY_D2
+                 , DI.QTY_D3
+                 , DI.QTY_D4
+                 , DI.QTY_D5
+                 , DI.QTY_D6
+                 , DI.QTY_D7
+                 , ISNULL(DI2.PRE_PROD, 0) + ISNULL(DI.QTY_D1, 0) + ISNULL(DI.QTY_D2, 0) + ISNULL(DI.QTY_D3, 0) + ISNULL(DI.QTY_D4, 0) + ISNULL(DI.QTY_D5, 0) + ISNULL(DI.QTY_D6, 0) + ISNULL(DI.QTY_D7, 0) AS TOTAL
+                 , HAPP.WEEKLY_PROD_PLAN_AMT
+                 , DI.WEEKLY_PROD_RESULT_AMT
+                 , ROUND((ISNULL(DI2.PRE_PROD, 0) + ISNULL(DI.QTY_D1, 0) + ISNULL(DI.QTY_D2, 0) + ISNULL(DI.QTY_D3, 0) + ISNULL(DI.QTY_D4, 0) + ISNULL(DI.QTY_D5, 0) + ISNULL(DI.QTY_D6, 0) + ISNULL(DI.QTY_D7, 0)) / NULLIF(HAPP.PLAN_QTY_W1, 0) * 100, 1) AS COMP_RATE
+                 <!-- , DI.QTY_D1 + DI.QTY_D2 + DI.QTY_D3 + DI.QTY_D4 + DI.QTY_D5 + DI.QTY_D6 + DI.QTY_D7 AS TOTAL
+                 , ROUND((DI.QTY_D1 + DI.QTY_D2 + DI.QTY_D3 + DI.QTY_D4 + DI.QTY_D5 + DI.QTY_D6 + DI.QTY_D7) / NULLIF(HAPP.PLAN_QTY_W1, 0) * 100, 1) AS COMP_RATE -->
+                 , HAPP.PLAN_QTY_W2
+                 , ROUND(HAPP.PLAN_QTY_W2 / NULLIF((DPOHD.REMAIN_QTY - HAPP.PLAN_QTY_W1), 0) * 100, 1) AS RATE_W2
+            FROM TB_MST_CODE MC WITH(NOLOCK)
+            LEFT OUTER JOIN 
+            (
+                SELECT MC2.ATTB_2_CD AS PROD_PART
+                     , ISNULL(MC1.CODE_CD, 'NONE') AS WORKER_GROUP
+                     , SUM(DPOHD.REMAIN_QTY) AS REMAIN_QTY
+                FROM TB_DYN_PROD_ORDER_HDR_DAILY DPOHD WITH(NOLOCK)
+                INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                   ON DPOH.COMPANY_CD = DPOHD.COMPANY_CD
+                  AND DPOH.BU_CD = DPOHD.BU_CD
+                  AND DPOH.PROD_ORDER_NO = DPOHD.PROD_ORDER_NO
+                LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+                  ON MC1.BU_CD = @{GV_BU_CD}
+                 AND MC1.GROUP_CD = 'WORKER_GROUP'
+                 AND MC1.CODE_CD = DPOH.WORKER_GROUP
+                 AND MC1.USE_FLAG = 'Y'
+                INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+                   ON MIP.COMPANY_CD = DPOHD.COMPANY_CD
+                  AND MIP.BU_CD = DPOHD.BU_CD
+                  AND MIP.PLANT_CD = 'WF01'
+                  AND MIP.ITEM_CD = DPOHD.ITEM_CD
+                INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+                   ON MC2.BU_CD = MIP.BU_CD
+                  AND MC2.GROUP_CD = 'PROD_L2'
+                  AND MC2.CODE_CD = MIP.ROUTING_ID
+                  AND MC2.ATTB_2_CD = @{prodPart}
+                  AND MC2.USE_FLAG = 'Y'
+                WHERE DPOHD.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPOHD.BU_CD = @{GV_BU_CD}
+                  AND DPOHD.YYYYMMDD = @{fromCal}
+                  AND DPOHD.ORDER_STATUS IN ('RL', 'ST')
+                  AND EXISTS (
+                                SELECT 1
+                                FROM TB_MST_ITEM MI WITH(NOLOCK)
+                                WHERE MI.COMPANY_CD = DPOHD.COMPANY_CD
+                                  AND MI.BU_CD = DPOHD.BU_CD
+                                  AND MI.ITEM_CD = DPOHD.ITEM_CD
+                                  AND MI.ITEM_TYPE = @{itemType}
+                                #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+                                  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+                                #end
+                            )
+                GROUP BY MC2.ATTB_2_CD, ISNULL(MC1.CODE_CD, 'NONE')
+            ) DPOHD
+            ON DPOHD.WORKER_GROUP = MC.CODE_CD
+            AND MC.USE_FLAG = 'Y'
+            LEFT OUTER JOIN 
+            (
+                SELECT HAPP.PROD_PART
+                     , ISNULL(MC.CODE_CD, ISNULL(MC1.CODE_CD, 'NONE')) AS WORKER_GROUP
+                     , SUM(CASE WHEN MCAL.YEARWEEK = @{startWeek} THEN HAPP.QTY ELSE 0 END) AS PLAN_QTY_W1
+                     , SUM(CASE WHEN MCAL.YEARWEEK = @{endWeek} THEN HAPP.QTY ELSE 0 END) AS PLAN_QTY_W2
+                     
+                     -- 20211124 김수호 추가: ITSM 4번, 컬럼추가요청( 주간 생산계획 금액, 주간 생산실적 금액 ) FROM 김동현 B 
+                     , SUM(
+
+                            CASE WHEN MCAL.YEARWEEK = @{startWeek}
+                            THEN HAPP.QTY * ISNULL(MICG.SALES_PRICE_KRW,0)
+                            ELSE 0
+                            END
+            
+                        ) AS WEEKLY_PROD_PLAN_AMT
+                     --------------------------------------------------------------------------------------
+                     
+                FROM TB_HIS_APS_PLAN_PEGGING HAPP WITH(NOLOCK)
+                INNER JOIN TB_MST_CALENDAR MCAL WITH(NOLOCK)
+                   ON MCAL.YYYYMMDD = CONVERT(NVARCHAR, HAPP.END_DTTM, 112)
+                  AND MCAL.YEARWEEK IN (@{startWeek}, @{endWeek})
+                OUTER APPLY 
+                (
+                    SELECT MAX(HAPP2.WORKER_GROUP) AS WORKER_GROUP
+                    FROM TB_HIS_APS_PLAN_PEGGING HAPP2 WITH(NOLOCK)
+                    WHERE HAPP2.PLAN_ID = HAPP.PLAN_ID
+                      AND HAPP2.VERSION_ID = HAPP.VERSION_ID
+                      AND HAPP2.COMPANY_CD = HAPP.COMPANY_CD
+                      AND HAPP2.BU_CD = HAPP.BU_CD
+                      AND HAPP2.PROD_PART = HAPP.PROD_PART
+                      AND HAPP2.DEMAND_ID = HAPP.DEMAND_ID
+                      AND HAPP2.ORDER_ID = HAPP.ORDER_ID
+                ) HAPP2
+                LEFT OUTER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                  ON MC.BU_CD = @{GV_BU_CD}
+                 AND MC.GROUP_CD = 'WORKER_GROUP'
+                 AND MC.CODE_CD = HAPP2.WORKER_GROUP
+                 AND MC.USE_FLAG = 'Y'
+                INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                   ON DPOH.COMPANY_CD = HAPP.COMPANY_CD
+                  AND DPOH.BU_CD = HAPP.BU_CD
+                  AND DPOH.PROD_ORDER_NO = HAPP.PROD_ORDER_NO  
+                LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+                  ON MC1.BU_CD = @{GV_BU_CD}
+                 AND MC1.GROUP_CD = 'WORKER_GROUP'
+                 AND MC1.CODE_CD = DPOH.WORKER_GROUP
+                 AND MC1.USE_FLAG = 'Y'
+                
+              -- 20211124 김수호 추가: ITSM 4번, 컬럼추가요청( 주간 생산계획 금액, 주간 생산실적 금액 ) FROM 김동현 B 
+                INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                ON MI.COMPANY_CD = HAPP.COMPANY_CD
+                AND MI.BU_CD     = HAPP.BU_CD
+                AND MI.ITEM_CD   = HAPP.ITEM_CD
+                INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+                ON MIP.COMPANY_CD = MI.COMPANY_CD
+                AND MIP.BU_CD = MI.BU_CD
+                AND MIP.PLANT_CD = 'WF01'
+                AND MIP.ITEM_CD = MI.ITEM_CD
+                LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+                ON MRC.COMPANY_CD = MI.COMPANY_CD
+                AND MRC.BU_CD = MI.BU_CD
+                AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+                LEFT OUTER JOIN TB_MST_CUSTOMER TMC WITH(NOLOCK)
+                ON TMC.COMPANY_CD = MRC.COMPANY_CD
+                AND TMC.BU_CD = MRC.BU_CD
+                AND TMC.CUST_CD = MRC.REP_CUST_CD
+                LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+                ON MICG.COMPANY_CD = MI.COMPANY_CD
+                AND MICG.BU_CD = MI.BU_CD
+                AND MICG.ITEM_CD = MI.ITEM_CD
+                AND MICG.CUST_GROUP_CD = TMC.CUST_GROUP_CD
+                ------------------------------------------------------------------------------------------
+                  
+                WHERE HAPP.PLAN_ID = @{planId}
+                  AND HAPP.VERSION_ID = @V_VERSION_ID_MP
+                  AND HAPP.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND HAPP.BU_CD = @{GV_BU_CD}
+                  AND HAPP.PROD_PART = @{prodPart}
+                  AND HAPP.ROUTING_ORDER IN ('S', 'L')
+                  AND HAPP.PROD_OR_QC = 'QC_PART'
+                  AND EXISTS (
+                                SELECT 1
+                                FROM TB_MST_ITEM MI WITH(NOLOCK)
+                                WHERE MI.COMPANY_CD = HAPP.COMPANY_CD
+                                  AND MI.BU_CD = HAPP.BU_CD
+                                  AND MI.ITEM_CD = HAPP.ITEM_CD
+                                  AND MI.ITEM_TYPE = @{itemType}
+                                #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+                                  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+                                #end
+                )
+                GROUP BY HAPP.PROD_PART, ISNULL(MC.CODE_CD, ISNULL(MC1.CODE_CD, 'NONE'))
+            ) HAPP
+            ON HAPP.WORKER_GROUP = MC.CODE_CD
+            LEFT OUTER JOIN 
+            (
+                SELECT DI.PROD_PART
+                , ISNULL(MC.CODE_CD, 'NONE') AS WORKER_GROUP
+                , SUM(DI.QTY_D1) AS QTY_D1
+                , SUM(DI.QTY_D2) AS QTY_D2
+                , SUM(DI.QTY_D3) AS QTY_D3
+                , SUM(DI.QTY_D4) AS QTY_D4
+                , SUM(DI.QTY_D5) AS QTY_D5
+                , SUM(DI.QTY_D6) AS QTY_D6
+                , SUM(DI.QTY_D7) AS QTY_D7
+                , SUM(DI.WEEKLY_PROD_RESULT_AMT) AS WEEKLY_PROD_RESULT_AMT
+                FROM 
+                (
+                    SELECT MC.ATTB_2_CD AS PROD_PART
+                         , ISNULL(DPOH.WORKER_GROUP, 'NONE') AS WORKER_GROUP
+                        #foreach($bucketMap in $_parameter.bucketList)
+                        #set($paramData = "$bucketMap.BUCKET_VAL")
+                         , CASE WHEN DI.RELEASE_DATE = '$paramData' THEN DI.GOODS_QTY ELSE 0 END AS QTY_D$velocityCount
+                        #end
+                        
+                        #foreach($bucketMap in $_parameter.bucketList)
+                        #set($paramData = "$bucketMap.BUCKET_VAL")
+                             #if($velocityCount == 1)
+                             , CASE WHEN DI.RELEASE_DATE = '$paramData' THEN DI.GOODS_QTY *ISNULL(MICG.SALES_PRICE_KRW,0) ELSE 0 END 
+                             #else
+                             + CASE WHEN DI.RELEASE_DATE = '$paramData' THEN DI.GOODS_QTY *ISNULL(MICG.SALES_PRICE_KRW,0) ELSE 0 END 
+                             #end
+                             
+                        #end
+                        AS WEEKLY_PROD_RESULT_AMT
+                        
+                        
+                    FROM TB_DYN_INSPECTION DI WITH(NOLOCK)
+                    INNER JOIN TB_DYN_PROD_ORDER_HDR_DAILY DPOHD WITH(NOLOCK)
+                       ON DPOHD.COMPANY_CD = DI.COMPANY_CD
+                      AND DPOHD.BU_CD = DI.BU_CD
+                      AND DPOHD.YYYYMMDD = @{fromCal}
+                      AND DPOHD.PROD_ORDER_NO = DI.PROD_ORDER_NO
+                    INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                       ON DPOH.COMPANY_CD = DPOHD.COMPANY_CD
+                      AND DPOH.BU_CD = DPOHD.BU_CD
+                      AND DPOH.PROD_ORDER_NO = DPOHD.PROD_ORDER_NO  
+                    INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+                       ON MIP.COMPANY_CD = DI.COMPANY_CD
+                      AND MIP.BU_CD = DI.BU_CD
+                      AND MIP.PLANT_CD = 'WF01'
+                      AND MIP.ITEM_CD = DI.ITEM_CD
+                      
+                    -- 20211124 김수호 추가: ITSM 4번, 컬럼추가요청( 주간 생산계획 금액, 주간 생산실적 금액 ) FROM 김동현 B  
+                    INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                    ON MI.COMPANY_CD = MIP.COMPANY_CD
+                    AND MI.BU_CD     = MIP.BU_CD
+                    AND MI.ITEM_CD   = MIP.ITEM_CD
+                    LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+                    ON MRC.COMPANY_CD = MI.COMPANY_CD
+                    AND MRC.BU_CD = MI.BU_CD
+                    AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+                    LEFT OUTER JOIN TB_MST_CUSTOMER TMC WITH(NOLOCK)
+                    ON TMC.COMPANY_CD = MRC.COMPANY_CD
+                    AND TMC.BU_CD = MRC.BU_CD
+                    AND TMC.CUST_CD = MRC.REP_CUST_CD
+                    LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+                    ON MICG.COMPANY_CD = MI.COMPANY_CD
+                    AND MICG.BU_CD = MI.BU_CD
+                    AND MICG.ITEM_CD = MI.ITEM_CD
+                    AND MICG.CUST_GROUP_CD = TMC.CUST_GROUP_CD
+                    ------------------------------------------------------------------------------------------
+                    
+                    INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                       ON MC.BU_CD = MIP.BU_CD
+                      AND MC.GROUP_CD = 'PROD_L2'
+                      AND MC.CODE_CD = MIP.ROUTING_ID
+                      AND MC.ATTB_2_CD = @{prodPart}
+                      AND MC.USE_FLAG = 'Y'
+                    WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND DI.BU_CD = @{GV_BU_CD}
+                      AND DI.RELEASE_DATE BETWEEN @{fromCal} AND @{toCal}
+                      AND DI.RELEASE_DATE <![CDATA[<]]> CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112)
+                      AND DI.DEL_FLAG = 'N'
+                      AND EXISTS (
+                                    SELECT 1
+                                    FROM TB_MST_ITEM MI WITH(NOLOCK)
+                                    WHERE MI.COMPANY_CD = DI.COMPANY_CD
+                                      AND MI.BU_CD = DI.BU_CD
+                                      AND MI.ITEM_CD = DI.ITEM_CD
+                                      AND MI.ITEM_TYPE = @{itemType}
+                                    #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+                                      AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+                                    #end
+                                 )
+                    UNION ALL
+                    SELECT HAPP.PROD_PART
+                         , ISNULL(HAPP2.WORKER_GROUP, ISNULL(DPOH.WORKER_GROUP, 'NONE')) AS WORKER_GROUP
+                        #foreach($bucketMap in $_parameter.bucketList)
+                        #set($paramData = "$bucketMap.BUCKET_VAL")
+                         , CASE WHEN CONVERT(NVARCHAR, HAPP.END_DTTM, 112) = '$paramData' THEN HAPP.QTY ELSE 0 END AS QTY_D$velocityCount
+                        #end
+                        #foreach($bucketMap in $_parameter.bucketList)
+                        #set($paramData = "$bucketMap.BUCKET_VAL")
+                            #if($velocityCount == 1)
+                             , CASE WHEN CONVERT(NVARCHAR, HAPP.END_DTTM, 112) = '$paramData' THEN HAPP.QTY *ISNULL(MICG.SALES_PRICE_KRW,0)  ELSE 0 END 
+                            #else
+                              + CASE WHEN CONVERT(NVARCHAR, HAPP.END_DTTM, 112) = '$paramData' THEN HAPP.QTY *ISNULL(MICG.SALES_PRICE_KRW,0)  ELSE 0 END 
+                            #end
+                            
+                        #end
+                        AS WEEKLY_PROD_RESULT_AMT
+                        
+                    FROM TB_HIS_APS_PLAN_PEGGING HAPP WITH(NOLOCK)
+                    INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                       ON DPOH.COMPANY_CD = HAPP.COMPANY_CD
+                      AND DPOH.BU_CD = HAPP.BU_CD
+                      AND DPOH.PROD_ORDER_NO = HAPP.PROD_ORDER_NO  
+                    OUTER APPLY 
+                    (
+                        SELECT MAX(HAPP2.WORKER_GROUP) AS WORKER_GROUP
+                        FROM TB_HIS_APS_PLAN_PEGGING HAPP2 WITH(NOLOCK)
+                        WHERE HAPP2.PLAN_ID = HAPP.PLAN_ID
+                          AND HAPP2.VERSION_ID = HAPP.VERSION_ID
+                          AND HAPP2.COMPANY_CD = HAPP.COMPANY_CD
+                          AND HAPP2.BU_CD = HAPP.BU_CD
+                          AND HAPP2.PROD_PART = HAPP.PROD_PART
+                          AND HAPP2.DEMAND_ID = HAPP.DEMAND_ID
+                          AND HAPP2.ORDER_ID = HAPP.ORDER_ID
+                    ) HAPP2
+                    -- 20211124 김수호 추가: ITSM 4번, 컬럼추가요청( 주간 생산계획 금액, 주간 생산실적 금액 ) FROM 김동현 B
+                    LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+                    ON MC1.BU_CD = @{GV_BU_CD}
+                    AND MC1.GROUP_CD = 'WORKER_GROUP'
+                    AND MC1.CODE_CD = DPOH.WORKER_GROUP
+                    AND MC1.USE_FLAG = 'Y'
+                    INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                    ON MI.COMPANY_CD = HAPP.COMPANY_CD
+                    AND MI.BU_CD     = HAPP.BU_CD
+                    AND MI.ITEM_CD   = HAPP.ITEM_CD
+                    INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+                    ON MIP.COMPANY_CD = MI.COMPANY_CD
+                    AND MIP.BU_CD = MI.BU_CD
+                    AND MIP.PLANT_CD = 'WF01'
+                    AND MIP.ITEM_CD = MI.ITEM_CD
+                    LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+                    ON MRC.COMPANY_CD = MI.COMPANY_CD
+                    AND MRC.BU_CD = MI.BU_CD
+                    AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+                    LEFT OUTER JOIN TB_MST_CUSTOMER TMC WITH(NOLOCK)
+                    ON TMC.COMPANY_CD = MRC.COMPANY_CD
+                    AND TMC.BU_CD = MRC.BU_CD
+                    AND TMC.CUST_CD = MRC.REP_CUST_CD
+                    LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+                    ON MICG.COMPANY_CD = MI.COMPANY_CD
+                    AND MICG.BU_CD = MI.BU_CD
+                    AND MICG.ITEM_CD = MI.ITEM_CD
+                    AND MICG.CUST_GROUP_CD = TMC.CUST_GROUP_CD
+                    ------------------------------------------------------------------------------------------
+                    
+                    WHERE HAPP.PLAN_ID = @V_PLAN_ID_FP
+                      AND HAPP.VERSION_ID = @V_VERSION_ID_FP
+                      AND HAPP.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND HAPP.BU_CD = @{GV_BU_CD}
+                      AND HAPP.PROD_PART = @{prodPart}
+                      AND HAPP.ROUTING_ORDER IN ('S', 'L')
+                      AND HAPP.PROD_OR_QC = 'QC_PART'
+                      AND CONVERT(NVARCHAR, HAPP.END_DTTM, 112) BETWEEN @{fromCal} AND @{toCal}
+                      AND CONVERT(NVARCHAR, HAPP.END_DTTM, 112) <![CDATA[>=]]> CONVERT(NVARCHAR(30), DBO.UFN_GETDATE(), 112)
+                      AND EXISTS (
+                                    SELECT 1
+                                    FROM TB_MST_ITEM MI WITH(NOLOCK)
+                                    WHERE MI.COMPANY_CD = HAPP.COMPANY_CD
+                                      AND MI.BU_CD = HAPP.BU_CD
+                                      AND MI.ITEM_CD = HAPP.ITEM_CD
+                                      AND MI.ITEM_TYPE = @{itemType}
+                                    #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+                                      AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+                                    #end
+                                 )
+                ) DI
+                LEFT OUTER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                  ON MC.BU_CD = @{GV_BU_CD}
+                 AND MC.GROUP_CD = 'WORKER_GROUP'
+                 AND MC.CODE_CD = DI.WORKER_GROUP
+                 AND MC.USE_FLAG = 'Y'
+                GROUP BY DI.PROD_PART, ISNULL(MC.CODE_CD, 'NONE')
+            ) DI
+            ON DI.WORKER_GROUP = MC.CODE_CD
+            LEFT OUTER JOIN 
+            (
+                SELECT DI.PROD_PART
+                     , ISNULL(MC.CODE_CD, 'NONE') AS WORKER_GROUP
+                     , SUM(DI.GOODS_QTY) AS PRE_PROD
+                FROM 
+                (
+                    SELECT DI.COMPANY_CD
+                         , DI.BU_CD
+                         , DI.PROD_PART
+                         , DI.PROD_ORDER_NO
+                         , DI.ITEM_CD
+                         , DBO.UFN_GREATEST(SUM(DI.GOODS_QTY), 0) AS GOODS_QTY
+                    FROM 
+                    (
+                        SELECT DI.COMPANY_CD
+                             , DI.BU_CD
+                             , MC.ATTB_2_CD AS PROD_PART
+                             , DI.PROD_ORDER_NO
+                             , DI.ITEM_CD
+                             , DI.GOODS_QTY
+                        FROM TB_DYN_INSPECTION DI WITH(NOLOCK)
+                        INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+                           ON MIP.COMPANY_CD = DI.COMPANY_CD
+                          AND MIP.BU_CD = DI.BU_CD
+                          AND MIP.PLANT_CD = 'WF01'
+                          AND MIP.ITEM_CD = DI.ITEM_CD
+                        INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                           ON MC.BU_CD = MIP.BU_CD
+                          AND MC.GROUP_CD = 'PROD_L2'
+                          AND MC.CODE_CD = MIP.ROUTING_ID
+                          AND MC.ATTB_2_CD = @{prodPart}
+                          AND MC.USE_FLAG = 'Y'
+                        WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+                          AND DI.BU_CD = @{GV_BU_CD}
+                          AND DI.RELEASE_DATE BETWEEN @V_BEFORE_WEEK_THU AND @V_BEFORE_WEEK_SAT
+                          AND DI.DEL_FLAG = 'N'
+                        UNION ALL
+                        SELECT HAPPDO.COMPANY_CD
+                             , HAPPDO.BU_CD
+                             , HAPPDO.PROD_PART
+                             , HAPPDO.PROD_ORDER_NO
+                             , HAPPDO.ITEM_CD
+                             , HAPPDO.QTY * -1 AS QTY
+                        FROM TB_HIS_APS_PROD_PLAN_DAILY_ORDER HAPPDO WITH(NOLOCK)
+                        WHERE HAPPDO.COMPANY_CD = @{GV_COMPANY_CD}
+                          AND HAPPDO.BU_CD = @{GV_BU_CD}
+                          AND HAPPDO.PLAN_ID = @V_BEFORE_WEEK_THU
+                          AND HAPPDO.PROD_PART = @{prodPart}
+                          AND HAPPDO.YYYYMMDD BETWEEN @V_BEFORE_WEEK_THU AND @V_BEFORE_WEEK_SAT
+                    ) DI
+                    GROUP BY DI.COMPANY_CD, DI.BU_CD, DI.PROD_PART, DI.PROD_ORDER_NO, DI.ITEM_CD
+                ) DI
+                INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                ON DPOH.COMPANY_CD = DI.COMPANY_CD
+                AND DPOH.BU_CD = DI.BU_CD
+                AND DPOH.PROD_ORDER_NO = DI.PROD_ORDER_NO  
+                LEFT OUTER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                  ON MC.BU_CD = @{GV_BU_CD}
+                 AND MC.GROUP_CD = 'WORKER_GROUP'
+                 AND MC.CODE_CD = DPOH.WORKER_GROUP
+                 AND MC.USE_FLAG = 'Y'
+                WHERE EXISTS (
+                                SELECT 1
+                                FROM TB_MST_ITEM MI WITH(NOLOCK)
+                                WHERE MI.COMPANY_CD = DI.COMPANY_CD
+                                  AND MI.BU_CD = DI.BU_CD
+                                  AND MI.ITEM_CD = DI.ITEM_CD
+                                  AND MI.ITEM_TYPE = @{itemType}
+                                #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+                                  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+                                #end
+                             )
+                GROUP BY DI.PROD_PART, ISNULL(MC.CODE_CD, 'NONE')
+            ) DI2
+            ON DI2.WORKER_GROUP = MC.CODE_CD
+            LEFT OUTER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+              ON MWC.COMPANY_CD = @{GV_COMPANY_CD}
+             AND MWC.BU_CD = MC.BU_CD
+             AND MWC.WC_CD = MC.ATTB_2_CD
+            WHERE MC.BU_CD = @{GV_BU_CD}
+              AND MC.GROUP_CD = 'WORKER_GROUP'
+              AND (DPOHD.WORKER_GROUP IS NOT NULL OR HAPP.WORKER_GROUP IS NOT NULL OR DI.WORKER_GROUP IS NOT NULL)
+            #if($_parameter.workplaces and $_parameter.workplaces != "")
+              AND ISNULL(MC.ATTB_2_CD, 'NONE') IN ('$_parameter.workplaces.replace(",","','")')
+            #end
+            #if($_parameter.workerGroup and $_parameter.workerGroup != "")
+              AND ISNULL(MC.CODE_CD, 'NONE') IN ('$_parameter.workerGroup.replace(",","','")')
+            #end
+            ORDER BY MC.SORT
+        END;
+    </select>
+    
+    <select id="workerGroupProdPlanJobListSelect" parameterType="map" resultType="map">
+        /****** [ aps.dynamic.workerGroupProdPlanJobListSelect ] ******/
+        BEGIN
+            
+            DECLARE @P_CUR_WEEK NVARCHAR(6)
+                    , @V_VERSION_ID_MP NVARCHAR(20)
+                    , @V_PLAN_ID_FP NVARCHAR(8)
+                    , @V_VERSION_ID_FP NVARCHAR(20)
+                    , @V_BEFORE_WEEK_THU NVARCHAR(8)
+                    , @V_BEFORE_WEEK_SAT NVARCHAR(8)
+          
+          
+          SELECT @V_BEFORE_WEEK_THU = CONVERT(VARCHAR, (DATEADD(DAY, -7, A1.YYYYMMDD)), 112)
+                 , @V_BEFORE_WEEK_SAT = CONVERT(VARCHAR, (DATEADD(DAY, -5, A1.YYYYMMDD)), 112)
+            FROM TB_MST_CALENDAR A1 WITH(NOLOCK)
+            WHERE YEARWEEK = @{startWeek}
+              AND DAY_NM ='THU'
+            ;
+          
+            
+            SELECT @V_VERSION_ID_MP = MAX(VERSION_ID)
+            FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'MP'
+              AND PLAN_ID = @{planId}
+              AND VERSION_TYPE_CD = 'F';
+            
+            
+            SELECT TOP 1 @V_PLAN_ID_FP = PLAN_ID
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'FP'
+              AND RELEASE_FLAG = 'Y'
+            ORDER BY APS_START_DATE DESC;
+             
+            SELECT @V_VERSION_ID_FP = MAX(VERSION_ID)
+            FROM TB_MST_PLAN_VERSION_SUB WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'FP'
+              AND PLAN_ID = @V_PLAN_ID_FP
+              AND VERSION_TYPE_CD = 'F';
+        
+            SELECT @P_CUR_WEEK = YEARWEEK
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112);
+        
+        
+           SELECT COMPANY_CD
+                , BU_CD
+                , PROD_ORDER_NO
+                , PRE_PROD_QTY
+           INTO #W_PRE_PROD_QTY
+           FROM (
+                                
+                        SELECT DI.COMPANY_CD
+                             , DI.BU_CD
+                             , DI.PROD_ORDER_NO
+                             , SUM(DI.GOODS_QTY) AS PRE_PROD_QTY
+                        FROM 
+                        (
+                            SELECT DI.COMPANY_CD
+                                 , DI.BU_CD
+                                 , DI.PROD_PART
+                                 , DI.PROD_ORDER_NO
+                                 , DI.ITEM_CD
+                                 , DBO.UFN_GREATEST(SUM(DI.GOODS_QTY), 0) AS GOODS_QTY
+                            FROM 
+                            (
+                                SELECT DI.COMPANY_CD
+                                     , DI.BU_CD
+                                     , MC.ATTB_2_CD AS PROD_PART
+                                     , DI.PROD_ORDER_NO
+                                     , DI.ITEM_CD
+                                     , DI.GOODS_QTY
+                                FROM TB_DYN_INSPECTION DI WITH(NOLOCK)
+                                INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+                                   ON MIP.COMPANY_CD = DI.COMPANY_CD
+                                  AND MIP.BU_CD = DI.BU_CD
+                                  AND MIP.PLANT_CD = 'WF01'
+                                  AND MIP.ITEM_CD = DI.ITEM_CD
+                                INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                   ON MC.BU_CD = MIP.BU_CD
+                                  AND MC.GROUP_CD = 'PROD_L2'
+                                  AND MC.CODE_CD = MIP.ROUTING_ID
+                                  AND MC.ATTB_2_CD = @{prodPart}
+                                  AND MC.USE_FLAG = 'Y'
+                                WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+                                  AND DI.BU_CD = @{GV_BU_CD}
+                                  AND DI.RELEASE_DATE BETWEEN @V_BEFORE_WEEK_THU AND @V_BEFORE_WEEK_SAT
+                                  AND DI.DEL_FLAG = 'N'
+                               
+                                UNION ALL
+                               
+                                SELECT HAPPDO.COMPANY_CD
+                                     , HAPPDO.BU_CD
+                                     , HAPPDO.PROD_PART
+                                     , HAPPDO.PROD_ORDER_NO
+                                     , HAPPDO.ITEM_CD
+                                     , HAPPDO.QTY * -1 AS QTY
+                                FROM TB_HIS_APS_PROD_PLAN_DAILY_ORDER HAPPDO WITH(NOLOCK)
+                                WHERE HAPPDO.COMPANY_CD = @{GV_COMPANY_CD}
+                                  AND HAPPDO.BU_CD = @{GV_BU_CD}
+                                  AND HAPPDO.PLAN_ID = @V_BEFORE_WEEK_THU
+                                  AND HAPPDO.PROD_PART = @{prodPart}
+                                  AND HAPPDO.YYYYMMDD BETWEEN @V_BEFORE_WEEK_THU AND @V_BEFORE_WEEK_SAT
+                            ) DI
+                            GROUP BY DI.COMPANY_CD, DI.BU_CD, DI.PROD_PART, DI.PROD_ORDER_NO, DI.ITEM_CD
+                        ) DI
+                        INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                        ON DPOH.COMPANY_CD = DI.COMPANY_CD
+                        AND DPOH.BU_CD = DI.BU_CD
+                        AND DPOH.PROD_ORDER_NO = DI.PROD_ORDER_NO  
+                        WHERE EXISTS (
+                                        SELECT 1
+                                        FROM TB_MST_ITEM MI WITH(NOLOCK)
+                                        WHERE MI.COMPANY_CD = DI.COMPANY_CD
+                                          AND MI.BU_CD = DI.BU_CD
+                                          AND MI.ITEM_CD = DI.ITEM_CD
+                                          AND MI.ITEM_TYPE = @{itemType}
+                                        #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+                                          AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+                                        #end
+                        )
+                    
+                        GROUP BY DI.COMPANY_CD
+                        , DI.BU_CD
+                        , DI.PROD_ORDER_NO
+            
+                ) DI
+                
+                
+                
+               SELECT COMPANY_CD
+               , BU_CD
+               , PROD_ORDER_NO
+               , WORKER_GROUP
+               , PLAN_QTY
+               INTO #W_PLAN_QTY
+               FROM
+               (
+               
+                   SELECT HAPP.COMPANY_CD
+                   , HAPP.BU_CD
+                   , HAPP.PROD_ORDER_NO
+                   , ISNULL(MC.CODE_CD, ISNULL(MC1.CODE_CD, 'NONE')) AS WORKER_GROUP
+                   , SUM(CASE WHEN MCAL.YEARWEEK = @{startWeek} THEN HAPP.QTY ELSE 0 END) AS PLAN_QTY
+                   
+                    FROM TB_HIS_APS_PLAN_PEGGING HAPP WITH(NOLOCK)
+                    INNER JOIN TB_MST_CALENDAR MCAL WITH(NOLOCK)
+                       ON MCAL.YYYYMMDD = CONVERT(NVARCHAR, HAPP.END_DTTM, 112)
+                      AND MCAL.YEARWEEK IN (@{startWeek})
+                    OUTER APPLY 
+                    (
+                    
+                        SELECT MAX(HAPP2.WORKER_GROUP) AS WORKER_GROUP
+                        FROM TB_HIS_APS_PLAN_PEGGING HAPP2 WITH(NOLOCK)
+                        WHERE HAPP2.PLAN_ID = HAPP.PLAN_ID
+                          AND HAPP2.VERSION_ID = HAPP.VERSION_ID
+                          AND HAPP2.COMPANY_CD = HAPP.COMPANY_CD
+                          AND HAPP2.BU_CD = HAPP.BU_CD
+                          AND HAPP2.PROD_PART = HAPP.PROD_PART
+                          AND HAPP2.DEMAND_ID = HAPP.DEMAND_ID
+                          AND HAPP2.ORDER_ID = HAPP.ORDER_ID
+                        
+                    ) HAPP2
+                    LEFT OUTER JOIN TB_MST_CODE MC WITH (NOLOCK) ON MC.BU_CD = 'QT'
+                    AND MC.GROUP_CD = 'WORKER_GROUP'
+                    AND MC.CODE_CD = HAPP2.WORKER_GROUP
+                    AND MC.USE_FLAG = 'Y'
+                    INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                     ON DPOH.COMPANY_CD = HAPP.COMPANY_CD
+                    AND DPOH.BU_CD = HAPP.BU_CD
+                    AND DPOH.PROD_ORDER_NO = HAPP.PROD_ORDER_NO  
+                    LEFT OUTER JOIN TB_MST_CODE MC1 WITH (NOLOCK) ON MC1.BU_CD = 'QT'
+                    AND MC1.GROUP_CD = 'WORKER_GROUP'
+                    AND MC1.CODE_CD = DPOH.WORKER_GROUP
+                    AND MC1.USE_FLAG = 'Y'
+                    INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+                    ON MI.COMPANY_CD = HAPP.COMPANY_CD
+                    AND MI.BU_CD     = HAPP.BU_CD
+                    AND MI.ITEM_CD   = HAPP.ITEM_CD
+                    INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+                    ON MIP.COMPANY_CD = MI.COMPANY_CD
+                    AND MIP.BU_CD = MI.BU_CD
+                    AND MIP.PLANT_CD = 'WF01'
+                    AND MIP.ITEM_CD = MI.ITEM_CD
+                   
+                    WHERE HAPP.PLAN_ID = @{planId}
+                    AND HAPP.VERSION_ID = @V_VERSION_ID_MP
+                    AND HAPP.COMPANY_CD = @{GV_COMPANY_CD}
+                    AND HAPP.BU_CD = @{GV_BU_CD}
+                    AND HAPP.PROD_PART = @{prodPart}
+                    AND HAPP.ROUTING_ORDER IN ('S', 'L')
+                    AND HAPP.PROD_OR_QC = 'QC_PART'
+                    AND EXISTS (
+                                    SELECT 1
+                                    FROM TB_MST_ITEM MI WITH(NOLOCK)
+                                    WHERE MI.COMPANY_CD = HAPP.COMPANY_CD
+                                      AND MI.BU_CD = HAPP.BU_CD
+                                      AND MI.ITEM_CD = HAPP.ITEM_CD
+                                      AND MI.ITEM_TYPE = @{itemType}
+                                    #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+                                      AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+                                    #end
+                    )
+                    AND ISNULL(MC.CODE_CD, ISNULL(MC1.CODE_CD, 'NONE')) = @{workerGroup}
+                    
+                    GROUP BY HAPP.COMPANY_CD
+                    , HAPP.BU_CD
+                    , HAPP.PROD_ORDER_NO
+                    , ISNULL(MC.CODE_CD, ISNULL(MC1.CODE_CD, 'NONE')) 
+                    
+                ) HAPP
+        
+        
+        
+        
+            
+            SELECT 
+             DPOH.COMPANY_CD
+             ,DPOH.BU_CD
+             ,DPOH.PROD_ORDER_NO
+             , DPOH.PROD_ORDER_NO AS PROD_ORDER_NO_NM
+             , DPOH.ITEM_CD
+             , MI.ITEM_NM
+             , MI.SPEC
+             , MC3.CODE_NM AS ITEM_TYPE
+             , MIG.ITEM_GROUP_NM
+             , DPOH.PROD_ORDER_QTY
+             , DPOHD.REMAIN_QTY                                                               -- 잔량: 매일 UPDATE됨
+             , CONVERT(VARCHAR, CONVERT(DATETIME, DPOH.RELEASE_DATE), 102) AS RELEASE_DATE   
+             , MC4.CODE_NM AS ORDER_STATUS                                                   -- 작업지시상태: 오더기준 - 전주 목요일 기준 data fix (과거 완료된 CLOSE 제외)
+             , MC5.CODE_NM AS ORDER_STATUS_RECENT                                            -- 작업지시상태: 오더기준(최신)
+             , CASE WHEN TMC.YEARWEEK = @P_CUR_WEEK THEN 'Y' ELSE 'N' END COLOR_FLAG 
+             , ISNULL(MICG.SALES_PRICE_KRW,0) AS SALES_PRICE_KRW
+             , DI.PRE_PROD_QTY         AS PRE_PROD_QTY                                       -- 주간생산실적: 오더별 생산 실적 수량 표기 (전주목요일~당주토요일)
+             , HAPP.PLAN_QTY           AS PLAN_QTY                                           -- 주간생산계획: 오더별 차주 생산 계획 수량 표기
+            FROM TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+            INNER JOIN TB_DYN_PROD_ORDER_HDR_DAILY DPOHD WITH(NOLOCK)
+            ON DPOH.COMPANY_CD = DPOHD.COMPANY_CD
+            AND DPOH.BU_CD     = DPOHD.BU_CD
+            AND DPOH.PROD_ORDER_NO = DPOHD.PROD_ORDER_NO
+            AND DPOHD.YYYYMMDD     = @{fromCal}
+            AND DPOHD.ORDER_STATUS IN ('RL', 'ST')
+            OUTER APPLY
+            (
+                SELECT COMPANY_CD
+                , BU_CD
+                , PROD_ORDER_NO
+                , PRE_PROD_QTY
+                FROM #W_PRE_PROD_QTY DI
+                WHERE 1=1
+                AND    DI.COMPANY_CD     = DPOH.COMPANY_CD
+                AND DI.BU_CD             = DPOH.BU_CD
+                AND DI.PROD_ORDER_NO     = DPOH.PROD_ORDER_NO
+            
+            ) DI
+            OUTER APPLY
+            (
+                SELECT COMPANY_CD
+                , BU_CD
+                , PROD_ORDER_NO
+                , PLAN_QTY
+                FROM #W_PLAN_QTY HAPP
+                WHERE 1=1
+                AND HAPP.COMPANY_CD     = DPOH.COMPANY_CD
+                AND HAPP.BU_CD          = DPOH.BU_CD
+                AND HAPP.PROD_ORDER_NO  = DPOH.PROD_ORDER_NO
+                
+            ) HAPP
+            
+            LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+              ON MC1.BU_CD = DPOH.BU_CD
+             AND MC1.GROUP_CD = 'WORKER_GROUP'
+             AND MC1.CODE_CD =  DPOH.WORKER_GROUP
+             AND MC1.USE_FLAG = 'Y'
+            
+            INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+               ON MI.COMPANY_CD = DPOH.COMPANY_CD
+              AND MI.BU_CD = DPOH.BU_CD
+              AND MI.ITEM_CD = DPOH.ITEM_CD
+              AND MI.ITEM_TYPE = @{itemType}
+            #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+              AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+            #end
+            
+            INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+               ON MIP.COMPANY_CD = MI.COMPANY_CD
+              AND MIP.BU_CD = MI.BU_CD
+              AND MIP.PLANT_CD = 'WF01'
+              AND MIP.ITEM_CD = MI.ITEM_CD
+            
+            INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+               ON MC2.BU_CD = MIP.BU_CD
+              AND MC2.GROUP_CD = 'PROD_L2'
+              AND MC2.CODE_CD = MIP.ROUTING_ID
+              AND MC2.ATTB_2_CD = @{prodPart}
+              AND MC2.USE_FLAG = 'Y'
+            
+            LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+              ON MC3.BU_CD = 'ALL'
+             AND MC3.GROUP_CD = 'ITEM_TYPE'
+             AND MC3.CODE_CD = MI.ITEM_TYPE
+             AND MC3.USE_FLAG = 'Y'
+            
+            LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+              ON MIG.COMPANY_CD = MI.COMPANY_CD
+             AND MIG.BU_CD = MI.BU_CD
+             AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+            
+            LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+             ON MC4.BU_CD = DPOH.BU_CD
+            AND MC4.GROUP_CD = 'ORDER_STATUS'
+            AND MC4.CODE_CD = DPOHD.ORDER_STATUS
+            AND MC4.USE_FLAG = 'Y'
+            
+            LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+             ON MC5.BU_CD = DPOH.BU_CD
+            AND MC5.GROUP_CD = 'ORDER_STATUS'
+            AND MC5.CODE_CD = DPOH.ORDER_STATUS
+            AND MC5.USE_FLAG = 'Y'
+            
+            LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+           ON MRC.COMPANY_CD = MI.COMPANY_CD
+           AND MRC.BU_CD = MI.BU_CD
+           AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+            
+            INNER JOIN TB_MST_CALENDAR TMC WITH(NOLOCK)
+            ON TMC.YYYYMMDD = DPOH.PLAN_COMP_DATE
+            
+            LEFT OUTER JOIN TB_MST_CUSTOMER TMCU WITH(NOLOCK)
+               ON TMCU.COMPANY_CD = MRC.COMPANY_CD
+            AND TMCU.BU_CD = MRC.BU_CD
+            AND TMCU.CUST_CD = MRC.REP_CUST_CD
+            
+            LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+            ON MICG.COMPANY_CD = MI.COMPANY_CD
+            AND MICG.BU_CD = MI.BU_CD
+            AND MICG.ITEM_CD = MI.ITEM_CD
+            AND MICG.CUST_GROUP_CD = TMCU.CUST_GROUP_CD  
+               
+            WHERE DPOHD.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DPOHD.BU_CD = @{GV_BU_CD}
+              AND DPOHD.ORDER_STATUS IN ('RL', 'ST')
+              AND DPOHD.YYYYMMDD     = @{fromCal}
+            #if($_parameter.workplaces and $_parameter.workplaces != "")
+              AND ISNULL(MC1.ATTB_2_CD, 'NONE') IN ('$_parameter.workplaces.replace(",","','")')
+            #end
+            #if($_parameter.workerGroup and $_parameter.workerGroup != "")
+              AND ISNULL(MC1.CODE_CD, 'NONE') IN ('$_parameter.workerGroup.replace(",","','")')
+            #end
+            
+            
+            DROP TABLE #W_PRE_PROD_QTY
+            DROP TABLE #W_PLAN_QTY
+            ------------------------------------------------------------------------------------------------------
+        END;
+    </select>
+    <select id="workerGroupProdPlanJobListExcelSqlSelect" parameterType="map" resultType="map">
+    /****** [ aps.dynamic.workerGroupProdPlanJobListExcelSqlSelect ] ******/
+        SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+        , A2.ACTION_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+                 , ACTION_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD = @{popUpMenuCd}
+              AND ACTION_CD IN ('EXCEL','SQL')
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+        , A2.ACTION_CD
+    
+    </select>
+    
+    
+</mapper>

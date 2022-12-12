@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.salesPerform">
+
+	<select id="planSalesStatusReasonRoleSelect" parameterType="map" resultType="map">
+		/****** [ dp.salesPerform.planSalesStatusReasonRoleSelect ] ******/
+		BEGIN
+		    <include refid="dp.common.salesPlanRole"/>
+		
+		    SELECT @AP2_YN AS AP2_YN
+		         , @AP1_YN AS AP1_YN;
+		END
+	</select>
+	
+
+    <select id="planSalesStatusReasonSelect" parameterType="map" resultType="map">
+	    /****** [ dp.salesPerform.planSalesStatusReasonSelect ] ******/
+	    <include refid="include.macros"/>
+	    #getProductTree()
+	    #getCustomerTree()
+	    #getSalesOrgTree()
+	    
+	    WITH W_ROW AS 
+	    (
+	        SELECT PP.YEARPWEEK
+	             , CG.CUST_GROUP_CD
+	             , CM.CUST_NM AS CUST_GROUP_NM
+	             , CG.ITEM_CD
+	             , IT.ITEM_NM
+	             , IT.SPEC
+	             , IT.DRAW_NO
+	             , ISNULL(PP.SALES_PLAN_QTY, 0)                                AS SALES_PLAN_QTY
+	             , ISNULL(PP.SALES_QTY     , 0)                                AS SALES_QTY
+	             , ISNULL(PP.PROD_PLAN_QTY , 0)                                AS PROD_PLAN_QTY
+	             , ISNULL(PP.PROD_QTY      , 0)                                AS PROD_QTY
+	             , ISNULL(PP.SALES_QTY     , 0) - ISNULL(PP.SALES_PLAN_QTY, 0) AS DELTA_SALES
+	             , ISNULL(PP.PROD_QTY      , 0) - ISNULL(PP.PROD_PLAN_QTY , 0) AS DELTA_PROD
+	             , ISNULL(PP.INV_QTY       , 0)                                AS INV_QTY
+	             , CASE WHEN ISNULL(PP.SALES_PLAN_QTY, 0) > ISNULL(PP.SALES_QTY     , 0)
+	                    THEN ISNULL(ROUND(PP.SALES_QTY      / NULLIF(PP.SALES_PLAN_QTY, 0) * 100, 1), 0)
+	                    ELSE ISNULL(ROUND(PP.SALES_PLAN_QTY / NULLIF(PP.SALES_QTY     , 0) * 100, 1), 0)
+	                END PTSP
+	             , PR.PTSP_TYPE
+	             , PR.QTY
+	             , PR.PTSP_REASON_ID
+	             , PR.REMARK
+	             , CONVERT(VARCHAR(19), PR.CREATE_DTTM, 120) AS CREATE_DTTM
+	             , PR.CREATE_ID
+	             , CONVERT(VARCHAR(19), PR.UPDATE_DTTM, 120) AS UPDATE_DTTM
+	             , PR.UPDATE_ID
+			FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+	        INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+	           ON CG.COMPANY_CD = IT.COMPANY_CD
+	          AND CG.BU_CD      = IT.BU_CD
+	          AND CG.ITEM_CD    = IT.ITEM_CD
+	        #set($treeAlias = "IT")
+			<include refid="include.productTree"/>
+	        INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+	           ON CG.COMPANY_CD    = CM.COMPANY_CD
+	          AND CG.BU_CD         = CM.BU_CD
+	          AND CG.CUST_GROUP_CD = CM.CUST_CD
+			INNER JOIN TB_DYN_PTSP PP WITH(NOLOCK)
+	           ON CG.COMPANY_CD    = PP.COMPANY_CD
+	          AND CG.BU_CD         = PP.BU_CD
+	          AND CG.ITEM_CD       = PP.ITEM_CD
+	          AND CG.CUST_GROUP_CD = PP.CUST_GROUP_CD
+	          AND PP.YEARPWEEK     BETWEEN @{fromPWeek} AND @{toPWeek}
+			INNER JOIN TB_DYN_PTSP_REASON PR WITH(NOLOCK)
+	           ON PP.COMPANY_CD    = PR.COMPANY_CD
+	          AND PP.BU_CD         = PR.BU_CD
+	          AND PP.ITEM_CD       = PR.ITEM_CD
+	          AND PP.CUST_GROUP_CD = PR.CUST_GROUP_CD
+	          AND PP.YEARPWEEK     = PR.YEARPWEEK
+			LEFT OUTER JOIN UV_MAP_SALES_ORG SO WITH(NOLOCK)
+	          ON CG.COMPANY_CD        = SO.COMPANY_CD
+	         AND CG.BU_CD             = SO.BU_CD
+	         AND CG.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+	         AND ((CG.SALES_ORG_LVL5_CD IS NULL)
+	        	 OR (CG.SALES_ORG_LVL5_CD IS NOT NULL AND CG.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD))
+			WHERE CG.COMPANY_CD = @{GV_COMPANY_CD}
+	          AND CG.BU_CD      = @{GV_BU_CD}
+			#if($_parameter.ptspType and $_parameter.ptspType != "")
+	          AND EXISTS (
+							SELECT 1
+	               			FROM TB_DYN_PTSP_REASON PT
+			              	WHERE PT.COMPANY_CD    = CG.COMPANY_CD
+			                  AND PT.BU_CD         = CG.BU_CD
+			                  AND PT.ITEM_CD       = CG.ITEM_CD
+			                  AND PT.CUST_GROUP_CD = CG.CUST_GROUP_CD
+			                  AND PT.YEARPWEEK     = PP.YEARPWEEK
+			                  AND PT.PTSP_TYPE     IN ('$_parameter.ptspType.replace(",","','")')
+			                  AND PT.QTY           <![CDATA[>]]> 0
+	           			 )
+			#end
+			#if($_parameter.customerList and $_parameter.customerList.size() > 0)
+	          AND EXISTS (
+	             			SELECT 1
+	               			FROM TB_MST_CUSTOMER TT
+	              			WHERE TT.COMPANY_CD    = CG.COMPANY_CD
+	                		  AND TT.BU_CD         = CG.BU_CD
+	                		  AND TT.CUST_GROUP_CD = CG.CUST_GROUP_CD
+	                		#set($treeAlias = "TT")
+	                		<include refid="include.customerTree"/>
+	           			 )
+			#end
+			#if($_parameter.salesOrgList and $_parameter.salesOrgList.size() > 0)
+			  #set($treeAlias = "SO")
+			  <include refid="include.salesOrgTree"/>
+			#end
+			#if($_parameter.ap1_yn == "Y")
+	          AND EXISTS (
+	             			SELECT 1
+	               			FROM TB_MAP_ITEM_CUST_GROUP_AP1 A1 WITH(NOLOCK)
+	              			WHERE A1.COMPANY_CD    = CG.COMPANY_CD
+	                  		  AND A1.BU_CD         = CG.BU_CD
+	                		  AND A1.ITEM_CD       = CG.ITEM_CD
+	                		  AND A1.CUST_GROUP_CD = CG.CUST_GROUP_CD
+	                		  AND A1.USE_FLAG      = 'Y'
+	                		  AND A1.AP1_USER_ID   = @{GV_USER_ID}
+	           			 )
+			#end
+	    )
+	    SELECT * 
+	    FROM W_ROW
+	    WHERE 1 = 1
+		#if($_parameter.deltaFrom and $_parameter.deltaFrom != "")
+	      AND DELTA_SALES <![CDATA[>=]]> @{deltaFrom}
+		#end
+		#if($_parameter.deltaTo and $_parameter.deltaTo != "")
+	      AND DELTA_SALES <![CDATA[<=]]> @{deltaTo}
+		#end
+		#if($_parameter.ptspFrom and $_parameter.ptspFrom != "")
+	      AND PTSP        <![CDATA[>=]]> @{ptspFrom}
+		#end
+		#if($_parameter.ptspTo and $_parameter.ptspTo != "")
+	      AND PTSP        <![CDATA[<=]]> @{ptspTo}
+		#end
+		#if($_parameter.ptspType and $_parameter.ptspType != "")
+		  AND PTSP_TYPE IN ('$_parameter.ptspType.replace(",","','")')
+		  AND QTY != 0 
+		#end
+		ORDER BY YEARPWEEK, CUST_GROUP_CD, CUST_GROUP_NM, ITEM_CD, ITEM_NM
+    </select>
+    
+    <update id="planSalesStatusReasonUpdate" parameterType="map">
+		/****** [ dp.salesPerform.planSalesStatusReasonUpdate ] ******/
+		UPDATE TB_DYN_PTSP_REASON
+		   SET PTSP_REASON_ID = NULLIF(@{PTSP_REASON_ID}, ' ')
+		     , REMARK         = NULLIF(@{REMARK}, '')
+		     , UPDATE_DTTM    = DBO.UFN_GETDATE()
+		     , UPDATE_ID      = @{GV_USER_ID}
+		 WHERE COMPANY_CD     = @{GV_COMPANY_CD}
+		   AND BU_CD          = @{GV_BU_CD}
+		   AND ITEM_CD        = @{ITEM_CD}
+		   AND CUST_GROUP_CD  = @{CUST_GROUP_CD}
+		   AND YEARPWEEK      = @{YEARPWEEK}
+		   AND PTSP_TYPE      = @{PTSP_TYPE}
+	</update>
+
+</mapper>

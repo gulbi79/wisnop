@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+
+   <select id="dailySupplyPlanOrderSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.dailySupplyPlanOrderList ] ******/
+		BEGIN
+			DECLARE @V_CUR_WEEK NVARCHAR(6);
+			
+			SELECT @V_CUR_WEEK = MC.YEARWEEK
+	  		FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+	 		WHERE EXISTS 
+	 		(
+	        	SELECT 1
+	            FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+	            WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+	              AND MPV.BU_CD = @{GV_BU_CD}
+	              AND MPV.PLAN_TYPE_CD = 'FP'
+	              AND MPV.PLAN_ID = @{planId}
+	              AND MPV.APS_START_DATE = MC.YYYYMMDD
+			);
+			
+			SELECT NULL AS TMP_COL 
+				 , ISNULL(HAD.PROD_PART, ' ') AS PROD_PART
+				 , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+					    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+				   ELSE MC2.CODE_NM
+				   END AS PROD_PART_NM
+			     , HAD.PRIORITY AS PRIORITY
+				 , HAD.PRIORITY AS PRIORITY_NM
+				 , HAD.DEMAND_ID AS DEMAND_ID
+				 , HAD.DEMAND_ID AS DEMAND_ID_NM
+			     , HAD.ADJ_PRIORITY AS ADJ_PRIORITY
+				 , HAD.ADJ_PRIORITY AS ADJ_PRIORITY_NM
+			     , HAD.APS_DEMAND_TYPE AS APS_DEMAND_TYPE
+				 , CASE WHEN 'ko' = @{GV_LANG} THEN MC3.CODE_NM_KR
+							 WHEN 'cn' = @{GV_LANG} THEN MC3.CODE_NM_CN
+						ELSE MC3.CODE_NM
+						END AS APS_DEMAND_TYPE_NM
+				 , ISNULL(HAD.PLAN_WEEK, ' ') AS PLAN_WEEK
+				 , ISNULL(HAD.PLAN_WEEK, ' ') AS PLAN_WEEK_NM
+				 , ISNULL(HAD.PLAN_DATE, ' ') AS PLAN_DATE
+				 , ISNULL(HAD.PLAN_DATE, ' ') AS PLAN_DATE_NM
+			     , HAD.PROD_ORDER_QTY AS PLAN_QTY
+				 , HAD.PROD_ORDER_QTY AS PLAN_QTY_NM
+			     , ISNULL(HAD.PROD_ORDER_NO, ' ') AS PROD_ORDER_NO
+				 , ISNULL(HAD.PROD_ORDER_NO, ' ') AS PROD_ORDER_NO_NM
+			     , ISNULL(HAD.RESULT_QTY, 0) AS PROD_ORDER_COMP_QTY
+				 , ISNULL(HAD.RESULT_QTY, 0) AS PROD_ORDER_COMP_QTY_NM
+				 , ISNULL(HAD.PLAN_QTY, 0) AS DAILY_PLAN_QTY
+				 , ISNULL(HAD.PLAN_QTY, 0) AS DAILY_PLAN_QTY_NM
+				 , CASE WHEN HAD.PLAN_WEEK = @V_CUR_WEEK THEN ISNULL(HAD.PLAN_QTY, 0)
+	                    WHEN HAD.PLAN_WEEK <![CDATA[>]]> @V_CUR_WEEK THEN ISNULL(HAPPDO.QTY, 0)
+	                END CUR_WEEK_PLAN_QTY
+	             , CASE WHEN HAD.PLAN_WEEK = @V_CUR_WEEK THEN ISNULL(HAD.PLAN_QTY, 0)
+	                    WHEN HAD.PLAN_WEEK <![CDATA[>]]> @V_CUR_WEEK THEN ISNULL(HAPPDO.QTY, 0)
+	                END CUR_WEEK_PLAN_QTY_NM
+	             , CASE WHEN ORG_PLAN_WEEK IS NULL OR ORG_PLAN_WEEK != @{fromWeek} THEN 'N' ELSE 'Y'
+	                END DIFF_YN    
+			     , DPOH.ORDER_STATUS AS ORDER_STATUS
+				 , CASE WHEN 'ko' = @{GV_LANG} THEN MC6.CODE_NM_KR
+						WHEN 'cn' = @{GV_LANG} THEN MC6.CODE_NM_CN
+						ELSE MC6.CODE_NM
+				   END AS ORDER_STATUS_NM
+			     , ISNULL(HAD.ITEM_CD, ' ') AS ITEM_CD
+			     , ISNULL(HAD.ITEM_CD, ' ') AS ITEM_CD_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+				 , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(MI.SPEC, ' ') AS SPEC
+				 , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+				        WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+					    ELSE MC4.CODE_NM
+				   END AS ITEM_GRADE
+				 , CASE WHEN 'ko' = @{GV_LANG} THEN MC4.CODE_NM_KR
+				        WHEN 'cn' = @{GV_LANG} THEN MC4.CODE_NM_CN
+						ELSE MC4.CODE_NM
+				   END AS ITEM_GRADE_NM
+				 , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+				        WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+						ELSE MC5.CODE_NM
+				   END AS ITEM_TYPE_CD
+				 , CASE WHEN 'ko' = @{GV_LANG} THEN MC5.CODE_NM_KR
+				        WHEN 'cn' = @{GV_LANG} THEN MC5.CODE_NM_CN
+						ELSE MC5.CODE_NM
+				   END AS ITEM_TYPE_CD_NM
+			     , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) AS SALES_PRICE_KRW
+				 , ISNULL(MICG.SALES_PRICE_KRW, MI.ITEM_COST_KRW) AS SALES_PRICE_KRW_NM
+			     , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID
+				 , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID_NM
+				 , ISNULL(MC.CUST_NM, ' ') AS CUST_NM
+				 , ISNULL(MC.CUST_NM, ' ') AS CUST_NM_NM
+				 , ISNULL(MC.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+				 , ISNULL(MC.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+				 , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+				 , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+				 , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+				 , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+				 , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+				 , MIP.SS_QTY AS SS_QTY
+				 , MIP.SS_QTY AS SS_QTY_NM
+				 , ISNULL(MI.CPFR_YN, ' ') AS CPFR_YN
+				 , ISNULL(MI.CPFR_YN, ' ') AS CPFR_YN_NM
+			     , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+				 , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN_NM
+				 , ISNULL(dbo.UFN_GET_USER_NAME(HAD.UPDATE_ID), ' ') AS UPDATE_ID
+				 , ISNULL(dbo.UFN_GET_USER_NAME(HAD.UPDATE_ID), ' ') AS UPDATE_ID_NM
+				 , ISNULL(CONVERT(VARCHAR(30), HAD.UPDATE_DTTM, 120), ' ') AS UPDATE_DTTM
+				 , ISNULL(CONVERT(VARCHAR(30), HAD.UPDATE_DTTM, 120), ' ') AS UPDATE_DTTM_NM
+				 , MC2.SORT
+			FROM TB_HIS_APS_DEMAND_DAILY HAD WITH(NOLOCK)
+			LEFT OUTER JOIN 
+			(
+	        	SELECT HAPPDO.COMPANY_CD
+	        	     , HAPPDO.BU_CD
+	        	     , HAPPDO.PLAN_ID
+	        	     , HAPPDO.PROD_PART
+	        	     , HAPPDO.ITEM_CD
+	        	     , HAPPDO.PROD_ORDER_NO
+	        	     , SUM(HAPPDO.QTY) QTY
+	            FROM TB_HIS_APS_PROD_PLAN_DAILY_ORDER HAPPDO WITH(NOLOCK)
+				WHERE HAPPDO.COMPANY_CD = @{GV_COMPANY_CD}
+	              AND HAPPDO.BU_CD = @{GV_BU_CD}
+	              AND HAPPDO.PLAN_ID = @{planId}
+	              AND EXISTS (
+	              				SELECT 1
+	                            FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+	                            WHERE MC.YYYYMMDD = HAPPDO.YYYYMMDD
+	                              AND MC.YEARWEEK = @V_CUR_WEEK
+							 )
+				GROUP BY HAPPDO.COMPANY_CD, HAPPDO.BU_CD, HAPPDO.PLAN_ID, HAPPDO.PROD_PART, HAPPDO.ITEM_CD, HAPPDO.PROD_ORDER_NO
+			) HAPPDO
+			ON HAPPDO.COMPANY_CD = HAD.COMPANY_CD
+	        AND HAPPDO.BU_CD = HAD.BU_CD
+	        AND HAPPDO.PLAN_ID = HAD.PLAN_ID
+	        AND HAPPDO.PROD_PART = HAD.PROD_PART
+	        AND HAPPDO.ITEM_CD = HAD.ITEM_CD
+	        AND HAPPDO.PROD_ORDER_NO = HAD.PROD_ORDER_NO
+			LEFT OUTER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+			  ON DPOH.COMPANY_CD = HAD.COMPANY_CD
+			 AND DPOH.BU_CD = HAD.BU_CD
+			 AND DPOH.PROD_ORDER_NO = HAD.PROD_ORDER_NO
+			INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+			   ON MI.COMPANY_CD = HAD.COMPANY_CD
+			  AND MI.BU_CD = HAD.BU_CD
+			  AND MI.ITEM_CD = HAD.ITEM_CD
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			   ON MIP.COMPANY_CD = MI.COMPANY_CD
+			  AND MIP.BU_CD = MI.BU_CD
+			  AND MIP.PLANT_CD = 'WF01'
+			  AND MIP.ITEM_CD = MI.ITEM_CD
+			LEFT OUTER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+			  ON MRC.COMPANY_CD = MI.COMPANY_CD
+			 AND MRC.BU_CD = MI.BU_CD
+			 AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+			LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+			  ON MC.COMPANY_CD = MRC.COMPANY_CD
+			 AND MC.BU_CD = MRC.BU_CD
+			 AND MC.CUST_CD = MRC.REP_CUST_CD
+			LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+			  ON MICG.COMPANY_CD = MI.COMPANY_CD
+			 AND MICG.BU_CD = MI.BU_CD
+			 AND MICG.ITEM_CD = MI.ITEM_CD
+			 AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+			LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+			  ON MIG.COMPANY_CD = MI.COMPANY_CD
+			 AND MIG.BU_CD = MI.BU_CD
+			 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+			LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			  ON MC1.BU_CD = MIP.BU_CD
+			 AND MC1.GROUP_CD = 'CL_SL_CD'
+			 AND MC1.CODE_CD = MIP.RCPT_SL_CD
+			 AND MC1.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			  ON MC2.BU_CD = HAD.BU_CD
+			 AND MC2.GROUP_CD = 'PROD_PART'
+			 AND MC2.CODE_CD = HAD.PROD_PART
+			 AND MC2.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+			  ON MC3.BU_CD = HAD.BU_CD
+			 AND MC3.GROUP_CD = 'APS_DEMAND_TYPE'
+			 AND MC3.CODE_CD = HAD.APS_DEMAND_TYPE
+			 AND MC3.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+			  ON MC4.BU_CD = 'ALL'
+			 AND MC4.GROUP_CD = 'ITEM_GRADE'
+			 AND MC4.CODE_CD = MI.ITEM_GRADE
+			 AND MC4.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC5 WITH(NOLOCK)
+			  ON MC5.BU_CD = 'ALL'
+			 AND MC5.GROUP_CD = 'ITEM_TYPE'
+			 AND MC5.CODE_CD = MI.ITEM_TYPE
+			 AND MC5.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC6 WITH(NOLOCK)
+			  ON MC6.BU_CD = DPOH.BU_CD
+			 AND MC6.GROUP_CD = 'ORDER_STATUS'
+			 AND MC6.CODE_CD = DPOH.ORDER_STATUS
+			 AND MC6.USE_FLAG = 'Y'
+			<!-- LEFT OUTER JOIN TB_MST_USER MU WITH(NOLOCK)
+			  ON MU.USER_ID = HAD.UPDATE_ID -->
+			WHERE HAD.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND HAD.BU_CD = @{GV_BU_CD}
+			#if($_parameter.planId and $_parameter.planId != "")
+			  AND HAD.PLAN_ID = @{planId}
+			#end 
+			#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+			  AND MC.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+			#end 
+			#if($_parameter.custGroup and $_parameter.custGroup != "")
+			  AND MC.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+			#end 
+			#if($_parameter.prodPart and $_parameter.prodPart != "")
+			  AND HAD.PROD_PART IN ('$_parameter.prodPart.replace(",","','")')
+			#end 
+			#if($_parameter.apsDemandType and $_parameter.apsDemandType != "")
+			  AND HAD.APS_DEMAND_TYPE IN ('$_parameter.apsDemandType.replace(",","','")')
+			#end 
+			#if($_parameter.route and $_parameter.route != "")
+			  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+			#end
+			#if($_parameter.item_nm and $_parameter.item_nm != ""  )
+			  AND (MI.ITEM_CD  LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+			#end
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+			  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			#end
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+			  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			#end
+			#if($_parameter.fromCal and $_parameter.fromCal != "" and $_parameter.toCal and $_parameter.toCal != "")
+			  AND HAD.PLAN_DATE BETWEEN @{fromCal} AND @{toCal}
+			#end
+			#if($_parameter.orderStatus and $_parameter.orderStatus != "")
+			  AND DPOH.ORDER_STATUS IN ('$_parameter.orderStatus.replace(",","','")')				
+			#end
+			#if($_parameter.prodOrderNo and $_parameter.prodOrderNo != "")
+			  AND HAD.PROD_ORDER_NO LIKE '%' + @{prodOrderNo} + '%'				
+			#end
+			ORDER BY MC2.SORT, HAD.ADJ_PRIORITY
+		END;
+	</select>
+	
+	<select id="dailySupplyPlanOrderAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.prodStand.workCalendarRscAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS30701', 'APS30702', 'APS30703', 'APS30704')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<update id="dailySupplyPlanOrderUpdate" parameterType="map">
+		/****** [ aps.static.dailySupplyPlanOrderUpdate ] ******/
+		MERGE TB_HIS_APS_DEMAND_DAILY WITH (HOLDLOCK) AS T 
+		USING 
+	    (
+			SELECT @{GV_COMPANY_CD} AS COMPANY_CD
+			     , @{GV_BU_CD} AS BU_CD
+			     , '$_parameter.PLAN_ID' AS PLAN_ID
+				 , '$_parameter.PROD_PART' AS PROD_PART
+				 , '$_parameter.ITEM_CD' AS ITEM_CD
+				 , '$_parameter.APS_DEMAND_TYPE' AS APS_DEMAND_TYPE
+				 , '$_parameter.PLAN_DATE' AS PLAN_DATE
+				 , '$_parameter.PROD_ORDER_NO' AS PROD_ORDER_NO
+				 , '$_parameter.ADJ_PRIORITY' AS ADJ_PRIORITY	     
+			     , '$_parameter.GV_USER_ID' AS UPDATE_ID
+				 , DBO.UFN_GETDATE() AS UPDATE_DTTM
+	      ) S
+	      ON 
+	      (
+			T.PLAN_ID = S.PLAN_ID
+	        AND T.PROD_PART = S.PROD_PART
+	        AND T.ITEM_CD = S.ITEM_CD
+	        AND T.APS_DEMAND_TYPE = S.APS_DEMAND_TYPE
+	        AND T.PLAN_DATE = S.PLAN_DATE
+	        AND T.PROD_ORDER_NO = S.PROD_ORDER_NO
+	        AND T.COMPANY_CD = S.COMPANY_CD
+	        AND T.BU_CD = S.BU_CD
+	      )
+	      WHEN MATCHED THEN 
+	      UPDATE 
+	      SET ADJ_PRIORITY = S.ADJ_PRIORITY                              
+	        , UPDATE_ID = S.UPDATE_ID
+	        , UPDATE_DTTM = S.UPDATE_DTTM
+	      ;
+      </update>
+	  	
+</mapper>

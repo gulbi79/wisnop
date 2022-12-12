@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.bsc">
+    <select id="chartSelect" parameterType="map" resultType="map">
+      /****** [ dashboard.bsc.cahrtSelect ] ******/
+        
+      #set($QC    = 'BSC_KPI1,BSC_KPI2')
+      #set($SALES = 'BSC_KPI3,BSC_KPI4')
+      #set($INV   = 'BSC_KPI5,BSC_KPI6,BSC_KPI7')
+      #set($SNOP  = 'BSC_KPI8,BSC_KPI9,BSC_KPI10,BSC_KPI11,BSC_KPI12,BSC_KPI13')
+      #set($INVT  = 'BSC_KPI14,BSC_KPI15')
+      #set($GWP   = 'BSC_KPI16,BSC_KPI17,BSC_KPI18')
+      #set($BSC = [{"CD" : "QC", "VAL" : $QC }, {"CD" : "SALES", "VAL" : $SALES }, {"CD" : "INV", "VAL" : $INV }, {"CD" : "SNOP", "VAL" : $SNOP }, {"CD" : "INVT", "VAL" : $INVT }, {"CD" : "GWP", "VAL" : $GWP }])
+      
+      #set($KPI_NO   = [1..18])
+      
+BEGIN
+    
+    DECLARE @P_YEARMONTH  NVARCHAR(6) = LEFT (CONVERT (NVARCHAR (30), DBO.UFN_GETDATE(), 112), 6);
+    
+    WITH W_CODE AS (
+      #set($_parameter.groupCd = "BU_CD,DIV_CD,TEAM_CD,PART_CD")
+      #set($_parameter.buAllYn = "Y")
+      <include refid="include.mstCode"/>
+    ), W_CNT AS (
+        SELECT *
+          FROM (
+          SELECT KPI_ID
+               , COMPANY_CD
+               , BU_CD
+               , DIV_CD
+               , TEAM_CD
+               , COUNT(*) AS CNT
+          FROM TB_KPI_BSC WITH(NOLOCK)
+          WHERE TEAM_CD != 'ALL'
+            AND YEARMONTH = @P_YEARMONTH
+          GROUP BY KPI_ID, COMPANY_CD, BU_CD, DIV_CD, TEAM_CD
+        ) A
+        WHERE A.CNT <![CDATA[>]]> 2
+   )  
+    SELECT M.* 
+     FROM  (
+            SELECT A.COMPANY_CD
+                 , A.YEARMONTH
+                 , A.BU_CD
+                 , A.BU_NM
+                 , A.GRP_LVL_ID
+                 , A.DIV_CD
+                 , A.DIV_NM
+                 , A.TEAM_CD
+                 , A.TEAM_NM
+                 , A.PART_CD
+                 , A.PART_NM
+                 , A.BU_SORT
+                 , A.DIV_SORT
+                 , A.TEM_SORT
+                 , A.HDR_WEIGHT_RATE
+                 
+                 , ISNULL ( A.TOT_WEIGHT_RATE, 0 ) AS TOT_WEIGHT_RATE
+                 , round( ( ISNULL ( ISNULL ( A.QC_BSC_VAL   , 0 ) * ISNULL ( A.QC_WEIGHT_RATE   , 0 ), 0 ) +
+                     ISNULL ( ISNULL ( A.SALES_BSC_VAL, 0 ) * ISNULL ( A.SALES_WEIGHT_RATE, 0 ), 0 ) +
+                     ISNULL ( ISNULL ( A.INV_BSC_VAL  , 0 ) * ISNULL ( A.INV_WEIGHT_RATE  , 0 ), 0 ) +
+                     ISNULL ( ISNULL ( A.SNOP_BSC_VAL , 0 ) * ISNULL ( A.SNOP_WEIGHT_RATE , 0 ), 0 ) +  
+                     ISNULL ( ISNULL ( A.INVT_BSC_VAL , 0 ) * ISNULL ( A.INVT_WEIGHT_RATE , 0 ), 0 ) +
+                     ISNULL ( ISNULL ( A.GWP_BSC_VAL  , 0 ) * ISNULL ( A.GWP_WEIGHT_RATE  , 0 ), 0 ) ) / NULLIF( A.TOT_WEIGHT_RATE, 0 ), 0)  AS TOT_BSC_VAL
+                 , A.QC_WEIGHT_RATE
+                 , A.QC_BSC_VAL
+                 , A.SALES_WEIGHT_RATE
+                 , A.SALES_BSC_VAL
+                 , A.INV_WEIGHT_RATE
+                 , A.INV_BSC_VAL
+                 , A.SNOP_WEIGHT_RATE
+                 , A.SNOP_BSC_VAL
+                 , A.INVT_WEIGHT_RATE
+                 , A.INVT_BSC_VAL
+                 , A.GWP_WEIGHT_RATE
+                 , A.GWP_BSC_VAL
+              FROM (SELECT X.COMPANY_CD
+                         , X.YEARMONTH
+                         , X.BU_CD
+                         , X.BU_NM
+                         , X.LVL AS GRP_LVL_ID
+                         , CASE X.LVL WHEN 7 THEN NULL ELSE X.DIV_CD END                                           AS DIV_CD
+                         , CASE X.LVL WHEN 7 THEN 'Sub Total' ELSE X.DIV_NM END                                    AS DIV_NM
+                         , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN NULL ELSE X.TEAM_CD END                         AS TEAM_CD
+                         , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN 'Sub Total' ELSE X.TEAM_NM END                  AS TEAM_NM
+                         , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN NULL WHEN 1 THEN NULL ELSE X.PART_CD END        AS PART_CD
+                         , CASE X.LVL WHEN 7 THEN NULL WHEN 3 THEN NULL WHEN 1 THEN 'Sub Total' ELSE X.PART_NM END AS PART_NM
+                         , X.BU_SORT
+                         , X.DIV_SORT
+                         , X.TEM_SORT
+                         , MAX (CASE X.LVL WHEN 3 THEN HDR_WEIGHT_RATE ELSE NULL END)                              AS HDR_WEIGHT_RATE
+                         
+                         , SUM ( X.TOT_WEIGHT_RATE )   AS TOT_WEIGHT_RATE
+                         , SUM ( X.QC_WEIGHT_RATE )    AS QC_WEIGHT_RATE
+                         , SUM ( X.SALES_WEIGHT_RATE ) AS SALES_WEIGHT_RATE
+                         , SUM ( X.INV_WEIGHT_RATE )   AS INV_WEIGHT_RATE
+                         , SUM ( X.SNOP_WEIGHT_RATE )  AS SNOP_WEIGHT_RATE
+                         , SUM ( X.INVT_WEIGHT_RATE )  AS INVT_WEIGHT_RATE
+                         , SUM ( X.GWP_WEIGHT_RATE )   AS GWP_WEIGHT_RATE
+                         
+                         /*** QC ***/ 
+                         , (ISNULL (SUM (X.KPI1_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI1_BSC_SCORE), 0) + 
+                            ISNULL (SUM (X.KPI2_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI2_BSC_SCORE), 0) ) / NULLIF (SUM (X.QC_WEIGHT_RATE), 0)  AS QC_BSC_VAL
+                      
+                         /*** SALES ***/
+                         , (ISNULL (SUM (X.KPI3_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI3_BSC_SCORE), 0) + 
+                            ISNULL (SUM (X.KPI4_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI4_BSC_SCORE), 0) ) / NULLIF (SUM (X.SALES_WEIGHT_RATE), 0)  AS SALES_BSC_VAL
+                         
+                         /*** INVENTORY BONDS ***/
+                         , (ISNULL (SUM (X.KPI5_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI5_BSC_SCORE), 0) + 
+                            ISNULL (SUM (X.KPI6_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI6_BSC_SCORE), 0) +
+                            ISNULL (SUM (X.KPI7_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI7_BSC_SCORE), 0) ) / NULLIF (SUM (X.INV_WEIGHT_RATE), 0)  AS INV_BSC_VAL
+                         
+                         /*** SNOP ***/
+                         , (ISNULL (SUM (X.KPI8_WEIGHT_RATE), 0)  * ISNULL (SUM (X.KPI8_BSC_SCORE), 0)  + 
+                            ISNULL (SUM (X.KPI9_WEIGHT_RATE), 0)  * ISNULL (SUM (X.KPI9_BSC_SCORE), 0)  + 
+                            ISNULL (SUM (X.KPI10_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI10_BSC_SCORE), 0) + 
+                            ISNULL (SUM (X.KPI11_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI11_BSC_SCORE), 0) + 
+                            ISNULL (SUM (X.KPI12_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI12_BSC_SCORE), 0) +
+                            ISNULL (SUM (X.KPI13_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI13_BSC_SCORE), 0)) / NULLIF (SUM (X.SNOP_WEIGHT_RATE), 0)  AS SNOP_BSC_VAL
+                         
+                         
+                         /*** INNOVATION ***/
+                         , (ISNULL (SUM (X.KPI14_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI14_BSC_SCORE), 0) + 
+                            ISNULL (SUM (X.KPI15_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI15_BSC_SCORE), 0) ) / NULLIF (SUM (X.INVT_WEIGHT_RATE), 0)  AS INVT_BSC_VAL
+                         
+                         /*** GWP ***/
+                         , (ISNULL (SUM (X.KPI16_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI16_BSC_SCORE), 0) + 
+                            ISNULL (SUM (X.KPI17_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI17_BSC_SCORE), 0) +
+                            ISNULL (SUM (X.KPI18_WEIGHT_RATE), 0) * ISNULL (SUM (X.KPI18_BSC_SCORE), 0) ) / NULLIF (SUM (X.GWP_WEIGHT_RATE), 0)  AS GWP_BSC_VAL
+                         
+                    FROM (SELECT BSC.COMPANY_CD
+                               , BSC.BU_CD
+                               , BU.CODE_NM  AS BU_NM
+                               , BSC.DIV_CD
+                               , DIV.CODE_NM AS DIV_NM
+                               , BSC.TEAM_CD
+                               , TEM.CODE_NM AS TEAM_NM
+                               , BSC.PART_CD
+                               , PART.CODE_NM AS PART_NM
+                               , BU.SORT      AS BU_SORT
+                               , DIV.SORT     AS DIV_SORT
+                               , TEM.SORT     AS TEM_SORT
+                               , CASE
+                                   WHEN BSC.DIV_CD  = 'ALL' THEN 7
+                                   WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD  = 'ALL' THEN 3
+                                   WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD  = 'ALL' THEN 1
+                                   WHEN BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD != 'ALL' THEN 0
+                                 END LVL
+                                 
+                               , ISNULL (HDR.YEARMONTH, @P_YEARMONTH) YEARMONTH
+                               , BSC.KPI_ID
+                               , BSC.WEIGHT_RATE      AS TOT_WEIGHT_RATE
+                               , HDR.WEIGHT_RATE      AS HDR_WEIGHT_RATE
+        #foreach( $b in $BSC )
+                               , (CASE WHEN BSC.KPI_ID IN ('$b.VAL.replace(",","','")')  THEN BSC.WEIGHT_RATE     ELSE NULL END) AS ${b.CD}_WEIGHT_RATE
+        #end
+                               
+        #foreach( $a in $KPI_NO )
+                               , (CASE BSC.KPI_ID WHEN 'BSC_KPI${a}' THEN BSC.WEIGHT_RATE     ELSE NULL END) AS KPI${a}_WEIGHT_RATE
+                               , (CASE BSC.KPI_ID WHEN 'BSC_KPI${a}' THEN BSC.BSC_SCORE       ELSE NULL END) AS KPI${a}_BSC_SCORE
+        #end
+                               , CASE WHEN CNT.CNT IS NULL AND BSC.DIV_CD != 'ALL' AND BSC.TEAM_CD != 'ALL' AND BSC.PART_CD = 'ALL' THEN 'Y' ELSE 'N' END FLAG
+                            FROM TB_KPI_BSC BSC WITH (NOLOCK)
+                            LEFT OUTER JOIN TB_KPI_BSC_HDR HDR WITH (NOLOCK)
+                              ON HDR.COMPANY_CD = BSC.COMPANY_CD
+                             AND HDR.BU_CD      = BSC.BU_CD
+                             AND HDR.DIV_CD     = BSC.DIV_CD
+                             AND HDR.YEARMONTH  = @P_YEARMONTH
+                            LEFT OUTER JOIN W_CODE BU
+                              ON BU.CODE_CD     = BSC.BU_CD
+                             AND BU.GROUP_CD    = 'BU_CD'
+                            LEFT OUTER JOIN W_CODE DIV
+                    	        ON DIV.BU_CD      = BSC.BU_CD
+                     			AND DIV.CODE_CD    = BSC.DIV_CD
+                     			AND DIV.GROUP_CD   = 'DIV_CD' 
+                            LEFT OUTER JOIN W_CODE TEM
+                              ON TEM.BU_CD    = BSC.BU_CD
+                             AND TEM.CODE_CD  = BSC.TEAM_CD
+                             AND TEM.GROUP_CD   = 'TEAM_CD'
+							LEFT OUTER JOIN W_CODE PART
+		                      ON PART.BU_CD    = BSC.BU_CD
+		                     AND PART.CODE_CD  = BSC.PART_CD
+		                     AND PART.GROUP_CD   = 'PART_CD' 
+                            LEFT OUTER JOIN W_CNT CNT
+                              ON BSC.COMPANY_CD = CNT.COMPANY_CD
+                             AND BSC.BU_CD      = CNT.BU_CD
+                             AND BSC.DIV_CD     = CNT.DIV_CD
+                             AND BSC.TEAM_CD    = CNT.TEAM_CD
+                             AND BSC.KPI_ID     = CNT.KPI_ID
+                           WHERE BSC.YEARMONTH  = @P_YEARMONTH
+                           ) X
+                    WHERE X.FLAG = 'N'
+                    GROUP BY X.COMPANY_CD
+                       , X.YEARMONTH
+                       , X.BU_CD
+                       , X.BU_NM
+                       , X.LVL
+                       , X.DIV_CD
+                       , X.DIV_NM
+                       , X.TEAM_CD
+                       , X.TEAM_NM
+                       , X.PART_CD
+                       , X.PART_NM
+                       , X.BU_SORT
+                       , X.DIV_SORT
+                       , X.TEM_SORT
+                       ) A
+                )M
+        WHERE M.GRP_LVL_ID = CAST (@{lvl} AS NUMERIC(1))
+        ORDER BY M.BU_SORT
+               , M.DIV_SORT
+               , M.TEM_SORT
+               , M.GRP_LVL_ID DESC
+;
+
+
+END;
+    </select>
+    
+    <select id="chartBscSelect" parameterType="map" resultType="map">
+      /****** [ dashboard.bsc.chartBscSelect ] ******/
+        SELECT COMPANY_CD
+             , BU_CD
+             , ISNULL (LAST_MONTH_SCORE, 0) LAST_SCORE
+             , ISNULL (CUR_MONTH_SCORE, 0)  CUR_SCORE
+             , ROUND(ISNULL (CUR_YEAR_SCORE, 0), 0)   TAGET_SCORE
+          FROM TB_KPI_DASHBOARD_BSC
+    </select>
+    
+</mapper>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	<select id="codeMngSelect" parameterType="map" resultType="map">
+		/****** [ admin.codeMngSelect ] ******/
+	    SELECT BU_CD
+	         , GROUP_CD
+	         , GROUP_DESC
+	         , CODE_CD
+	         , CODE_NM
+	         , CODE_NM_KR
+	         , CODE_NM_CN
+	         , SORT
+	         , USE_FLAG
+	         , ATTB_1_CD, ATTB_1_NM, ATTB_2_CD, ATTB_2_NM, ATTB_3_CD, ATTB_3_NM, ATTB_4_CD, ATTB_4_NM, ATTB_5_CD , ATTB_5_NM			
+	         , ATTB_6_CD, ATTB_6_NM, ATTB_7_CD, ATTB_7_NM, ATTB_8_CD, ATTB_8_NM, ATTB_9_CD, ATTB_9_NM, ATTB_10_CD, ATTB_10_NM			
+	         , ATTB_11_CD, ATTB_11_NM, ATTB_12_CD, ATTB_12_NM, ATTB_13_CD, ATTB_13_NM, ATTB_14_CD, ATTB_14_NM, ATTB_15_CD, ATTB_15_NM
+	         , CREATE_ID
+	         , CONVERT(VARCHAR(30), CREATE_DTTM, 120) AS CREATE_DTTM
+	         , UPDATE_ID
+	         , CONVERT(VARCHAR(30), UPDATE_DTTM, 120) AS UPDATE_DTTM
+	    FROM TB_MST_CODE WITH(NOLOCK)
+	    #where()
+		#if($_parameter.SEARCH_BU and $_parameter.SEARCH_BU != "")
+	      AND BU_CD = @{SEARCH_BU}
+		#end
+		#if($_parameter.SEARCH_GROUP_CD and $_parameter.SEARCH_GROUP_CD != "")
+	      AND (UPPER(GROUP_CD)   LIKE '%' + UPPER(REPLACE(@{SEARCH_GROUP_CD},'_','[_]')) + '%'
+	        OR UPPER(GROUP_DESC) LIKE '%' + UPPER(REPLACE(@{SEARCH_GROUP_CD},'_','[_]')) + '%')
+		#end
+		#if($_parameter.SEARCH_CODE_CD and $_parameter.SEARCH_CODE_CD != "")
+	      AND (UPPER(CODE_CD) LIKE '%' + UPPER(REPLACE(@{SEARCH_CODE_CD},'_','[_]')) + '%'
+	        OR UPPER(CODE_NM) LIKE '%' + UPPER(REPLACE(@{SEARCH_CODE_CD},'_','[_]')) + '%')
+		#end
+	    #end
+	    ORDER BY BU_CD, GROUP_CD, SORT
+	</select>
+	
+	<update id="codeMngInsert" parameterType="map">
+		/****** [ admin.codeMngInsert ] ******/
+	    INSERT INTO TB_MST_CODE 
+	    (
+	    	BU_CD
+	      , GROUP_CD
+	      , GROUP_DESC
+	      , CODE_CD
+	      , CODE_NM
+	      , CODE_NM_KR
+	      , CODE_NM_CN
+	      , SORT
+	      , USE_FLAG
+	      , ATTB_1_CD, ATTB_1_NM, ATTB_2_CD, ATTB_2_NM, ATTB_3_CD, ATTB_3_NM, ATTB_4_CD, ATTB_4_NM, ATTB_5_CD , ATTB_5_NM			
+	      , ATTB_6_CD, ATTB_6_NM, ATTB_7_CD, ATTB_7_NM, ATTB_8_CD, ATTB_8_NM, ATTB_9_CD, ATTB_9_NM, ATTB_10_CD, ATTB_10_NM	
+	      , ATTB_11_CD, ATTB_11_NM, ATTB_12_CD, ATTB_12_NM, ATTB_13_CD, ATTB_13_NM, ATTB_14_CD, ATTB_14_NM, ATTB_15_CD, ATTB_15_NM
+	      , CREATE_ID
+	      , CREATE_DTTM
+	      , UPDATE_ID
+	      , UPDATE_DTTM
+	    ) VALUES (
+			@{BU_CD}
+          , @{GROUP_CD}            
+          , @{GROUP_DESC}            
+    	  , @{CODE_CD}            
+    	  , @{CODE_NM}            
+    	  , @{CODE_NM_KR}            
+    	  , @{CODE_NM_CN}            
+    	  , @{SORT}               
+    	  , @{USE_FLAG}           
+    	  , @{ATTB_1_CD}, @{ATTB_1_NM}, @{ATTB_2_CD}, @{ATTB_2_NM}, @{ATTB_3_CD}, @{ATTB_3_NM}, @{ATTB_4_CD}, @{ATTB_4_NM}, @{ATTB_5_CD }, @{ATTB_5_NM }		
+          , @{ATTB_6_CD}, @{ATTB_6_NM}, @{ATTB_7_CD}, @{ATTB_7_NM}, @{ATTB_8_CD}, @{ATTB_8_NM}, @{ATTB_9_CD}, @{ATTB_9_NM}, @{ATTB_10_CD}, @{ATTB_10_NM}
+          , @{ATTB_11_CD}, @{ATTB_11_NM}, @{ATTB_12_CD}, @{ATTB_12_NM}, @{ATTB_13_CD}, @{ATTB_13_NM}, @{ATTB_14_CD}, @{ATTB_14_NM}, @{ATTB_15_CD}, @{ATTB_15_NM}
+    	  , @{GV_USER_ID}         
+    	  , DBO.UFN_GETDATE()             
+    	  , @{GV_USER_ID}         
+    	  , DBO.UFN_GETDATE()             
+	    )
+	</update>
+	
+	<update id="codeMngUpdate" parameterType="map">
+		/****** [ admin.codeMngUpdate ] ******/
+		UPDATE TB_MST_CODE 
+		SET GROUP_DESC  = @{GROUP_DESC}
+		  , CODE_NM     = @{CODE_NM}
+		  , CODE_NM_KR  = @{CODE_NM_KR}
+		  , CODE_NM_CN  = @{CODE_NM_CN}
+		  , SORT        = @{SORT}
+		  , USE_FLAG    = @{USE_FLAG}
+		  , ATTB_1_CD   = @{ATTB_1_CD}, ATTB_1_NM = @{ATTB_1_NM}, ATTB_2_CD  = @{ATTB_2_CD} , ATTB_2_NM  = @{ATTB_2_NM}
+		  , ATTB_3_CD   = @{ATTB_3_CD}, ATTB_3_NM = @{ATTB_3_NM}, ATTB_4_CD  = @{ATTB_4_CD} , ATTB_4_NM  = @{ATTB_4_NM}
+		  , ATTB_5_CD   = @{ATTB_5_CD}, ATTB_5_NM = @{ATTB_5_NM}, ATTB_6_CD  = @{ATTB_6_CD} , ATTB_6_NM  = @{ATTB_6_NM}
+		  , ATTB_7_CD   = @{ATTB_7_CD}, ATTB_7_NM = @{ATTB_7_NM}, ATTB_8_CD  = @{ATTB_8_CD} , ATTB_8_NM  = @{ATTB_8_NM}
+		  , ATTB_9_CD   = @{ATTB_9_CD}, ATTB_9_NM = @{ATTB_9_NM}, ATTB_10_CD = @{ATTB_10_CD}, ATTB_10_NM = @{ATTB_10_NM}
+		  , ATTB_11_CD = @{ATTB_11_CD}, ATTB_11_NM = @{ATTB_11_NM}, ATTB_12_CD = @{ATTB_12_CD}, ATTB_12_NM = @{ATTB_12_NM}
+		  , ATTB_13_CD = @{ATTB_13_CD}, ATTB_13_NM = @{ATTB_13_NM}, ATTB_14_CD = @{ATTB_14_CD}, ATTB_14_NM = @{ATTB_14_NM}
+		  , ATTB_15_CD = @{ATTB_15_CD}, ATTB_15_NM = @{ATTB_15_NM}
+		  , UPDATE_ID   = @{GV_USER_ID}
+	      , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHERE BU_CD    = @{BU_CD}
+		  AND GROUP_CD = @{GROUP_CD}
+		  AND CODE_CD  = @{CODE_CD}
+	</update>
+	
+	<delete id="codeMngDelete" parameterType="map">
+		/****** [ admin.codeMngDelete ] ******/
+		DELETE FROM TB_MST_CODE
+		WHERE BU_CD    = @{BU_CD}
+		  AND GROUP_CD = @{GROUP_CD}
+		  AND CODE_CD  = @{CODE_CD}
+	</delete>
+
+	<select id="codeMngExistPkInsert" parameterType="map" resultType="int">
+		/****** [ admin.codeMngExistPkInsert ] ******/
+		SELECT COUNT(*)
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE BU_CD    = @{BU_CD}
+		  AND GROUP_CD = @{GROUP_CD}
+		  AND CODE_CD  = @{CODE_CD}
+	</select>
+
+</mapper>

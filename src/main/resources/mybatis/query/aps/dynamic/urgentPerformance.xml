@@ -1,0 +1,1191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+
+
+
+    <select id="urgentPerformanceSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.urgentPerformanceSelect ] ******/
+		
+		
+		-- 일일 긴급 수요 관리에 접수된 품목코드, SEQ, 요청납기(해당년 기준) 기준 산출
+		SELECT COMPANY_CD
+        , BU_CD
+        , ITEM_CD
+        , CREATE_DTTM
+        , MAX(SEQ)                                AS SEQ
+        , MAX(CONVERT(NVARCHAR, A.DUE_DATE, 112)) AS YYYYMMDD_DUE_DATE
+        , MAX(DEL_FLAG)                                         AS DEL_FLAG
+        , MAX(CONF_DATE)                                                    AS CONF_DATE
+        , MAX(URGENT_REASON_CD)                                     AS URGENT_REASON_CD
+        , MAX(REQ_QTY)                                                      AS REQ_QTY
+        , MAX(DUE_DATE)                                                     AS DUE_DATE
+		INTO #HSPU_TEMP
+		FROM TB_HIS_SALES_PLAN_URGENT A WITH(NOLOCK)
+		WHERE CONVERT(NVARCHAR, A.DUE_DATE, 112)  BETWEEN @{fromCal} AND @{toCal}
+		AND A.DEL_FLAG  = 'N'
+	    AND A.URGENT_STATUS_CD = 'APPLY'
+		GROUP BY 
+        A.COMPANY_CD
+        ,A.BU_CD
+        ,A.ITEM_CD
+        ,A.CREATE_DTTM;
+		
+		
+		
+		WITH
+		W_ITEM_P
+		AS
+		(
+		        SELECT T.COMPANY_CD
+		        , T.BU_CD
+		        , T.ITEM_CD
+		        , MAX(T.ROUTING_ID) AS ROUTING_ID
+		        , MAX(T.PUR_LT) AS PUR_LT
+		        , MAX(T.MFG_LT) AS MFG_LT
+		        , SUM(T.SS_QTY) AS SS_QTY
+		        , MAX(T.PROCUR_TYPE) AS PROCUR_TYPE
+		        , MAX(T.PROCUR_TYPE_NM) AS PROCUR_TYPE_NM
+		        FROM (
+		
+		                SELECT A.COMPANY_CD
+		                , A.BU_CD
+		                , A.ITEM_CD
+		                , A.ROUTING_ID
+		                , A.PUR_LT
+		                , A.MFG_LT
+		                , A.SS_QTY
+		                , A.PROCUR_TYPE
+		                , (
+							SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+							               WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+							               ELSE CODE_NM
+							          END AS CODE_NM
+							   FROM TB_MST_CODE WITH(NOLOCK)
+							   WHERE GROUP_CD = 'PROCUR_TYPE'
+							     AND USE_FLAG = 'Y'
+							     AND CODE_CD = A.PROCUR_TYPE
+		                    
+		                ) AS PROCUR_TYPE_NM
+		            FROM TB_MST_ITEM_PLANT A WITH (NOLOCK)
+		            WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		                AND A.BU_CD    =   @{GV_BU_CD}
+		                AND A.VALID_FLAG = 'Y'
+		
+		        ) T
+		        GROUP BY T.COMPANY_CD
+		        ,T.BU_CD
+		        ,T.ITEM_CD
+		    ),
+		
+		    W_ITEM
+		    AS
+		    (
+		        SELECT A.COMPANY_CD
+		        , A.BU_CD
+		        , A.ITEM_CD
+		        , A.ITEM_NM
+		        , A.SPEC
+		        , E.ROUTING_ID
+		        , B.ITEM_GROUP_CD
+		        , B.ITEM_GROUP_NM
+		        , B.UPPER_ITEM_GROUP_CD
+		        , B.UPPER_ITEM_GROUP_NM
+		        , A.ITEM_GRADE
+		        , H.REP_CUST_GROUP_CD
+		        , H.REP_CUST_GROUP_NM
+		        , C.CUST_GROUP_CD
+		        , G.CUST_GROUP_NM
+		        , A.ITEM_TYPE
+		        , (
+                        SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                    WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                    ELSE CODE_NM
+                                END AS CODE_NM
+                        FROM TB_MST_CODE MC WITH(NOLOCK)
+                       WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+                         AND MC.GROUP_CD = 'ITEM_TYPE'
+                         AND MC.CODE_CD  = A.ITEM_TYPE
+                         AND MC.USE_FLAG = 'Y'
+		           
+		          ) AS ITEM_TYPE_NM
+		         , MICG.SALES_PRICE_KRW
+		        FROM TB_MST_ITEM A WITH (NOLOCK)
+		            LEFT JOIN TB_MST_ITEM_GROUP B WITH (NOLOCK)
+		            ON A.COMPANY_CD = B.COMPANY_CD
+		                AND A.BU_CD = B.BU_CD
+		                AND A.ITEM_GROUP_CD = B.ITEM_GROUP_CD
+		                AND B.DEL_FLAG = 'N'
+		
+		            LEFT JOIN TB_MST_REP_CUST C WITH (NOLOCK)
+		            ON A.COMPANY_CD = C.COMPANY_CD
+		                AND A.BU_CD = C.BU_CD
+		                AND A.REP_CUST_CD = C.REP_CUST_CD
+		
+		            LEFT JOIN TB_MAP_ITEM_CUST_GROUP D WITH (NOLOCK)
+		            ON A.COMPANY_CD = D.COMPANY_CD
+		                AND A.BU_CD = D.BU_CD
+		                AND A.ITEM_CD = D.ITEM_CD
+		                AND C.CUST_GROUP_CD = D.CUST_GROUP_CD
+		
+		            LEFT JOIN W_ITEM_P E
+		            ON A.COMPANY_CD = E.COMPANY_CD
+		                AND A.BU_CD = E.BU_CD
+		                AND A.ITEM_CD = E.ITEM_CD
+		
+		            LEFT JOIN TB_MST_CUSTOMER F WITH (NOLOCK)
+		            ON C.COMPANY_CD = F.COMPANY_CD
+		                AND C.BU_CD = F.BU_CD
+		                AND C.REP_CUST_CD = F.CUST_CD
+		                AND F.VALID_FLAG = 'Y'
+		
+		----------------------------------------------------------------------------------
+		            LEFT  OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+		            ON A.COMPANY_CD = MICG.COMPANY_CD
+		            AND A.BU_CD     = MICG.BU_CD
+		            AND A.ITEM_CD   = MICG.ITEM_CD
+		            AND F.CUST_GROUP_CD = MICG.CUST_GROUP_CD
+		----------------------------------------------------------------------------------
+		
+		            LEFT JOIN TB_MST_CUST_GROUP G WITH (NOLOCK)
+		            ON G.COMPANY_CD = C.COMPANY_CD
+		                AND G.BU_CD = C.BU_CD
+		                AND G.CUST_GROUP_CD = C.CUST_GROUP_CD
+		                AND G.USE_FLAG = 'Y'
+		
+		            LEFT JOIN TB_MST_REP_CUST_GROUP H WITH (NOLOCK)
+		            ON H.COMPANY_CD = G.COMPANY_CD
+		                AND H.BU_CD = G.BU_CD
+		                AND H.REP_CUST_GROUP_CD = G.REP_CUST_GROUP_CD
+		
+		        WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		            AND A.BU_CD    = @{GV_BU_CD}
+		            AND A.USE_FLAG = 'Y'
+		
+		    )
+		
+		------------------------------------------------------------------------------------------------------------------
+		
+		SELECT A.COMPANY_CD
+		, A.BU_CD
+		, A.SEQ
+		, MC2.CODE_CD AS PROD_PART_CD                                       -- 생산파트 코드
+        , MC2.CODE_NM AS PROD_PART_NM                                       -- 생산파트명
+		, MC.MONTH + 'M'   AS MONTH                                         -- [요청납기]일 기준 월
+        , MC.YEARMONTH
+        , MC.YEARPWEEK                                                      -- [요청납기]일 기준 주차
+		, B.ITEM_CD                                                         -- 품목코드
+		, B.ITEM_NM                                                         -- 품목명
+		, B.SPEC                                                            -- SPEC
+		, B.ROUTING_ID                                                      -- Routing
+		, CONVERT(VARCHAR(10), CONVERT(DATE, A.CONF_DATE), 20) AS CONF_DATE    -- 협의일자
+        , CONVERT(VARCHAR(10), CONVERT(DATE, A.DUE_DATE), 20) AS DUE_DATE   -- 요청납기일
+		, A.URGENT_REASON_CD                                                -- 요청유형
+	    , CONVERT(VARCHAR(30), A.CREATE_DTTM, 120) AS CREATE_DTTM           -- 등록일자
+		, A.REQ_QTY                                                         -- 요청수량
+		, C.RESULT_QTY                                                      -- 실적 수량
+		, (ISNULL(C.RESULT_QTY,0) - ISNULL(A.REQ_QTY,0)) AS OVER_SHORT      -- 과부족
+		, CASE WHEN ROUND(ISNULL(C.RESULT_QTY,0) / NULLIF(A.REQ_QTY,0)*100,1) <![CDATA[>=]]> 100  THEN 100 ELSE ROUND(ISNULL(C.RESULT_QTY,0) / NULLIF(A.REQ_QTY,0)*100,1)  END AS COMPLIANCE_RATE -- 준수율
+		, CONVERT(VARCHAR(10), CONVERT(DATE, D.RELEASE_DATE),20) AS RELEASE_DATE -- 완료일
+		
+		, CASE WHEN A.REQ_QTY <![CDATA[<=]]> C.RESULT_QTY THEN 1 ELSE NULL END AS SUCCESS_YN  -- 달성
+		, CASE WHEN A.REQ_QTY <![CDATA[>]]> ISNULL(C.RESULT_QTY,0) THEN 1 ELSE NULL END AS FAIL_YN    -- 미달성
+		, CASE WHEN A.REQ_QTY <![CDATA[<=]]> C.RESULT_QTY THEN 1 ELSE 0 END AS ACHIVE_YN      -- 준수
+		
+		, B.SALES_PRICE_KRW                                                      -- 품목단가
+		, B.REP_CUST_GROUP_NM                                               -- 대표거래처그룹명
+		
+		
+		FROM #HSPU_TEMP A
+		INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+		ON A.YYYYMMDD_DUE_DATE = MC.YYYYMMDD
+		
+		INNER JOIN W_ITEM B
+		ON A.COMPANY_CD = B.COMPANY_CD
+		AND A.BU_CD = B.BU_CD
+		AND A.ITEM_CD = B.ITEM_CD
+		
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+          ON MC1.BU_CD = A.BU_CD
+         AND MC1.GROUP_CD = 'PROD_L2'
+         AND MC1.CODE_CD = B.ROUTING_ID
+         AND MC1.USE_FLAG = 'Y'
+        LEFT OUTER JOIN 
+        (
+            SELECT BU_CD
+                 , CODE_CD
+                 , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                        ELSE CODE_NM
+                   END AS CODE_NM
+                 , GROUP_CD
+                 , SORT
+            FROM TB_MST_CODE WITH(NOLOCK)
+            WHERE USE_FLAG = 'Y'
+        ) MC2
+        ON MC2.BU_CD = MC1.BU_CD
+        AND MC2.GROUP_CD = 'PROD_PART'
+        AND MC2.CODE_CD = MC1.ATTB_2_CD
+        
+		
+		
+		LEFT OUTER JOIN (
+		
+		
+		        SELECT
+		        HSPUP.COMPANY_CD
+		        , HSPUP.BU_CD
+		        , HSPUP.ITEM_CD
+		        , HSPUP.SEQ
+		        , SUM(CASE WHEN DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112) AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE) THEN  DI.GOODS_QTY END) AS RESULT_QTY
+		        FROM #HSPU_TEMP HSPUP
+		        LEFT OUTER JOIN TB_DYN_INSPECTION DI WITH(NOLOCK)
+		        ON HSPUP.COMPANY_CD      = DI.COMPANY_CD
+		        AND HSPUP.BU_CD          = DI.BU_CD
+		        AND HSPUP.ITEM_CD        = DI.ITEM_CD
+		        
+		        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+				ON DI.RELEASE_DATE = MC.YYYYMMDD
+			    AND DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112)
+		        AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE)
+		        AND DI.INSP_CLASS_CD    = 'F' -- F : 최종검사
+		        AND DI.STATUS_FLAG      = 'R' -- R : 확정, N : 미검사,  D : 검사중
+		        AND DI.DEL_FLAG         = 'N'
+		        AND DI.PLANT_CD         = 'WF01'
+		        AND DI.RELEASE_DATE IS NOT NULL
+		
+		        WHERE HSPUP.COMPANY_CD = @{GV_COMPANY_CD}
+		        AND HSPUP.BU_CD = @{GV_BU_CD}
+		        AND DI.RELEASE_DATE IS NOT NULL
+		
+		        GROUP BY 
+		        HSPUP.COMPANY_CD
+		        ,HSPUP.BU_CD
+		        ,HSPUP.ITEM_CD
+		        ,HSPUP.SEQ
+
+		
+		) C
+		ON 1=1
+		AND C.COMPANY_CD = A.COMPANY_CD
+		AND C.BU_CD = A.BU_CD
+		AND C.ITEM_CD = A.ITEM_CD
+		AND C.SEQ = A.SEQ
+		
+		LEFT OUTER JOIN 
+		(
+		
+		        SELECT
+		        HSPUP.COMPANY_CD
+		        , HSPUP.BU_CD
+		        , HSPUP.ITEM_CD
+		        , HSPUP.SEQ
+				, MAX(DI.RELEASE_DATE) RELEASE_DATE
+		        FROM #HSPU_TEMP HSPUP
+		        LEFT OUTER JOIN TB_DYN_INSPECTION DI WITH(NOLOCK)
+		        ON HSPUP.COMPANY_CD      = DI.COMPANY_CD
+		        AND HSPUP.BU_CD          = DI.BU_CD
+		        AND HSPUP.ITEM_CD        = DI.ITEM_CD
+		        
+		        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+				ON DI.RELEASE_DATE = MC.YYYYMMDD
+				AND DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112)
+		        AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE)
+		        AND DI.INSP_CLASS_CD    = 'F' -- F : 최종검사
+		        AND DI.STATUS_FLAG      = 'R' -- R : 확정, N : 미검사,  D : 검사중
+		        AND DI.DEL_FLAG         = 'N'
+		        AND DI.PLANT_CD         = 'WF01'
+		        AND DI.RELEASE_DATE IS NOT NULL
+		
+		        WHERE HSPUP.COMPANY_CD = @{GV_COMPANY_CD}
+		        AND HSPUP.BU_CD = @{GV_BU_CD}
+		        AND DI.RELEASE_DATE IS NOT NULL
+		
+		        GROUP BY 
+		        HSPUP.COMPANY_CD
+		        ,HSPUP.BU_CD
+		        ,HSPUP.ITEM_CD
+		        ,HSPUP.SEQ
+		
+		) D
+		ON 1=1
+		AND D.COMPANY_CD = A.COMPANY_CD
+		AND D.BU_CD      = A.BU_CD
+		AND D.ITEM_CD    = A.ITEM_CD
+		AND D.SEQ        = A.SEQ
+		
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		AND A.BU_CD        = @{GV_BU_CD}
+		AND A.DEL_FLAG     = 'N'
+		
+		AND (
+
+	        A.URGENT_REASON_CD = 'NEW_DEMAND' AND MC2.CODE_CD <![CDATA[<>]]> 'DIFFUSION'
+	        OR A.URGENT_REASON_CD IN (
+	        'DUE_DATE_SHORTEN'
+	        ,'CONFERENCE_DISCUSSION'
+	        )
+        
+        )
+		#if($_parameter.month and $_parameter.month != "")
+        AND MC.YEARMONTH  IN ('$_parameter.month.replace(",","','")')
+        #end
+		#if($_parameter.week and $_parameter.week != "")
+        AND MC.YEARPWEEK  IN ('$_parameter.week.replace(",","','")')
+        #end
+        #if($_parameter.reqType and $_parameter.reqType != "")
+        AND A.URGENT_REASON_CD  IN ('$_parameter.reqType.replace(",","','")')
+        #end
+        #if($_parameter.route and $_parameter.route != "")
+        AND B.ROUTING_ID  IN ('$_parameter.route.replace(",","','")')
+        #end
+        #if($_parameter.item_cd and $_parameter.item_cd != "")
+          AND B.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+        #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+          AND (B.ITEM_CD LIKE '%'+@{item_nm}+'%' OR B.ITEM_NM LIKE '%'+@{item_nm}+'%')
+        #end
+        
+		DROP TABLE #HSPU_TEMP
+
+    </select>
+    
+    <select id="urgentPerformanceYearSelect" parameterType="map" resultType="map">
+    
+		    
+		SELECT  DISTINCT TOP 5 YEAR AS CODE_CD
+		, YEAR AS CODE_NM
+		, (
+		
+		    SELECT MIN(YYYYMMDD)
+		    FROM TB_MST_CALENDAR
+		    WHERE YEAR = MC.[YEAR]
+		
+		) AS YEAR_START_DATE
+		, (
+		
+		    SELECT MAX(YYYYMMDD)
+		    FROM TB_MST_CALENDAR
+		    WHERE YEAR = MC.[YEAR]
+		) AS YEAR_END_DATE
+		
+		FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+		WHERE YEAR <![CDATA[>=]]> (
+		
+		    SELECT YEAR
+		    FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+		    WHERE YYYYMMDD = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112)
+		 
+		)
+		ORDER BY YEAR
+    </select>
+    
+    <select id="urgentPerformanceMonthSelect" parameterType="map" resultType="map">
+        
+        SELECT RTRIM((RIGHT(YEARMONTH,2)))+'M' AS CODE_NM
+        ,  YEARMONTH                       AS CODE_CD
+        FROM TB_MST_CALENDAR
+        WHERE YEAR = CONVERT(NVARCHAR(4), DBO.UFN_GETDATE(),112)
+        GROUP BY YEARMONTH
+        
+    </select>
+    
+    <select id="urgentPerformanceWeekSelect" parameterType="map" resultType="map">
+    
+        DECLARE @P_YEAR NVARCHAR(4) 
+        SET @P_YEAR =  CONVERT(NVARCHAR(4), DBO.UFN_GETDATE(),112)
+
+
+        SELECT YEARPWEEK AS CODE_CD
+        , YEARPWEEK+'W' AS CODE_NM
+        FROM TB_MST_CALENDAR
+        WHERE YEAR = @P_YEAR
+    
+        #if($_parameter.selectedMonth and $_parameter.selectedMonth != "")
+            AND YEARMONTH  IN ('$_parameter.selectedMonth.replace(",","','")')
+        #else
+            AND YEARMONTH = CONVERT(NVARCHAR(6), DBO.UFN_GETDATE(),112)
+        #end
+        
+        GROUP BY YEARPWEEK
+        ORDER BY YEARPWEEK
+    </select>
+    
+
+
+    <select id="urgentPerformanceCumComplRateSelect" parameterType="map" resultType="map">
+        /****** [ aps.dynamic.urgentPerformanceCumComplRateSelect ] ******/
+        
+        
+        -- 일일 긴급 수요 관리에 접수된 품목코드, SEQ, 요청납기(해당년 기준) 기준 산출
+       SELECT COMPANY_CD
+        , BU_CD
+        , ITEM_CD
+        , CREATE_DTTM
+        , MAX(SEQ)                                AS SEQ
+        , MAX(CONVERT(NVARCHAR, A.DUE_DATE, 112)) AS YYYYMMDD_DUE_DATE
+        , MAX(DEL_FLAG)                                         AS DEL_FLAG
+        , MAX(CONF_DATE)                                                    AS CONF_DATE
+        , MAX(URGENT_REASON_CD)                                     AS URGENT_REASON_CD
+        , MAX(REQ_QTY)                                                      AS REQ_QTY
+        , MAX(DUE_DATE)                                                     AS DUE_DATE
+        INTO #HSPU_TEMP
+        FROM TB_HIS_SALES_PLAN_URGENT A WITH(NOLOCK)
+        WHERE CONVERT(NVARCHAR, A.DUE_DATE, 112)  BETWEEN @{fromCal} AND @{toCal}
+        AND A.DEL_FLAG  = 'N'
+        AND A.URGENT_STATUS_CD = 'APPLY'
+        GROUP BY 
+        A.COMPANY_CD
+        ,A.BU_CD
+        ,A.ITEM_CD
+        ,A.CREATE_DTTM;
+        
+        
+        WITH
+        W_ITEM_P
+        AS
+        (
+                SELECT T.COMPANY_CD
+                , T.BU_CD
+                , T.ITEM_CD
+                , MAX(T.ROUTING_ID) AS ROUTING_ID
+                , MAX(T.PUR_LT) AS PUR_LT
+                , MAX(T.MFG_LT) AS MFG_LT
+                , SUM(T.SS_QTY) AS SS_QTY
+                , MAX(T.PROCUR_TYPE) AS PROCUR_TYPE
+                , MAX(T.PROCUR_TYPE_NM) AS PROCUR_TYPE_NM
+                FROM (
+        
+                        SELECT A.COMPANY_CD
+                        , A.BU_CD
+                        , A.ITEM_CD
+                        , A.ROUTING_ID
+                        , A.PUR_LT
+                        , A.MFG_LT
+                        , A.SS_QTY
+                        , A.PROCUR_TYPE
+                        , (
+                            SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                           WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                           ELSE CODE_NM
+                                      END AS CODE_NM
+                               FROM TB_MST_CODE WITH(NOLOCK)
+                               WHERE GROUP_CD = 'PROCUR_TYPE'
+                                 AND USE_FLAG = 'Y'
+                                 AND CODE_CD = A.PROCUR_TYPE
+                            
+                        ) AS PROCUR_TYPE_NM
+                    FROM TB_MST_ITEM_PLANT A WITH (NOLOCK)
+                    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                        AND A.BU_CD    =   @{GV_BU_CD}
+                        AND A.VALID_FLAG = 'Y'
+        
+                ) T
+                GROUP BY T.COMPANY_CD
+                ,T.BU_CD
+                ,T.ITEM_CD
+            ),
+        
+            W_ITEM
+            AS
+            (
+                SELECT A.COMPANY_CD
+                , A.BU_CD
+                , A.ITEM_CD
+                , A.ITEM_NM
+                , A.SPEC
+                , E.ROUTING_ID
+                , B.ITEM_GROUP_CD
+                , B.ITEM_GROUP_NM
+                , B.UPPER_ITEM_GROUP_CD
+                , B.UPPER_ITEM_GROUP_NM
+                , A.ITEM_GRADE
+                , H.REP_CUST_GROUP_CD
+                , H.REP_CUST_GROUP_NM
+                , C.CUST_GROUP_CD
+                , G.CUST_GROUP_NM
+                , A.ITEM_TYPE
+                , (
+                        SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                    WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                    ELSE CODE_NM
+                                END AS CODE_NM
+                        FROM TB_MST_CODE MC WITH(NOLOCK)
+                       WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+                         AND MC.GROUP_CD = 'ITEM_TYPE'
+                         AND MC.CODE_CD  = A.ITEM_TYPE
+                         AND MC.USE_FLAG = 'Y'
+                   
+                  ) AS ITEM_TYPE_NM
+                 , MICG.SALES_PRICE_KRW
+                FROM TB_MST_ITEM A WITH (NOLOCK)
+                    LEFT JOIN TB_MST_ITEM_GROUP B WITH (NOLOCK)
+                    ON A.COMPANY_CD = B.COMPANY_CD
+                        AND A.BU_CD = B.BU_CD
+                        AND A.ITEM_GROUP_CD = B.ITEM_GROUP_CD
+                        AND B.DEL_FLAG = 'N'
+        
+                    LEFT JOIN TB_MST_REP_CUST C WITH (NOLOCK)
+                    ON A.COMPANY_CD = C.COMPANY_CD
+                        AND A.BU_CD = C.BU_CD
+                        AND A.REP_CUST_CD = C.REP_CUST_CD
+        
+                    LEFT JOIN TB_MAP_ITEM_CUST_GROUP D WITH (NOLOCK)
+                    ON A.COMPANY_CD = D.COMPANY_CD
+                        AND A.BU_CD = D.BU_CD
+                        AND A.ITEM_CD = D.ITEM_CD
+                        AND C.CUST_GROUP_CD = D.CUST_GROUP_CD
+        
+                    LEFT JOIN W_ITEM_P E
+                    ON A.COMPANY_CD = E.COMPANY_CD
+                        AND A.BU_CD = E.BU_CD
+                        AND A.ITEM_CD = E.ITEM_CD
+        
+                    LEFT JOIN TB_MST_CUSTOMER F WITH (NOLOCK)
+                    ON C.COMPANY_CD = F.COMPANY_CD
+                        AND C.BU_CD = F.BU_CD
+                        AND C.REP_CUST_CD = F.CUST_CD
+                        AND F.VALID_FLAG = 'Y'
+        
+        ----------------------------------------------------------------------------------
+                    LEFT  OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+                    ON A.COMPANY_CD = MICG.COMPANY_CD
+                    AND A.BU_CD     = MICG.BU_CD
+                    AND A.ITEM_CD   = MICG.ITEM_CD
+                    AND F.CUST_GROUP_CD = MICG.CUST_GROUP_CD
+        ----------------------------------------------------------------------------------
+        
+                    LEFT JOIN TB_MST_CUST_GROUP G WITH (NOLOCK)
+                    ON G.COMPANY_CD = C.COMPANY_CD
+                        AND G.BU_CD = C.BU_CD
+                        AND G.CUST_GROUP_CD = C.CUST_GROUP_CD
+                        AND G.USE_FLAG = 'Y'
+        
+                    LEFT JOIN TB_MST_REP_CUST_GROUP H WITH (NOLOCK)
+                    ON H.COMPANY_CD = G.COMPANY_CD
+                        AND H.BU_CD = G.BU_CD
+                        AND H.REP_CUST_GROUP_CD = G.REP_CUST_GROUP_CD
+        
+                WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                    AND A.BU_CD    = @{GV_BU_CD}
+                    AND A.USE_FLAG = 'Y'
+        
+            )
+        
+        ------------------------------------------------------------------------------------------------------------------
+        
+        
+        ------------------------------------------------------------------------------------------------------------------
+        
+         SELECT NULL AS TMP_COL
+        <include refid="include.getCdDimTotal"/>
+        <include refid="include.getGrpLvlId"/>
+       #foreach( $bucketMap in $_parameter.bucketList )
+        #set( $week = "$bucketMap.BUCKET_VAL" )
+            #if($bucketMap.CD.indexOf("MT") > -1)
+                #if($bucketMap.CD.indexOf("_REQ_QTY") > -1)
+                , SUM (CASE WHEN YEAR = '$week' THEN REQ_QTY ELSE NULL END)   AS $bucketMap.CD
+                #elseif($bucketMap.CD.indexOf("_RESULT_QTY") > -1)
+                , SUM (CASE WHEN YEAR = '$week' THEN RESULT_QTY ELSE NULL END) AS $bucketMap.CD
+                #elseif($bucketMap.CD.indexOf("_COMPLIANCE_RATE") > -1)
+                , CASE WHEN ROUND (CAST (SUM (CASE WHEN YEAR  ='$week' THEN RESULT_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                  NULLIF (CAST (SUM (CASE WHEN YEAR = '$week'THEN REQ_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 100, 1) <![CDATA[>=]]> 100 THEN 100 
+                  ELSE  
+                  ROUND (CAST (SUM (CASE WHEN YEAR  ='$week' THEN RESULT_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                  NULLIF (CAST (SUM (CASE WHEN YEAR = '$week'THEN REQ_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 100, 1)
+                  END AS $bucketMap.CD
+                #end
+            #else
+                #if($bucketMap.CD.indexOf("_REQ_QTY") > -1)
+                , SUM (CASE WHEN YEARMONTH = '$week' THEN REQ_QTY ELSE NULL END)   AS $bucketMap.CD
+                #elseif($bucketMap.CD.indexOf("_RESULT_QTY") > -1)
+                , SUM (CASE WHEN YEARMONTH = '$week' THEN RESULT_QTY ELSE NULL END) AS $bucketMap.CD
+               #end
+            #end
+        #end
+        
+		        FROM(
+		        
+		        
+		        
+		        SELECT T.PROD_PART_CD
+				, T.PROD_PART_CD_NM
+				, T.ROUTING_ID
+				, T.ROUTING_ID_NM
+				, T.YEAR
+				, T.YEARMONTH
+				, SUM(T.REQ_QTY)    AS REQ_QTY                                                 -- 요청건수   
+				, SUM(T.RESULT_QTY) AS RESULT_QTY                                              -- 실적건수
+				FROM (
+				        
+		        
+		        SELECT A.COMPANY_CD
+		        , A.BU_CD
+		        , A.SEQ
+		        , MC2.CODE_CD AS PROD_PART_CD                                       -- 생산파트 코드
+		        , MC2.CODE_CD AS PROD_PART_CD_NM
+		        , MC2.CODE_NM AS PROD_PART_NM                                       -- 생산파트명
+		        , MC.YEAR
+		        , MC.YEARMONTH                                                          -- [요청납기]일 기준 월
+		        , MC.YEARPWEEK                                                      -- [요청납기]일 기준 주차
+		        , B.ITEM_CD                                                         -- 품목코드
+		        , B.ITEM_NM                                                         -- 품목명
+		        , B.ROUTING_ID                                                      -- Routing
+		        , B.ROUTING_ID  AS ROUTING_ID_NM
+		        , CONVERT(VARCHAR(10), CONVERT(DATE, A.CONF_DATE), 20) AS CONF_DATE -- 협의일자
+		        , CONVERT(VARCHAR(10), CONVERT(DATE, A.DUE_DATE), 20) AS DUE_DATE   -- 요청납기일
+		        , A.URGENT_REASON_CD                                                -- 요청유형
+		        , A.REQ_QTY                                                         -- 요청수량
+		        , C.RESULT_QTY                                                      -- 실적 수량
+		        , CONVERT(VARCHAR(10), CONVERT(DATE, D.RELEASE_DATE),20) AS RELEASE_DATE -- 완료일
+		        
+		        , CASE WHEN A.REQ_QTY = C.RESULT_QTY THEN 1 ELSE NULL END AS SUCCESS_YN  -- 달성
+		        , CASE WHEN A.REQ_QTY <![CDATA[<>]]> ISNULL(C.RESULT_QTY,0) THEN 1 ELSE NULL END AS FAIL_YN    -- 미달성
+		        , CASE WHEN A.REQ_QTY = C.RESULT_QTY THEN 1 ELSE 0 END AS ACHIVE_YN      -- 준수
+		        
+		        , B.SALES_PRICE_KRW                                                      -- 품목단가
+		        , B.REP_CUST_GROUP_NM                                               -- 대표거래처그룹명
+		        
+		        
+		        FROM #HSPU_TEMP A
+		        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+		        ON A.YYYYMMDD_DUE_DATE = MC.YYYYMMDD
+		        
+		        INNER JOIN W_ITEM B
+		        ON A.COMPANY_CD = B.COMPANY_CD
+		        AND A.BU_CD = B.BU_CD
+		        AND A.ITEM_CD = B.ITEM_CD
+		        
+		        LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		          ON MC1.BU_CD = A.BU_CD
+		         AND MC1.GROUP_CD = 'PROD_L2'
+		         AND MC1.CODE_CD = B.ROUTING_ID
+		         AND MC1.USE_FLAG = 'Y'
+		        LEFT OUTER JOIN 
+		        (
+		            SELECT BU_CD
+		                 , CODE_CD
+		                 , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+		                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+		                        ELSE CODE_NM
+		                   END AS CODE_NM
+		                 , GROUP_CD
+		                 , SORT
+		            FROM TB_MST_CODE WITH(NOLOCK)
+		            WHERE USE_FLAG = 'Y'
+		        ) MC2
+		        ON MC2.BU_CD = MC1.BU_CD
+		        AND MC2.GROUP_CD = 'PROD_PART'
+		        AND MC2.CODE_CD = MC1.ATTB_2_CD
+		        
+		        LEFT OUTER JOIN (
+		        
+		        
+				        SELECT
+				        HSPUP.COMPANY_CD
+				        , HSPUP.BU_CD
+				        , HSPUP.ITEM_CD
+				        , HSPUP.SEQ
+				        , SUM(CASE WHEN DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112) AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE) THEN  DI.GOODS_QTY END) AS RESULT_QTY
+				        FROM #HSPU_TEMP HSPUP
+				        LEFT OUTER JOIN TB_DYN_INSPECTION DI WITH(NOLOCK)
+				        ON HSPUP.COMPANY_CD      = DI.COMPANY_CD
+				        AND HSPUP.BU_CD          = DI.BU_CD
+				        AND HSPUP.ITEM_CD        = DI.ITEM_CD
+				        
+				        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+						ON DI.RELEASE_DATE = MC.YYYYMMDD
+						AND DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112)
+				        AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE)
+				        AND DI.INSP_CLASS_CD    = 'F' -- F : 최종검사
+				        AND DI.STATUS_FLAG      = 'R' -- R : 확정, N : 미검사,  D : 검사중
+				        AND DI.DEL_FLAG         = 'N'
+				        AND DI.PLANT_CD         = 'WF01'
+				        AND DI.RELEASE_DATE IS NOT NULL
+				
+				        WHERE HSPUP.COMPANY_CD = @{GV_COMPANY_CD}
+				        AND HSPUP.BU_CD = @{GV_BU_CD}
+				        AND DI.RELEASE_DATE IS NOT NULL
+				
+				        GROUP BY 
+				        HSPUP.COMPANY_CD
+				        ,HSPUP.BU_CD
+				        ,HSPUP.ITEM_CD
+				        ,HSPUP.SEQ
+
+		
+		        
+		        ) C
+		        ON 1=1
+		        AND C.COMPANY_CD = A.COMPANY_CD
+		        AND C.BU_CD = A.BU_CD
+		        AND C.ITEM_CD = A.ITEM_CD
+		        AND C.SEQ = A.SEQ
+		        
+		        LEFT OUTER JOIN 
+		        (
+		        
+				        SELECT
+				        HSPUP.COMPANY_CD
+				        , HSPUP.BU_CD
+				        , HSPUP.ITEM_CD
+				        , HSPUP.SEQ
+						, MAX(DI.RELEASE_DATE) RELEASE_DATE
+				        FROM #HSPU_TEMP HSPUP
+				        LEFT OUTER JOIN TB_DYN_INSPECTION DI WITH(NOLOCK)
+				        ON HSPUP.COMPANY_CD      = DI.COMPANY_CD
+				        AND HSPUP.BU_CD          = DI.BU_CD
+				        AND HSPUP.ITEM_CD        = DI.ITEM_CD
+				        
+				        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+						ON DI.RELEASE_DATE = MC.YYYYMMDD
+						AND DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112)
+				        AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE)
+				        AND DI.INSP_CLASS_CD    = 'F' -- F : 최종검사
+				        AND DI.STATUS_FLAG      = 'R' -- R : 확정, N : 미검사,  D : 검사중
+				        AND DI.DEL_FLAG         = 'N'
+				        AND DI.PLANT_CD         = 'WF01'
+				        AND DI.RELEASE_DATE IS NOT NULL
+				
+				        WHERE HSPUP.COMPANY_CD = @{GV_COMPANY_CD}
+				        AND HSPUP.BU_CD = @{GV_BU_CD}
+				        AND DI.RELEASE_DATE IS NOT NULL
+				
+				        GROUP BY 
+				        HSPUP.COMPANY_CD
+				        ,HSPUP.BU_CD
+				        ,HSPUP.ITEM_CD
+				        ,HSPUP.SEQ
+		
+		        
+		        
+		        ) D
+		        ON 1=1
+		        AND D.COMPANY_CD = A.COMPANY_CD
+		        AND D.BU_CD      = A.BU_CD
+		        AND D.ITEM_CD    = A.ITEM_CD
+		        AND D.SEQ        = A.SEQ
+		        
+		        WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		        AND A.BU_CD        = @{GV_BU_CD}
+		        AND A.DEL_FLAG     = 'N'
+		        AND (
+		
+		            A.URGENT_REASON_CD = 'NEW_DEMAND' AND MC2.CODE_CD <![CDATA[<>]]> 'DIFFUSION'
+		            OR A.URGENT_REASON_CD IN (
+		            'DUE_DATE_SHORTEN'
+		            ,'CONFERENCE_DISCUSSION'
+		            )
+		        
+		        )
+		        
+		        ) T
+				GROUP BY 
+				 T.PROD_PART_CD
+				, T.PROD_PART_CD_NM 
+				, T.ROUTING_ID
+				, T.ROUTING_ID_NM
+				, T.YEAR
+				, T.YEARMONTH
+				
+		) A
+       GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+         ORDER BY TMP_COL
+         #foreach( $dimMap in $_parameter.dimList )
+                    , A.$dimMap.DIM_CD
+         #end
+       
+		        
+        
+        DROP TABLE #HSPU_TEMP
+
+
+
+    </select>
+    
+    <select id="urgentPerformanceSummaryByItemSelect" parameterType="map" resultType="map">
+        /****** [ aps.dynamic.urgentPerformanceSummaryByItemSelect ] ******/
+    
+    
+    
+        -- 일일 긴급 수요 관리에 접수된 품목코드, SEQ, 요청납기(해당년 기준) 기준 산출
+        SELECT COMPANY_CD
+        , BU_CD
+        , ITEM_CD
+        , CREATE_DTTM
+        , MAX(SEQ)                                AS SEQ
+        , MAX(CONVERT(NVARCHAR, A.DUE_DATE, 112)) AS YYYYMMDD_DUE_DATE
+        , MAX(DEL_FLAG)                                         AS DEL_FLAG
+        , MAX(CONF_DATE)                                                    AS CONF_DATE
+        , MAX(URGENT_REASON_CD)                                     AS URGENT_REASON_CD
+        , MAX(REQ_QTY)                                                      AS REQ_QTY
+        , MAX(DUE_DATE)                                                     AS DUE_DATE
+        INTO #HSPU_TEMP
+        FROM TB_HIS_SALES_PLAN_URGENT A WITH(NOLOCK)
+        WHERE CONVERT(NVARCHAR, A.DUE_DATE, 112)  BETWEEN @{fromCal} AND @{toCal}
+        AND A.DEL_FLAG  = 'N'
+        AND A.URGENT_STATUS_CD = 'APPLY'
+        GROUP BY 
+        A.COMPANY_CD
+        ,A.BU_CD
+        ,A.ITEM_CD
+        ,A.CREATE_DTTM;
+        
+        WITH
+        W_ITEM_P
+        AS
+        (
+                SELECT T.COMPANY_CD
+                , T.BU_CD
+                , T.ITEM_CD
+                , MAX(T.ROUTING_ID) AS ROUTING_ID
+                , MAX(T.PUR_LT) AS PUR_LT
+                , MAX(T.MFG_LT) AS MFG_LT
+                , SUM(T.SS_QTY) AS SS_QTY
+                , MAX(T.PROCUR_TYPE) AS PROCUR_TYPE
+                , MAX(T.PROCUR_TYPE_NM) AS PROCUR_TYPE_NM
+                FROM (
+        
+                        SELECT A.COMPANY_CD
+                        , A.BU_CD
+                        , A.ITEM_CD
+                        , A.ROUTING_ID
+                        , A.PUR_LT
+                        , A.MFG_LT
+                        , A.SS_QTY
+                        , A.PROCUR_TYPE
+                        , (
+                            SELECT CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+                                           WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+                                           ELSE CODE_NM
+                                      END AS CODE_NM
+                               FROM TB_MST_CODE WITH(NOLOCK)
+                               WHERE GROUP_CD = 'PROCUR_TYPE'
+                                 AND USE_FLAG = 'Y'
+                                 AND CODE_CD = A.PROCUR_TYPE
+                            
+                        ) AS PROCUR_TYPE_NM
+                    FROM TB_MST_ITEM_PLANT A WITH (NOLOCK)
+                    WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                        AND A.BU_CD    =   @{GV_BU_CD}
+                        AND A.VALID_FLAG = 'Y'
+        
+                ) T
+                GROUP BY T.COMPANY_CD
+                ,T.BU_CD
+                ,T.ITEM_CD
+            ),
+        
+            W_ITEM
+            AS
+            (
+                SELECT A.COMPANY_CD
+                , A.BU_CD
+                , A.ITEM_CD
+                , A.ITEM_NM
+                , A.SPEC
+                , E.ROUTING_ID
+                , B.ITEM_GROUP_CD
+                , B.ITEM_GROUP_NM
+                , B.UPPER_ITEM_GROUP_CD
+                , B.UPPER_ITEM_GROUP_NM
+                , A.ITEM_GRADE
+                , H.REP_CUST_GROUP_CD
+                , H.REP_CUST_GROUP_NM
+                , C.CUST_GROUP_CD
+                , G.CUST_GROUP_NM
+                , A.ITEM_TYPE
+                , (
+                        SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+                                    WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+                                    ELSE CODE_NM
+                                END AS CODE_NM
+                        FROM TB_MST_CODE MC WITH(NOLOCK)
+                       WHERE MC.BU_CD IN ('ALL',@{GV_BU_CD})
+                         AND MC.GROUP_CD = 'ITEM_TYPE'
+                         AND MC.CODE_CD  = A.ITEM_TYPE
+                         AND MC.USE_FLAG = 'Y'
+                   
+                  ) AS ITEM_TYPE_NM
+                 , MICG.SALES_PRICE_KRW
+                FROM TB_MST_ITEM A WITH (NOLOCK)
+                    LEFT JOIN TB_MST_ITEM_GROUP B WITH (NOLOCK)
+                    ON A.COMPANY_CD = B.COMPANY_CD
+                        AND A.BU_CD = B.BU_CD
+                        AND A.ITEM_GROUP_CD = B.ITEM_GROUP_CD
+                        AND B.DEL_FLAG = 'N'
+        
+                    LEFT JOIN TB_MST_REP_CUST C WITH (NOLOCK)
+                    ON A.COMPANY_CD = C.COMPANY_CD
+                        AND A.BU_CD = C.BU_CD
+                        AND A.REP_CUST_CD = C.REP_CUST_CD
+        
+                    LEFT JOIN TB_MAP_ITEM_CUST_GROUP D WITH (NOLOCK)
+                    ON A.COMPANY_CD = D.COMPANY_CD
+                        AND A.BU_CD = D.BU_CD
+                        AND A.ITEM_CD = D.ITEM_CD
+                        AND C.CUST_GROUP_CD = D.CUST_GROUP_CD
+        
+                    LEFT JOIN W_ITEM_P E
+                    ON A.COMPANY_CD = E.COMPANY_CD
+                        AND A.BU_CD = E.BU_CD
+                        AND A.ITEM_CD = E.ITEM_CD
+        
+                    LEFT JOIN TB_MST_CUSTOMER F WITH (NOLOCK)
+                    ON C.COMPANY_CD = F.COMPANY_CD
+                        AND C.BU_CD = F.BU_CD
+                        AND C.REP_CUST_CD = F.CUST_CD
+                        AND F.VALID_FLAG = 'Y'
+        
+        ----------------------------------------------------------------------------------
+                    LEFT  OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+                    ON A.COMPANY_CD = MICG.COMPANY_CD
+                    AND A.BU_CD     = MICG.BU_CD
+                    AND A.ITEM_CD   = MICG.ITEM_CD
+                    AND F.CUST_GROUP_CD = MICG.CUST_GROUP_CD
+        ----------------------------------------------------------------------------------
+        
+                    LEFT JOIN TB_MST_CUST_GROUP G WITH (NOLOCK)
+                    ON G.COMPANY_CD = C.COMPANY_CD
+                        AND G.BU_CD = C.BU_CD
+                        AND G.CUST_GROUP_CD = C.CUST_GROUP_CD
+                        AND G.USE_FLAG = 'Y'
+        
+                    LEFT JOIN TB_MST_REP_CUST_GROUP H WITH (NOLOCK)
+                    ON H.COMPANY_CD = G.COMPANY_CD
+                        AND H.BU_CD = G.BU_CD
+                        AND H.REP_CUST_GROUP_CD = G.REP_CUST_GROUP_CD
+        
+                WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                    AND A.BU_CD    = @{GV_BU_CD}
+                    AND A.USE_FLAG = 'Y'
+        
+            )
+        
+        ------------------------------------------------------------------------------------------------------------------
+        
+         SELECT NULL AS TMP_COL
+        <include refid="include.getCdDimTotal"/>
+        <include refid="include.getGrpLvlId"/>
+       #foreach( $bucketMap in $_parameter.bucketList )
+        #set( $week = "$bucketMap.BUCKET_VAL" )
+            #if($bucketMap.CD.indexOf("MT") > -1)
+                #if($bucketMap.CD.indexOf("_REQ_QTY") > -1)
+                , SUM (CASE WHEN YEAR = '$week' THEN REQ_QTY ELSE NULL END)   AS $bucketMap.CD
+                #elseif($bucketMap.CD.indexOf("_RESULT_QTY") > -1)
+                , SUM (CASE WHEN YEAR = '$week' THEN RESULT_QTY ELSE NULL END) AS $bucketMap.CD
+                #elseif($bucketMap.CD.indexOf("_COMPLIANCE_RATE") > -1)
+                , CASE WHEN ROUND (CAST (SUM (CASE WHEN YEAR  ='$week' THEN RESULT_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                  NULLIF (CAST (SUM (CASE WHEN YEAR = '$week'THEN REQ_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 100, 1) <![CDATA[>=]]> 100 THEN 100 
+                  ELSE 
+                  ROUND (CAST (SUM (CASE WHEN YEAR  ='$week' THEN RESULT_QTY ELSE NULL END) AS NUMERIC(20, 10)) /
+                  NULLIF (CAST (SUM (CASE WHEN YEAR = '$week'THEN REQ_QTY ELSE NULL END) AS NUMERIC(20, 10)), 0) * 100, 1)
+                  END  AS $bucketMap.CD
+                #end
+            #else
+                #if($bucketMap.CD.indexOf("_REQ_QTY") > -1)
+                , SUM (CASE WHEN YEARPWEEK = '$week' THEN REQ_QTY ELSE NULL END)   AS $bucketMap.CD
+                #elseif($bucketMap.CD.indexOf("_RESULT_QTY") > -1)
+                , SUM (CASE WHEN YEARPWEEK = '$week' THEN RESULT_QTY ELSE NULL END) AS $bucketMap.CD
+               #end
+            #end
+        #end
+        
+        FROM(
+		        
+		        SELECT 
+		        T.ITEM_CD
+		        , T.ITEM_CD_NM
+				, T.ITEM_NM
+				, T.ITEM_NM_NM
+				, T.YEAR
+				, T.YEARPWEEK
+				, T.ITEM_GROUP_NM
+				, T.ITEM_GROUP_NM_NM
+				, T.SPEC
+				, T.SPEC  AS SPEC_NM
+				, T.ROUTING_ID
+				, T.ROUTING_ID AS ROUTING_ID_NM
+                , SUM(T.REQ_QTY)    AS REQ_QTY                                                 -- 요청건수   
+				, SUM(T.RESULT_QTY) AS RESULT_QTY                                              -- 실적건수
+				FROM (
+
+		        SELECT A.COMPANY_CD
+		        , A.BU_CD
+		        , A.SEQ
+		        , MC.YEAR
+		        , MC.YEARPWEEK                                                      -- [요청납기]일 기준 주차
+		        , B.ITEM_CD                                                         -- 품목코드
+		        , B.ITEM_CD AS ITEM_CD_NM                                           -- 품목코드
+                , B.ITEM_NM AS ITEM_NM_NM                                           -- 품목명
+                , B.ITEM_NM                                                         -- 품목명
+		        , B.SPEC                                                            -- SPEC
+		        , B.SPEC    AS SPEC_NM                                              -- SPEC
+		        , B.ROUTING_ID                                                         -- ROUTING
+		        , B.ROUTING_ID AS ROUTING_ID_NM                                           -- ROUTING
+		        , B.ITEM_GROUP_NM                                                   -- 품목그룹명   
+		        , B.ITEM_GROUP_NM AS ITEM_GROUP_NM_NM                               -- 품목그룹명           
+		        , A.REQ_QTY                                                         -- 요청수량
+		        , C.RESULT_QTY                                                      -- 실적 수량
+		        , B.REP_CUST_GROUP_NM                                               -- 대표거래처그룹명
+		        
+		        
+		        FROM #HSPU_TEMP A
+		        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+		        ON A.YYYYMMDD_DUE_DATE = MC.YYYYMMDD
+		        
+		        INNER JOIN W_ITEM B
+		        ON A.COMPANY_CD = B.COMPANY_CD
+		        AND A.BU_CD = B.BU_CD
+		        AND A.ITEM_CD = B.ITEM_CD
+		        
+		        LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		        ON MC1.BU_CD = A.BU_CD
+		        AND MC1.GROUP_CD = 'PROD_L2'
+		        AND MC1.CODE_CD = B.ROUTING_ID
+		        AND MC1.USE_FLAG = 'Y'
+		        LEFT OUTER JOIN 
+		        (
+		            SELECT BU_CD
+		                 , CODE_CD
+		                 , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+		                        WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+		                        ELSE CODE_NM
+		                   END AS CODE_NM
+		                 , GROUP_CD
+		                 , SORT
+		            FROM TB_MST_CODE WITH(NOLOCK)
+		            WHERE USE_FLAG = 'Y'
+		        ) MC2
+		        ON MC2.BU_CD = MC1.BU_CD
+		        AND MC2.GROUP_CD = 'PROD_PART'
+		        AND MC2.CODE_CD = MC1.ATTB_2_CD
+		        
+		        LEFT OUTER JOIN (
+				        
+						        SELECT
+						        HSPUP.COMPANY_CD
+						        , HSPUP.BU_CD
+						        , HSPUP.ITEM_CD
+						        , HSPUP.SEQ
+						        , SUM(CASE WHEN DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112) AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE) THEN  DI.GOODS_QTY END) AS RESULT_QTY
+						        FROM #HSPU_TEMP HSPUP
+						        LEFT OUTER JOIN TB_DYN_INSPECTION DI WITH(NOLOCK)
+						        ON HSPUP.COMPANY_CD      = DI.COMPANY_CD
+						        AND HSPUP.BU_CD          = DI.BU_CD
+						        AND HSPUP.ITEM_CD        = DI.ITEM_CD
+						        
+						        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+								ON DI.RELEASE_DATE = MC.YYYYMMDD
+								AND DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112)
+						        AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE)
+						        AND DI.INSP_CLASS_CD    = 'F' -- F : 최종검사
+						        AND DI.STATUS_FLAG      = 'R' -- R : 확정, N : 미검사,  D : 검사중
+						        AND DI.DEL_FLAG         = 'N'
+						        AND DI.PLANT_CD         = 'WF01'
+						        AND DI.RELEASE_DATE IS NOT NULL
+						
+						        WHERE HSPUP.COMPANY_CD = @{GV_COMPANY_CD}
+						        AND HSPUP.BU_CD = @{GV_BU_CD}
+						        AND DI.RELEASE_DATE IS NOT NULL
+						
+						        GROUP BY 
+						        HSPUP.COMPANY_CD
+						        ,HSPUP.BU_CD
+						        ,HSPUP.ITEM_CD
+						        ,HSPUP.SEQ
+				        
+		        
+		        ) C
+		        ON 1=1
+		        AND C.COMPANY_CD = A.COMPANY_CD
+		        AND C.BU_CD = A.BU_CD
+		        AND C.ITEM_CD = A.ITEM_CD
+		        AND C.SEQ = A.SEQ
+		        
+		        LEFT OUTER JOIN 
+		        (
+		        
+				        SELECT
+				        HSPUP.COMPANY_CD
+				        , HSPUP.BU_CD
+				        , HSPUP.ITEM_CD
+				        , HSPUP.SEQ
+						, MAX(DI.RELEASE_DATE) RELEASE_DATE
+				        FROM #HSPU_TEMP HSPUP
+				        LEFT OUTER JOIN TB_DYN_INSPECTION DI WITH(NOLOCK)
+				        ON HSPUP.COMPANY_CD      = DI.COMPANY_CD
+				        AND HSPUP.BU_CD          = DI.BU_CD
+				        AND HSPUP.ITEM_CD        = DI.ITEM_CD
+				        
+				        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+						ON DI.RELEASE_DATE = MC.YYYYMMDD
+				        AND DI.RELEASE_DATE <![CDATA[>=]]> CONVERT(NVARCHAR, HSPUP.CREATE_DTTM, 112)
+				        AND DI.RELEASE_DATE <![CDATA[<=]]> ISNULL(CONVERT(NVARCHAR, HSPUP.CONF_DATE),HSPUP.DUE_DATE)
+				        AND DI.INSP_CLASS_CD    = 'F' -- F : 최종검사
+				        AND DI.STATUS_FLAG      = 'R' -- R : 확정, N : 미검사,  D : 검사중
+				        AND DI.DEL_FLAG         = 'N'
+				        AND DI.PLANT_CD         = 'WF01'
+				        AND DI.RELEASE_DATE IS NOT NULL
+				
+				        WHERE HSPUP.COMPANY_CD = @{GV_COMPANY_CD}
+				        AND HSPUP.BU_CD = @{GV_BU_CD}
+				        AND DI.RELEASE_DATE IS NOT NULL
+				
+				        GROUP BY 
+				        HSPUP.COMPANY_CD
+				        ,HSPUP.BU_CD
+				        ,HSPUP.ITEM_CD
+				        ,HSPUP.SEQ
+				
+		        
+		        
+		        ) D
+		        ON 1=1
+		        AND D.COMPANY_CD = A.COMPANY_CD
+		        AND D.BU_CD      = A.BU_CD
+		        AND D.ITEM_CD    = A.ITEM_CD
+		        AND D.SEQ        = A.SEQ
+		        
+		        WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		        AND A.BU_CD        = @{GV_BU_CD}
+		        AND A.DEL_FLAG     = 'N'
+		        AND (
+
+		            A.URGENT_REASON_CD = 'NEW_DEMAND' AND MC2.CODE_CD <![CDATA[<>]]> 'DIFFUSION'
+		            OR A.URGENT_REASON_CD IN (
+		            'DUE_DATE_SHORTEN'
+		            ,'CONFERENCE_DISCUSSION'
+		            )
+        
+                )
+		        
+		        
+		        ) T
+				GROUP BY T.ITEM_NM_NM
+				, T.ITEM_NM
+				, T.ITEM_CD_NM
+				, T.ITEM_CD
+				, T.SPEC
+				, T.SPEC_NM
+				, T.ROUTING_ID
+				, T.ROUTING_ID_NM
+				, T.YEAR
+				, T.YEARPWEEK
+				, T.ITEM_GROUP_NM
+                , T.ITEM_GROUP_NM_NM
+       ) A
+      GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+         ORDER BY TMP_COL
+         #foreach( $dimMap in $_parameter.dimList )
+                    , A.$dimMap.DIM_CD
+         #end
+       
+        DROP TABLE #HSPU_TEMP
+    
+    
+    
+    
+    </select>
+
+</mapper>

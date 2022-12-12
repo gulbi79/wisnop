@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.popup">
+
+	<select id="custGroupMappingReptSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.custGroupMappingReptSelect ] ******/
+		SELECT REP_CUST_GROUP_CD AS CODE_CD
+		     , REP_CUST_GROUP_NM AS CODE_NM
+		FROM TB_MST_REP_CUST_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND USE_FLAG   = 'Y'
+		ORDER BY REP_CUST_GROUP_CD ASC
+	</select>
+	
+	<select id="custGroupMappingCustSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.custGroupMappingCustSelect ] ******/
+		SELECT CUST_GROUP_CD AS CODE_CD
+		     , CUST_GROUP_NM AS CODE_NM
+		FROM TB_MST_CUST_GROUP WITH(NOLOCK)
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD      = @{GV_BU_CD}
+		  AND USE_FLAG   = 'Y'
+		ORDER BY CUST_GROUP_CD ASC
+	</select>
+
+	<select id="custGroupMappingSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.custGroupMappingSelect ] ******/
+		SELECT A.CUST_GROUP_CD
+		     , A.CUST_GROUP_NM
+		     , A.REP_CUST_GROUP_CD
+		     , CONVERT(VARCHAR(19), A.MAP_CREATE_DTTM, 120) AS CREATE_DTTM
+		     , A.MAP_CREATE_ID AS CREATE_ID
+		     , CONVERT(VARCHAR(19), A.MAP_UPDATE_DTTM, 120) AS UPDATE_DTTM
+		     , A.MAP_UPDATE_ID AS UPDATE_ID
+		FROM TB_MST_CUST_GROUP A WITH(NOLOCK)
+		WHERE A.COMPANY_CD        = @{GV_COMPANY_CD}
+		  AND A.BU_CD             = @{GV_BU_CD}
+		  AND A.USE_FLAG          = 'Y'
+		#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+		  AND A.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+		#end
+		#if($_parameter.custGroup and $_parameter.custGroup != "")
+		  AND A.CUST_GROUP_CD     IN ('$_parameter.custGroup.replace(",","','")')
+		#end
+		 ORDER BY A.CUST_GROUP_CD ASC
+	</select>
+	
+	<update id="custGroupMappingUpdate" parameterType="map">
+		/****** [ master.popup.custGroupMappingUpdate ] ******/
+		BEGIN
+	
+		UPDATE TB_MST_CUST_GROUP
+		   SET REP_CUST_GROUP_CD = NULLIF(@{REP_CUST_GROUP_CD}, '')
+		     , MAP_CREATE_DTTM   = CASE WHEN MAP_CREATE_DTTM IS NOT NULL THEN MAP_CREATE_DTTM ELSE DBO.UFN_GETDATE() END
+		     , MAP_CREATE_ID     = CASE WHEN MAP_CREATE_ID   IS NOT NULL THEN MAP_CREATE_ID   ELSE @{GV_USER_ID} END
+		     , MAP_UPDATE_DTTM   = DBO.UFN_GETDATE()
+		     , MAP_UPDATE_ID     = @{GV_USER_ID}
+		 WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		   AND BU_CD             = @{GV_BU_CD}
+		   AND CUST_GROUP_CD     = @{CUST_GROUP_CD}
+		   ;
+		
+		UPDATE TB_MST_CUSTOMER
+		   SET REP_CUST_GROUP_CD = NULLIF(@{REP_CUST_GROUP_CD}, '')
+		     , REP_CUST_GROUP_NM = NULLIF(@{REP_CUST_GROUP_NM}, '')
+		     , CUST_LVL2_CD      = NULLIF(@{REP_CUST_GROUP_CD}, '')
+		     , CUST_LVL2_NM      = NULLIF(@{REP_CUST_GROUP_NM}, '')
+		 WHERE COMPANY_CD        = @{GV_COMPANY_CD}
+		   AND BU_CD             = @{GV_BU_CD}
+		   AND CUST_GROUP_CD     = @{CUST_GROUP_CD}
+		   ;
+		END
+	</update>
+	
+	<select id="custGroupMappingExcelSqlSelect" parameterType="map" resultType="map">
+        /****** [ master.popup.custGroupMappingExcelSqlSelect ] ******/
+        SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+        , A2.ACTION_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+                 , ACTION_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD = @{popUpMenuCd}
+              AND ACTION_CD IN ('EXCEL','SQL')
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+        , A2.ACTION_CD
+    </select>
+	
+</mapper>

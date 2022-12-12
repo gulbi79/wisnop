@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	<!-- board Master 조회  -->
+	<select id="boardMngSelect" parameterType="map" resultType="map">
+		/****** [ admin.boardMngSelect ] ******/
+		SELECT BOARD_NO
+		     , BOARD_TYPE
+		     , TITLE
+		     , COMPANY_CD
+		     , BU_CD
+		     , CONTENT
+		     , FILE_NO
+		     , CONVERT(VARCHAR(30), START_DATE, 23) AS START_DATE
+		     , CONVERT(VARCHAR(30), END_DATE  , 23) AS END_DATE
+		     , USE_FLAG
+		     , dbo.UFN_GET_USER_NAME(CREATE_ID) AS CREATE_ID
+		     , CONVERT(VARCHAR(30), CREATE_DTTM, 120) AS CREATE_DTTM
+		     , dbo.UFN_GET_USER_NAME(UPDATE_ID) AS UPDATE_ID
+		     , CONVERT(VARCHAR(30), UPDATE_DTTM, 120) AS UPDATE_DTTM
+		FROM TB_MST_BOARD WITH(NOLOCK)
+		WHERE 1 = 1
+		#if($_parameter.SEARCH_TITLE and $_parameter.SEARCH_TITLE != "")
+		  AND TITLE LIKE '%' + @{SEARCH_TITLE} + '%' 
+		#end
+		#if($_parameter.PORTAL_YN == "Y")
+		  AND BOARD_TYPE = '002'
+		  AND USE_FLAG   = 'Y'
+		  AND CONVERT(VARCHAR(30), DBO.UFN_GETDATE(), 112) BETWEEN CONVERT(VARCHAR(30), START_DATE, 112) AND CONVERT(VARCHAR(30), END_DATE, 112)
+		#end
+	</select>
+	
+	<!-- board Master 등록  -->
+	<insert id="boardMngInsert" parameterType="map">
+		/****** [ admin.boardMngInsert ] ******/
+		INSERT INTO TB_MST_BOARD 
+		(
+			BOARD_NO
+	      , BOARD_TYPE
+	      , TITLE
+	      , COMPANY_CD
+	      , BU_CD
+	      , CONTENT
+	      , FILE_NO
+	      , START_DATE
+	      , END_DATE
+	      , USE_FLAG
+	      , CREATE_ID
+	      , CREATE_DTTM
+	      , UPDATE_ID
+	      , UPDATE_DTTM
+		) VALUES (
+			(SELECT DBO.UFN_LPAD(ISNULL(MAX(BOARD_NO),0) + 1 ,8 ,'0') FROM TB_MST_BOARD WITH(NOLOCK))
+		  , @{BOARD_TYPE}
+		  , @{TITLE}
+		  , @{COMPANY_CD}
+		  , @{BU_CD}
+		  , @{CONTENT}
+		  , @{FILE_NO}
+		  , CONVERT(DATETIME, @{START_DATE})
+		  , CONVERT(DATETIME, @{END_DATE})
+		  , @{USE_FLAG}
+		  , @{GV_USER_ID}     
+		  , DBO.UFN_GETDATE()     
+		  , @{GV_USER_ID}       
+		  , DBO.UFN_GETDATE()   
+		)
+	</insert>
+	
+	<!-- board Master 수정 -->
+	<update id="boardMngUpdate" parameterType="map">
+		/****** [ admin.boardMngUpdate ] ******/
+		UPDATE TB_MST_BOARD
+		SET BOARD_TYPE  = @{BOARD_TYPE}
+		  , TITLE       = @{TITLE}
+		  , COMPANY_CD  = @{COMPANY_CD}
+		  , BU_CD       = @{BU_CD}
+		  , CONTENT     = @{CONTENT}
+		  , FILE_NO     = @{FILE_NO}
+		  , START_DATE  = CONVERT(DATETIME, @{START_DATE})
+		  , END_DATE    = CONVERT(DATETIME, @{END_DATE})
+		  , USE_FLAG    = @{USE_FLAG}
+		  , UPDATE_ID   = @{GV_USER_ID}  
+		  , UPDATE_DTTM = DBO.UFN_GETDATE() 
+		WHERE BOARD_NO = @{BOARD_NO}
+	</update>
+	
+	<!-- board Master 삭제 -->
+	<delete id="boardMngDelete" parameterType="map">
+		/****** [ admin.boardMngDelete ] ******/
+		DELETE FROM TB_MST_BOARD WHERE BOARD_NO = @{BOARD_NO}
+	</delete>
+
+</mapper>

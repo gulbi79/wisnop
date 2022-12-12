@@ -1,0 +1,1398 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.bizKpi">
+	<select id="inventorySynthesisListSelect" parameterType="map" resultType="map">
+		/****** [ snop.bizKpi.inventorySynthesisListSelect ] ******/
+		BEGIN
+		
+			DECLARE @BEF_LAST_YEAR NVARCHAR(8);
+			DECLARE @LAST_YEAR NVARCHAR(8);
+			
+			SELECT @LAST_YEAR = CONVERT(NVARCHAR(4), DBO.UFN_GETDATE(), 112) + '0101'
+                 , @BEF_LAST_YEAR = CONVERT(NVARCHAR(8), DATEADD(YEAR, -1, @LAST_YEAR), 112)
+			;
+		
+			WITH W_CALENDAR AS
+			(
+				SELECT YYYYMMDD
+				     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A1.YEARWEEK AND DAY_NM = 'SUN') AS SUN_YYYYMMDD
+				     , (SELECT YYYYMMDD FROM TB_MST_CALENDAR WITH(NOLOCK) WHERE YEARWEEK = A1.YEARWEEK AND DAY_NM = 'SAT') AS SAT_YYYYMMDD
+				     , DAY
+				     , DAY_NM     
+				     , YEARWEEK
+				     , YEARMONTH
+				     #if($_parameter.bucket == "WEEK")
+				     	, CASE WHEN CONVERT(VARCHAR, DATEPART(yy, CONVERT(VARCHAR, @{currentDay}, 112))) 
+					              + REPLICATE('0', 2 - LEN(DATEPART(ww, CONVERT(VARCHAR, @{currentDay}, 112)))) 
+					              + CONVERT(VARCHAR, DATEPART(ww, CONVERT(VARCHAR, @{currentDay}, 112))-1) = YEARWEEK THEN CONVERT(VARCHAR, @{currentDay}, 112)
+			             	   ELSE CONVERT(VARCHAR, DATEADD(wk, 1, YYYYMMDD), 112)
+			         	   END AFTER_YYYYMMDD
+				     #else
+				     	, CASE WHEN CONVERT(VARCHAR, DATEPART(yy, CONVERT(VARCHAR, @{currentDay}, 112))) 
+					              + REPLICATE('0', 2 - LEN(DATEPART(mm, CONVERT(VARCHAR, @{currentDay}, 112)))) 
+					              + CONVERT(VARCHAR, DATEPART(mm, CONVERT(VARCHAR, @{currentDay}, 112))) = YEARMONTH THEN CONVERT(VARCHAR, @{currentDay}, 112)
+			             	   ELSE CONVERT(VARCHAR, DATEADD(mm, 1, YYYYMMDD), 112)
+			         	   END AFTER_YYYYMMDD
+				     #end
+				FROM TB_MST_CALENDAR A1 WITH(NOLOCK)
+				#if($_parameter.bucket == "WEEK")
+				WHERE YYYYMMDD <![CDATA[>=]]> @{swFromDate}
+				  AND YYYYMMDD <![CDATA[<=]]> @{swToDate}
+				  AND DAY_NM = 'SUN'
+				#else
+				WHERE YEARMONTH <![CDATA[>=]]> @{fromMon}
+				  AND YEARMONTH <![CDATA[<=]]> @{toMon}
+				  AND DAY = '1'
+				#end
+			),
+			W_MAIN AS
+			(
+				/*재고(M01+WB01)*/
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+				     , B1.INV_QTY AS QTY
+				     , B1.INV_AMT_KRW AS AMT
+				     , B2.YEARMONTH
+				     , B2.YEARWEEK
+				     , 'INV_M_WB' AS FLAG
+				FROM
+				(
+					SELECT DI.COMPANY_CD
+					     , DI.BU_CD
+					     , DI.ITEM_CD
+					     , DI.INV_DATE
+					     , SUM(DI.INV_QTY) AS INV_QTY     
+					     , SUM(DI.INV_AMT_KRW) AS INV_AMT_KRW
+					FROM TB_DYN_INVENTORY DI WITH(NOLOCK)
+		 			WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+		   			  AND DI.BU_CD = @{GV_BU_CD}
+				      AND DI.PLANT_CD = 'WF01'
+				      AND DI.SL_CD IN ('M01', 'WB01')
+					#if($_parameter.bucket == "WEEK")
+					  AND DI.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					  AND DI.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+					#else
+					  AND DI.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					  AND DI.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					#end
+					GROUP BY DI.COMPANY_CD, DI.BU_CD, DI.ITEM_CD, DI.INV_DATE
+				) B1
+				INNER JOIN 
+				(
+					SELECT *
+					FROM W_CALENDAR
+				) B2
+				ON B1.INV_DATE = B2.AFTER_YYYYMMDD
+				UNION ALL
+				/*재고(기타창고)*/
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+				     , B1.INV_QTY AS QTY
+				     , B1.INV_AMT_KRW AS AMT
+				     , B2.YEARMONTH
+				     , B2.YEARWEEK
+				     , 'INV_ETC' AS FLAG
+				FROM
+				(
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A1.ITEM_CD
+					     , A1.INV_DATE
+					     , SUM(A1.INV_QTY) AS INV_QTY     
+					     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+					FROM
+					(
+						SELECT DI.COMPANY_CD
+						     , DI.BU_CD
+						     , DI.ITEM_CD
+						     , DI.INV_DATE
+						     , DI.INV_QTY
+						     , DI.INV_AMT_KRW
+						FROM TB_DYN_INVENTORY DI WITH(NOLOCK)
+						WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+						  AND DI.BU_CD = @{GV_BU_CD}
+						  AND DI.PLANT_CD = 'WF01'
+						  AND DI.SL_CD NOT IN ('M01', 'WB01')
+						#if($_parameter.bucket == "WEEK")
+					  	  AND DI.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					  	  AND DI.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+						#else
+					  	  AND DI.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					  	  AND DI.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+						#end
+						UNION ALL  
+						SELECT DIO.COMPANY_CD
+						     , DIO.BU_CD
+						     , DIO.ITEM_CD
+						     , DIO.INV_DATE
+						     , DIO.INV_QTY
+						     , DIO.INV_AMT_KRW
+						FROM TB_DYN_INVENTORY_OTHERS DIO WITH(NOLOCK)
+						WHERE DIO.COMPANY_CD = @{GV_COMPANY_CD}
+						  AND DIO.BU_CD = @{GV_BU_CD}
+						  AND DIO.PLANT_CD = 'WF01'
+						#if($_parameter.bucket == "WEEK")
+					  	  AND DIO.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					  	  AND DIO.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+						#else
+					  	  AND DIO.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					  	  AND DIO.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+						#end
+					) A1
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+				) B1
+				INNER JOIN 
+				(
+					SELECT *
+					FROM W_CALENDAR
+				) B2
+				ON B1.INV_DATE = B2.AFTER_YYYYMMDD
+				UNION ALL
+				
+				
+				
+				
+				
+				
+	#if($_parameter.companyYn == "Y")
+					/*companyYn Data*/
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'BEFORE_INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD != 'WI01'
+			            #if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+						#if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+						#else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					    #end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.YYYYMMDD
+					UNION ALL
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD != 'WI01'
+			            #if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+						#if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+					    #else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					    #end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.AFTER_YYYYMMDD
+					
+					/*companyYn Data -> bef_last_year, last_year */
+					UNION ALL
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A1.ITEM_CD
+					     , SUM(A1.INV_QTY) AS QTY
+					     , SUM(A1.INV_AMT_KRW) AS AMT
+					     , NULL AS YEARMONTH
+					     , NULL AS YEARWEEK
+					     , CASE WHEN INV_DATE = @BEF_LAST_YEAR THEN 'BEF_LAST_YEAR' ELSE 'LAST_YEAR' END FLAG
+					FROM TB_DYN_INVENTORY A1 WITH(NOLOCK)
+					WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND A1.BU_CD = @{GV_BU_CD}
+		              AND A1.PLANT_CD = 'WF01'
+		              AND A1.SL_CD != 'WI01'
+		            #if($_parameter.slCd and $_parameter.slCd != "")
+					  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+					#end
+					  AND A1.INV_DATE IN (@BEF_LAST_YEAR, @LAST_YEAR)
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					
+					
+					
+					
+					
+					
+					
+	#end
+				
+	#if($_parameter.outsideYn == "Y")
+					/*outsideYn Data*/
+		#if($_parameter.companyYn == "Y")
+					UNION ALL
+					#end
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'BEFORE_INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD NOT IN ('P31', 'P32', 'P33', 'P36', 'D01')
+			            #if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+						#if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+					    #else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					    #end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.YYYYMMDD
+					UNION ALL
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD NOT IN ('P31', 'P32', 'P33', 'P36', 'D01')
+			            #if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+			            #if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+					    #else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					    #end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.AFTER_YYYYMMDD
+					
+					/*outsideYn Data -> bef_last_year, last_year */
+					UNION ALL
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A1.ITEM_CD
+					     , SUM(A1.INV_QTY) AS QTY
+					     , SUM(A1.INV_AMT_KRW) AS AMT
+					     , NULL AS YEARMONTH
+					     , NULL AS YEARWEEK
+					     , CASE WHEN INV_DATE = @BEF_LAST_YEAR THEN 'BEF_LAST_YEAR' ELSE 'LAST_YEAR' END FLAG
+					FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+					WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND A1.BU_CD = @{GV_BU_CD}
+		              AND A1.PLANT_CD = 'WF01'
+		              AND A1.SL_CD NOT IN ('P31', 'P32', 'P33', 'P36', 'D01')
+		            #if($_parameter.slCd and $_parameter.slCd != "")
+					  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+					#end
+					  AND A1.INV_DATE IN (@BEF_LAST_YEAR, @LAST_YEAR)
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+		#end
+				
+		#if($_parameter.consignYn == "Y")
+					/*consignYn Data*/
+					#if($_parameter.companyYn == "Y" or $_parameter.outsideYn == "Y")
+					UNION ALL
+					#end
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'BEFORE_INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD IN ('P31', 'P32', 'P36', 'P33')
+						#if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+						#if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+						#else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					    #end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.YYYYMMDD
+					UNION ALL
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD IN ('P31', 'P32', 'P36', 'P33')
+						#if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+			            #if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+						#else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					    #end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.AFTER_YYYYMMDD
+					
+					/*consignYn Data -> bef_last_year, last_year */
+					UNION ALL
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A1.ITEM_CD
+					     , SUM(A1.INV_QTY) AS QTY
+					     , SUM(A1.INV_AMT_KRW) AS AMT
+					     , NULL AS YEARMONTH
+					     , NULL AS YEARWEEK
+					     , CASE WHEN INV_DATE = @BEF_LAST_YEAR THEN 'BEF_LAST_YEAR' ELSE 'LAST_YEAR' END FLAG
+					FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+					WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND A1.BU_CD = @{GV_BU_CD}
+		              AND A1.PLANT_CD = 'WF01'
+		              AND A1.SL_CD IN ('P31', 'P32', 'P36', 'P33')
+		            #if($_parameter.slCd and $_parameter.slCd != "")
+					  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+					#end
+					  AND A1.INV_DATE IN (@BEF_LAST_YEAR, @LAST_YEAR)
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					
+		#end
+				
+		#if($_parameter.customerYn == "Y")
+					/*customerYn Data*/
+					#if($_parameter.companyYn == "Y" or $_parameter.outsideYn == "Y" or $_parameter.consignYn == "Y")
+					UNION ALL
+					#end	
+				
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'BEFORE_INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD = 'D01'
+			            #if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+						#if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+						#else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+						  AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+						#end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.YYYYMMDD
+					UNION ALL
+					SELECT B1.COMPANY_CD
+					     , B1.BU_CD
+					     , B1.ITEM_CD
+					     , B1.INV_QTY AS QTY
+					     , B1.INV_AMT_KRW AS AMT
+					     , B2.YEARMONTH
+					     , B2.YEARWEEK
+					     , 'INVENTORY' AS FLAG
+					FROM
+					(
+						SELECT A1.COMPANY_CD
+						     , A1.BU_CD
+						     , A1.ITEM_CD
+						     , A1.INV_DATE
+						     , SUM(A1.INV_QTY) AS INV_QTY
+						     , SUM(A1.INV_AMT_KRW) AS INV_AMT_KRW
+						FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+						WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			              AND A1.BU_CD = @{GV_BU_CD}
+			              AND A1.PLANT_CD = 'WF01'
+			              AND A1.SL_CD = 'D01'
+			            #if($_parameter.slCd and $_parameter.slCd != "")
+						  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+						#end
+						#if($_parameter.bucket == "WEEK")
+						  AND A1.INV_DATE <![CDATA[>=]]> @{swFromDate}
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(wk, 1, @{swToDate}), 112) 
+					    #else
+					      AND A1.INV_DATE <![CDATA[>=]]> @{fromMon} + '01'
+					      AND A1.INV_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(MONTH, 1, CONVERT(SMALLDATETIME, DATEADD(mm, 1, @{toMon} + '01')))-1, 112)
+					    #end
+						GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+					) B1
+					INNER JOIN 
+					(
+						SELECT *
+						FROM W_CALENDAR
+					) B2
+					ON B1.INV_DATE = B2.AFTER_YYYYMMDD
+					
+					/*customerYn Data -> bef_last_year, last_year */
+					UNION ALL
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A1.ITEM_CD
+					     , SUM(A1.INV_QTY) AS QTY
+					     , SUM(A1.INV_AMT_KRW) AS AMT
+					     , NULL AS YEARMONTH
+					     , NULL AS YEARWEEK
+					     , CASE WHEN INV_DATE = @BEF_LAST_YEAR THEN 'BEF_LAST_YEAR' ELSE 'LAST_YEAR' END FLAG
+					FROM TB_DYN_INVENTORY_OTHERS A1 WITH(NOLOCK)
+					WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND A1.BU_CD = @{GV_BU_CD}
+		              AND A1.PLANT_CD = 'WF01'
+		              AND A1.SL_CD = 'D01'
+		            #if($_parameter.slCd and $_parameter.slCd != "")
+					  AND A1.SL_CD IN ('$_parameter.slCd.replace(",","','")')
+					#end
+					  AND A1.INV_DATE IN (@BEF_LAST_YEAR, @LAST_YEAR)
+					GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD, A1.INV_DATE
+		#end
+				
+				
+				/* 출고*/
+				UNION ALL
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+				     , B1.GI_QTY AS QTY
+				     , B1.GI_AMT_KRW AS AMT
+				     , B2.YEARMONTH
+				     , B2.YEARWEEK 
+				     , 'OUTBOUND' AS FLAG
+				FROM
+				(
+				
+					#foreach($monthWeekMap in $_parameter.monthWeekBuckArry)
+		    			#set($monthWeekData = "$monthWeekMap.MONTH_WEEK_VAL")
+		    			#if($_parameter.bucket == "WEEK")
+		    				#if($velocityCount > 1)
+			    				UNION ALL
+			    			#end
+							SELECT A1.COMPANY_CD
+							     , A1.BU_CD
+							     , A1.ITEM_CD
+						     	 , SUM(A1.QTY) AS GI_QTY
+						     	 , SUM(A1.AMT_KRW) AS GI_AMT_KRW 
+							     , '$monthWeekData' AS YEARWEEK
+							FROM TB_DYN_GI A1 WITH(NOLOCK)
+							WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+					          AND A1.BU_CD = @{GV_BU_CD}
+					          AND A1.GI_DATE <![CDATA[>=]]> (
+					          									SELECT TOP(1) YYYYMMDD 
+	   															FROM TB_MST_CALENDAR
+																WHERE YEARWEEK = '$monthWeekData'
+																ORDER BY YYYYMMDD ASC
+															)
+					          AND A1.GI_DATE <![CDATA[<=]]> (
+					          									
+	   															SELECT TOP(1) YYYYMMDD
+																FROM TB_MST_CALENDAR
+																WHERE YEARWEEK = '$monthWeekData'
+																ORDER BY YYYYMMDD DESC
+															)
+							  AND A1.PLANT_CD = 'WF01'
+					          AND A1.DEL_FLAG = 'N'
+					        GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+					        
+		    			#else
+		    				#if($velocityCount > 1)
+			    				UNION ALL
+			    			#end
+							SELECT A1.COMPANY_CD
+							     , A1.BU_CD
+							     , A1.ITEM_CD
+						     	 , SUM(A1.QTY) AS GI_QTY
+						     	 , SUM(A1.AMT_KRW) AS GI_AMT_KRW
+							     , '$monthWeekData' AS YEARMONTH
+							FROM TB_DYN_GI A1 WITH(NOLOCK)
+							WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+					          AND A1.BU_CD = @{GV_BU_CD}
+					          AND A1.PLANT_CD = 'WF01'
+					          AND A1.GI_DATE <![CDATA[>=]]> '$monthWeekData' + '01'
+					          AND A1.GI_DATE <![CDATA[<=]]> '$monthWeekData' + '31'
+					          AND A1.DEL_FLAG = 'N'
+					        GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+		    			#end
+		    		#end
+		    		
+		    	) B1
+	    		INNER JOIN
+	    		( 
+	    			SELECT 
+		    		#if($_parameter.bucket == "WEEK")
+		    			YEARMONTH_STD AS YEARMONTH, YEARWEEK
+		    		#else
+		    			YEARMONTH, '' AS YEARWEEK
+		    		#end
+		    		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		    		#if($_parameter.bucket == "WEEK")
+		    			GROUP BY YEARMONTH_STD, YEARWEEK
+		    		#else
+		    			GROUP BY YEARMONTH
+		    		#end
+	    		) B2
+	    		#if($_parameter.bucket == "WEEK")
+	    		ON B1.YEARWEEK = B2.YEARWEEK
+	    		#else
+	    		ON B1.YEARMONTH = B2.YEARMONTH
+	    		#end
+				
+				/* 1년 평균 출고*/
+				UNION ALL
+				SELECT B1.COMPANY_CD
+				     , B1.BU_CD
+				     , B1.ITEM_CD
+				     , B1.GI_QTY AS QTY
+				     , B1.GI_AMT_KRW AS AMT
+				     , B2.YEARMONTH
+				     , B2.YEARWEEK 
+				     , 'OUTBOUND_Y_AVG' AS FLAG
+				FROM
+				(
+					#foreach($monthWeekMap in $_parameter.monthWeekBuckArry)
+		    			#set($monthWeekData = "$monthWeekMap.MONTH_WEEK_VAL")
+		    			
+		    			#if($_parameter.bucket == "WEEK")
+		    				#if($velocityCount > 1)
+			    				UNION ALL
+			    			#end
+							SELECT A1.COMPANY_CD
+							     , A1.BU_CD
+							     , A1.ITEM_CD
+						     	 , SUM(A1.QTY) / 52 AS GI_QTY
+						     	 , SUM(A1.AMT_KRW) / 52 AS GI_AMT_KRW
+							     , '$monthWeekData' AS YEARWEEK
+							FROM TB_DYN_GI A1 WITH(NOLOCK)
+							WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+					          AND A1.BU_CD = @{GV_BU_CD}
+					          AND A1.PLANT_CD = 'WF01'
+					          AND A1.GI_DATE <![CDATA[>=]]> (
+					          									SELECT CONVERT(VARCHAR, DATEADD(wk, -52, (
+					          																				SELECT TOP(1) YYYYMMDD 
+					          																				FROM TB_MST_CALENDAR
+																											WHERE YEARWEEK = '$monthWeekData'
+																											ORDER BY YYYYMMDD ASC
+																										 )
+																							   ), 112)
+															)
+					          AND A1.GI_DATE <![CDATA[<=]]> (
+					          									SELECT CONVERT(VARCHAR, DATEADD(wk, -1, (
+					          																				SELECT TOP(1) YYYYMMDD
+																											FROM TB_MST_CALENDAR
+																											WHERE YEARWEEK = '$monthWeekData'
+																											ORDER BY YYYYMMDD DESC
+																										)
+																							   ), 112)
+															)
+					          AND A1.DEL_FLAG = 'N'
+					        GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+		    			#else
+		    				#if($velocityCount > 1)
+			    				UNION ALL
+			    			#end
+							SELECT A1.COMPANY_CD
+							     , A1.BU_CD
+							     , A1.ITEM_CD
+						     	 , SUM(A1.QTY) / 12 AS GI_QTY
+						     	 , SUM(A1.AMT_KRW) / 12 AS GI_AMT_KRW
+							     , '$monthWeekData' AS YEARMONTH
+							FROM TB_DYN_GI A1 WITH(NOLOCK)
+							WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+					          AND A1.BU_CD = @{GV_BU_CD}
+					          AND A1.PLANT_CD = 'WF01'
+					          AND A1.GI_DATE <![CDATA[>=]]> CONVERT(VARCHAR, DATEADD(mm, -12, '$monthWeekData' + '01'), 112)
+					          AND A1.GI_DATE <![CDATA[<=]]> CONVERT(VARCHAR, DATEADD(d, -1, '$monthWeekData' + '01'), 112)
+					          AND A1.DEL_FLAG = 'N'
+					        GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+		    			#end
+		    		#end
+		    	) B1
+	    		INNER JOIN
+	    		( 
+	    			SELECT 
+		    		#if($_parameter.bucket == "WEEK")
+		    			YEARMONTH_STD AS YEARMONTH, YEARWEEK
+		    		#else
+		    			YEARMONTH, '' AS YEARWEEK
+		    		#end
+		    		FROM TB_MST_CALENDAR WITH(NOLOCK)
+		    		#if($_parameter.bucket == "WEEK")
+		    			GROUP BY YEARMONTH_STD, YEARWEEK
+		    		#else
+		    			GROUP BY YEARMONTH
+		    		#end
+	    		) B2
+	    		#if($_parameter.bucket == "WEEK")
+	    		ON B1.YEARWEEK = B2.YEARWEEK
+	    		#else
+	    		ON B1.YEARMONTH = B2.YEARMONTH
+	    		#end
+	    		
+	    		/*입고 실적 (월간 선택시 구간 변경 필요)*/
+	    		UNION ALL
+	    		SELECT DG.COMPANY_CD
+				     , DG.BU_CD
+				     , DG.ITEM_CD
+				     , SUM(DG.GR_QTY) AS QTY
+				     , SUM(DG.GR_AMT) AS AMT
+				     , YEARMONTH
+				     , YEARWEEK
+				     , 'EXP_RESULT' AS FLAG
+				FROM
+				(
+					SELECT A1.COMPANY_CD
+					     , A1.BU_CD
+					     , A1.ITEM_CD
+					     , A1.GR_QTY
+					     , A1.GR_QTY * A3.ITEM_COST_KRW AS GR_AMT
+						#if($_parameter.bucket == "WEEK")
+		    			 , A2.YEARMONTH
+		    			 , A2.YEARWEEK
+		    			#else
+		    			 , A2.YEARMONTH
+		    			 , '' AS YEARWEEK
+		    			#end
+					FROM
+					(
+				        SELECT DG.COMPANY_CD
+				             , DG.BU_CD
+				             , DG.ITEM_CD
+				             , DG.GR_QTY
+				             , DG.GR_DATE
+						FROM TB_DYN_GR DG WITH(NOLOCK)
+				        WHERE DG.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND DG.BU_CD = @{GV_BU_CD}
+						#if($_parameter.bucket == "WEEK")
+				          AND DG.GR_DATE BETWEEN @{swFromDate} AND @{swToDate}
+				        #else
+				          AND DG.GR_DATE BETWEEN @{fromMon} + '01' AND @{toMon} + '31'
+				        #end
+				          AND DG.DEL_FLAG = 'N'
+				          AND EXISTS (
+				                       	SELECT 1
+				                        FROM TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				                        WHERE MIP.COMPANY_CD = DG.COMPANY_CD
+				                          AND MIP.BU_CD = DG.BU_CD
+				                          AND MIP.PLANT_CD = 'WF01'
+				                          AND MIP.ITEM_CD = DG.ITEM_CD
+				                          AND MIP.PROCUR_TYPE IN ('OH', 'OP')
+				                     )
+						UNION ALL
+				        SELECT DGP.COMPANY_CD
+				             , DGP.BU_CD
+				             , DGP.ITEM_CD
+				             , DGP.GR_QTY
+				             , DGP.GR_DATE
+				        FROM TB_DYN_GR_PROD DGP WITH(NOLOCK)
+				        WHERE DGP.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND DGP.BU_CD = @{GV_BU_CD}
+				          AND DGP.PLANT_CD = 'WF01'
+						#if($_parameter.bucket == "WEEK")
+				          AND DGP.GR_DATE BETWEEN @{swFromDate} AND @{swToDate} 
+				        #else
+				          AND DGP.GR_DATE BETWEEN @{fromMon} + '01' AND @{toMon} + '31'
+				        #end
+				          AND EXISTS (
+				                       	SELECT 1
+				                        FROM TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				                        WHERE MIP.COMPANY_CD = DGP.COMPANY_CD
+				                          AND MIP.BU_CD = DGP.BU_CD
+				                          AND MIP.PLANT_CD = 'WF01'
+				                          AND MIP.ITEM_CD = DGP.ITEM_CD
+				                          AND MIP.PROCUR_TYPE IN ('MG', 'MH', 'MM')
+									 )
+						UNION ALL
+						SELECT UPR.COMPANY_CD
+				             , UPR.BU_CD
+				             , UPR.ITEM_CD
+				             , UPR.QTY
+				             , UPR.PROD_DATE
+						FROM UV_PROD_RESULT UPR WITH(NOLOCK)
+						WHERE UPR.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND UPR.BU_CD = @{GV_BU_CD}
+				          AND UPR.PLANT_CD = 'WF01'
+						#if($_parameter.bucket == "WEEK")
+				          AND UPR.PROD_DATE BETWEEN @{swFromDate} AND @{swToDate} 
+				        #else
+				          AND UPR.PROD_DATE BETWEEN @{fromMon} + '01' AND @{toMon} + '31'
+				        #end
+					) A1
+					INNER JOIN TB_MST_CALENDAR A2 WITH(NOLOCK)
+	          		   ON A1.GR_DATE = A2.YYYYMMDD
+	          		INNER JOIN TB_MST_ITEM A3 WITH(NOLOCK)
+	           		  ON A1.COMPANY_CD = A3.COMPANY_CD
+	           		 AND A1.BU_CD = A3.BU_CD
+	           	     AND A1.ITEM_CD = A3.ITEM_CD
+				) DG
+				GROUP BY DG.COMPANY_CD, DG.BU_CD, DG.ITEM_CD, DG.YEARMONTH, DG.YEARWEEK
+				
+				#if($_parameter.bucket == "WEEK")
+				
+					/*입고 계획 (월간 제외)*/
+					UNION ALL
+					SELECT MGSD.COMPANY_CD
+					     , MGSD.BU_CD
+					     , MGSD.ITEM_CD
+					     , SUM(MGSD.SCHED_QTY) AS QTY
+					     , SUM(MGSD.SCHED_QTY * MI.ITEM_COST_KRW) AS AMT
+					     , MGSD.YEARMONTH
+					     , MGSD.YEARWEEK
+					     , 'EXP_PLAN' AS FLAG
+					FROM 
+					(
+						SELECT MGSD.COMPANY_CD
+				             , MGSD.BU_CD
+				             , MGSD.ITEM_CD
+				             , MGSD.SCHED_QTY
+				             , WC.YEARMONTH
+	                   		 , WC.YEARWEEK
+						FROM UV_MAT_GR_SCHED_DAILY MGSD WITH(NOLOCK)
+						INNER JOIN W_CALENDAR WC
+	             		   ON MGSD.YYYYMMDD = WC.SUN_YYYYMMDD
+				        WHERE MGSD.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND MGSD.BU_CD = @{GV_BU_CD}
+				          AND MGSD.SCHED_DATE BETWEEN @{swFromDate} AND @{swToDate}
+				          AND EXISTS (
+				                       	SELECT 1
+				                        FROM TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				                        WHERE MIP.COMPANY_CD = MGSD.COMPANY_CD
+				                          AND MIP.BU_CD = MGSD.BU_CD
+				                          AND MIP.PLANT_CD = 'WF01'
+				                          AND MIP.ITEM_CD = MGSD.ITEM_CD
+				                          AND MIP.PROCUR_TYPE IN ('OH', 'OP')
+				                      )
+						UNION ALL
+				        SELECT KAPPW.COMPANY_CD
+				             , KAPPW.BU_CD
+				             , KAPPW.ITEM_CD
+				             , KAPPW.QTY
+				             , MC.YEARMONTH
+	                   		 , MC.YEARWEEK
+				        FROM TB_KPI_APS_PROD_PLAN_WEEKLY KAPPW WITH(NOLOCK)
+				        INNER JOIN TB_MST_CALENDAR MC WITH(NOLOCK)
+	                 	   ON KAPPW.YYYYMMDD = MC.YYYYMMDD
+				        WHERE KAPPW.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND KAPPW.BU_CD = @{GV_BU_CD}
+				          AND KAPPW.YYYYMMDD BETWEEN @{swFromDate} AND @{swToDate}
+				          AND EXISTS (
+				                       	SELECT 1
+				                        FROM TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				                        WHERE MIP.COMPANY_CD = KAPPW.COMPANY_CD
+				                          AND MIP.BU_CD = KAPPW.BU_CD
+				                          AND MIP.PLANT_CD = 'WF01'
+				                          AND MIP.ITEM_CD = KAPPW.ITEM_CD
+				                          AND MIP.PROCUR_TYPE IN ('MG', 'MH', 'MM')
+				                     )
+					) MGSD
+					INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+	           		   ON MGSD.COMPANY_CD = MI.COMPANY_CD
+	           		  AND MGSD.BU_CD = MI.BU_CD
+	           	      AND MGSD.ITEM_CD = MI.ITEM_CD
+					GROUP BY MGSD.COMPANY_CD, MGSD.BU_CD, MGSD.ITEM_CD, MGSD.YEARMONTH, MGSD.YEARWEEK
+				
+					/*출하출고계획 (월간 제외)*/
+					UNION ALL
+					SELECT DIM.COMPANY_CD
+					     , DIM.BU_CD
+					     , DIM.ITEM_CD
+					     , SUM(DIM.QTY) AS QTY
+					     , SUM(DIM.QTY * MI.ITEM_COST_KRW) AS AMT
+					     , DIM.YEARMONTH
+					     , DIM.YEARWEEK
+					     , 'SHIP_OUT_PLAN' AS FLAG
+					FROM 
+					(
+						SELECT DIM.COMPANY_CD
+				             , DIM.BU_CD
+				             , DIM.ITEM_CD
+				             , ISNULL(DIM.NON_DEPLOY_QTY, 0) + ISNULL(DIM.NON_MOVING_QTY, 0) AS QTY
+				             , WC.YEARMONTH
+	                   		 , WC.YEARWEEK
+				        FROM TB_DYN_ITEM_MOVE DIM WITH(NOLOCK)
+				        INNER JOIN W_CALENDAR WC
+	             		   ON DIM.YYYYMMDD = WC.SUN_YYYYMMDD
+				        WHERE DIM.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND DIM.BU_CD = @{GV_BU_CD}
+				          AND EXISTS (
+				                       	SELECT 1
+				                        FROM TB_MST_ITEM MI WITH(NOLOCK)
+				                        WHERE MI.COMPANY_CD = DIM.COMPANY_CD
+				                          AND MI.BU_CD = DIM.BU_CD
+				                          AND MI.ITEM_CD = DIM.ITEM_CD
+				                          AND MI.ITEM_TYPE IN ('20', '30')
+				                     )
+						UNION ALL
+				        SELECT KSP.COMPANY_CD
+				             , KSP.BU_CD
+				             , KSP.ITEM_CD
+				             , KSP.QTY
+				             , WC.YEARMONTH
+	                   		 , WC.YEARWEEK
+				        FROM TB_KPI_SALES_PLAN KSP WITH(NOLOCK)
+				        INNER JOIN W_CALENDAR WC
+	             		   ON KSP.YEARWEEK = WC.YEARWEEK
+				        WHERE KSP.COMPANY_CD = @{GV_COMPANY_CD}
+				          AND KSP.BU_CD = @{GV_BU_CD}
+				          AND KSP.MEAS_CD = 'CFM_SP'
+				          AND EXISTS (
+				                       	SELECT 1
+				                        FROM TB_MST_ITEM MI WITH(NOLOCK)
+				                        WHERE MI.COMPANY_CD = KSP.COMPANY_CD
+				                          AND MI.BU_CD = KSP.BU_CD
+				                          AND MI.ITEM_CD = KSP.ITEM_CD
+				                          AND MI.ITEM_TYPE IN ('10', '50')
+				                     )
+					) DIM
+					INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+	           		   ON DIM.COMPANY_CD = MI.COMPANY_CD
+	           		  AND DIM.BU_CD = MI.BU_CD
+	           	      AND DIM.ITEM_CD = MI.ITEM_CD
+					GROUP BY DIM.COMPANY_CD, DIM.BU_CD, DIM.ITEM_CD, DIM.YEARMONTH, DIM.YEARWEEK
+					
+					/*외주 미이동 (월간 제외)*/
+					UNION ALL
+					SELECT DIE.COMPANY_CD
+					     , DIE.BU_CD
+					     , DIE.ITEM_CD
+					     , SUM(DIE.OS_NON_MOVING_QTY) AS OS_NON_MOVING_QTY
+					     , SUM(DIE.OS_NON_MOVING_QTY * MI.ITEM_COST_KRW) AS OS_NON_MOVING_AMT
+					     , WC.YEARMONTH
+	                   	 , WC.YEARWEEK
+	                   	 , 'OUT_TRANS' AS FLAG
+					FROM TB_DYN_INVENTORY_ETC DIE WITH(NOLOCK)
+					INNER JOIN W_CALENDAR WC
+	             	   ON DIE.INV_DATE = WC.SUN_YYYYMMDD
+	             	INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+	           		   ON DIE.COMPANY_CD = MI.COMPANY_CD
+	           		  AND DIE.BU_CD = MI.BU_CD
+	           	      AND DIE.ITEM_CD = MI.ITEM_CD
+					WHERE DIE.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND DIE.BU_CD = @{GV_BU_CD}
+					GROUP BY DIE.COMPANY_CD, DIE.BU_CD, DIE.ITEM_CD, WC.YEARMONTH, WC.YEARWEEK
+				#end
+			)
+			SELECT NULL AS TMP_COL 
+				<include refid="include.getCdDimTotal"/>
+		    	<include refid="include.getGrpLvlId"/> 
+				 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN AVG(BEF_LAST_GR_AVG_QTY) ELSE SUM(BEF_LAST_GR_AVG_QTY) END BEF_LAST_GR_AVG_QTY
+				 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN AVG(BEF_LAST_PROD_AVG_QTY) ELSE SUM(BEF_LAST_PROD_AVG_QTY) END BEF_LAST_PROD_AVG_QTY
+				 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN AVG(LAST_GR_AVG_QTY) ELSE SUM(LAST_GR_AVG_QTY) END LAST_GR_AVG_QTY
+				 , CASE WHEN GROUPING_ID(${grpLvlId}) = 0 THEN AVG(LAST_PROD_AVG_QTY) ELSE SUM(LAST_PROD_AVG_QTY) END LAST_PROD_AVG_QTY
+				 , SUM(BEF_LAST_EOH_QTY) AS BEF_LAST_EOH_QTY
+		    	 , SUM(LAST_EOH_QTY) AS LAST_EOH_QTY
+				
+	        
+                #foreach($bucketMap in $_parameter.bucketList)
+    
+                    #if($bucketMap.CD.indexOf("_INV_DAY") > -1)
+                 
+                    , SUM(${bucketMap.ROOT_CD}_INVEN)/NULLIF(SUM(${bucketMap.ROOT_CD}_OUTBOUND_Y_AVG),0)*7  AS $bucketMap.CD
+                 
+                    #else
+                    , SUM($bucketMap.CD) AS $bucketMap.CD
+                    #end
+                  
+                #end
+                
+				
+				, SUM(OMIT_FLAG) AS OMIT_FLAG
+			FROM
+			(
+				SELECT NULL AS TMP_COL
+					#foreach( $dimMap in $_parameter.dimList )
+		             , $dimMap.DIM_CD 
+		             , MAX(${dimMap.DIM_CD}_NM) AS ${dimMap.DIM_CD}_NM
+					#end
+		    		 , AVG(BEF_LAST_GR_AVG_QTY) AS BEF_LAST_GR_AVG_QTY 
+		    		 , AVG(BEF_LAST_PROD_AVG_QTY) AS BEF_LAST_PROD_AVG_QTY 
+		    		 , AVG(LAST_GR_AVG_QTY) AS LAST_GR_AVG_QTY
+		    		 , AVG(LAST_PROD_AVG_QTY) AS LAST_PROD_AVG_QTY 
+		    		 , SUM(BEF_LAST_YEAR) AS BEF_LAST_EOH_QTY
+		    		 , SUM(LAST_YEAR) AS LAST_EOH_QTY
+		    		#foreach($bucketMap in $_parameter.bucketList)
+		    			#set($paramData = "$bucketMap.BUCKET_VAL")
+		    			#if($_parameter.rdoAqType == "QTY")
+		    				#if($_parameter.bucket == "WEEK")
+			   					#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			    					, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END) AS $bucketMap.CD
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END) AS $bucketMap.CD	
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND' THEN QTY END) AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END) /
+									  NULLIF(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END), 0) * 7 AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_COMPARE") > -1)
+									, (SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END)
+									  - SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'BEFORE_INVENTORY' THEN QTY END))
+									  / NULLIF(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END), 0) * 100 AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_RESULT' THEN QTY END) AS $bucketMap.CD	
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_PLAN' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUT_TRANS' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_M_WB' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_ETC' THEN QTY END) AS $bucketMap.CD
+								#end
+			   				#else
+			   					#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			   						, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END) AS $bucketMap.CD
+			   					#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END) AS $bucketMap.CD
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND' THEN QTY END) AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END) /
+									  NULLIF(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END), 0) * 30 AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_COMPARE") > -1)
+									, (SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END)
+									  - SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'BEFORE_INVENTORY' THEN QTY END))
+									  / NULLIF(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END), 0) * 100 AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_RESULT' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_PLAN' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUT_TRANS' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_M_WB' THEN QTY END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_ETC' THEN QTY END) AS $bucketMap.CD
+								#end
+			   				#end
+		    			#elseif ($_parameter.rdoAqType == "AMT")
+		    				#if($_parameter.bucket == "WEEK")
+			   					#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			    					, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN AMT END) AS $bucketMap.CD
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN AMT END) AS $bucketMap.CD	
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND' THEN AMT END) AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END) /
+									  NULLIF(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END), 0) * 7 AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_COMPARE") > -1)
+									, (SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN AMT END)
+									  - SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'BEFORE_INVENTORY' THEN AMT END))
+									  / NULLIF(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN AMT END), 0) * 100 AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_RESULT' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_PLAN' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUT_TRANS' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_M_WB' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)
+									, SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_ETC' THEN AMT END) AS $bucketMap.CD
+								#end
+			   				#else
+			   					#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			   						, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN AMT END) AS $bucketMap.CD
+			   					#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN AMT END) AS $bucketMap.CD
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND' THEN AMT END) AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END) /
+									  NULLIF(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END), 0) * 30 AS $bucketMap.CD
+								
+								
+								#elseif($bucketMap.CD.indexOf("_COMPARE") > -1)
+									, (SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN AMT END)
+									  - SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'BEFORE_INVENTORY' THEN AMT END))
+									  / NULLIF(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN AMT END), 0) * 100 AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_RESULT' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_PLAN' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)	  
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUT_TRANS' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)	  
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_M_WB' THEN AMT END) AS $bucketMap.CD
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)	  
+									, SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_ETC' THEN AMT END) AS $bucketMap.CD	
+								#end
+			   				#end
+		    			#end
+		    		#end
+		    		
+		    		#foreach($bucketMap in $_parameter.bucketList)
+		    			#set($paramData = "$bucketMap.BUCKET_VAL")
+		    			#if($velocityCount > 1)
+		    				#if($_parameter.bucket == "WEEK")
+			    				#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			   						+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END)), 0)
+			   					#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END)), 0)
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+									  
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_RESULT' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)								  
+									+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUT_TRANS' THEN QTY END)), 0)
+								
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)								  
+									+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_M_WB' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)								  
+									+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_ETC' THEN QTY END)), 0)
+								#end
+			   				#else
+			   					#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			   						+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END)), 0)
+			   					#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END)), 0)
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_RESULT' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)								  
+									+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUT_TRANS' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)								  
+									+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_M_WB' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)								  
+									+ ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_ETC' THEN QTY END)), 0)
+								#end
+			   				#end
+		    			#else
+		    				#if($_parameter.bucket == "WEEK")
+								#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			   						, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END)), 0)
+			   					#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END)), 0)
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUTBOUND' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+									, 0  
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_RESULT' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'EXP_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)								  
+									, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'OUT_TRANS' THEN QTY END)), 0)
+								
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)								  
+									, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_M_WB' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)								  
+									, ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INV_ETC' THEN QTY END)), 0)
+								#end
+			   				#else
+			   					#if($bucketMap.CD.indexOf("_INVEN") > -1)
+			   						, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END)), 0)
+			   					#elseif($bucketMap.CD.indexOf("_OUTBOUND_Y_AVG") > -1)
+			    					, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND_Y_AVG' THEN QTY END)), 0)
+			    				#elseif($bucketMap.CD.indexOf("_OUTBOUND") > -1)
+			    					, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUTBOUND' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_DAY") > -1)
+									, 0
+								#elseif($bucketMap.CD.indexOf("_EXP_RESULT") > -1)
+									, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_RESULT' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_EXP_PLAN") > -1)
+									, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'EXP_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_SHIP_OUT_PLAN") > -1)
+									, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'SHIP_OUT_PLAN' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_OUT_TRANS") > -1)								  
+									, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'OUT_TRANS' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_M_WB") > -1)								  
+									, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_M_WB' THEN QTY END)), 0)
+								#elseif($bucketMap.CD.indexOf("_INV_ETC") > -1)								  
+									, ISNULL(ABS(SUM(CASE WHEN YEARMONTH = '$paramData' AND FLAG = 'INV_ETC' THEN QTY END)), 0)
+								#end
+			   				#end
+		    			#end
+					#end AS OMIT_FLAG
+		    	FROM
+		    	( 
+					SELECT ISNULL(T3.ITEM_CD, ' ') AS ITEM_CD
+					     , ISNULL(T3.ITEM_CD, ' ') AS ITEM_CD_NM
+					     , ISNULL(T3.UPPER_ITEM_GROUP_CD, ' ') AS UPPER_ITEM_GROUP_CD
+					     , ISNULL(T3.UPPER_ITEM_GROUP_CD, ' ') AS UPPER_ITEM_GROUP_CD_NM
+					     , ISNULL(T3.UPPER_ITEM_GROUP_NM, ' ') AS UPPER_ITEM_GROUP_NM
+					     , ISNULL(T3.UPPER_ITEM_GROUP_NM, ' ') AS UPPER_ITEM_GROUP_NM_NM
+					     , ISNULL(T3.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+					     , ISNULL(T3.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+					     , ISNULL(T3.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+					     , ISNULL(T3.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+					     , ISNULL(T3.ITEM_NM, ' ') AS ITEM_NM
+					     , ISNULL(T3.ITEM_NM, ' ') AS ITEM_NM_NM
+					     , ISNULL(T3.ITEM_TYPE, ' ') AS ITEM_TYPE_CD
+					     , ISNULL(T3.ITEM_TYPE, ' ') AS ITEM_TYPE_CD_NM
+					     , ISNULL(T3.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM
+					     , ISNULL(T3.ITEM_TYPE_NM, ' ') AS ITEM_TYPE_NM_NM
+					     , ISNULL(T3.SPEC, ' ') AS SPEC
+					     , ISNULL(T3.SPEC, ' ') AS SPEC_NM
+					     , ISNULL(T3.DRAW_NO, ' ') AS DRAW_NO
+					     , ISNULL(T3.DRAW_NO, ' ') AS DRAW_NO_NM
+					     , ISNULL(T3.UOM_CD, ' ') AS UOM_CD
+					     , ISNULL(T3.UOM_CD, ' ') AS UOM_CD_NM
+					     , ISNULL(T3.ROUTING_ID, ' ') AS ROUTING_ID
+					     , ISNULL(T3.ROUTING_ID, ' ') AS ROUTING_ID_NM
+					     , ISNULL(T3.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+					     , ISNULL(T3.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+					     , ISNULL(T3.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+					     , ISNULL(T3.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+					     , ISNULL(T3.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+					     , ISNULL(T3.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+					     , ISNULL(T3.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+					     , ISNULL(T3.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+					     , ISNULL(T3.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+					     , ISNULL(T3.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+					     , ISNULL(T3.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+					     , ISNULL(T3.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+					     , ISNULL(T3.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+					     , ISNULL(T3.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+					     , ISNULL(T3.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+					     , ISNULL(T3.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+					     , ISNULL(T3.SALES_PRICE_KRW, 0) AS SALES_PRICE_KRW
+					     , ISNULL(T3.SALES_PRICE_KRW, 0) AS SALES_PRICE_KRW_NM
+					     , ISNULL(T3.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD
+					     , ISNULL(T3.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM
+					     , ISNULL(T3.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM
+					     , ISNULL(T3.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+					     , ISNULL(CAST (T3.SS_QTY_DISP AS NVARCHAR(20)), ' ') AS SS_QTY_DISP2
+					     , ISNULL(CAST (T3.SS_QTY_DISP AS NVARCHAR(20)), ' ') AS SS_QTY_DISP2_NM
+					     , ISNULL(T1.QTY, 0) AS QTY
+						#if($_parameter.rdoAqType == "QTY")
+						 , T3.BEF_LAST_GR_AVG_QTY
+					     , T3.BEF_LAST_PROD_AVG_QTY
+					     , T3.LAST_GR_AVG_QTY
+					     , T3.LAST_PROD_AVG_QTY
+					     , CASE WHEN T1.FLAG = 'BEF_LAST_YEAR' THEN QTY ELSE NULL END BEF_LAST_YEAR
+					     , CASE WHEN T1.FLAG = 'LAST_YEAR' THEN QTY ELSE NULL END LAST_YEAR
+						#else
+							#if($_parameter.unitPrice == "COST")
+							 , T3.BEF_LAST_GR_AVG_QTY * T3.ITEM_COST_KRW AS BEF_LAST_GR_AVG_QTY
+					     	 , T3.BEF_LAST_PROD_AVG_QTY * T3.ITEM_COST_KRW AS BEF_LAST_PROD_AVG_QTY
+					     	 , T3.LAST_GR_AVG_QTY * T3.ITEM_COST_KRW AS LAST_GR_AVG_QTY
+					     	 , T3.LAST_PROD_AVG_QTY * T3.ITEM_COST_KRW AS LAST_PROD_AVG_QTY
+					     	 , (CASE WHEN T1.FLAG = 'BEF_LAST_YEAR' THEN QTY ELSE NULL END) * T3.ITEM_COST_KRW AS BEF_LAST_YEAR
+					     	 , (CASE WHEN T1.FLAG = 'LAST_YEAR' THEN QTY ELSE NULL END) * T3.ITEM_COST_KRW AS LAST_YEAR
+							#else
+							 , T3.BEF_LAST_GR_AVG_QTY * SALES_PRICE_KRW AS BEF_LAST_GR_AVG_QTY
+					     	 , T3.BEF_LAST_PROD_AVG_QTY * SALES_PRICE_KRW AS BEF_LAST_PROD_AVG_QTY
+					     	 , T3.LAST_GR_AVG_QTY * SALES_PRICE_KRW AS LAST_GR_AVG_QTY
+					     	 , T3.LAST_PROD_AVG_QTY * SALES_PRICE_KRW AS LAST_PROD_AVG_QTY
+					     	 , (CASE WHEN T1.FLAG = 'BEF_LAST_YEAR' THEN QTY ELSE NULL END) * T3.SALES_PRICE_KRW AS BEF_LAST_YEAR
+					     	 , (CASE WHEN T1.FLAG = 'LAST_YEAR' THEN QTY ELSE NULL END) * T3.SALES_PRICE_KRW AS LAST_YEAR
+							#end
+						#end
+						#if($_parameter.unitPrice == "COST")
+					     , ISNULL(T1.AMT, 0) AS AMT
+					    #else
+					     , CASE WHEN SALES_PRICE_KRW <![CDATA[>]]> 0 THEN SALES_PRICE_KRW * ISNULL(T1.QTY, 0) ELSE ISNULL(T1.AMT, 0) END AMT
+					    #end
+					     , T1.FLAG
+						#if($_parameter.bucket == "WEEK")
+						 	, T1.YEARWEEK
+						#else
+						 	, T1.YEARMONTH
+						#end
+					FROM (<include refid="snop.common.t_itemCust" />) T3
+					LEFT OUTER JOIN W_MAIN T1 
+					   ON T1.COMPANY_CD = T3.COMPANY_CD
+					  AND T1.BU_CD = T3.BU_CD
+					  AND T1.ITEM_CD = T3.ITEM_CD
+					WHERE T3.ITEM_TYPE IN ('10', '20', '30', '50')
+				) A
+				GROUP BY 
+				#foreach($dimMap in $_parameter.dimList)
+					#if($velocityCount > 1)
+					 , A.$dimMap.DIM_CD
+					#else
+					   A.$dimMap.DIM_CD
+					#end
+				#end
+			) B
+			GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+		    ORDER BY TMP_COL
+			#foreach($dimMap in $_parameter.dimList)
+		    	, B.$dimMap.DIM_CD
+			#end
+		END;
+	</select>
+	
+	
+	
+	
+</mapper>

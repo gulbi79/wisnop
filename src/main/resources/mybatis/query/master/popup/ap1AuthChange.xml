@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="master.popup">
+
+	<select id="ap1AuthChangeUserAuthLvlSelect" parameterType="map" resultType="string">
+		/****** [ master.popup.ap1AuthChangeUserAuthLvlSelect ] ******/
+		WITH USER_ROLE AS 
+		(
+			SELECT R.BU_CD, R.ROLE_CD
+		    FROM TB_MST_USER U WITH(NOLOCK)
+		    INNER JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+		       ON (U.USER_ID = R.USER_ID AND R.BU_CD = @{GV_BU_CD} AND R.USE_FLAG = 'Y')
+			WHERE U.DEL_FLAG = 'N'
+		      AND U.USE_FLAG = 'Y'
+		      AND U.USER_ID  = @{GV_USER_ID}
+		),
+		W_CODE AS 
+		(
+		    #set($_parameter.groupCd="DP_AUTH_CTRL")
+		    <include refid="include.mstCode"/>
+		)
+		SELECT CASE WHEN (SELECT COUNT(1) 
+		FROM USER_ROLE R
+		INNER JOIN W_CODE C
+		   ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_3_CD = 'Y')) > 0 THEN 'GOC'
+		WHEN (SELECT COUNT(1) 
+				FROM USER_ROLE R
+		        INNER JOIN W_CODE C
+		           ON (R.ROLE_CD = C.CODE_CD AND C.ATTB_1_CD = 'Y')) > 0 THEN 'AP1'
+		ELSE 'NON' 
+		END AS AUTH_LVL
+	</select>
+	
+	<select id="ap1AuthChangeProdL3Select" parameterType="map" resultType="map">
+		/****** [ master.popup.ap1AuthChangeProdL3Select ] ******/
+		WITH W_CODE AS 
+		(
+		    #set($_parameter.groupCd = "ITEM_TYPE")
+		    <include refid="include.mstCode"/>
+	    )
+		SELECT I.PROD_LVL1_CD+I.PROD_LVL2_CD+I.PROD_LVL3_CD AS CODE_CD
+		     , I.PROD_LVL3_NM                               AS CODE_NM
+		FROM TB_MST_ITEM I WITH (NOLOCK)
+		INNER JOIN W_CODE C
+		   ON I.ITEM_TYPE = C.CODE_CD 
+		  AND C.ATTB_2_CD = 'Y'
+		WHERE I.COMPANY_CD   = @{GV_COMPANY_CD}
+		  AND I.BU_CD        = @{GV_BU_CD}
+		  AND I.PROD_LVL1_CD IS NOT NULL
+		  AND I.PROD_LVL2_CD IS NOT NULL
+		  AND I.PROD_LVL3_CD IS NOT NULL
+		  AND I.USE_FLAG     = 'Y'
+		  AND I.VALID_FLAG   = 'Y'
+		GROUP BY I.PROD_LVL1_CD, I.PROD_LVL2_CD, I.PROD_LVL3_CD, I.PROD_LVL3_NM
+	</select>
+	
+	<select id="ap1AuthChangeCustL2Select" parameterType="map" resultType="map">
+		/****** [ master.popup.ap1AuthChangeCustL2Select ] ******/
+		SELECT CUST_LVL1_CD+CUST_LVL2_CD AS CODE_CD
+		     , CUST_LVL2_NM              AS CODE_NM
+		FROM TB_MST_CUSTOMER WITH (NOLOCK)
+		WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+		  AND BU_CD        = @{GV_BU_CD}
+		  AND CUST_LVL1_CD IS NOT NULL
+		  AND CUST_LVL2_CD IS NOT NULL
+		  AND VALID_FLAG   = 'Y'
+		GROUP BY CUST_LVL1_CD, CUST_LVL2_CD, CUST_LVL2_NM
+	</select>
+	
+	<select id="ap1AuthChangeSelect" parameterType="map" resultType="map">
+		/****** [ master.popup.ap1AuthChangeSelect ] ******/
+		SELECT CG.COMPANY_CD
+		     , CG.BU_CD
+		     , IT.PROD_LVL3_NM
+		     , CT.CUST_LVL2_NM
+		     , CG.ITEM_CD
+		     , IT.ITEM_NM
+		     , IT.SPEC
+		     , CG.CUST_GROUP_CD
+		     , CT.CUST_NM AS CUST_GROUP_NM
+		     , A1.AP1_USER_ID
+		FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+		INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+		   ON CG.COMPANY_CD = IT.COMPANY_CD
+		  AND CG.BU_CD      = IT.BU_CD
+		  AND CG.ITEM_CD    = IT.ITEM_CD
+		  AND IT.USE_FLAG   = 'Y'
+		  AND IT.VALID_FLAG = 'Y'
+		#if($_parameter.prodL3 and $_parameter.prodL3 != "")
+		  AND (IT.PROD_LVL1_CD+IT.PROD_LVL2_CD+IT.PROD_LVL3_CD) IN ('$_parameter.prodL3.replace(",","','")')
+		#end
+		INNER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+		    ON CG.COMPANY_CD    = CT.COMPANY_CD
+		   AND CG.BU_CD         = CT.BU_CD
+		   AND CG.CUST_GROUP_CD = CT.CUST_CD
+		   AND CT.VALID_FLAG    = 'Y'
+		#if($_parameter.custL2 and $_parameter.custL2 != "")
+		  AND (CT.CUST_LVL1_CD+CT.CUST_LVL2_CD) IN ('$_parameter.custL2.replace(",","','")')
+		#end
+		INNER JOIN TB_MAP_ITEM_CUST_GROUP_AP1 A1 WITH(NOLOCK)
+		   ON CG.COMPANY_CD    = A1.COMPANY_CD
+		  AND CG.BU_CD         = A1.BU_CD
+		  AND CG.ITEM_CD       = A1.ITEM_CD
+		  AND CG.CUST_GROUP_CD = A1.CUST_GROUP_CD
+		  AND A1.USE_FLAG      = 'Y'
+		  AND A1.AP1_USER_ID   = @{ap1PicFrom}
+		WHERE CG.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND CG.BU_CD      = @{GV_BU_CD}
+		#if($_parameter.item_cd and $_parameter.item_cd != "")
+		  AND CG.ITEM_CD    IN ('$_parameter.item_cd.replace(",","','")')
+		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		  AND (CG.ITEM_CD LIKE '%' + @{item_nm} + '%' OR IT.ITEM_NM LIKE '%' + @{item_nm} + '%')
+		#end
+		#if($_parameter.custGroup and $_parameter.custGroup != "")
+		  AND (CG.CUST_GROUP_CD LIKE '%' + @{custGroup} + '%' OR CT.CUST_GROUP_NM LIKE '%' + @{custGroup} + '%')
+		#end
+		ORDER BY IT.PROD_LVL3_NM, CT.CUST_LVL2_NM, CG.ITEM_CD, CG.CUST_GROUP_CD
+	</select>
+	
+	<select id="ap1AuthChangeExcelSqlSelect" parameterType="map" resultType="map">
+        /****** [ master.popup.ap1AuthChangeExcelSqlSelect ] ******/
+        SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+        , A2.ACTION_CD
+        FROM
+        (
+            SELECT BU_CD
+                 , ROLE_CD
+            FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+            WHERE USER_ID = @{GV_USER_ID}
+              AND BU_CD = @{GV_BU_CD}
+              AND USE_FLAG = 'Y'
+        ) A1
+        INNER JOIN
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ROLE_CD
+                 , MENU_CD
+                 , ACTION_CD
+            FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MENU_CD = @{popUpMenuCd}
+              AND ACTION_CD IN ('EXCEL','SQL')
+              AND USE_FLAG = 'Y'
+        ) A2
+        ON A1.BU_CD = A2.BU_CD
+        AND A1.ROLE_CD = A2.ROLE_CD
+        GROUP BY A2.MENU_CD
+        , A2.ACTION_CD
+    </select>
+	
+	<sql id="ap1AuthChangeInclude">
+	MERGE TB_MAP_ITEM_CUST_GROUP_AP1 AS A
+	USING (SELECT 'X' AS DUAL) AS B 
+	   ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+	     AND BU_CD         = @{GV_BU_CD}
+	     AND ITEM_CD       = @{ITEM_CD}
+	     AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+	     AND AP1_USER_ID   = @{AP1_USER_ID_TO}
+	   )
+	 WHEN MATCHED THEN
+	   UPDATE
+	      SET USE_FLAG    = 'Y'
+	        , UPDATE_ID   = CASE WHEN USE_FLAG = 'Y' THEN UPDATE_ID   ELSE @{GV_USER_ID} END
+	        , UPDATE_DTTM = CASE WHEN USE_FLAG = 'Y' THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	 WHEN NOT MATCHED THEN
+	   INSERT (
+	      COMPANY_CD, BU_CD, ITEM_CD, CUST_GROUP_CD, AP1_USER_ID, USE_FLAG, CREATE_ID, CREATE_DTTM, UPDATE_ID, UPDATE_DTTM
+	   ) VALUES (
+	      @{GV_COMPANY_CD}, @{GV_BU_CD}, @{ITEM_CD}, @{CUST_GROUP_CD}, @{AP1_USER_ID_TO}, 'Y', @{GV_USER_ID}, DBO.UFN_GETDATE(), @{GV_USER_ID}, DBO.UFN_GETDATE()
+	   );
+	</sql>
+	
+	<update id="ap1AuthChangeCopyUpdate" parameterType="map">
+		/****** [ master.popup.ap1AuthChangeCopyUpdate ] ******/
+		<include refid="master.popup.ap1AuthChangeInclude"/>
+	</update>
+	
+	<update id="ap1AuthChangeHandOverUpdate" parameterType="map">
+		/****** [ master.popup.ap1AuthChangeHandOverUpdate ] ******/
+		BEGIN
+		
+		UPDATE TB_MAP_ITEM_CUST_GROUP_AP1
+		   SET USE_FLAG      = 'N'
+		     , UPDATE_ID     = @{GV_USER_ID}
+		     , UPDATE_DTTM   = DBO.UFN_GETDATE()
+		 WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+		   AND BU_CD         = @{GV_BU_CD}
+		   AND ITEM_CD       = @{ITEM_CD}
+		   AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+		   AND AP1_USER_ID   = @{AP1_USER_ID}
+		   ;
+		
+		<include refid="master.popup.ap1AuthChangeInclude"/>
+		
+		END;
+	</update>
+
+</mapper>

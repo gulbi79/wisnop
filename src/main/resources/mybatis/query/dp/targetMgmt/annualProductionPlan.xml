@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.targetMgmt">
+    
+    <select id="annualProductionPlanYearSelect" parameterType="map" resultType="map">
+	    /****** [ dp.targetMgmt.annualProductionPlanYearSelect ] ******/
+	    WITH W_YEAR AS 
+	    (
+	    	SELECT YEAR
+	        FROM TB_DYN_BIZ_PLAN
+	        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	          AND BU_CD = @{GV_BU_CD}
+	         AND MEAS_CD = 'YP_QTY'
+	         AND CONFIRM_YN = 'Y'
+	        GROUP BY YEAR
+	    )
+	    SELECT YEAR AS CODE_CD
+	         , YEAR AS CODE_NM
+	    FROM 
+	    (
+	    	SELECT YEAR 
+	    	FROM W_YEAR
+	        UNION
+	        SELECT CONVERT(VARCHAR(4), DBO.UFN_GETDATE(), 112)
+	        UNION
+	        SELECT CONVERT(VARCHAR(4), DBO.UFN_GETDATE(), 112) + 1
+	    ) T
+	    ORDER BY YEAR DESC
+    </select>
+    
+    
+    <!--  
+    <select id="annualProductionPlanRoleSelect" parameterType="map" resultType="map">
+	    /****** [ dp.targetMgmt.annualProductionPlanRoleSelect ] ******/
+	    BEGIN
+	        <include refid="dp.common.salesPlanRole"/>
+	        SELECT @AP2_YN AS AP2_YN
+	             , @AP1_YN AS AP1_YN
+	             , @GOC_YN AS GOC_YN
+	        ;
+	    
+	    END
+    </select>
+    
+    <select id="annualProductionPlanReleaseSelect" parameterType="map" resultType="map">
+	    /****** [ dp.targetMgmt.annualProductionPlanReleaseSelect ] ******/
+	    SELECT ISNULL(MAX(RELEASE_FLAG), 'N') AS RELEASE_YN
+	    FROM TB_DYN_BIZ_PLAN_RELEASE WITH(NOLOCK)
+	    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+	      AND BU_CD = @{GV_BU_CD}
+	      AND YEAR = @{year}
+    </select>
+	-->
+
+	<sql id="annualProductionPlanMonth">
+	    #set($monthArr=[
+	        {'M': '1','MM':'01','YYMM':'01'},
+	        {'M': '2','MM':'02','YYMM':'02'},
+	        {'M': '3','MM':'03','YYMM':'03'},
+	        {'M': '4','MM':'04','YYMM':'04'},
+	        {'M': '5','MM':'05','YYMM':'05'},
+	        {'M': '6','MM':'06','YYMM':'06'},
+	        {'M': '7','MM':'07','YYMM':'07'},
+	        {'M': '8','MM':'08','YYMM':'08'},
+	        {'M': '9','MM':'09','YYMM':'09'},
+	        {'M':'10','MM':'10','YYMM':'10'},
+	        {'M':'11','MM':'11','YYMM':'11'},
+	        {'M':'12','MM':'12','YYMM':'12'}
+	    ])
+	    #foreach( $month in $monthArr )
+	        #set($month.YYMM=$_parameter.year+$month.YYMM)
+	    #end
+	</sql>
+
+    <select id="annualProductionPlanSelect" parameterType="map" resultType="map">
+	    /****** [ dp.targetMgmt.annualProductionPlanSelect ] ******/
+	    <include refid="dp.targetMgmt.annualProductionPlanMonth"/>
+	 	
+	   WITH W_DIM AS 
+		(
+			SELECT CG.COMPANY_CD
+	             , CG.BU_CD
+	             , MC2.CODE_CD AS PROD_PART_CD -- 생산파트 코드
+			     , MC2.CODE_NM AS PROD_PART_NM -- 생산파트명
+	             , CG.CUST_GROUP_CD
+	             , ISNULL(CM.CUST_NM          , ' ') AS CUST_GROUP_NM
+	             , IT.ITEM_CD
+	             , ISNULL(IT.ITEM_NM          , ' ') AS ITEM_NM
+	             , IP.ROUTING_ID
+	             , ISNULL(CG.SALES_PRICE_KRW, 0) AS SALES_PRICE_KRW
+	    	FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+	        INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+	           ON CG.COMPANY_CD = IT.COMPANY_CD
+	          AND CG.BU_CD = IT.BU_CD
+	          AND CG.ITEM_CD = IT.ITEM_CD
+			  AND IT.VALID_FLAG = 'Y'
+	          AND IT.USE_FLAG = 'Y'
+	        
+	        LEFT OUTER JOIN 
+            (
+                SELECT COMPANY_CD 
+                     , BU_CD 
+                     , ITEM_CD 
+                     , MAX (ROUTING_ID)  AS ROUTING_ID 
+                     , MAX (PUR_LT)      AS PUR_LT
+                     , MAX (MFG_LT)      AS MFG_LT
+                     , SUM (SS_QTY)      AS SS_QTY
+                     , MAX (PROCUR_TYPE) AS PROCUR_TYPE
+                     , MAX(RCPT_SL_CD) AS RCPT_SL_CD
+                FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+                WHERE PLANT_CD = 'WF01'
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+            ) IP
+            ON CG.COMPANY_CD     = IP.COMPANY_CD
+            AND CG.BU_CD         = IP.BU_CD
+            AND CG.ITEM_CD       = IP.ITEM_CD  
+			LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			ON MC1.BU_CD = CG.BU_CD
+			AND MC1.GROUP_CD = 'PROD_L2'
+			AND MC1.CODE_CD = IP.ROUTING_ID
+			AND MC1.USE_FLAG = 'Y'
+			LEFT OUTER JOIN 
+			(
+				SELECT BU_CD
+					 , CODE_CD
+				     , CASE WHEN @{GV_LANG} = 'ko' THEN CODE_NM_KR
+				            WHEN @{GV_LANG} = 'cn' THEN CODE_NM_CN
+				            ELSE CODE_NM
+				       END AS CODE_NM
+				     , GROUP_CD
+				     , SORT
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE USE_FLAG = 'Y'
+			) MC2
+			ON MC2.BU_CD = MC1.BU_CD
+			AND MC2.GROUP_CD = 'PROD_PART'
+			AND MC2.CODE_CD = MC1.ATTB_2_CD
+						
+			INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+	           ON CG.COMPANY_CD = CM.COMPANY_CD
+	          AND CG.BU_CD = CM.BU_CD
+	          AND CG.CUST_GROUP_CD = CM.CUST_CD
+			  AND CM.VALID_FLAG    = 'Y'
+			LEFT OUTER JOIN UV_MAP_SALES_ORG SO WITH(NOLOCK)
+	          ON CG.COMPANY_CD = SO.COMPANY_CD
+			 AND CG.BU_CD = SO.BU_CD
+	         AND CG.SALES_ORG_LVL4_CD = SO.SALES_ORG_LVL4_CD
+	         AND ((CG.SALES_ORG_LVL5_CD IS NULL)
+	          OR (CG.SALES_ORG_LVL5_CD IS NOT NULL AND CG.SALES_ORG_LVL5_CD = SO.SALES_ORG_LVL5_CD))
+			WHERE CG.COMPANY_CD = @{GV_COMPANY_CD}
+	          AND CG.BU_CD = @{GV_BU_CD}
+			  AND CG.VALID_FLAG    = 'Y'
+			
+		),
+    	W_SALES_QTY AS 
+    	(
+        	SELECT CG.COMPANY_CD
+            	 , CG.BU_CD
+             	 , CG.ITEM_CD
+             	 , CG.CUST_GROUP_CD
+				#foreach( $month in $monthArr )
+             	 , SUM(CASE WHEN SUBSTRING(SR.SALES_DATE, 5, 2) = '$month.MM' THEN SR.QTY     ELSE 0 END) AS M${month.MM}_VAL
+             	 , SUM(CASE WHEN SUBSTRING(SR.SALES_DATE, 5, 2) = '$month.MM' THEN SR.AMT_KRW ELSE 0 END) AS M${month.MM}_AMT
+				#end
+			FROM W_DIM CG
+          	INNER JOIN TB_MST_CUSTOMER CT WITH(NOLOCK)
+               ON CG.COMPANY_CD    = CT.COMPANY_CD
+              AND CG.BU_CD         = CT.BU_CD
+              AND CG.CUST_GROUP_CD = CT.CUST_GROUP_CD
+		      AND CT.VALID_FLAG    = 'Y'
+		  	INNER JOIN TB_DYN_SALES_RESULT SR WITH(NOLOCK)
+              ON CG.COMPANY_CD = SR.COMPANY_CD
+			 AND CG.BU_CD      = SR.BU_CD
+             AND CG.ITEM_CD    = SR.ITEM_CD
+             AND CT.CUST_CD    = SR.CUST_CD
+             AND SR.PLANT_CD = 'WF01'
+             AND SR.DEL_FLAG   = 'N'
+             AND SR.SALES_DATE BETWEEN @{year} + '0101' AND @{year} + '1231'
+			GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.ITEM_CD, CG.CUST_GROUP_CD
+    	),
+	  	
+	  	W_PROD_QTY AS 
+    	(
+        	SELECT CG.COMPANY_CD
+            	 , CG.BU_CD
+             	 , CG.ITEM_CD
+            	#foreach( $month in $monthArr )
+             	 , SUM(CASE WHEN SUBSTRING(PR.PROD_DATE, 5, 2) = '$month.MM' THEN PR.AMT_KRW ELSE 0 END) AS M${month.MM}_AMT
+				#end
+			FROM W_DIM CG
+		  	INNER JOIN UV_PROD_RESULT PR WITH(NOLOCK)
+		  	  ON CG.COMPANY_CD = PR.COMPANY_CD
+			 AND CG.BU_CD      = PR.BU_CD
+             AND CG.ITEM_CD    = PR.ITEM_CD
+            INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+ 	        ON	MIP.COMPANY_CD = PR.COMPANY_CD
+			AND MIP.BU_CD = PR.BU_CD
+			AND MIP.PLANT_CD = PR.PLANT_CD
+			AND MIP.ITEM_CD = PR.ITEM_CD
+			AND MIP.ROUTING_ID IN ('1-B', '1-L', '1-S', '2-L', '2-M', '2-T')
+
+			INNER JOIN TB_MST_CALENDAR MC WITH (NOLOCK) 
+        	ON PR.PROD_DATE = MC.YYYYMMDD
+			AND MC.YYYYMMDD BETWEEN @{year} + '0101' AND @{year} + '1231'
+			
+			GROUP BY CG.COMPANY_CD
+			, CG.BU_CD
+			, CG.ITEM_CD
+			
+    	),
+	  
+	    W_ROW AS 
+	    (
+	    	SELECT CG.*
+
+				#foreach( $month in $monthArr )
+				 , YP.M${month.M}_VAL * CG.SALES_PRICE_KRW AS M${month.YYMM}_YP_AMT_KRW
+				#end
+				
+				#foreach( $month in $monthArr )
+	             , ISNULL(SQ.M${month.MM}_VAL * CG.SALES_PRICE_KRW, 0) AS M${month.YYMM}_SALES_AMT_KRW
+				#end
+				
+				#foreach( $month in $monthArr )
+	             , ISNULL(PQ.M${month.MM}_AMT, 0) AS M${month.YYMM}_PROD_AMT_KRW
+				#end
+				
+				
+			FROM W_DIM CG
+			LEFT OUTER JOIN TB_DYN_BIZ_PLAN YP WITH(NOLOCK)
+			ON CG.COMPANY_CD    = YP.COMPANY_CD
+	        AND CG.BU_CD         = YP.BU_CD
+	        AND CG.ITEM_CD = YP.ITEM_CD
+			AND CG.CUST_GROUP_CD = YP.CUST_GROUP_CD
+			AND YP.MEAS_CD = 'YP_QTY'
+	        AND YP.YEAR          = @{year}
+			
+			LEFT OUTER JOIN W_SALES_QTY SQ
+	          ON CG.COMPANY_CD    = SQ.COMPANY_CD
+	         AND CG.BU_CD         = SQ.BU_CD
+	         AND CG.ITEM_CD       = SQ.ITEM_CD
+	         AND CG.CUST_GROUP_CD = SQ.CUST_GROUP_CD
+	         
+	        LEFT OUTER JOIN W_PROD_QTY PQ
+	        ON CG.COMPANY_CD      = PQ.COMPANY_CD
+	        AND CG.BU_CD	      = PQ.BU_CD
+	        AND CG.ITEM_CD	      = PQ.ITEM_CD
+	        
+			
+	    ),
+	    W_ROW_GROUP AS 
+	    (
+	    	
+	        	SELECT NULL AS TMP_COL 
+	        	   , COMPANY_CD
+	        	   , BU_CD
+					#foreach( $dimMap in $_parameter.dimList )
+	                 , $dimMap.DIM_CD 
+					#end
+					#foreach( $month in $monthArr )
+	                 , SUM(M${month.YYMM}_YP_AMT_KRW) AS M${month.YYMM}_YP_AMT_KRW
+					#end
+					#foreach( $month in $monthArr )
+	                 , SUM(M${month.YYMM}_SALES_AMT_KRW) AS M${month.YYMM}_SALES_AMT_KRW 
+					#end
+					#foreach( $month in $monthArr )
+	                 , SUM(M${month.YYMM}_PROD_AMT_KRW) AS M${month.YYMM}_PROD_AMT_KRW 
+					#end
+					
+				FROM W_ROW
+				GROUP BY
+				#foreach( $dimMap in $_parameter.dimList )
+				#if($velocityCount == 1)
+	              $dimMap.DIM_CD
+				#else
+	              , $dimMap.DIM_CD
+				#end
+				#end
+				, COMPANY_CD
+				, BU_CD
+				HAVING MAX(PROD_PART_CD) IN ('DIFFUSION','LAM','TEL')
+			
+	    ),
+	    
+    	W_ROW_GROUP_ADDED
+		AS
+		(
+	
+			SELECT RG.*
+			#foreach( $month in $monthArr )
+				, PP.M${month.M}_VAL  AS M${month.YYMM}_PP_AMT_KRW
+			#end
+		FROM W_ROW_GROUP RG
+		LEFT OUTER JOIN TB_DYN_PRODUCT_PLAN PP WITH(NOLOCK)
+		ON  PP.COMPANY_CD = RG.COMPANY_CD
+		AND PP.BU_CD	  = RG.BU_CD
+		AND PP.[YEAR]     = @{year}
+		AND PP.PROD_PART_CD  = RG.PROD_PART_CD
+		),
+	    
+	    W_MEASURE AS 
+	    (
+	    	SELECT CATEGORY_CD
+	    	     , CATEGORY_NM
+	    	     , CATEGORY_IDX 
+			FROM 
+			(
+	        	SELECT NULL AS CATEGORY_CD
+	        	     , NULL AS CATEGORY_NM
+	        	     , NULL AS CATEGORY_IDX
+				#foreach( $meaMap in $_parameter.meaList )
+	            UNION ALL 
+	            SELECT '$meaMap.CD'
+	                 , '$meaMap.NM'
+	                 , $velocityCount 
+				#end
+			) A
+	        WHERE CATEGORY_CD IS NOT NULL
+	    ),
+	    W_MAIN AS 
+	    (
+	    	SELECT NULL AS TMP_COL 
+				#foreach( $dimMap in $_parameter.dimList )
+	             , $dimMap.DIM_CD 
+	             , MAX($dimMap.DIM_CD) AS ${dimMap.DIM_CD}_NM
+				#end
+	            <include refid="include.getGrpLvlId"/>
+	             , M.CATEGORY_CD
+	             , M.CATEGORY_NM
+	             , M.CATEGORY_IDX
+				#foreach( $bucketMap in $_parameter.bucketList )
+	             , SUM(
+	                 CASE
+	  				#foreach( $meaMap in $_parameter.meaList )
+	                      WHEN M.CATEGORY_CD = '${meaMap.CD}' THEN A.${bucketMap.CD}_${meaMap.CD}
+	  				#end
+	                  END
+	             ) AS $bucketMap.CD
+
+				#end
+			FROM W_ROW_GROUP_ADDED A
+	        CROSS JOIN W_MEASURE M
+	        WHERE 1 = 1
+			
+	        GROUP BY ROLLUP (<include refid="include.getCdRollup"/>), M.CATEGORY_CD, M.CATEGORY_NM, M.CATEGORY_IDX
+	    )
+	    
+	    
+	    
+		SELECT A.*
+		, B.REMARK
+		FROM(
+
+	    SELECT NULL AS TMP_COL
+	          <include refid="include.getDimTotal"/>
+		     , GRP_LVL_ID
+	         , CATEGORY_CD
+	         , CATEGORY_NM
+	         , CATEGORY_IDX
+			#foreach( $bucketMap in $_parameter.bucketList )
+	         ,  $bucketMap.CD	AS $bucketMap.CD 
+			#end
+	         ,0	#foreach( $bucketMap in $_parameter.bucketList )
+	                + ISNULL($bucketMap.CD,0)
+				#end AS TOTAL
+
+	         , 0 #foreach( $bucketMap in $_parameter.bucketList )
+	                + ISNULL(ABS($bucketMap.CD),0)
+				 #end
+	           AS OMIT_FLAG
+	    FROM W_MAIN 
+	    ) A
+	    LEFT OUTER JOIN TB_DYN_PRODUCT_PLAN_REMARK B WITH(NOLOCK)
+		ON A.PROD_PART_CD_NM = B.PROD_PART_CD
+		AND A.CATEGORY_CD = B.MEAS_CD
+		AND B.YEAR        = @{year}
+		AND B.COMPANY_CD  = @{GV_COMPANY_CD}
+		AND B.BU_CD       = @{GV_BU_CD}
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList) 
+	      , A.$dimMap.DIM_CD, A.${dimMap.DIM_CD}_NM 
+		#end
+		  , A.CATEGORY_IDX
+			    
+	    
+    </select>
+    
+    
+    <!--  
+    <update id="annualProductionPlanConfirmUpdate" parameterType="map">
+    /****** [ dp.targetMgmt.annualProductionPlanConfirmUpdate ] ******/
+    UPDATE TB_DYN_BIZ_PLAN
+       SET CONFIRM_YN    = @{CONFIRM_YN}
+         , UPDATE_ID     = CASE WHEN CONFIRM_YN = @{CONFIRM_YN} THEN UPDATE_ID ELSE @{GV_USER_ID} END
+         , UPDATE_DTTM   = CASE WHEN CONFIRM_YN = @{CONFIRM_YN} THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+     WHERE COMPANY_CD    = @{GV_COMPANY_CD}
+       AND BU_CD         = @{GV_BU_CD}
+       AND ITEM_CD       = @{ITEM_CD}
+       AND CUST_GROUP_CD = @{CUST_GROUP_CD}
+       AND YEAR          = @{YEAR}
+       AND MEAS_CD       = 'YP_QTY'
+    </update>
+    
+    <update id="annualProductionPlanReleaseUpdate" parameterType="map">
+    /****** [ dp.targetMgmt.annualProductionPlanReleaseUpdate ] ******/
+    MERGE TB_DYN_BIZ_PLAN_RELEASE AS A
+    USING (SELECT 'X' AS DUAL) AS B
+       ON (  COMPANY_CD = @{GV_COMPANY_CD}
+         AND BU_CD      = @{GV_BU_CD}
+         AND YEAR       = @{YEAR}
+       )
+     WHEN MATCHED THEN
+       UPDATE
+          SET RELEASE_FLAG = @{RELEASE_FLAG}
+            , UPDATE_ID    = @{GV_USER_ID}
+            , UPDATE_DTTM  = DBO.UFN_GETDATE()
+     WHEN NOT MATCHED THEN
+       INSERT (
+          COMPANY_CD,
+          BU_CD,
+          YEAR,
+          RELEASE_FLAG,
+          CREATE_ID,
+          CREATE_DTTM,
+          UPDATE_ID,
+          UPDATE_DTTM
+        ) VALUES (
+          @{GV_COMPANY_CD},
+          @{GV_BU_CD},
+          @{YEAR},
+          @{RELEASE_FLAG},
+          @{GV_USER_ID},
+          DBO.UFN_GETDATE(),
+          @{GV_USER_ID},
+          DBO.UFN_GETDATE()
+        );
+    </update>
+    
+    -->
+    
+    <update id="annualProductionPlanUpdate" parameterType="map">
+    /****** [ dp.targetMgmt.annualProductionPlanUpdate ] ******/
+    <include refid="dp.targetMgmt.annualProductionPlanMonth"/>
+    BEGIN
+        
+         #if($_parameter.CATEGORY_CD =="PP_AMT_KRW" and $_parameter.PROD_PART_CD_NM !="Total")
+            /* Start Save : Product Plan ----------------------------- */
+            MERGE TB_DYN_PRODUCT_PLAN AS A
+            USING (SELECT 'X' AS DUAL) AS B
+               ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+                 AND BU_CD         = @{GV_BU_CD}
+                 AND YEAR          = @{year}
+                 AND PROD_PART_CD       = @{PROD_PART_CD_NM}
+                 AND MEAS_CD			= @{CATEGORY_CD}
+               )
+             WHEN MATCHED THEN
+               UPDATE
+                  SET UPDATE_ID   = @{GV_USER_ID}
+                    , UPDATE_DTTM = DBO.UFN_GETDATE()
+#foreach( $month in $monthArr )
+                    , M${month.M}_VAL = #if ($_parameter.get("M${month.YYMM}")) $_parameter.get("M${month.YYMM}") #else NULL #end 
+#end
+             WHEN NOT MATCHED THEN
+               INSERT (
+                  COMPANY_CD,
+                  BU_CD,
+                  YEAR,
+                  PROD_PART_CD,
+                  MEAS_CD,
+#foreach( $month in $monthArr )
+                  M${month.M}_VAL,
+#end
+                  CREATE_ID,
+                  CREATE_DTTM,
+                  UPDATE_ID,
+                  UPDATE_DTTM
+               ) VALUES (
+                  @{GV_COMPANY_CD},
+                  @{GV_BU_CD},
+                  @{year},
+                  @{PROD_PART_CD_NM},
+                  @{CATEGORY_CD},
+#foreach( $month in $monthArr )
+                  #if ($_parameter.get("M${month.YYMM}")) $_parameter.get("M${month.YYMM}") #else NULL #end,
+#end
+                  @{GV_USER_ID},
+                  DBO.UFN_GETDATE(),
+                  @{GV_USER_ID},
+                  DBO.UFN_GETDATE()
+               );
+            /* End Save   : Product Plan ----------------------------- */
+            #end
+            
+             /* Start Save : REMARK  ----------------------------- */
+            MERGE TB_DYN_PRODUCT_PLAN_REMARK AS A
+            USING (SELECT 'X' AS DUAL) AS B
+               ON (  COMPANY_CD    = @{GV_COMPANY_CD}
+                 AND BU_CD         = @{GV_BU_CD}
+                 AND YEAR          = @{year}
+                 AND PROD_PART_CD       = @{PROD_PART_CD_NM}
+                 AND MEAS_CD			= @{CATEGORY_CD}
+               )
+             WHEN MATCHED THEN
+               UPDATE
+                  SET UPDATE_ID   = @{GV_USER_ID}
+                    , UPDATE_DTTM = DBO.UFN_GETDATE()
+					, REMARK      = @{REMARK}
+
+             WHEN NOT MATCHED THEN
+               INSERT (
+                  COMPANY_CD,
+                  BU_CD,
+                  YEAR,
+                  PROD_PART_CD,
+                  MEAS_CD,
+			      REMARK,
+                  CREATE_ID,
+                  CREATE_DTTM,
+                  UPDATE_ID,
+                  UPDATE_DTTM
+               ) VALUES (
+                  @{GV_COMPANY_CD},
+                  @{GV_BU_CD},
+                  @{year},
+                  @{PROD_PART_CD_NM},
+                  @{CATEGORY_CD},
+				  @{REMARK},
+                  
+                  @{GV_USER_ID},
+                  DBO.UFN_GETDATE(),
+                  @{GV_USER_ID},
+                  DBO.UFN_GETDATE()
+               );
+            /* End Save   : REMARK ----------------------------- */
+            
+            
+         
+         
+    END
+    </update>
+    <update id="annualProductionPlanChartUpdate" parameterType="map" >
+        /****** [ dp.targetMgmt.annualProductionPlanChart ] ******/
+        BEGIN
+            EXEC dbo.USP_TB_DYN_PRODUCT_PLAN_RESULT_DAILY @{GV_COMPANY_CD}, @{GV_BU_CD};
+        END;
+    </update>
+    
+    <select id="annualProductionPlanInputBlockYnSelect" parameterType="map" resultType="map">
+		/****** [ dp.targetMgmt.annualProductionPlanInputBlockYn ] ******/
+    	SELECT ATTB_1_CD AS 'INPUT_BLOCK_YN'
+		FROM TB_MST_CODE
+		WHERE 1=1
+		AND BU_CD	= 'QT'
+		AND GROUP_CD	= 'ANNUAL_PROD_PLAN_CD'
+		AND CODE_CD = 'ANNUAL_PROD_PLAN_CD'
+		    	
+    
+    </select>
+    
+</mapper>

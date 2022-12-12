@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	<select id="menuMngSelect" parameterType="map" resultType="map">
+		/****** [ admin.menuMngSelect ] ******/
+	    <include refid="include.menuData"/>
+	    SELECT <include refid="include.menuDataSelColumn"/>
+	    FROM CTE
+	    ORDER BY ROOT_SORT
+	</select>
+	
+	<insert id="menuMngInsert" parameterType="map">
+		/****** [ admin.menuMngInsert ] ******/
+	    INSERT INTO TB_MST_MENU 
+	    (
+            COMPANY_CD
+          , BU_CD
+          , MENU_CD
+          , MENU_LVL
+          , MENU_NM
+          , MENU_NM_KR
+          , MENU_NM_CN
+          , UPPER_MENU_CD
+          , URL
+          , SORT
+          , USE_DIM_FLAG
+          , USE_MEAS_FLAG
+          , USE_DECIMAL_FLAG
+          , USE_ITEM_HIER_FLAG
+    	  , USE_CUSTOMER_HIER_FLAG
+    	  , USE_SALES_ORG_HIER_FLAG
+    	  , USE_DIM_FIX_FLAG
+          , USE_FLAG
+          , MENU_TYPE
+          , MENU_PARAM
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+	    ) VALUES (
+    	    @{COMPANY_CD}                 
+    	  , @{BU_CD}                      
+    	  , @{MENU_CD}                    
+    	  , @{MENU_LVL}                   
+    	  , @{MENU_NM}                    
+    	  , @{MENU_NM_KR}                    
+    	  , @{MENU_NM_CN}                    
+    	  , @{UPPER_MENU_CD}              
+    	  , @{URL}                        
+    	  , @{SORT}                       
+    	  , @{USE_DIM_FLAG}               
+          , @{USE_MEAS_FLAG}              
+          , @{USE_DECIMAL_FLAG}           
+          , @{USE_ITEM_HIER_FLAG}     
+    	  , @{USE_CUSTOMER_HIER_FLAG} 
+    	  , @{USE_SALES_ORG_HIER_FLAG}    
+    	  , @{USE_DIM_FIX_FLAG}    
+    	  , 'Y'
+    	  , @{MENU_TYPE}
+          , @{MENU_PARAM}
+    	  , @{GV_USER_ID}                 
+    	  , DBO.UFN_GETDATE()                     
+    	  , @{GV_USER_ID}                 
+    	  , DBO.UFN_GETDATE()                     
+	    )
+	</insert>
+	
+	<update id="menuMngUpdate" parameterType="map">
+		/****** [ admin.menuMngUpdate ] ******/
+		UPDATE TB_MST_MENU 
+		SET MENU_LVL                   = @{MENU_LVL}
+		  , MENU_NM                    = @{MENU_NM}
+		  , MENU_NM_KR                 = @{MENU_NM_KR}
+		  , MENU_NM_CN                 = @{MENU_NM_CN}
+		  , UPPER_MENU_CD              = @{UPPER_MENU_CD}
+		  , URL                        = @{URL}
+		  , SORT                       = @{SORT}
+		  , USE_FLAG                   = ISNULL(@{USE_FLAG},'Y')
+		  , USE_DIM_FLAG               = ISNULL(@{USE_DIM_FLAG},'N')
+		  , USE_MEAS_FLAG              = ISNULL(@{USE_MEAS_FLAG},'N')
+		  , USE_DECIMAL_FLAG           = ISNULL(@{USE_DECIMAL_FLAG},'N')
+		  , USE_ITEM_HIER_FLAG         = ISNULL(@{USE_ITEM_HIER_FLAG},'N')
+		  , USE_CUSTOMER_HIER_FLAG     = ISNULL(@{USE_CUSTOMER_HIER_FLAG},'N')
+		  , USE_SALES_ORG_HIER_FLAG    = ISNULL(@{USE_SALES_ORG_HIER_FLAG},'N')
+		  , USE_DIM_FIX_FLAG           = ISNULL(@{USE_DIM_FIX_FLAG},'N')
+		  , MENU_TYPE                  = @{MENU_TYPE}
+	      , MENU_PARAM                 = @{MENU_PARAM}
+		WHERE COMPANY_CD = @{COMPANY_CD}
+		  AND BU_CD      = @{BU_CD}
+		  AND MENU_CD    = @{MENU_CD}
+	</update>
+	
+	<delete id="menuMngDelete" parameterType="map">
+		/****** [ admin.menuMngDelete ] ******/
+		BEGIN
+			DECLARE @SEARCH_DB 		nvarchar(1)
+	
+			-- menu 삭제 -----------------------------------------
+			DELETE FROM TB_MST_MENU
+			WHERE COMPANY_CD = @{COMPANY_CD}
+			  AND BU_CD      = @{BU_CD}
+			  AND MENU_CD    = @{MENU_CD}
+			;
+	
+			-- role 삭제 -----------------------------------------
+			DELETE FROM TB_MAP_ROLE_MENU_ACTION
+			WHERE COMPANY_CD = @{COMPANY_CD}
+			  AND BU_CD      = @{BU_CD}
+			  AND MENU_CD    = @{MENU_CD}
+			;
+		END;
+	</delete>
+
+</mapper>

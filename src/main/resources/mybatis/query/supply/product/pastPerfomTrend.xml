@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+
+    <select id="pastPerfomTrendSelect" parameterType="map" resultType="map">
+	    /****** [ supply.product.pastPerfomTrendSelect ] ******/
+	    <include refid="snop.common.w_cust" />
+		, W_SALES_PROD AS 
+		(
+		    SELECT KSP.COMPANY_CD
+		         , KSP.BU_CD
+		         , KSP.ITEM_CD
+		         , KSP.YEARWEEK AS WEEK
+		         , SUM (KSP.QTY) AS QTY
+		         , 'SALES_PLAN_QTY' AS FLAG
+			FROM TB_KPI_SALES_PLAN KSP WITH(NOLOCK)
+			WHERE KSP.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND KSP.BU_CD      = @{GV_BU_CD}
+		      AND KSP.MEAS_CD    = 'CFM_SP'
+		      AND KSP.YEARWEEK  <![CDATA[>=]]> @{fromWeek}
+		      AND KSP.YEARWEEK  <![CDATA[<=]]> @{toWeek}
+		    GROUP BY KSP.COMPANY_CD, KSP.BU_CD, KSP.ITEM_CD, KSP.YEARWEEK
+			UNION ALL
+		    SELECT BI.COMPANY_CD
+		         , BI.BU_CD
+		         , BI.ITEM_CD
+		         , CAL.YEARWEEK AS BI_WEEK
+		         , SUM (BI.QTY) AS BI_QTY
+		         , 'SALES_QTY' AS FLAG
+		    FROM TB_DYN_SALES_RESULT BI WITH(NOLOCK)  
+		    INNER JOIN TB_MST_CALENDAR CAL WITH(NOLOCK)
+		       ON BI.SALES_DATE = CAL.YYYYMMDD
+		    WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+		      AND BU_CD        = @{GV_BU_CD}
+		      AND BI.PLANT_CD  = 'WF01'
+		      AND DEL_FLAG     = 'N'
+		      AND SALES_DATE  <![CDATA[>=]]> @{swFromDate}
+		      AND SALES_DATE  <![CDATA[<=]]> @{swToDate}
+		    GROUP BY BI.COMPANY_CD, BI.BU_CD, BI.ITEM_CD, CAL.YEARWEEK
+		    UNION ALL
+		    SELECT DPP.COMPANY_CD
+		         , DPP.BU_CD
+		         , DPP.ITEM_CD
+		         , DPP.YEARWEEK AS DPP_WEEK
+		         , SUM (DPP.QTY) AS DPP_QTY
+		         , 'PROD_PLAN_QTY' AS FLAG
+		    FROM TB_KPI_PROD_PLAN DPP WITH(NOLOCK) 
+		    WHERE DPP.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND DPP.BU_CD      = @{GV_BU_CD}
+		      AND DPP.YEARWEEK  <![CDATA[>=]]> @{fromWeek}
+		      AND DPP.YEARWEEK  <![CDATA[<=]]> @{toWeek}
+		    GROUP BY DPP.COMPANY_CD, DPP.BU_CD, DPP.ITEM_CD, DPP.YEARWEEK
+		    UNION ALL
+		    SELECT GR.COMPANY_CD
+		         , GR.BU_CD
+		         , GR.ITEM_CD
+		         , CAL.YEARWEEK AS WEEK
+		         , SUM (GR.QTY) AS QTY
+		         , 'PROD_QTY' AS FALG
+		    FROM UV_PROD_RESULT GR WITH(NOLOCK) 
+		    INNER JOIN TB_MST_CALENDAR CAL WITH(NOLOCK)
+		       ON GR.PROD_DATE  = CAL.YYYYMMDD
+		    WHERE GR.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND GR.BU_CD      = @{GV_BU_CD}
+		      AND GR.PLANT_CD   = 'WF01'
+		      AND GR.PROD_DATE <![CDATA[>=]]> @{swFromDate}
+		      AND GR.PROD_DATE <![CDATA[<=]]> @{swToDate}
+		    GROUP BY GR.COMPANY_CD, GR.BU_CD, GR.ITEM_CD, CAL.YEARWEEK
+			UNION ALL
+		    SELECT IV.COMPANY_CD
+		         , IV.BU_CD
+		         , IV.ITEM_CD
+		         , CAL.YEARWEEK AS INV_WEEK
+		         , SUM (IV.INV_QTY) AS INV_QTY
+		         , 'INV_BOH' AS FALG
+		    FROM UV_DYN_INVENTORY IV WITH(NOLOCK) 
+		    INNER JOIN TB_MST_CALENDAR CAL WITH(NOLOCK)
+		       ON IV.INV_DATE   = CAL.YYYYMMDD
+		      AND CAL.DAY_NM    = 'SUN'
+		    WHERE IV.COMPANY_CD = @{GV_COMPANY_CD}
+		      AND IV.BU_CD      = @{GV_BU_CD}
+		      AND IV.PLANT_CD   = 'WF01'
+		      AND IV.INV_DATE  <![CDATA[>=]]> @{swFromDate}
+		      AND IV.INV_DATE  <![CDATA[<=]]> @{swToDate}
+		    GROUP BY IV.COMPANY_CD, IV.BU_CD, IV.ITEM_CD, CAL.YEARWEEK
+		)
+		SELECT TT.*
+			, #foreach( $bucketMap in $_parameter.bucketList )
+	       	ISNULL (ABS ($bucketMap.CD), 0) +
+	       	#end + 0 AS OMIT_FLAG
+	  	FROM 
+	  	(
+			SELECT NULL AS TMP_COL
+				<include refid="include.getCdDimTotal"/>
+			   	<include refid="include.getGrpLvlId"/>
+				 , CATEGORY_CD
+				 , CATEGORY_NM
+				 , CATEGORY_IDX
+				#foreach( $bucketMap in $_parameter.bucketList )
+				#set( $week = "$bucketMap.BUCKET_VAL" )
+				 , SUM($bucketMap.CD) AS $bucketMap.CD
+				#end
+			FROM 
+			(
+				SELECT X.COMPANY_CD
+					 , X.BU_CD
+					 , X.ROUTING_ID
+					 , X.ROUTING_ID_NM
+					 , X.REP_CUST_GROUP_CD
+					 , X.REP_CUST_GROUP_CD_NM
+					 , X.REP_CUST_GROUP_NM
+					 , X.REP_CUST_GROUP_NM_NM
+					 , X.CUST_GROUP_CD
+					 , X.CUST_GROUP_CD_NM
+					 , X.CUST_GROUP_NM
+					 , X.CUST_GROUP_NM_NM
+					 , X.ITEM_GROUP_CD
+					 , X.ITEM_GROUP_CD_NM
+					 , X.ITEM_GROUP_NM
+					 , X.ITEM_GROUP_NM_NM
+					 , X.ITEM_CD
+					 , X.ITEM_CD_NM
+					 , X.ITEM_NM
+					 , X.ITEM_NM_NM
+					 , X.SPEC
+					 , X.SPEC_NM
+					 , X.MFG_LT
+					 , X.MFG_LT_NM
+					 , X.SALES_PRICE_KRW
+					 , X.SALES_PRICE_KRW_NM
+					 , X.REP_ITEM_GROUP_CD
+					 , X.REP_ITEM_GROUP_CD_NM
+					 , X.REP_ITEM_GROUP_NM
+					 , X.REP_ITEM_GROUP_NM_NM
+					 , X.DRAW_NO
+					 , X.DRAW_NO_NM
+					 , X.ITEM_TYPE_CD
+					 , X.ITEM_TYPE_CD_NM
+					 , X.ITEM_TYPE_NM
+					 , X.ITEM_TYPE_NM_NM
+					 , X.SALES_ORG_LVL5_CD
+					 , X.SALES_ORG_LVL5_CD_NM
+					 , X.SALES_ORG_LVL5_NM
+					 , X.SALES_ORG_LVL5_NM_NM
+					 , X.CLEANING_YN
+					 , X.CLEANING_YN_NM
+					 , Y.CATEGORY_CD
+					 , Y.CATEGORY_NM
+					 , Y.CATEGORY_IDX
+					#foreach( $bucketMap in $_parameter.bucketList )
+		  			#set( $week = "$bucketMap.BUCKET_VAL" )
+					, SUM(CASE WHEN Y.CATEGORY_CD = 'SALES_PLAN_QTY' AND WEEK = '$week' AND FLAG = 'SALES_PLAN_QTY' THEN QTY
+							   WHEN Y.CATEGORY_CD = 'SALES_QTY'      AND WEEK = '$week' AND FLAG = 'SALES_QTY'      THEN QTY
+							   WHEN Y.CATEGORY_CD = 'PROD_PLAN_QTY'  AND WEEK = '$week' AND FLAG = 'PROD_PLAN_QTY'  THEN QTY
+							   WHEN Y.CATEGORY_CD = 'PROD_QTY'       AND WEEK = '$week' AND FLAG = 'PROD_QTY'       THEN QTY
+							   WHEN Y.CATEGORY_CD = 'INV_BOH'        AND WEEK = '$week' AND FLAG = 'INV_BOH'        THEN QTY
+						   END) AS $bucketMap.CD
+					#end
+				FROM 
+				(
+					SELECT T1.COMPANY_CD
+						 , T1.BU_CD
+						 , T1.ROUTING_ID
+						 , T1.ROUTING_ID_NM
+						 , T1.REP_CUST_GROUP_CD
+						 , T1.REP_CUST_GROUP_CD_NM
+						 , T1.REP_CUST_GROUP_NM
+						 , T1.REP_CUST_GROUP_NM_NM
+						 , T1.CUST_GROUP_CD
+						 , T1.CUST_GROUP_CD_NM
+						 , T1.CUST_GROUP_NM
+						 , T1.CUST_GROUP_NM_NM
+						 , T1.ITEM_GROUP_CD
+						 , T1.ITEM_GROUP_CD_NM
+						 , T1.ITEM_GROUP_NM
+						 , T1.ITEM_GROUP_NM_NM
+						 , T1.ITEM_CD
+						 , T1.ITEM_CD_NM
+						 , T1.ITEM_NM
+						 , T1.ITEM_NM_NM
+						 , T1.SPEC
+						 , T1.SPEC_NM
+						 , T1.MFG_LT
+						 , T1.MFG_LT_NM
+						 , T1.SALES_PRICE_KRW
+						 , T1.SALES_PRICE_KRW_NM
+						 , T1.REP_ITEM_GROUP_CD
+						 , T1.REP_ITEM_GROUP_CD_NM
+						 , T1.REP_ITEM_GROUP_NM
+						 , T1.REP_ITEM_GROUP_NM_NM
+						 , T1.DRAW_NO
+						 , T1.DRAW_NO_NM
+						 , T1.ITEM_TYPE_CD
+						 , T1.ITEM_TYPE_CD_NM
+						 , T1.ITEM_TYPE_NM
+						 , T1.ITEM_TYPE_NM_NM
+						 , T1.SALES_ORG_LVL5_CD
+						 , T1.SALES_ORG_LVL5_CD_NM
+						 , T1.SALES_ORG_LVL5_NM
+						 , T1.SALES_ORG_LVL5_NM_NM
+						 , T1.CLEANING_YN
+						 , T1.CLEANING_YN_NM
+						 , T1.WEEK
+						 , T1.FLAG
+						 , SUM(T1.QTY) AS QTY
+					FROM 
+					(
+						SELECT CT.COMPANY_CD
+							 , CT.BU_CD
+							 , ISNULL(CT.ROUTING_ID             , ' ') AS ROUTING_ID       
+							 , ISNULL(CT.ROUTING_ID             , ' ') AS ROUTING_ID_NM       
+							 , ISNULL(CT.REP_CUST_GROUP_CD      , ' ') AS REP_CUST_GROUP_CD
+							 , ISNULL(CT.REP_CUST_GROUP_CD      , ' ') AS REP_CUST_GROUP_CD_NM
+							 , ISNULL(CT.REP_CUST_GROUP_NM      , ' ') AS REP_CUST_GROUP_NM
+							 , ISNULL(CT.REP_CUST_GROUP_NM      , ' ') AS REP_CUST_GROUP_NM_NM
+							 , ISNULL(CT.CUST_GROUP_CD          , ' ') AS CUST_GROUP_CD    
+							 , ISNULL(CT.CUST_GROUP_CD          , ' ') AS CUST_GROUP_CD_NM    
+							 , ISNULL(CT.CUST_GROUP_NM          , ' ') AS CUST_GROUP_NM    
+							 , ISNULL(CT.CUST_GROUP_NM          , ' ') AS CUST_GROUP_NM_NM    
+							 , ISNULL(CT.ITEM_GROUP_CD          , ' ') AS ITEM_GROUP_CD    
+							 , ISNULL(CT.ITEM_GROUP_CD          , ' ') AS ITEM_GROUP_CD_NM    
+							 , ISNULL(CT.ITEM_GROUP_NM          , ' ') AS ITEM_GROUP_NM    
+							 , ISNULL(CT.ITEM_GROUP_NM          , ' ') AS ITEM_GROUP_NM_NM    
+							 , ISNULL(CT.ITEM_CD                , ' ') AS ITEM_CD          
+							 , ISNULL(CT.ITEM_CD                , ' ') AS ITEM_CD_NM          
+							 , ISNULL(CT.ITEM_NM                , ' ') AS ITEM_NM          
+							 , ISNULL(CT.ITEM_NM                , ' ') AS ITEM_NM_NM          
+							 , ISNULL(CT.SPEC                   , ' ') AS SPEC             
+							 , ISNULL(CT.SPEC                   , ' ') AS SPEC_NM             
+							 , ISNULL(CT.MFG_LT                 , ' ') AS MFG_LT           
+							 , ISNULL(CT.MFG_LT                 , ' ') AS MFG_LT_NM           
+							 , ISNULL(CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+							 , ISNULL(CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+							 , ISNULL(CT.REP_ITEM_GROUP_CD      , ' ') AS REP_ITEM_GROUP_CD
+							 , ISNULL(CT.REP_ITEM_GROUP_CD      , ' ') AS REP_ITEM_GROUP_CD_NM
+							 , ISNULL(CT.REP_ITEM_GROUP_NM      , ' ') AS REP_ITEM_GROUP_NM
+							 , ISNULL(CT.REP_ITEM_GROUP_NM      , ' ') AS REP_ITEM_GROUP_NM_NM
+							 , ISNULL(CT.DRAW_NO                , ' ') AS DRAW_NO          
+							 , ISNULL(CT.DRAW_NO                , ' ') AS DRAW_NO_NM          
+							 , ISNULL(CT.ITEM_TYPE              , ' ') AS ITEM_TYPE_CD
+							 , ISNULL(CT.ITEM_TYPE              , ' ') AS ITEM_TYPE_CD_NM
+							 , ISNULL(CT.ITEM_TYPE_NM           , ' ') AS ITEM_TYPE_NM
+							 , ISNULL(CT.ITEM_TYPE_NM           , ' ') AS ITEM_TYPE_NM_NM
+							 , ISNULL(CT.SALES_ORG_LVL5_CD      , ' ') AS SALES_ORG_LVL5_CD
+							 , ISNULL(CT.SALES_ORG_LVL5_CD      , ' ') AS SALES_ORG_LVL5_CD_NM
+							 , ISNULL(CT.SALES_ORG_LVL5_NM      , ' ') AS SALES_ORG_LVL5_NM
+							 , ISNULL(CT.SALES_ORG_LVL5_NM      , ' ') AS SALES_ORG_LVL5_NM_NM
+							 , ISNULL(CT.CLEANING_YN      , ' ')       AS CLEANING_YN
+							 , ISNULL(CT.CLEANING_YN      , ' ')       AS CLEANING_YN_NM
+							 , SP.WEEK
+							 , SP.FLAG
+							 , SP.QTY
+						FROM W_CUST CT
+						INNER JOIN W_SALES_PROD  SP
+						   ON CT.COMPANY_CD    = SP.COMPANY_CD
+						  AND CT.BU_CD         = SP.BU_CD
+						  AND CT.ITEM_CD       = SP.ITEM_CD
+						WHERE CT.COMPANY_CD = @{GV_COMPANY_CD}
+						  AND CT.BU_CD      = @{GV_BU_CD}
+					  	#if($_parameter.item_cd and $_parameter.item_cd != "")
+					      AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+					  	#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+					      AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+					  	#end
+					  	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+					      AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+					  	#end
+					  	#if($_parameter.route and $_parameter.route != "")
+					      AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+					  	#end
+					  	#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+					      AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+					  	#end
+					  	#if($_parameter.custGroup and $_parameter.custGroup != "")
+					      AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+					  	#end
+					) T1
+					GROUP BY T1.COMPANY_CD, T1.BU_CD, T1.ROUTING_ID, T1.ROUTING_ID_NM, T1.REP_CUST_GROUP_CD, T1.REP_CUST_GROUP_CD_NM, T1.REP_CUST_GROUP_NM, T1.REP_CUST_GROUP_NM_NM
+						   , T1.CUST_GROUP_CD, T1.CUST_GROUP_CD_NM, T1.CUST_GROUP_NM, T1.CUST_GROUP_NM_NM, T1.ITEM_GROUP_CD, T1.ITEM_GROUP_CD_NM, T1.ITEM_GROUP_NM, T1.ITEM_GROUP_NM_NM
+						   , T1.ITEM_CD, T1.ITEM_CD_NM, T1.ITEM_NM, T1.ITEM_NM_NM, T1.SPEC, T1.SPEC_NM, T1.MFG_LT, T1.MFG_LT_NM, T1.SALES_PRICE_KRW, T1.SALES_PRICE_KRW_NM, T1.REP_ITEM_GROUP_CD
+						   , T1.REP_ITEM_GROUP_CD_NM, T1.REP_ITEM_GROUP_NM, T1.REP_ITEM_GROUP_NM_NM, T1.DRAW_NO, T1.DRAW_NO_NM, T1.ITEM_TYPE_CD, T1.ITEM_TYPE_CD_NM, T1.ITEM_TYPE_NM, T1.ITEM_TYPE_NM_NM
+						   , T1.SALES_ORG_LVL5_CD, T1.SALES_ORG_LVL5_CD_NM, T1.SALES_ORG_LVL5_NM, T1.SALES_ORG_LVL5_NM_NM, T1.WEEK, T1.FLAG, T1.CLEANING_YN, T1.CLEANING_YN_NM
+				) X
+				CROSS JOIN 
+				(
+			    	SELECT CATEGORY_CD
+			    	     , CATEGORY_NM
+			    	     , CATEGORY_IDX 
+				    FROM 
+					(
+				    	SELECT NULL AS CATEGORY_CD
+				    	     , NULL AS CATEGORY_NM
+				    	     , NULL AS CATEGORY_IDX
+						#foreach($meaMap in $_parameter.meaList)
+				        UNION ALL 
+				        SELECT '$meaMap.CD'
+				             , '$meaMap.NM'
+				             , $velocityCount 
+						#end
+					) SS
+				    WHERE CATEGORY_CD IS NOT NULL
+				) Y
+				GROUP BY X.COMPANY_CD, X.BU_CD, X.ROUTING_ID, X.ROUTING_ID_NM, X.REP_CUST_GROUP_CD, X.REP_CUST_GROUP_CD_NM, X.REP_CUST_GROUP_NM, X.REP_CUST_GROUP_NM_NM, X.CUST_GROUP_CD, X.CUST_GROUP_CD_NM
+					   , X.CUST_GROUP_NM, X.CUST_GROUP_NM_NM, X.ITEM_GROUP_CD, X.ITEM_GROUP_CD_NM, X.ITEM_GROUP_NM, X.ITEM_GROUP_NM_NM, X.ITEM_CD, X.ITEM_CD_NM, X.ITEM_NM, X.ITEM_NM_NM, X.SPEC, X.SPEC_NM
+					   , X.MFG_LT, X.MFG_LT_NM, X.SALES_PRICE_KRW, X.SALES_PRICE_KRW_NM, X.REP_ITEM_GROUP_CD, X.REP_ITEM_GROUP_CD_NM, X.REP_ITEM_GROUP_NM, X.REP_ITEM_GROUP_NM_NM, X.DRAW_NO, X.DRAW_NO_NM
+					   , X.ITEM_TYPE_CD, X.ITEM_TYPE_CD_NM, X.ITEM_TYPE_NM, X.ITEM_TYPE_NM_NM, X.SALES_ORG_LVL5_CD, X.SALES_ORG_LVL5_CD_NM, X.SALES_ORG_LVL5_NM, X.SALES_ORG_LVL5_NM_NM, Y.CATEGORY_CD, Y.CATEGORY_NM, Y.CATEGORY_IDX
+					   , X.CLEANING_YN, X.CLEANING_YN_NM
+			) T
+			GROUP BY ROLLUP(<include refid="include.getCdRollup"/>), CATEGORY_CD, CATEGORY_NM, CATEGORY_IDX
+		) TT
+		ORDER BY TMP_COL
+		#foreach($dimMap in $_parameter.dimList)
+	    , TT.$dimMap.DIM_CD
+		#end
+        , TT.CATEGORY_IDX
+    </select>
+</mapper>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.common">
+
+	<sql id="upperItemGroupWith">
+		WITH W_UPPER_ITEM_GROUP AS 
+		(
+			SELECT COMPANY_CD
+		         , BU_CD
+		         , ITEM_GROUP_CD AS UPPER_ITEM_GROUP_CD
+		         , ITEM_GROUP_NM AS UPPER_ITEM_GROUP_NM
+		    FROM TB_MST_ITEM_GROUP WITH (NOLOCK)
+		    WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD      = @{GV_BU_CD}
+		      AND LEAF_FLAG  = 'N'
+		      AND DEL_FLAG   = 'N'
+		)
+	</sql>
+	
+	<sql id="salesPlanRole">
+	    DECLARE @AP1_YN    nvarchar(1);
+	    DECLARE @AP2_YN    nvarchar(1);
+	    DECLARE @GOC_YN    nvarchar(1);
+	    
+	    WITH W_USER_ROLE AS 
+	    (
+	    	SELECT R.BU_CD
+	             , R.ROLE_CD
+	        FROM TB_MST_USER U WITH(NOLOCK)
+	        JOIN TB_MAP_USER_ROLE R WITH(NOLOCK)
+	          ON U.USER_ID  = R.USER_ID
+	         AND R.BU_CD    = @{GV_BU_CD}
+	         AND R.USE_FLAG = 'Y'
+	        WHERE U.USER_ID  = @{GV_USER_ID}
+	          AND U.USE_FLAG = 'Y'
+	          AND U.DEL_FLAG = 'N'
+	    )
+	    , W_CODE AS 
+	    (
+	        #set($_parameter.groupCd="DP_AUTH_CTRL")
+	        <include refid="include.mstCode"/>
+	    )
+#if ($_parameter.menuParam == "YP" or $_parameter.menuParam == "AP2" or $_parameter.menuParam == "AP1" or $_parameter.menuParam == "CFM")
+	    , W_GOC_ROLE AS 
+	    (
+	        SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END AS GOC_ROLE_YN
+	        FROM W_USER_ROLE R
+	        JOIN W_CODE C
+	          ON R.ROLE_CD = C.CODE_CD 
+	         AND C.ATTB_3_CD = 'Y'
+	    )
+#end
+#if ($_parameter.menuParam != "AP2")
+	    , W_AP1_ROLE AS 
+	    (
+	        SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END AS AP1_ROLE_YN
+	        FROM W_USER_ROLE R
+	        JOIN W_CODE C
+	          ON R.ROLE_CD = C.CODE_CD 
+	         AND C.ATTB_1_CD = 'Y'
+	    )
+#end
+#if ($_parameter.menuParam != "AP1")
+	    , W_AP2_ROLE AS 
+	    (
+	        SELECT CASE WHEN COUNT(1) = 0 THEN 'N' ELSE 'Y' END AS AP2_ROLE_YN
+	        FROM W_USER_ROLE R
+	        JOIN W_CODE C
+	          ON R.ROLE_CD = C.CODE_CD 
+	         AND C.ATTB_2_CD = 'Y'
+	    )
+#end
+#if ($_parameter.menuParam == "AP1")
+	    SELECT @AP2_YN = 'N'
+	         , @AP1_YN = (SELECT AP1_ROLE_YN FROM W_AP1_ROLE)
+	         , @GOC_YN = (SELECT GOC_ROLE_YN FROM W_GOC_ROLE);
+#elseif ($_parameter.menuParam == "AP2")
+	    SELECT @AP2_YN = (SELECT AP2_ROLE_YN FROM W_AP2_ROLE)
+	         , @AP1_YN = 'N'
+	         , @GOC_YN = (SELECT GOC_ROLE_YN FROM W_GOC_ROLE);
+#elseif ($_parameter.menuParam == "CFM")
+	    SELECT @AP2_YN = (SELECT AP2_ROLE_YN FROM W_AP2_ROLE)
+	         , @AP1_YN = (SELECT AP1_ROLE_YN FROM W_AP1_ROLE)
+	         , @GOC_YN = (SELECT GOC_ROLE_YN FROM W_GOC_ROLE);
+#elseif ($_parameter.menuParam == "YP")
+	    SELECT @AP2_YN = (SELECT AP2_ROLE_YN FROM W_AP2_ROLE)
+	         , @AP1_YN = (SELECT AP1_ROLE_YN FROM W_AP1_ROLE)
+	         , @GOC_YN = (SELECT GOC_ROLE_YN FROM W_GOC_ROLE);
+#end
+	</sql>
+	
+</mapper>

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.bizKpi">
+	<update id="bondRotateDayListUpdate" parameterType="map" >
+		/****** [ snop.bondRotateDayListUpdate ] ******/
+		#foreach( $rowMap in $_parameter.rowList )
+		UPDATE TB_DYN_AR
+		   SET SUSPENSION_REASON = #if($rowMap.get("SUSPENSION_REASON")) '$rowMap.get("SUSPENSION_REASON")' #else NULL #end 
+		  	 , TREATMENT_PLAN = #if($rowMap.get("TREATMENT_PLAN")) '$rowMap.get("TREATMENT_PLAN")' #else NULL #end 
+		  	 , UPDATE_ID = @{GV_USER_ID}
+		  	 , UPDATE_DTTM = DBO.UFN_GETDATE()
+		WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		  AND BU_CD = @{GV_BU_CD}
+		  AND AR_NO = '$rowMap.get("AR_NO")'
+		  AND YEARMONTH = '$rowMap.get("FROM_MONTH")'
+		#end
+	</update>
+	<select id="bondRotateDayListSelect" parameterType="map" resultType="map">
+		/****** [ snop.bondRotateDayListSelect ] ******/
+		WITH W_DYN_AR AS
+		(
+			SELECT A1.COMPANY_CD
+			     , A1.BU_CD
+			     , A1.YEARMONTH
+			     , A1.AR_NO
+			     , A1.REF_NO
+			     , A1.PAY_CUST_CD
+			     , A1.AR_DATE AS BONDS_CREATION_DATE
+			     , A1.BAL_AMT 
+			     , A1.BAL_AMT_KRW
+			     , A1.SUSPENSION_REASON
+           		 , A1.TREATMENT_PLAN
+			     , A2.CUST_CD
+				 , A2.CUST_NM
+				 , A2.REP_CUST_GROUP_CD
+				 , A2.REP_CUST_GROUP_NM
+				 , A2.CUST_GROUP_CD
+				 , A2.CUST_GROUP_NM
+				 , A2.REP_CUST_CD
+				 , A2.CUST_NM AS REP_CUST_NM 
+			     , CONVERT(VARCHAR, DATEADD(dd, -30, A1.IF_DTTM), 112) AS OVER_30
+				 , CONVERT(VARCHAR, DATEADD(dd, -60, A1.IF_DTTM), 112) AS OVER_60
+				 , CONVERT(VARCHAR, DATEADD(dd, -90, A1.IF_DTTM), 112) AS OVER_90
+			FROM TB_DYN_AR A1 WITH(NOLOCK) 
+			INNER JOIN TB_MST_CUSTOMER A2 WITH(NOLOCK)
+			  ON A1.COMPANY_CD = A2.COMPANY_CD
+			 AND A1.BU_CD = A2.BU_CD
+			 AND A1.PAY_CUST_CD = A2.CUST_CD
+			WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND A1.BU_CD = @{GV_BU_CD}
+			  AND A1.YEARMONTH = @{fromMonth}
+			#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+			  AND A2.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+			#end
+			#if($_parameter.custGroup and $_parameter.custGroup != "")
+			  AND A2.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+			#end
+		)
+		SELECT D1.CATEGORY_NM
+		     , D1.CATEGORY_NM_NM
+		     , D1.BU_CD
+		     , D1.BU_CD_NM
+		     , D1.REP_CUST_GROUP_CD
+		     , D1.REP_CUST_GROUP_NM
+		     , D1.CUST_GROUP_CD
+		     , D1.CUST_GROUP_NM
+		     , D1.REP_CUST_CD
+		     , D1.REP_CUST_NM
+		     , D1.AR_NO
+		     , D1.REF_NO
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, BONDS_CREATION_DATE), 102) AS BONDS_CREATION_DATE
+		     , D1.BAL_AMT AS BAL_AMT
+		     , D1.BAL_AMT_KRW AS BAL_AMT_KRW
+		     , D1.GRP_LVL_ID
+		     , ISNULL(ABS(BAL_AMT), 0) + ISNULL(ABS(BAL_AMT_KRW), 0) AS OMIT_FLAG
+		     , @{fromMonth} AS FROM_MONTH
+		     , D1.SUSPENSION_REASON
+             , D1.TREATMENT_PLAN
+		FROM
+		(
+			SELECT NULL AS TMP_COL
+	           	 , C1.CATEGORY_NM
+	           	 , CASE WHEN CATEGORY_NM IS NULL THEN 'Total' ELSE CATEGORY_NM END CATEGORY_NM_NM
+		         , C1.BU_CD         
+	           	 , CASE WHEN CATEGORY_NM IS NOT NULL THEN CASE WHEN BU_CD IS NULL THEN 'Sub Total' ELSE BU_CD_NM END
+	                    ELSE CASE WHEN CATEGORY_NM IS NULL THEN '' ELSE CATEGORY_NM_NM END
+	                END BU_CD_NM        
+		         , C1.REP_CUST_GROUP_CD
+		         , C1.REP_CUST_GROUP_NM
+		         , C1.CUST_GROUP_CD
+		         , C1.CUST_GROUP_NM
+		         , C1.REP_CUST_CD
+		         , C1.REP_CUST_NM
+		         , C1.AR_NO
+		         , C1.REF_NO
+		         , C1.BONDS_CREATION_DATE
+		         , SUM(CASE WHEN C1.CATEGORY_CD = 'OVER_90' AND BONDS_CREATION_DATE <![CDATA[<=]]> OVER_90 THEN BAL_AMT 
+		                    WHEN C1.CATEGORY_CD = 'OVER_60' AND BONDS_CREATION_DATE <![CDATA[>]]> OVER_90 AND BONDS_CREATION_DATE <![CDATA[<=]]> OVER_60 THEN BAL_AMT 
+		                    WHEN C1.CATEGORY_CD = 'OVER_30' AND BONDS_CREATION_DATE <![CDATA[>]]> OVER_60 AND BONDS_CREATION_DATE <![CDATA[<=]]> OVER_30 THEN BAL_AMT 
+		              END) AS BAL_AMT
+		         , SUM(CASE WHEN C1.CATEGORY_CD = 'OVER_90' AND BONDS_CREATION_DATE <![CDATA[<=]]> OVER_90 THEN BAL_AMT_KRW 
+		                    WHEN C1.CATEGORY_CD = 'OVER_60' AND BONDS_CREATION_DATE <![CDATA[>]]> OVER_90 AND BONDS_CREATION_DATE <![CDATA[<=]]> OVER_60 THEN BAL_AMT_KRW 
+		                    WHEN C1.CATEGORY_CD = 'OVER_30' AND BONDS_CREATION_DATE <![CDATA[>]]> OVER_60 AND BONDS_CREATION_DATE <![CDATA[<=]]> OVER_30 THEN BAL_AMT_KRW  
+		              END) AS BAL_AMT_KRW
+		         , GROUPING_ID(CATEGORY_NM, CATEGORY_NM_NM, BU_CD, REP_CUST_GROUP_CD, REP_CUST_GROUP_NM, REF_NO) AS GRP_LVL_ID
+		         , C1.SUSPENSION_REASON
+           		 , C1.TREATMENT_PLAN
+			FROM
+			(
+				SELECT ISNULL(B1.BU_CD, ' ') AS BU_CD
+					 , ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN B3.CODE_NM_KR
+			                       WHEN 'cn' = @{GV_LANG} THEN B3.CODE_NM_CN
+			                       ELSE B3.CODE_NM
+			           		   END, ' ')
+			           AS BU_CD_NM
+			         , ISNULL(B1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+					 , ISNULL(B1.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+			         , ISNULL(B1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+					 , ISNULL(B1.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+					 , ISNULL(B1.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+					 , ISNULL(B1.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+					 , ISNULL(B1.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+					 , ISNULL(B1.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+			         , ISNULL(B1.REP_CUST_CD, ' ') AS REP_CUST_CD
+					 , ISNULL(B1.REP_CUST_CD, ' ') AS REP_CUST_CD_NM
+			         , ISNULL(B1.REP_CUST_NM, ' ') AS REP_CUST_NM
+					 , ISNULL(B1.REP_CUST_NM, ' ') AS REP_CUST_NM_NM
+					 , B1.AR_NO
+			         , B1.REF_NO
+			         , B1.BONDS_CREATION_DATE
+			         , B1.BAL_AMT
+			         , B1.BAL_AMT_KRW
+			         , B1.SUSPENSION_REASON
+           			 , B1.TREATMENT_PLAN     
+					 , ISNULL(B2.CATEGORY_CD, ' ') AS CATEGORY_CD
+					 , ISNULL(B2.CATEGORY_CD, ' ') AS CATEGORY_CD_NM
+					 , ISNULL(B2.CATEGORY_NM, ' ') AS CATEGORY_NM
+					 , ISNULL(B2.CATEGORY_NM, ' ') AS CATEGORY_NM_NM
+			         , B2.CATEGORY_IDX
+			         , B1.OVER_90
+			         , B1.OVER_60
+			         , B1.OVER_30
+				FROM W_DYN_AR B1
+				CROSS JOIN 
+				(
+					SELECT CATEGORY_CD
+					     , CATEGORY_NM
+					     , CATEGORY_IDX 
+		        	FROM 
+		        	(
+		            	SELECT NULL AS CATEGORY_CD
+		            	     , NULL AS CATEGORY_NM
+		            	     , NULL AS CATEGORY_IDX
+						#foreach($meaMap in $_parameter.meaList)
+		            	UNION ALL 
+		            	SELECT '$meaMap.CD'
+		            		 , '$meaMap.NM'
+		            		 , $velocityCount 
+						#end
+		        	) SS
+		        	WHERE CATEGORY_CD IS NOT NULL
+				) B2
+				LEFT OUTER JOIN TB_MST_CODE B3 WITH(NOLOCK)
+				  ON B3.GROUP_CD = 'BU_CD'
+				 AND B3.CODE_CD = B1.BU_CD
+				 AND B3.USE_FLAG = 'Y'
+				WHERE 1 = 1
+				#if($_parameter.overDay and $_parameter.overDay != "")
+			       AND B2.CATEGORY_CD IN ('$_parameter.overDay.replace(",","','")')
+			  	#end
+			) C1
+			GROUP BY ROLLUP((CATEGORY_NM, CATEGORY_NM_NM), (BU_CD, BU_CD_NM, REP_CUST_GROUP_CD, REP_CUST_GROUP_NM, CUST_GROUP_CD, CUST_GROUP_NM, REP_CUST_CD, REP_CUST_NM, REF_NO, BONDS_CREATION_DATE, AR_NO, SUSPENSION_REASON, TREATMENT_PLAN))
+		) D1
+		WHERE D1.BAL_AMT IS NOT NULL OR D1.BAL_AMT_KRW IS NOT NULL
+		ORDER BY CATEGORY_NM, CATEGORY_NM_NM, BU_CD, REP_CUST_GROUP_CD, REP_CUST_GROUP_NM, CUST_GROUP_CD, CUST_GROUP_NM, REP_CUST_CD, REP_CUST_NM, BONDS_CREATION_DATE, REF_NO
+	</select>
+	
+</mapper>

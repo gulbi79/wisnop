@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+
+	<select id="invDateSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.invDateSelect ] ******/
+		SELECT TOP 1 A.INV_DATE
+		FROM TB_DYN_INVENTORY_EXPECT A
+		WHERE A.PLAN_ID = @{planId}
+		  AND A.VERSION_TYPE_CD = @{versionType}
+	</select>
+
+	<select id="versionTypeCdSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.versionTypeCdSelect ] ******/
+		SELECT A1.CODE_CD
+		     , CASE WHEN @{GV_LANG} = 'ko' THEN A1.CODE_NM_KR
+		            WHEN @{GV_LANG} = 'cn' THEN A1.CODE_NM_CN
+		            ELSE A1.CODE_NM
+		       END AS CODE_NM
+		FROM TB_MST_CODE A1 WITH(NOLOCK)
+		WHERE A1.BU_CD = @{GV_BU_CD}
+		  AND A1.GROUP_CD = 'VERSION_TYPE_CD'
+		  AND A1.USE_FLAG = 'Y'
+		  AND A1.ATTB_2_CD = 'Y'
+	</select>
+
+	<select id="invSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.invSelect ] ******/		
+		SELECT ISNULL(DI.ITEM_CD, ' ') AS ITEM_CODE
+			 , ISNULL(DI.ITEM_CD, ' ') AS ITEM_CODE_NM
+		     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+	  	 	 , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+		     , ISNULL(MI.SPEC, ' ') AS SPEC
+			 , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+		    	    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+		  	   		ELSE MC2.CODE_NM
+		       END AS ITEM_TYPE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+		    	   WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+		    	   ELSE MC2.CODE_NM
+	    	   END AS ITEM_TYPE_CD_NM
+		     , ISNULL(MICG.SALES_PRICE_KRW,MI.ITEM_COST_KRW) AS ITEM_COST_KRW
+			 , ISNULL(MICG.SALES_PRICE_KRW,MI.ITEM_COST_KRW) AS ITEM_COST_KRW_NM
+		     , ISNULL(MI.UOM_CD, ' ') AS UOM_CD
+			 , ISNULL(MI.UOM_CD, ' ') AS UOM_CD_NM
+		     , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID
+			 , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID_NM
+		     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+			 , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+		     , ISNULL(MC.CUST_NM, ' ') AS REP_CUST_NM
+			 , ISNULL(MC.CUST_NM, ' ') AS REP_CUST_NM_NM
+		     , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+			 , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+		     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+		     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			 , MIP.SS_QTY AS SS_QTY
+		     , MIP.SS_QTY AS SS_QTY_NM
+			 , ISNULL(MI.CPFR_YN, ' ') AS CPFR_YN
+		     , ISNULL(MI.CPFR_YN, ' ') AS CPFR_YN_NM
+		     , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+		     , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN_NM
+		     , DI.INV_QTY AS INV_QTY
+		     , DI.INV_QTY AS INV_QTY_NM
+			#if($_parameter.planId and $_parameter.planId != "" and $_parameter.planId != "null" and $_parameter.versionType and $_parameter.versionType != "" and $_parameter.versionType != "null")
+		     , DI.EXP_INV_QTY AS EXP_INV_QTY
+		     , DI.EXP_INV_QTY AS EXP_INV_QTY_NM
+		     , DI.PROD_PLAN_QTY AS PROD_PLAN_QTY
+	         , DI.PROD_PLAN_QTY AS PROD_PLAN_QTY_NM
+	         , DI.SALES_REMAIN_QTY AS SALES_REMAIN_QTY
+	         , DI.SALES_REMAIN_QTY AS SALES_REMAIN_QTY_NM
+	         , DI.SALES_PLAN_QTY AS SALES_PLAN_QTY
+	         , DI.SALES_PLAN_QTY AS SALES_PLAN_QTY_NM
+	         , DI.SALES_RESULT_QTY AS SALES_RESULT_QTY
+	         , DI.SALES_RESULT_QTY AS SALES_RESULT_QTY_NM
+	         , DI.ARRIVAL_INFO_QTY AS ARRIVAL_INFO_QTY
+	         , DI.ARRIVAL_INFO_QTY AS ARRIVAL_INFO_QTY_NM
+	         , DI.MATERIAL_REQ_QTY AS MATERIAL_REQ_QTY
+	         , DI.MATERIAL_REQ_QTY AS MATERIAL_REQ_QTY_NM
+	        #end
+		FROM 
+		(
+			SELECT DIA.COMPANY_CD
+			     , DIA.BU_CD
+			     , DIA.PLANT_CD
+			     , DIA.INV_DATE
+			     , DIA.ITEM_CD
+			     , SUM(DIA.INV_QTY) AS INV_QTY
+			     , SUM(DIA.EXP_INV_QTY) AS EXP_INV_QTY
+			     , SUM(DIA.PROD_PLAN_QTY) AS PROD_PLAN_QTY
+			     , SUM(SALES_REMAIN_QTY) AS SALES_REMAIN_QTY
+			     , SUM(DIA.SALES_PLAN_QTY) AS SALES_PLAN_QTY
+			     , SUM(DIA.SALES_RESULT_QTY) AS SALES_RESULT_QTY
+			     , SUM(DIA.ARRIVAL_INFO_QTY) AS ARRIVAL_INFO_QTY
+			     , SUM(DIA.MATERIAL_REQ_QTY) AS MATERIAL_REQ_QTY
+			FROM 
+			(
+				SELECT DI.COMPANY_CD
+		             , DI.BU_CD
+		             , DI.PLANT_CD
+		             , DI.INV_DATE
+		             , DI.ITEM_CD
+		             , DI.INV_QTY AS INV_QTY
+		             , 0 AS EXP_INV_QTY
+		             , 0 AS PROD_PLAN_QTY
+		             , 0 AS SALES_REMAIN_QTY
+		             , 0 AS SALES_PLAN_QTY
+		             , 0 AS SALES_RESULT_QTY
+		             , 0 AS ARRIVAL_INFO_QTY
+		             , 0 AS MATERIAL_REQ_QTY
+				FROM UV_DYN_INVENTORY DI WITH(NOLOCK)
+		        WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND DI.BU_CD = @{GV_BU_CD}
+		          AND DI.PLANT_CD = 'WF01'
+		          AND DI.INV_DATE = @{fromCal}
+				#if($_parameter.planId and $_parameter.planId != "" and $_parameter.planId != "null" and $_parameter.versionType and $_parameter.versionType != "" and $_parameter.versionType != "null")
+				UNION ALL
+		        SELECT DIE.COMPANY_CD
+		             , DIE.BU_CD
+		             , DIE.PLANT_CD
+		             , DIE.INV_DATE
+		             , DIE.ITEM_CD
+		             , 0 AS INV_QTY
+		             , DIE.INV_QTY AS EXP_INV_QTY
+		             , DIE.PROD_PLAN_QTY AS PROD_PLAN_QTY
+		             , CASE WHEN DIE.SALES_PLAN_QTY - DIE.SALES_RESULT_QTY <![CDATA[<]]>= 0 THEN 0 
+		               ELSE DIE.SALES_PLAN_QTY - DIE.SALES_RESULT_QTY 
+		               END AS SALES_REMAIN_QTY
+		             , DIE.SALES_PLAN_QTY AS SALES_PLAN_QTY
+		             , DIE.SALES_RESULT_QTY AS SALES_RESULT_QTY
+		             , DIE.ARRIVAL_INFO_QTY AS ARRIVAL_INFO_QTY
+		             , DIE.MATERIAL_REQ_QTY AS MATERIAL_REQ_QTY
+				FROM TB_DYN_INVENTORY_EXPECT DIE WITH(NOLOCK)
+		        WHERE DIE.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND DIE.BU_CD = @{GV_BU_CD}
+		          AND DIE.PLANT_CD = 'WF01'
+		          AND DIE.INV_DATE = @{fromCal}
+		          AND DIE.PLAN_ID = @{planId}
+		          AND DIE.VERSION_TYPE_CD = @{versionType}
+	           	#end
+			) DIA
+			GROUP BY DIA.COMPANY_CD, DIA.BU_CD, DIA.PLANT_CD, DIA.INV_DATE, DIA.ITEM_CD
+		) DI
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = DI.COMPANY_CD
+		  AND MI.BU_CD = DI.BU_CD
+		  AND MI.ITEM_CD = DI.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = DI.COMPANY_CD
+		  AND MIP.BU_CD = DI.BU_CD
+		  AND MIP.PLANT_CD = DI.PLANT_CD
+		  AND MIP.ITEM_CD = DI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MI.COMPANY_CD
+		 AND MC.BU_CD = MI.BU_CD
+		 AND MC.CUST_CD = MI.REP_CUST_CD
+		LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+		  ON MICG.COMPANY_CD = DI.COMPANY_CD
+		 AND MICG.BU_CD = DI.BU_CD
+		 AND MICG.ITEM_CD = DI.ITEM_CD
+		 AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+		LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		  ON MIG.COMPANY_CD = MI.COMPANY_CD
+		 AND MIG.BU_CD = MI.BU_CD
+		 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = MIP.BU_CD
+		 AND MC1.GROUP_CD = 'CL_SL_CD'
+		 AND MC1.CODE_CD = MIP.RCPT_SL_CD
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = 'ALL'
+		 AND MC2.GROUP_CD = 'ITEM_TYPE'
+		 AND MC2.CODE_CD = MI.ITEM_TYPE
+		 AND MC2.USE_FLAG = 'Y'
+	    WHERE 1 = 1 
+		#if($_parameter.item_nm and $_parameter.item_nm != ""  )
+		  AND (MI.ITEM_CD  LIKE '%'+'$_parameter.item_nm'+'%' OR MI.ITEM_NM LIKE '%'+'$_parameter.item_nm'+'%' or 
+			   MI.ITEM_CD IN ('$_parameter.item_nm.replace(",","','")') )
+		#end
+		#if($_parameter.itemType and $_parameter.itemType != "")
+		  AND MI.ITEM_TYPE IN ('$_parameter.itemType.replace(",","','")')
+		#end
+	 	#if($_parameter.procurType and $_parameter.procurType != "")
+		  AND MIP.PROCUR_TYPE IN ('$_parameter.procurType.replace(",","','")') 
+		#end
+		#if($_parameter.route and $_parameter.route != "")
+		  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")') 
+		#end
+	 	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+		  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+		#end
+	 
+	</select>
+	  	
+</mapper>

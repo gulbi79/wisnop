@@ -1,0 +1,672 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="snop.oprtKpi">
+
+    <select id="bucketWeekProdSelect" parameterType="map" resultType="map">
+        /****** [ supply.bucketWeekProdSelect ] ******/
+        SELECT CASE WHEN A.CD IS NULL THEN 'WM' + RTRIM(RIGHT(A.ROOT_CD, 6)) ELSE A.CD END CD
+             , CASE WHEN A.NM IS NULL THEN A.ROOT_CD ELSE A.NM END NM
+             , A.ROOT_CD
+             , CASE WHEN A.BUCKET_VAL IS NULL THEN RTRIM(RIGHT(A.ROOT_CD, 6)) ELSE A.BUCKET_VAL END BUCKET_VAL
+             , A.TYPE
+             , A.TOT_TYPE
+        FROM
+        (
+            SELECT 
+                 #if($_parameter.vhWeekType == "SW")
+                     'W' + YEARWEEK AS CD
+                    , YEARWEEK AS NM
+                    , 'M' + YEARMONTH_STD AS ROOT_CD
+                    , YEARWEEK AS BUCKET_VAL
+                 #else
+                    'W' + YEARPWEEK AS CD
+                    , YEARPWEEK AS NM
+                    , 'M' + YEARMONTH AS ROOT_CD
+                    , YEARPWEEK AS BUCKET_VAL
+                 #end
+                 , 'group' AS TYPE
+                 , NULL AS TOT_TYPE
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YYYYMMDD BETWEEN @{fromDate} AND @{toDate}
+            #if($_parameter.vhWeekType == "SW")
+                GROUP BY ROLLUP(YEARMONTH_STD, YEARWEEK)
+            #else
+                GROUP BY ROLLUP(YEARMONTH, YEARPWEEK)
+            #end
+        ) A
+        WHERE A.ROOT_CD IS NOT NULL
+    </select>
+
+    <select id="salesPalnCmplRtSelect" parameterType="map" resultType="map">
+        /****** [ snop.oprtKpi.salesPalnCmplRtSelect ] ******/
+        <include refid="snop.common.w_cust" />
+        , W_PLAN_RES AS 
+        (
+            SELECT PL.COMPANY_CD
+                 , PL.BU_CD
+                 , PL.CUST_GROUP_CD
+                 , PL.ITEM_CD
+                 , 'PLAN' FLAG 
+                #if ($_parameter.vhWeekType == "SW")
+                 , PL.YEARWEEK
+                 , MC.YEARMONTH_STD AS YEARMONTH
+                #else
+                 , PL.YEARPWEEK YEARWEEK
+                 , MC.YEARMONTH
+                #end
+                 , SUM (PL.AMT) AMT
+                 , SUM (PL.QTY) QTY
+            FROM TB_KPI_SALES_PLAN PL WITH(NOLOCK)
+            INNER JOIN 
+            (
+                SELECT 
+                    #if ($_parameter.vhWeekType == "SW")
+                       DISTINCT YEARMONTH_STD
+                     , YEARWEEK
+                     , YEARPWEEK
+                    #else
+                       DISTINCT YEARMONTH
+                     , YEARPWEEK
+                    #end                     
+                FROM TB_MST_CALENDAR MC WITH(NOLOCK)
+            ) MC
+            ON PL.YEARPWEEK = MC.YEARPWEEK
+            <!-- #if($_parameter.vhWeekType == "SW")
+               ON PL.YEARWEEK = MC.YEARWEEK
+            #else
+               ON PL.YEARPWEEK = MC.YEARPWEEK
+            #end -->
+            WHERE PL.COMPANY_CD = @{GV_COMPANY_CD}
+              AND PL.BU_CD   = @{GV_BU_CD}
+              AND PL.MEAS_CD IN (SELECT ATTB_4_CD FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'DP_DEMAND_TYPE')
+            #if ($_parameter.cpfrCd == "N")
+              AND NOT EXISTS (
+                             SELECT 1
+                               FROM TB_MST_CUST_GROUP MCG WITH(NOLOCK)
+                              INNER JOIN TB_MST_REP_CUST_GROUP MRCG WITH(NOLOCK)
+                                 ON MRCG.COMPANY_CD = MCG.COMPANY_CD
+                                AND MRCG.BU_CD = MCG.BU_CD
+                                AND MRCG.REP_CUST_GROUP_CD = MCG.REP_CUST_GROUP_CD
+                                AND MRCG.CUST_CATE = 'SAM'
+                              INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                                 ON MC.BU_CD = MRCG.BU_CD
+                                AND MC.GROUP_CD = 'DP_DEMAND_TYPE'
+                                AND MC.CODE_CD = 'DMD1'
+                              WHERE MCG.COMPANY_CD = PL.COMPANY_CD
+                                AND MCG.BU_CD = PL.BU_CD
+                                AND MCG.CUST_GROUP_CD = PL.CUST_GROUP_CD
+                                AND MC.ATTB_4_CD = PL.MEAS_CD
+                            )
+            #end  
+              <!-- AND MC.DAY_NM = 'SUN' -->
+            #if ($_parameter.vhWeekType == "SW")
+              AND PL.YEARWEEK <![CDATA[>=]]> @{fromWeek}
+              AND PL.YEARWEEK <![CDATA[<=]]> @{toWeek}
+            #else
+              AND PL.YEARPWEEK <![CDATA[>=]]> @{fromPWeek}
+              AND PL.YEARPWEEK <![CDATA[<=]]> @{toPWeek}
+            #end
+            GROUP BY PL.COMPANY_CD, PL.BU_CD, PL.CUST_GROUP_CD, PL.ITEM_CD
+            #if ($_parameter.vhWeekType == "SW")
+             , PL.YEARWEEK, MC.YEARMONTH_STD
+            #else
+             , PL.YEARPWEEK, MC.YEARMONTH
+            #end
+            UNION ALL
+            SELECT BILL.COMPANY_CD
+                 , BILL.BU_CD
+                 , CU.CUST_GROUP_CD
+                 , BILL.ITEM_CD
+                 , 'RES' FLAG
+                #if ($_parameter.vhWeekType == "SW")
+                 , CAL.YEARWEEK
+                 , CAL.YEARMONTH_STD AS YEARMONTH  
+                #else
+                 , CAL.YEARPWEEK YEARWEEK
+                 , CAL.YEARMONTH 
+                #end
+                 , SUM (BILL.AMT_KRW) RS_AMT
+                 , SUM (BILL.QTY) RS_QTY
+            #if ($_parameter.cutOff == "Y")
+            FROM TB_DYN_SALES_RESULT_WEEKLY BILL WITH(NOLOCK)
+            #elseif ($_parameter.cutOff == "N")
+            FROM TB_DYN_SALES_RESULT BILL WITH(NOLOCK)
+            #end         
+            INNER JOIN TB_MST_CALENDAR CAL WITH(NOLOCK)
+              ON CAL.YYYYMMDD = BILL.SALES_DATE 
+            #if ($_parameter.vhWeekType == "SW")
+             AND CAL.YYYYMMDD <![CDATA[>=]]> @{swFromDate}
+             AND CAL.YYYYMMDD <![CDATA[<=]]> @{swToDate}
+            #else
+             AND CAL.YYYYMMDD <![CDATA[>=]]> @{pwFromDate}
+             AND CAL.YYYYMMDD <![CDATA[<=]]> @{pwToDate}
+            #end
+            INNER JOIN TB_MST_CUSTOMER CU WITH(NOLOCK)
+               ON BILL.COMPANY_CD = CU.COMPANY_CD
+              AND BILL.BU_CD      = CU.BU_CD
+              AND BILL.CUST_CD    = CU.CUST_CD
+            WHERE BILL.COMPANY_CD = @{GV_COMPANY_CD}
+              AND BILL.BU_CD      = @{GV_BU_CD}
+              AND BILL.PLANT_CD = 'WF01'
+              AND BILL.DEL_FLAG   = 'N'
+            #if ($_parameter.cpfrCd == "N")
+              AND ISNULL(BILL.CPFR_FLAG, 'N') <![CDATA[<>]]> 'Y'
+            #end
+            GROUP BY BILL.COMPANY_CD, BILL.BU_CD, CU.CUST_GROUP_CD, BILL.ITEM_CD
+            #if ($_parameter.vhWeekType == "SW")
+             , CAL.YEARWEEK, CAL.YEARMONTH_STD
+            #else
+             , CAL.YEARPWEEK, CAL.YEARMONTH
+            #end
+            
+            UNION ALL
+            /* 가용 재고 추가 START*/
+            SELECT DI.COMPANY_CD
+                 , DI.BU_CD
+                 , CS.CUST_GROUP_CD AS CUST_GROUP_CD
+                 , DI.ITEM_CD
+                 , 'INV' AS FLAG
+                 , MC.YEARWEEK
+                 , MC.YEARMONTH
+                 , SUM(DI.INV_AMT_KRW) AS INV_AMT
+                 , SUM(DI.INV_QTY) AS INV_QTY
+            FROM UV_DYN_INVENTORY DI WITH(NOLOCK)
+            INNER JOIN
+            (
+                SELECT IT.COMPANY_CD
+                     , IT.BU_CD
+                     , IT.ITEM_CD     
+                     , RC.CUST_GROUP_CD
+                FROM TB_MST_ITEM IT WITH(NOLOCK)
+                INNER JOIN TB_MST_REP_CUST RC WITH(NOLOCK)
+                   ON IT.COMPANY_CD = RC.COMPANY_CD
+                  AND IT.BU_CD = RC.BU_CD
+                  AND IT.REP_CUST_CD = RC.REP_CUST_CD
+            ) CS
+            ON DI.COMPANY_CD = CS.COMPANY_CD
+            AND DI.BU_CD = CS.BU_CD
+            AND DI.ITEM_CD = CS.ITEM_CD
+            INNER JOIN 
+            (   
+                #if ($_parameter.vhWeekType == "SW")
+                    /*STANDARD WEEK*/
+                    SELECT YYYYMMDD
+                         , YEARWEEK
+                         , YEARMONTH_STD AS YEARMONTH  
+                    FROM TB_MST_CALENDAR WITH(NOLOCK)
+                    WHERE YEARWEEK <![CDATA[>=]]> @{fromWeek}
+                      AND YEARWEEK <![CDATA[<=]]> @{toWeek}
+                      AND DAY_NM = 'FRI'
+                #else
+                    /*PARTIAL WEEK*/
+                    SELECT *
+                    FROM
+                    (
+                        #if ($_parameter.resultFrom == "A")
+                            SELECT MAX(YYYYMMDD) AS YYYYMMDD
+                                 , MAX(YEARPWEEK) AS YEARWEEK
+                                 , MAX(YEARMONTH) AS YEARMONTH 
+                            FROM TB_MST_CALENDAR WITH(NOLOCK)
+                            WHERE YEARPWEEK = @{fromPWeek}
+                            UNION 
+                            SELECT YYYYMMDD
+                                 , YEARPWEEK AS YEARWEEK
+                                 , YEARMONTH 
+                            FROM TB_MST_CALENDAR WITH(NOLOCK)
+                            WHERE YEARPWEEK = @{fromPWeek}
+                              AND DAY_NM = 'FRI'
+                        #elseif ($_parameter.resultFrom == "B" or $_parameter.resultFrom == "C")
+                            SELECT YYYYMMDD
+                                 , YEARPWEEK AS YEARWEEK
+                                 , YEARMONTH 
+                            FROM TB_MST_CALENDAR WITH(NOLOCK)
+                            WHERE YEARPWEEK = @{fromPWeek}
+                              AND DAY_NM = 'FRI'
+                        #end
+                        UNION 
+                        SELECT YYYYMMDD
+                             , YEARPWEEK AS YEARWEEK
+                             , YEARMONTH  
+                        FROM TB_MST_CALENDAR WITH(NOLOCK)
+                        WHERE YEARWEEK <![CDATA[>]]> @{fromPWeek}
+                          AND YEARWEEK <![CDATA[<]]> @{toPWeek}
+                          AND DAY_NM = 'FRI'
+                        UNION 
+                        #if ($_parameter.resultTo == "A")
+                            SELECT MAX(YYYYMMDD) AS YYYYMMDD
+                                 , MAX(YEARPWEEK) AS YEARWEEK
+                                 , MAX(YEARMONTH) AS YEARMONTH 
+                            FROM TB_MST_CALENDAR WITH(NOLOCK)
+                            WHERE YEARPWEEK = @{toPWeek}
+                        #elseif ($_parameter.resultTo == "B")
+                            SELECT MAX(YYYYMMDD) AS YYYYMMDD
+                                 , MAX(YEARPWEEK) AS YEARWEEK
+                                 , MAX(YEARMONTH) AS YEARMONTH 
+                            FROM TB_MST_CALENDAR WITH(NOLOCK)
+                            WHERE YEARPWEEK = SUBSTRING(@{toPWeek}, 1, 6) + 'A'
+                            UNION 
+                            SELECT YYYYMMDD
+                                 , YEARPWEEK AS YEARWEEK
+                                 , YEARMONTH 
+                            FROM TB_MST_CALENDAR WITH(NOLOCK)
+                            WHERE YEARPWEEK = @{toPWeek}
+                              AND DAY_NM = 'FRI'
+                        #elseif ($_parameter.resultTo == "C")
+                            SELECT YYYYMMDD
+                                 , YEARPWEEK AS YEARWEEK
+                                 , YEARMONTH 
+                            FROM TB_MST_CALENDAR WITH(NOLOCK)
+                            WHERE YEARPWEEK = @{toPWeek}
+                              AND DAY_NM = 'FRI'
+                        #end  
+                    ) A
+                    WHERE A.YYYYMMDD IS NOT NULL
+                #end
+            ) MC
+            ON DI.INV_DATE = MC.YYYYMMDD
+            WHERE DI.COMPANY_CD = @{GV_COMPANY_CD}
+              AND DI.BU_CD = @{GV_BU_CD}
+              AND DI.PLANT_CD = 'WF01'
+            GROUP BY DI.COMPANY_CD, DI.BU_CD, DI.ITEM_CD, CS.CUST_GROUP_CD
+            #if ($_parameter.vhWeekType == "SW")
+            , MC.YEARWEEK, MC.YEARMONTH
+            #else
+            , MC.YEARWEEK, MC.YEARMONTH /*변경*/
+            #end
+            /* 가용 재고 추가 END*/
+        )
+        
+        
+        SELECT NULL AS TMP_COL
+        <include refid="include.getCdDimTotal"/>
+        <include refid="include.getGrpLvlId"/>
+        
+
+        #foreach( $bucketMap in $_parameter.bucketList )
+            #set( $week = "$bucketMap.BUCKET_VAL" )
+               
+               
+                #if($bucketMap.ROOT_CD.indexOf("WM") > -1)
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                        #if ($_parameter.invCd == "N")
+                        , SUM ($bucketMap.CD) AS $bucketMap.CD
+                        #elseif ($_parameter.invCd == "Y")
+                        , SUM($bucketMap.CD)  AS $bucketMap.CD
+                        #end
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                         , ISNULL(SUM($bucketMap.CD),0) AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                        , SUM($bucketMap.CD) AS $bucketMap.CD 
+                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                         , CASE WHEN ISNULL(SUM(${bucketMap.ROOT_CD}_MIN),0) = 0 AND ISNULL(SUM(${bucketMap.ROOT_CD}_MAX),0) = 0 THEN NULL
+                           ELSE SUM(${bucketMap.ROOT_CD}_MIN) / NULLIF(SUM(${bucketMap.ROOT_CD}_MAX),0)*100 END AS $bucketMap.CD
+                    #end
+                #else
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                        #if ($_parameter.invCd == "N")
+                        , SUM ($bucketMap.CD) AS $bucketMap.CD
+                        #elseif ($_parameter.invCd == "Y")
+                        , SUM ($bucketMap.CD) AS $bucketMap.CD
+                        #end
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                         , ISNULL(SUM($bucketMap.CD),0) AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                         , SUM ($bucketMap.CD) AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                         , CASE WHEN ISNULL(SUM(${bucketMap.ROOT_CD}_MIN),0) = 0 AND ISNULL(SUM(${bucketMap.ROOT_CD}_MAX),0) = 0 THEN NULL  
+                           ELSE SUM(${bucketMap.ROOT_CD}_MIN) / NULLIF(SUM(${bucketMap.ROOT_CD}_MAX),0)*100 END AS $bucketMap.CD
+                    #end
+                #end
+           
+            #end
+       
+       #foreach( $bucketMap in $_parameter.bucketList )
+            #set( $week = "$bucketMap.BUCKET_VAL" )
+            #if($velocityCount > 1)
+                #if ($_parameter.rdoAqType == "QTY")
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                     + ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                     + ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                     + ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #end
+                #elseif ($_parameter.rdoAqType == "AMT")
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                     + ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                     + ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                     + ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #end
+                #end
+            #else
+                #if ($_parameter.rdoAqType == "QTY")
+                    #if($bucketMap.CD.indexOf("_INV") > -1)
+                     , ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #end
+                #elseif ($_parameter.rdoAqType == "AMT")
+                    #if($bucketMap.CD.indexOf("_INV") > -1)
+                     , ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+                    #end
+                #end
+            #end
+        #end AS OMIT_FLAG
+        FROM(
+        
+                 SELECT A.COMPANY_CD
+                 , A.BU_CD
+                 , ISNULL (A.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+                 , ISNULL (A.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+                 , ISNULL (A.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+                 , ISNULL (A.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+                 , ISNULL (A.ROUTING_ID, ' ')        AS ROUTING_ID
+                 , ISNULL (A.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+                 , ISNULL (A.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+                 , ISNULL (A.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+                 , ISNULL (A.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+                 , ISNULL (A.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+                 , ISNULL (A.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+                 , ISNULL (A.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+                 , ISNULL (A.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+                 , ISNULL (A.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+                 , ISNULL (A.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+                 , ISNULL (A.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+                 , ISNULL (A.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+                 , ISNULL (A.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+                 , ISNULL (A.ITEM_CD, ' ')           AS ITEM_CD
+                 , ISNULL (A.ITEM_CD, ' ')           AS ITEM_CD_NM
+                 , ISNULL (A.ITEM_NM, ' ')           AS ITEM_NM
+                 , ISNULL (A.ITEM_NM, ' ')           AS ITEM_NM_NM
+                 , ISNULL (A.SPEC, ' ')              AS SPEC
+                 , ISNULL (A.SPEC, ' ')              AS SPEC_NM
+                 , ISNULL (A.DRAW_NO, ' ')           AS DRAW_NO
+                 , ISNULL (A.DRAW_NO, ' ')           AS DRAW_NO_NM
+                 , ISNULL (A.ITEM_TYPE_CD, ' ')      AS ITEM_TYPE_CD
+                 , ISNULL (A.ITEM_TYPE_CD, ' ')      AS ITEM_TYPE_CD_NM
+                 , ISNULL (A.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+                 , ISNULL (A.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+                 , ISNULL (A.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+                 , ISNULL (A.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+                 , ISNULL (A.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+                 , ISNULL (A.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+                 , ISNULL (A.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+                 , ISNULL (A.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+                 , ISNULL (A.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+                 , ISNULL (A.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+                 , ISNULL (CAST (A.SALES_PRICE_KRW AS NVARCHAR(20)), ' ')   AS SALES_PRICE_KRW
+                 , ISNULL (CAST (A.SALES_PRICE_KRW AS NVARCHAR(20)), ' ')   AS SALES_PRICE_KRW_NM
+                 , A.WEEK                        AS WEEK
+                 , A.YEARMONTH                   AS YEARMONTH
+        
+            #foreach( $bucketMap in $_parameter.bucketList )
+            #set( $week = "$bucketMap.BUCKET_VAL" )
+            #if ($_parameter.rdoAqType == "QTY")
+                #if($bucketMap.ROOT_CD.indexOf("WM") > -1)
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                        #if ($_parameter.invCd == "N")
+                        , SUM (CASE WHEN YEARMONTH = '$week' THEN PLAN_QTY ELSE NULL END) AS $bucketMap.CD
+                        #elseif ($_parameter.invCd == "Y")
+                        , CASE WHEN ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN PLAN_QTY ELSE NULL END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN RES_QTY ELSE NULL END), 0) + ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN INV_QTY ELSE NULL END), 0)
+                               THEN ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN PLAN_QTY ELSE NULL END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN RES_QTY ELSE NULL END), 0) + ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN INV_QTY ELSE NULL END), 0)
+                           END $bucketMap.CD
+                        #end
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                         , SUM (CASE WHEN YEARMONTH = '$week' THEN RES_QTY ELSE NULL END) AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                        , SUM (CASE WHEN YEARMONTH = '$week' THEN INV_QTY ELSE NULL END) AS $bucketMap.CD 
+                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                         , SUM (CASE WHEN YEARMONTH = '$week' THEN MIN_QTY ELSE NULL END) AS ${bucketMap.ROOT_CD}_MIN
+                          
+                         , SUM (CASE WHEN YEARMONTH = '$week' THEN MAX_QTY ELSE NULL END) AS ${bucketMap.ROOT_CD}_MAX
+                           
+                    #end
+                #else
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                        #if ($_parameter.invCd == "N")
+                        , SUM (CASE WHEN WEEK = '$week' THEN PLAN_QTY ELSE NULL END) AS $bucketMap.CD
+                        #elseif ($_parameter.invCd == "Y")
+                        , CASE WHEN ISNULL(SUM (CASE WHEN WEEK = '$week' THEN PLAN_QTY ELSE NULL END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN WEEK = '$week' THEN RES_QTY ELSE NULL END), 0) + ISNULL(SUM (CASE WHEN WEEK = '$week' THEN INV_QTY ELSE NULL END), 0)
+                               THEN ISNULL(SUM (CASE WHEN WEEK = '$week' THEN PLAN_QTY ELSE NULL END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN WEEK = '$week' THEN RES_QTY ELSE NULL END), 0) + ISNULL(SUM (CASE WHEN WEEK = '$week' THEN INV_QTY ELSE NULL END), 0)
+                           END $bucketMap.CD 
+                        #end
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                         , SUM (CASE WHEN WEEK = '$week' THEN RES_QTY ELSE NULL END) AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                         , SUM (CASE WHEN WEEK = '$week' THEN INV_QTY ELSE NULL END) AS $bucketMap.CD 
+                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                        , SUM (CASE WHEN WEEK = '$week' THEN MIN_QTY ELSE NULL END) AS ${bucketMap.ROOT_CD}_MIN
+                          
+                         , SUM (CASE WHEN WEEK = '$week' THEN MAX_QTY ELSE NULL END) AS ${bucketMap.ROOT_CD}_MAX
+                           
+                    #end
+                #end
+            #elseif ($_parameter.rdoAqType == "AMT")
+                #if($bucketMap.ROOT_CD.indexOf("WM") > -1)
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                        #if ($_parameter.invCd == "N")
+                        , SUM (CASE WHEN YEARMONTH = '$week' THEN PLAN_AMT END) AS $bucketMap.CD
+                        #elseif ($_parameter.invCd == "Y")
+                        , CASE WHEN ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN PLAN_AMT END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN RES_AMT END), 0) + ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN INV_AMT END), 0)
+                               THEN ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN PLAN_AMT END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN RES_AMT END), 0) + ISNULL(SUM (CASE WHEN YEARMONTH = '$week' THEN INV_AMT END), 0)
+                           END $bucketMap.CD
+                        #end
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                         , SUM (CASE WHEN YEARMONTH = '$week' THEN RES_AMT END) AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                         , SUM (CASE WHEN YEARMONTH = '$week' THEN INV_AMT END) AS $bucketMap.CD 
+                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                         , SUM (CASE WHEN YEARMONTH = '$week' THEN MIN_AMT ELSE NULL END) AS ${bucketMap.ROOT_CD}_MIN
+                          
+                         , SUM (CASE WHEN YEARMONTH = '$week' THEN MAX_AMT ELSE NULL END) AS ${bucketMap.ROOT_CD}_MAX
+                         
+                    #end
+                #else
+                    #if($bucketMap.CD.indexOf("_PLAN") > -1)
+                        #if ($_parameter.invCd == "N")
+                        , SUM (CASE WHEN WEEK = '$week' THEN PLAN_AMT END) AS $bucketMap.CD
+                        #elseif ($_parameter.invCd == "Y")
+                        
+                        , CASE WHEN ISNULL(SUM (CASE WHEN WEEK = '$week' THEN PLAN_AMT END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN WEEK = '$week' THEN RES_AMT END), 0) + ISNULL(SUM (CASE WHEN WEEK = '$week' THEN INV_AMT END), 0)
+                               THEN ISNULL(SUM (CASE WHEN WEEK = '$week' THEN PLAN_AMT END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN WEEK = '$week' THEN RES_AMT END), 0) + ISNULL(SUM (CASE WHEN WEEK = '$week' THEN INV_AMT END), 0)
+                           END $bucketMap.CD
+                        #end
+                    #elseif($bucketMap.CD.indexOf("_RES") > -1)
+                         , SUM (CASE WHEN WEEK = '$week' THEN RES_AMT END) AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_INV") > -1)
+                         , SUM (CASE WHEN WEEK = '$week' THEN INV_AMT END) AS $bucketMap.CD 
+                    #elseif($bucketMap.CD.indexOf("_RATE") > -1)
+                         , SUM (CASE WHEN WEEK = '$week' THEN MIN_AMT ELSE NULL END) AS ${bucketMap.ROOT_CD}_MIN
+                          
+                         , SUM (CASE WHEN WEEK = '$week' THEN MAX_AMT ELSE NULL END) AS ${bucketMap.ROOT_CD}_MAX
+                    #end
+                #end
+            #end
+            #end
+            
+        FROM 
+        (
+            SELECT CT.COMPANY_CD
+                 , CT.BU_CD
+                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID
+                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD
+                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD_NM
+                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM
+                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM_NM
+                 , ISNULL (CT.SPEC, ' ')              AS SPEC
+                 , ISNULL (CT.SPEC, ' ')              AS SPEC_NM
+                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO
+                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO_NM
+                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ')   AS SALES_PRICE_KRW
+                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ')   AS SALES_PRICE_KRW_NM
+                 , PL.YEARWEEK                        AS WEEK
+                 , PL.YEARMONTH                       AS YEARMONTH
+                 #if ($_parameter.invCd == "N")
+                 , CASE 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END) <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.QTY ELSE 0 END) 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END) <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END)
+                   END AS MIN_QTY
+                 , CASE 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END) <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END) 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END) <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.QTY ELSE 0 END)
+                   END AS MAX_QTY
+                 , CASE 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END) <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.AMT ELSE 0 END) 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END) <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END)
+                   END AS MIN_AMT
+                 , CASE 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END) <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END) 
+                     WHEN SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END) <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.AMT ELSE 0 END)
+                   END AS MAX_AMT
+                 #elseif ($_parameter.invCd == "Y")
+                 , CASE WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                                  THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0)
+                                  ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                              END <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                        THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.QTY ELSE 0 END) 
+                        WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                                  THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0)
+                                  ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                              END <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                        THEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                                  THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0)
+                                  ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                              END
+                    END MIN_QTY
+                 , CASE 
+                     WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                              THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0)
+                              ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                          END <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                     THEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                          END 
+                     WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.QTY ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.QTY ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END), 0)
+                           END <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.QTY ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.QTY ELSE 0 END)
+                   END AS MAX_QTY
+                 , CASE 
+                     WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                          END <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.AMT ELSE 0 END) 
+                     WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                          END <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                          END
+                   END AS MIN_AMT
+                 , CASE 
+                     WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                          END <![CDATA[>=]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                          END 
+                     WHEN CASE WHEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0) <![CDATA[<]]> ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                               THEN ISNULL(SUM (CASE WHEN FLAG = 'PLAN' THEN PL.AMT ELSE 0 END), 0)
+                               ELSE ISNULL(SUM (CASE WHEN FLAG = 'INV' THEN PL.AMT ELSE 0 END), 0) + ISNULL(SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END), 0)
+                          END <![CDATA[<]]> SUM (CASE WHEN FLAG = 'RES' THEN PL.AMT ELSE 0 END)
+                     THEN SUM (CASE WHEN FLAG = 'RES'  THEN PL.AMT ELSE 0 END)
+                   END AS MAX_AMT  
+                 #end
+                 , SUM (CASE WHEN PL.FLAG = 'PLAN' THEN PL.QTY ELSE NULL END)  PLAN_QTY
+                 , SUM (CASE WHEN PL.FLAG = 'RES'  THEN PL.QTY ELSE NULL END)  RES_QTY
+                 , SUM (CASE WHEN PL.FLAG = 'PLAN' THEN PL.AMT ELSE NULL END)  PLAN_AMT
+                 , SUM (CASE WHEN PL.FLAG = 'RES'  THEN PL.AMT ELSE NULL END)  RES_AMT
+                 , SUM (CASE WHEN PL.FLAG = 'INV'  THEN PL.QTY ELSE NULL END)  INV_QTY
+                 , SUM (CASE WHEN PL.FLAG = 'INV'  THEN PL.AMT ELSE NULL END)  INV_AMT 
+            FROM W_CUST CT
+            LEFT OUTER JOIN W_PLAN_RES PL
+              ON CT.COMPANY_CD    = PL.COMPANY_CD 
+             AND CT.BU_CD         = PL.BU_CD
+             AND CT.ITEM_CD       = PL.ITEM_CD
+             AND CT.CUST_GROUP_CD = PL.CUST_GROUP_CD
+            WHERE CT.COMPANY_CD    = @{GV_COMPANY_CD}
+              AND CT.BU_CD         = @{GV_BU_CD}
+            #if($_parameter.item_cd and $_parameter.item_cd != "")
+              AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+            #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+              AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+            #end
+            #if($_parameter.itemGroup and $_parameter.itemGroup != "")
+              AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+            #end
+            #if($_parameter.route and $_parameter.route != "")
+              AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+            #end
+            #if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+              AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+            #end
+            #if($_parameter.custGroup and $_parameter.custGroup != "")
+              AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+            #end
+              GROUP BY CT.COMPANY_CD, CT.BU_CD, ISNULL (CT.REP_ITEM_GROUP_CD, ' '), ISNULL (CT.REP_ITEM_GROUP_NM, ' '), ISNULL (CT.ROUTING_ID, ' '), ISNULL (CT.REP_CUST_GROUP_CD, ' '), ISNULL (CT.REP_CUST_GROUP_NM, ' '), ISNULL (CT.CUST_GROUP_CD, ' ')    
+                  , ISNULL (CT.CUST_GROUP_NM, ' '), ISNULL (CT.ITEM_GROUP_CD, ' '), ISNULL (CT.ITEM_GROUP_NM, ' '), ISNULL (CT.ITEM_CD, ' '), ISNULL (CT.ITEM_NM, ' '), ISNULL (CT.SPEC, ' ')             
+                  , ISNULL (CT.DRAW_NO, ' '), ISNULL (CT.ITEM_TYPE, ' '), ISNULL (CT.ITEM_TYPE_NM, ' '), ISNULL (CT.SALES_ORG_LVL4_CD, ' '), ISNULL (CT.SALES_ORG_LVL4_NM, ' ')
+                  , ISNULL (CT.SALES_ORG_LVL5_CD, ' '), ISNULL (CT.SALES_ORG_LVL5_NM, ' '), ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' '), PL.YEARWEEK, PL.YEARMONTH
+        ) A
+        GROUP BY A.COMPANY_CD, A.BU_CD, ISNULL (A.REP_ITEM_GROUP_CD, ' '), ISNULL (A.REP_ITEM_GROUP_NM, ' '), ISNULL (A.ROUTING_ID, ' '), ISNULL (A.REP_CUST_GROUP_CD, ' '), ISNULL (A.REP_CUST_GROUP_NM, ' '), ISNULL (A.CUST_GROUP_CD, ' ')    
+                  , ISNULL (A.CUST_GROUP_NM, ' '), ISNULL (A.ITEM_GROUP_CD, ' '), ISNULL (A.ITEM_GROUP_NM, ' '), ISNULL (A.ITEM_CD, ' '), ISNULL (A.ITEM_NM, ' '), ISNULL (A.SPEC, ' ')             
+                  , ISNULL (A.DRAW_NO, ' '), ISNULL (A.ITEM_TYPE_CD, ' '), ISNULL (A.ITEM_TYPE_NM, ' '), ISNULL (A.SALES_ORG_LVL4_CD, ' '), ISNULL (A.SALES_ORG_LVL4_NM, ' ')
+                  , ISNULL (A.SALES_ORG_LVL5_CD, ' '), ISNULL (A.SALES_ORG_LVL5_NM, ' '), ISNULL (CAST (A.SALES_PRICE_KRW AS NVARCHAR(20)), ' '), A.WEEK, A.YEARMONTH
+        
+        ) T
+        GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+        ORDER BY TMP_COL
+        #foreach( $dimMap in $_parameter.dimList )
+         , T.$dimMap.DIM_CD
+        #end
+    </select>
+</mapper>

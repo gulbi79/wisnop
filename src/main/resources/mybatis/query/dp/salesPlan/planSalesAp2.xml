@@ -1,0 +1,1797 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dp.planSalesAp2">
+    <select id="salesPlanListAp2Select" parameterType="map" resultType="map">
+        /****** [ dp.planSalesAp2.salesPlanListAp2Select ] ******/
+        BEGIN
+        <include refid="include.macros"/>
+        #getProductTree()
+        #getCustomerTree()
+    
+        #foreach( $dimMap in $_parameter.dimList )
+            #if     ( $dimMap.DIM_CD == "SS_QTY") #set($dim_SS_QTY = "Y")
+            #elseif ( $dimMap.DIM_CD == "INV_QTY") #set($dim_INV_QTY = "Y")
+            #elseif ( $dimMap.DIM_CD == "WIP_MFG_QTY") #set($dim_WIP_MFG_QTY = "Y")
+            #elseif ( $dimMap.DIM_CD == "TOTAL_OPEN_SO") #set($dim_TOTAL_OPEN_SO = "Y")
+            #elseif ( $dimMap.DIM_CD == "SO_QTY") #set($dim_SO_QTY = "Y")
+            #elseif ( $dimMap.DIM_CD == "DIM_PROD_PLAN_QTY") #set($dim_DIM_PROD_PLAN_QTY = "Y")
+            #elseif ( $dimMap.DIM_CD == "DIM_PROD_PLAN_QTY_REMAINS") #set($dim_DIM_PROD_PLAN_QTY_REMAINS = "Y")
+            #elseif ( $dimMap.DIM_CD == "DIM_CPFR_QTY" or $dimMap.DIM_CD == "DIM_CFM_DMD1_SP" or $dimMap.DIM_CD == "DIM_CFM_DMD2_SP" or $dimMap.DIM_CD == "DIM_CFM_DMD3_SP") #set($dim_DIM_CPFR_QTY = "Y")
+            #elseif ( $dimMap.DIM_CD == "DIM_CPFR_REMAIN_QTY") #set($dim_DIM_CPFR_REMAIN_QTY = "Y")
+            #elseif ( $dimMap.DIM_CD == "MAJOR_ROUTING_YN") #set($dim_MAJOR_ROUTING_YN = "Y")
+            #elseif ( $dimMap.DIM_CD == "PROD_ORDER_QTY3") #set($dim_PROD_ORDER_QTY3 = "Y")
+            
+            #elseif ( $dimMap.DIM_CD == "CFM_SHPMT_QTY_M")              #set($dim_CFM_SHPMT_QTY_M              = "Y")
+            #elseif ( $dimMap.DIM_CD == "SHPMT_PERFRMNCE_QTY")          #set($dim_SHPMT_PERFRMNCE_QTY          = "Y") 
+            #elseif ( $dimMap.DIM_CD == "ADDITIONAL_INPUT_AVAIL_QTY_M") #set($dim_ADDITIONAL_INPUT_AVAIL_QTY_M = "Y")
+            #elseif ( $dimMap.DIM_CD == "OVER_SHORT_M")                 #set($dim_OVER_SHORT_M                 = "Y")
+            #elseif ( $dimMap.DIM_CD == "PROD_NO_REFLECTION")           #set($dim_PROD_NO_REFLECTION           = "Y")
+            
+            #end
+        #end
+
+        #if ($_parameter.dataAddSales == "INV_WIP" or $_parameter.soDataCheck == "OPEN_SO_INV_WIP")
+          #set($dim_INV_QTY     = "Y")
+          #set($dim_WIP_MFG_QTY = "Y")
+        #end
+
+        #if ($_parameter.soDataCheck == "OPEN_SO_SP" or $_parameter.soDataCheck == "OPEN_SO_SP2" or $_parameter.soDataCheck == "OPEN_SO_INV_WIP")
+            #set($dim_OPEN_SO_SP = "Y")
+        #end
+        
+        DECLARE @P_CURRENT_DAY DATE;
+        DECLARE @P_START_DATE NVARCHAR(8);
+        DECLARE @P_END_DATE NVARCHAR(8);
+        DECLARE @P_START_W1_DATE NVARCHAR(8);
+        DECLARE @P_END_W1_DATE NVARCHAR(8);
+        DECLARE @V_MP_PLAN_ID NVARCHAR(8);
+        
+        DECLARE @YYYYMMDD_START NVARCHAR(8);
+        DECLARE @YYYYMMDD_END NVARCHAR(8);
+        DECLARE @PLAN_ID_M_RECENT_CFM_SHPMT NVARCHAR(8);
+        DECLARE @YYYYWWP_START NVARCHAR(8);
+        DECLARE @YYYYWWP_END   NVARCHAR(8);
+        
+        DECLARE @PLAN_ID_WEEK NVARCHAR(6);
+        DECLARE @PLAN_ID_YYYYMMDD NVARCHAR(8);
+        DECLARE @PLAN_ID_NEXT_WEEK NVARCHAR(8);
+                
+                
+                
+        SELECT TOP 1 @V_MP_PLAN_ID = MPV.PLAN_ID
+        FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+        WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+          AND MPV.BU_CD = @{GV_BU_CD}
+          AND MPV.PLAN_TYPE_CD = 'MP'
+        ORDER BY MPV.START_WEEK DESC
+        ;
+        
+        SELECT @P_CURRENT_DAY = DBO.UFN_GETDATE();
+        
+        SELECT @P_START_DATE = CONVERT(NVARCHAR, DATEADD(DAY, (SELECT CAST(ATTB_1_CD AS INT) FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'CFM_PERIOD' AND CODE_CD = 'PROD'), MIN(YYYYMMDD)), 112)
+             , @P_END_DATE = CONVERT(NVARCHAR, DATEADD(DAY, (SELECT CAST(ATTB_2_CD AS INT) FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'CFM_PERIOD' AND CODE_CD = 'PROD'), MIN(YYYYMMDD)), 112)
+        FROM TB_MST_CALENDAR WITH(NOLOCK)
+        WHERE YEARWEEK = @{planStartWeek}
+        ;
+        
+        SELECT @P_START_W1_DATE = CONVERT(NVARCHAR, DATEADD(DAY, (SELECT CAST(ATTB_1_CD AS INT) FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'CFM_PERIOD' AND CODE_CD = 'PROD'), MIN(YYYYMMDD)), 112)
+             , @P_END_W1_DATE = CONVERT(NVARCHAR, DATEADD(DAY, (SELECT CAST(ATTB_2_CD AS INT) FROM TB_MST_CODE WITH(NOLOCK) WHERE BU_CD = @{GV_BU_CD} AND GROUP_CD = 'CFM_PERIOD' AND CODE_CD = 'PROD'), MIN(YYYYMMDD)), 112)
+        FROM TB_MST_CALENDAR WITH(NOLOCK)
+        WHERE YEARWEEK = @{dimWeek}
+        ;
+    
+       
+        WITH CUR_PLAN_M AS 
+        (
+            SELECT PLAN_ID
+                 , START_WEEK
+                 , END_WEEK
+                 , START_MONTH
+            FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+            WHERE COMPANY_CD   = @{GV_COMPANY_CD}
+              AND BU_CD        = @{GV_BU_CD}
+              AND PLAN_TYPE_CD = 'DP_M'
+              AND CUT_OFF_FLAG = 'Y'
+        )
+    
+        SELECT TOP 1  
+              @YYYYMMDD_START = (
+                                    
+                                    SELECT YYYYMMDD 
+                                    FROM TB_MST_CALENDAR 
+                                    WHERE YEARMONTH = LEFT(@{planIdMonth},6) AND DAY = 1
+             ) 
+             ,@YYYYMMDD_END  =(
+                                    
+                                    SELECT MAX(YYYYMMDD) 
+                                    FROM TB_MST_CALENDAR 
+                                    WHERE YEARMONTH = LEFT(@{planIdMonth},6) 
+             
+             )
+             ,@PLAN_ID_M_RECENT_CFM_SHPMT = PLAN_ID
+        FROM CUR_PLAN_M A1 
+        ORDER BY PLAN_ID DESC
+
+
+        
+        SELECT @YYYYWWP_START = MIN(YEARPWEEK) 
+        , @YYYYWWP_END = MAX(YEARPWEEK)      
+        FROM TB_MST_CALENDAR
+        WHERE YEARMONTH =  LEFT(@{planIdMonth},6)      ;
+
+            
+               
+        WITH
+            CUR_PLAN_W
+            AS
+            (
+                SELECT PLAN_ID
+                             , START_WEEK
+                             , END_WEEK
+                             , RELEASE_FLAG
+                             
+                FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+                WHERE COMPANY_CD           = @{GV_COMPANY_CD}
+                          AND BU_CD        = @{GV_BU_CD}
+                          AND PLAN_TYPE_CD = 'DP_W'
+                     
+            )
+        
+        SELECT TOP 1 @PLAN_ID_WEEK =  START_WEEK
+        FROM CUR_PLAN_W A1
+        WHERE A1.PLAN_ID = @{planIdPast}
+        ORDER BY PLAN_ID DESC
+        
+        SELECT @PLAN_ID_YYYYMMDD  = MIN(YYYYMMDD)
+        FROM TB_MST_CALENDAR
+        WHERE YEARWEEK = @PLAN_ID_WEEK
+        
+        
+        SELECT @PLAN_ID_NEXT_WEEK = YEARPWEEK
+        FROM TB_MST_CALENDAR
+        WHERE YYYYMMDD = DATEADD(WK,1,@PLAN_ID_YYYYMMDD);
+               
+        
+       
+    
+        WITH W_PROD AS 
+        (
+            SELECT MATERIAL_CD AS PROD_LVL2_CD
+            FROM UV_HIER_ITEM
+            WHERE LEVEL = 'L2'
+        ),
+        W_PWEEK AS 
+        (
+            SELECT YEARWEEK
+                 , YEARPWEEK
+                 , DENSE_RANK() OVER(ORDER BY YEARWEEK ASC) AS RNUM
+            FROM TB_MST_CALENDAR WITH(NOLOCK)
+            WHERE YYYYMMDD BETWEEN @{planStartDay} AND @{toCal}
+            GROUP BY YEARWEEK, YEARPWEEK
+        ),
+        W_CODE_OPEN AS 
+        (
+            #set($_parameter.groupCd="DMD_FROZEN_PERIOD")
+            <include refid="include.mstCode"/>
+        ),
+        W_FROZEN AS 
+        (
+            SELECT PD.PROD_LVL2_CD
+                 , CASE WHEN ISNUMERIC(CD.ATTB_1_CD) = 1 THEN CD.ATTB_1_CD ELSE 1 END AS FROZEN_WEEK
+            FROM W_PROD PD
+            LEFT OUTER JOIN W_CODE_OPEN CD
+              ON PD.PROD_LVL2_CD = CD.CODE_CD
+        ),
+        W_OPEN_LIST AS
+        (
+            SELECT A1.PROD_LVL2_CD
+                 , A2.YEARWEEK
+                 , A2.YEARPWEEK
+            FROM W_FROZEN A1
+            CROSS JOIN W_PWEEK A2
+            WHERE A2.RNUM <![CDATA[>]]> A1.FROZEN_WEEK
+        ),
+        W_CUST_LVL2_CD_OPEN AS
+        (
+            SELECT A1.REP_CUST_GROUP_CD AS CUST_LVL2_CD_OPEN
+                 , A2.ATTB_1_CD AS DMD1_SP
+                 , A2.ATTB_2_CD AS DMD2_SP
+                 , A2.ATTB_3_CD AS DMD3_SP
+                 , CONVERT(NVARCHAR(40), CASE WHEN A2.ATTB_1_CD = 'Y' OR A2.ATTB_2_CD = 'Y' OR A2.ATTB_3_CD = 'Y' THEN 'Y' ELSE 'N' END) ADJ_REASON
+            FROM TB_MST_REP_CUST_GROUP A1 WITH(NOLOCK)
+            INNER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+               ON A1.BU_CD = A2.BU_CD
+              AND A2.GROUP_CD = 'CUST_CATE'
+              AND A1.CUST_CATE = A2.CODE_CD
+            WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+              AND A1.BU_CD = @{GV_BU_CD}
+              AND A1.USE_FLAG = 'Y'
+              AND A2.USE_FLAG = 'Y'
+        ),
+        W_OPEN_LIST_CONFIRM AS
+        (
+            SELECT *
+            FROM W_OPEN_LIST B1
+            CROSS JOIN W_CUST_LVL2_CD_OPEN B2
+        ), 
+        W_OPEN_CONFIRM AS
+        (
+            #if($_parameter.authorityFlag == "Y")
+                SELECT *
+                FROM 
+                (
+                    SELECT PROD_LVL2_CD
+                         , CUST_LVL2_CD_OPEN
+                         , CASE WHEN DEMAND_TYPE COLLATE DATABASE_DEFAULT = 'ADJ_REASON' THEN 'PW' + YEARPWEEK + '_' + DEMAND_TYPE COLLATE DATABASE_DEFAULT + '_YN' 
+                                ELSE 'PW' + YEARPWEEK + '_' + 'AP2' + '_' + DEMAND_TYPE COLLATE DATABASE_DEFAULT + '_YN'
+                            END YEARPWEEK_DEMAND_TYPE
+                         , EDIT_YN
+                    FROM 
+                    (
+                        SELECT PROD_LVL2_CD, CUST_LVL2_CD_OPEN, YEARPWEEK, DMD1_SP, DMD2_SP, DMD3_SP, ADJ_REASON FROM W_OPEN_LIST_CONFIRM) A
+                        UNPIVOT 
+                        (
+                            EDIT_YN FOR DEMAND_TYPE IN (DMD1_SP, DMD2_SP, DMD3_SP, ADJ_REASON)
+                        ) AS UPVT
+                ) A
+                PIVOT 
+                (
+                    MAX(EDIT_YN) FOR YEARPWEEK_DEMAND_TYPE IN 
+                    (
+                        #set($strCnt = "")
+                        #foreach($hiddenMap in $_parameter.hiddenList)
+                            #if($hiddenMap.CD.indexOf("PW") != -1 and $hiddenMap.CD.indexOf("PW_REMARK_YN") == -1)
+                                #if($strCnt == "1")
+                                    ,
+                                #end
+                                [$hiddenMap.CD]
+                                #set($strCnt = "1")
+                            #end
+                        #end 
+                    )
+                ) PVT
+            #else
+                SELECT '' AS PROD_LVL2_CD
+                     , '' AS CUST_LVL2_CD_OPEN
+            #end
+        ),
+        W_CODE AS 
+        (
+            #set($_parameter.groupCd="DP_AUTH_CTRL,SO_TYPE")
+            <include refid="include.mstCode"/>
+        ), 
+        W_SALES_WEEK AS
+        (
+            SELECT SUM(
+                      CASE WHEN A1.YYYYMMDD <![CDATA[>=]]> CONVERT(NVARCHAR, DATEADD(D, 1, EOMONTH(DATEADD(M, -2, @P_CURRENT_DAY))), 112)
+                               AND A1.YYYYMMDD <![CDATA[<=]]>  CONVERT(NVARCHAR, EOMONTH(DATEADD(M, -1, @P_CURRENT_DAY)), 112)
+                          THEN 1 ELSE 0 
+                      END
+                    ) AS M1_DAYS
+                 , SUM(
+                      CASE WHEN A1.YYYYMMDD <![CDATA[>=]]> CONVERT(NVARCHAR, DATEADD(D, 1, EOMONTH(DATEADD(M, -4, @P_CURRENT_DAY))), 112)
+                                AND A1.YYYYMMDD <![CDATA[<=]]>  CONVERT(NVARCHAR, EOMONTH(DATEADD(M, -1, @P_CURRENT_DAY)), 112)
+                           THEN 1 ELSE 0 
+                       END
+                    ) AS M3_DAYS            
+                 , SUM(
+                      CASE WHEN A1.YYYYMMDD <![CDATA[>=]]> CONVERT(NVARCHAR, DATEADD(D, 1, EOMONTH(DATEADD(M, -13, @P_CURRENT_DAY))), 112)
+                                AND A1.YYYYMMDD <![CDATA[<=]]>  CONVERT(NVARCHAR, EOMONTH(DATEADD(M, -1, @P_CURRENT_DAY)), 112)
+                           THEN 1 ELSE 0 
+                       END
+                    ) AS M12_DAYS
+            FROM TB_MST_CALENDAR A1
+            WHERE A1.YYYYMMDD <![CDATA[>=]]> CONVERT(NVARCHAR, DATEADD(D, 1, EOMONTH(DATEADD(M, -13, @P_CURRENT_DAY))), 112) 
+              AND A1.YYYYMMDD <![CDATA[<=]]> CONVERT(NVARCHAR, EOMONTH(DATEADD(M, -1, @P_CURRENT_DAY)), 112) 
+        ),
+        W_ITEM_CUST_GROUP AS 
+        (
+            SELECT CG.COMPANY_CD
+                 , CG.BU_CD
+                 , CG.CUST_GROUP_CD
+                 , IT.ITEM_CD
+                 , ISNULL(IT.PROD_LVL3_CD, ' ') AS PROD_LVL3_CD
+                 , ISNULL(IT.PROD_LVL3_NM, ' ') AS PROD_LVL3_NM
+                 , ISNULL(CM.CUST_LVL2_CD, ' ') AS CUST_LVL2_CD
+                 , ISNULL(CM.CUST_LVL2_NM, ' ') AS CUST_LVL2_NM 
+                 , ISNULL(CM.CUST_NM     , ' ') AS CUST_GROUP_NM
+                 , ISNULL(IT.ITEM_NM     , ' ') AS ITEM_NM
+                 , ISNULL(IT.SPEC        , ' ') AS SPEC
+                 , ISNULL(IT.DRAW_NO     , ' ') AS DRAW_NO
+                 
+                 /* 210122 이큰산K : 제조LT 추가 */
+                 , ISNULL(MIP.MFG_LT, 0) AS MFG_LT
+                 ----------------------------------
+                 
+                 , ISNULL(CG.MAT_ISSUE_FLAG, ' ') AS MAT_ISSUE_FLAG
+                 , ISNULL(CG.MAT_ISSUE_FLAG, ' ') AS MAT_ISSUE_FLAG_NM
+                 , CG.REMARK
+                 , CG.SALES_QTY_M1
+                 , CG.SALES_QTY_M3
+                 , CG.SALES_QTY_M12
+                 , ROUND(CG.SALES_QTY_M1 / NULLIF((SELECT M1_DAYS FROM W_SALES_WEEK), 0) * 7, 0) AS SALES_QTY_M1_WEEK
+                 , ROUND(CG.SALES_QTY_M3 / NULLIF((SELECT M3_DAYS FROM W_SALES_WEEK), 0) * 7, 0) AS SALES_QTY_M3_WEEK
+                 , ROUND(CG.SALES_QTY_M12 / NULLIF((SELECT M12_DAYS FROM W_SALES_WEEK), 0) * 7, 0) AS SALES_QTY_M12_WEEK
+                 , IT.PROD_LVL2_CD
+                 , CM.CUST_LVL2_CD AS CUST_LVL2_CD_HIDDEN
+                #if($_parameter.pastFlag == "Y")
+                 , 'Y' AS CONFIRM_YN
+                #else
+                 , CONFIRM_YN_AP2 AS CONFIRM_YN
+                #end
+                 , CG.SALES_PRICE_KRW AS SALES_PRICE_KRW_HIDDEN
+                 , IP.ROUTING_ID
+                 , CASE WHEN MC1.CODE_CD IS NULL THEN 'N' ELSE 'Y' END AS CLEANING_YN
+                 , CG.MAX_MAT_PUR_LT
+                 #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y")
+                 , DSR.QTY AS SHPMT_PERFRMNCE_QTY       -- 출하 실적 수량
+                 #end
+                 #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y")
+                 , CSQM.CFM_SHPMT_QTY_M 
+                 #end
+                 #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y")
+                 , AP2SP.AP2_SP
+                 #end
+                 
+                 
+            FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+            INNER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+              ON CG.COMPANY_CD = IT.COMPANY_CD
+             AND CG.BU_CD      = IT.BU_CD
+             AND CG.ITEM_CD    = IT.ITEM_CD
+             AND IT.VALID_FLAG = 'Y'
+             AND IT.USE_FLAG   = 'Y'
+            
+            /* 210122 이큰산K : 제조LT 추가 */
+            INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK) ON CG.COMPANY_CD = MIP.COMPANY_CD AND CG.BU_CD = MIP.BU_CD AND CG.ITEM_CD = MIP.ITEM_CD AND MIP.VALID_FLAG = 'Y' AND MIP.PLANT_CD = 'WF01'
+            ---------------------------------
+            
+            #set($treeAlias = "IT")
+            <include refid="include.productTree"/>
+            LEFT OUTER JOIN 
+            (
+                SELECT COMPANY_CD 
+                     , BU_CD 
+                     , ITEM_CD 
+                     , MAX (ROUTING_ID)  AS ROUTING_ID 
+                     , MAX (PUR_LT)      AS PUR_LT
+                     , MAX (MFG_LT)      AS MFG_LT
+                     , SUM (SS_QTY)      AS SS_QTY
+                     , MAX (PROCUR_TYPE) AS PROCUR_TYPE
+                     , MAX(RCPT_SL_CD) AS RCPT_SL_CD
+                FROM TB_MST_ITEM_PLANT WITH(NOLOCK) 
+                WHERE PLANT_CD = 'WF01'
+                GROUP BY COMPANY_CD, BU_CD, ITEM_CD
+            ) IP
+            ON CG.COMPANY_CD     = IP.COMPANY_CD
+            AND CG.BU_CD         = IP.BU_CD
+            AND CG.ITEM_CD       = IP.ITEM_CD  
+            INNER JOIN TB_MST_CUSTOMER CM WITH(NOLOCK)
+              ON CG.COMPANY_CD    = CM.COMPANY_CD
+             AND CG.BU_CD         = CM.BU_CD
+             AND CG.CUST_GROUP_CD = CM.CUST_CD
+             AND CM.VALID_FLAG    = 'Y'
+            LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+              ON MC1.BU_CD = IP.BU_CD
+             AND MC1.GROUP_CD = 'CL_SL_CD'
+             AND MC1.CODE_CD = IP.RCPT_SL_CD
+             AND MC1.USE_FLAG = 'Y'
+            /*2021-06-24 공석도B 요청(디멘전추가):출하 확정수량 (월간), 출하 실적수량, 추가 입력가능수량 (월간), 과부족 (월간)  */
+            #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y")
+            LEFT OUTER JOIN (
+                                
+        
+                            SELECT A.COMPANY_CD
+                            , A.BU_CD
+                            , A.ITEM_CD
+                            , B.CUST_GROUP_CD
+                            , SUM(A.QTY) AS QTY
+                            , SUM(A.AMT_KRW) AS AMT
+                            FROM TB_DYN_SALES_RESULT A WITH (NOLOCK)
+                                INNER JOIN TB_MST_CUSTOMER B WITH (NOLOCK) 
+                                ON B.COMPANY_CD = A.COMPANY_CD
+                                AND B.BU_CD = A.BU_CD
+                                AND B.CUST_CD = A.CUST_CD
+                            WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+                                AND A.BU_CD = @{GV_BU_CD}
+                                AND A.DEL_FLAG = 'N'
+                                AND A.SALES_DATE BETWEEN @YYYYMMDD_START AND @YYYYMMDD_END
+                            GROUP BY A.COMPANY_CD
+                                            ,A.BU_CD
+                                            ,A.ITEM_CD
+                                            ,B.CUST_GROUP_CD
+        
+        
+            ) DSR ON DSR.COMPANY_CD = CG.COMPANY_CD
+                AND DSR.BU_CD = CG.BU_CD
+                AND DSR.ITEM_CD = CG.ITEM_CD
+                AND DSR.CUST_GROUP_CD = CG.CUST_GROUP_CD
+                AND DSR.QTY IS NOT NULL
+            #end
+            /*2021-06-24 공석도B 요청(디멘전추가):출하 확정수량 (월간), 출하 실적수량, 추가 입력가능수량 (월간), 과부족 (월간)  */
+            #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y")
+		            
+		            
+		            
+                    LEFT OUTER JOIN(
+                        
+                                    -- 확정 출하 계획
+                                    SELECT PLAN_ID
+                                    , COMPANY_CD
+                                    ,BU_CD
+                                    ,ITEM_CD
+                                    ,CUST_GROUP_CD
+                                    , SUM(ISNULL(A.QTY,0)) AS 'CFM_SHPMT_QTY_M'
+                                    FROM TB_HIS_ACTION_PLAN A WITH(NOLOCK)
+                                    WHERE PLAN_ID = @PLAN_ID_M_RECENT_CFM_SHPMT
+                                    AND MEAS_CD = 'CFM_SP'
+                                    AND YEARPWEEK BETWEEN @YYYYWWP_START AND @YYYYWWP_END
+                                    
+                                    GROUP BY A.PLAN_ID
+                                    ,A.COMPANY_CD
+                                    ,A.BU_CD
+                                    ,A.ITEM_CD
+                                    ,A.CUST_GROUP_CD
+                    
+                    ) CSQM 
+                    ON CG.COMPANY_CD = CSQM.COMPANY_CD
+                    AND CG.BU_CD     = CSQM.BU_CD
+                    AND CG.ITEM_CD   = CSQM.ITEM_CD
+                    AND CG.CUST_GROUP_CD = CSQM.CUST_GROUP_CD
+		       
+		            
+		            
+            #end
+            /*2021-06-24 공석도B 요청(디멘전추가):출하 확정수량 (월간), 출하 실적수량, 추가 입력가능수량 (월간), 과부족 (월간)  */
+            #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y")
+            LEFT OUTER JOIN(
+            
+                SELECT 
+                #if($_parameter.pastFlag == "Y")
+	                
+	                SP.PLAN_ID
+	                , SP.COMPANY_CD
+	                , SP.BU_CD
+	                , SP.CUST_GROUP_CD
+	                , SP.ITEM_CD
+	                , SUM(ISNULL(SP.QTY,0)) AS 'AP2_SP'
+	            
+	            #elseif($_parameter.pastFlag == "N")
+	               
+	                SP.COMPANY_CD
+                    , SP.BU_CD
+                    , SP.CUST_GROUP_CD
+                    , SP.ITEM_CD
+                    , SUM(ISNULL(SP.QTY,0)) AS 'AP2_SP'
+                    
+	            #end
+	                
+                #if($_parameter.pastFlag == "Y")
+                
+                    FROM TB_HIS_SALES_PLAN SP WITH(NOLOCK)
+                
+                #elseif($_parameter.pastFlag == "N")
+                    
+                    FROM TB_DYN_SALES_PLAN SP WITH(NOLOCK)
+                
+                #end
+                
+                WHERE 1=1     
+                    AND SP.COMPANY_CD =  @{GV_COMPANY_CD}
+                    AND SP.BU_CD      =  @{GV_BU_CD}
+                    AND SP.MEAS_CD IN ('AP2_SP')
+                    AND SP.YEARPWEEK  BETWEEN @PLAN_ID_NEXT_WEEK AND @YYYYWWP_END
+                    #if($_parameter.pastFlag == "Y")
+                    AND SP.PLAN_ID =  @{planIdPast}
+                    #elseif($_parameter.pastFlag == "N")
+                    #end
+                GROUP BY 
+                #if($_parameter.pastFlag == "Y")
+	                
+	                SP.PLAN_ID
+	                , SP.COMPANY_CD
+	                , SP.BU_CD
+	                , SP.CUST_GROUP_CD
+	                , SP.ITEM_CD
+	            #elseif($_parameter.pastFlag == "N")
+	            
+	                 SP.COMPANY_CD
+                    , SP.BU_CD
+                    , SP.CUST_GROUP_CD
+                    , SP.ITEM_CD
+                #end
+            
+            
+            ) AP2SP
+            ON CG.COMPANY_CD     = AP2SP.COMPANY_CD
+            AND CG.BU_CD         = AP2SP.BU_CD
+            AND CG.ITEM_CD       = AP2SP.ITEM_CD
+            AND CG.CUST_GROUP_CD = AP2SP.CUST_GROUP_CD
+            
+                         
+            #end
+            
+            WHERE CG.COMPANY_CD    = @{GV_COMPANY_CD}
+              AND CG.BU_CD         = @{GV_BU_CD}
+            #if($_parameter.pastFlag != "Y")
+              AND CG.SALES_PLAN_YN = 'Y'
+            #end
+              AND CG.VALID_FLAG    = 'Y'
+            #if($_parameter.dataCheck == "SALES_PRICE")
+              AND (CG.SALES_PRICE_KRW IS NULL OR CG.SALES_PRICE_KRW = 0)
+            #end
+            #if($_parameter.customerList and $_parameter.customerList.size() > 0)
+              AND EXISTS (
+                             SELECT 1
+                             FROM TB_MST_CUSTOMER TT
+                             WHERE TT.COMPANY_CD    = CG.COMPANY_CD
+                               AND TT.BU_CD         = CG.BU_CD
+                               AND TT.CUST_GROUP_CD = CG.CUST_GROUP_CD
+                               AND TT.VALID_FLAG    = 'Y'
+                             #set($treeAlias = "TT")
+                             <include refid="include.customerTree"/>
+                         )
+            #end
+            #if($_parameter.item_cd and $_parameter.item_cd != "")
+              AND CG.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+            #elseif($_parameter.item_nm and $_parameter.item_nm != "")
+              AND (IT.ITEM_CD LIKE '%' + @{item_nm} + '%' OR IT.ITEM_NM LIKE '%' + @{item_nm} + '%')
+            #end
+            #if($_parameter.remark and $_parameter.remark != "")
+              AND CG.REMARK LIKE '%' + @{remark} + '%'
+            #end
+            #if($_parameter.drawNo and $_parameter.drawNo != "")
+              AND IT.DRAW_NO LIKE '%' + @{drawNo} + '%'
+            #end
+            #if($_parameter.excelFlag == "Y")
+              AND EXISTS (
+                        SELECT 1
+                        FROM TB_MAP_ITEM_CUST_GROUP_AP1 A1 WITH(NOLOCK)
+                        INNER JOIN TB_MAP_AP1_AP2 A2 WITH(NOLOCK)
+                           ON A1.COMPANY_CD  = A2.COMPANY_CD
+                          AND A1.AP1_USER_ID = A2.AP1_USER_ID
+                        #if($_parameter.goc_yn != "Y")
+                          AND (A2.AP2_USER_ID = @{GV_USER_ID} OR A2.AP1_USER_ID = @{GV_USER_ID})
+                        #end
+                        WHERE A1.COMPANY_CD    = CG.COMPANY_CD
+                          AND A1.BU_CD         = CG.BU_CD
+                          AND A1.ITEM_CD       = CG.ITEM_CD
+                          AND A1.CUST_GROUP_CD = CG.CUST_GROUP_CD
+                          AND A1.USE_FLAG      = 'Y'
+                     )
+            #end
+            
+            
+        ),
+        #if($_parameter.excelFlag != "Y")
+        W_MY_SELECT_ITEM AS
+        (
+            SELECT CG.COMPANY_CD
+                 , CG.BU_CD
+                 , CG.CUST_GROUP_CD
+                 , CG.ITEM_CD
+            FROM TB_MAP_ITEM_CUST_GROUP CG WITH(NOLOCK)
+            WHERE CG.COMPANY_CD = @{GV_COMPANY_CD}
+              AND CG.BU_CD      = @{GV_BU_CD}
+              AND EXISTS 
+            (
+                SELECT 1
+                FROM TB_MAP_ITEM_CUST_GROUP_AP1 A1 WITH(NOLOCK)
+                INNER JOIN TB_MAP_AP1_AP2 A2 WITH(NOLOCK)
+                   ON A1.COMPANY_CD  = A2.COMPANY_CD
+                  AND A1.AP1_USER_ID = A2.AP1_USER_ID
+                #if($_parameter.goc_yn != "Y")
+                  AND (A2.AP2_USER_ID = @{GV_USER_ID} OR A2.AP1_USER_ID = @{GV_USER_ID})
+                #end
+                WHERE A1.COMPANY_CD    = CG.COMPANY_CD
+                  AND A1.BU_CD         = CG.BU_CD
+                  AND A1.ITEM_CD       = CG.ITEM_CD
+                  AND A1.CUST_GROUP_CD = CG.CUST_GROUP_CD
+                  AND A1.USE_FLAG      = 'Y'
+            )
+        ),
+        #end
+        #if($dim_SS_QTY == "Y")
+            W_SS_QTY AS 
+            (
+                SELECT CG.COMPANY_CD
+                     , CG.BU_CD
+                     , CG.ITEM_CD
+                     , SUM(IP.SS_QTY) AS SS_QTY
+                FROM W_ITEM_CUST_GROUP CG
+                INNER JOIN TB_MST_ITEM_PLANT IP WITH(NOLOCK)
+                   ON CG.COMPANY_CD = IP.COMPANY_CD
+                  AND CG.BU_CD      = IP.BU_CD
+                  AND CG.ITEM_CD    = IP.ITEM_CD
+                  AND IP.PLANT_CD   = 'WF01'
+                  AND IP.VALID_FLAG = 'Y'
+                GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.ITEM_CD
+            ),
+        #end
+        #if($dim_INV_QTY == "Y")
+            W_INV_QTY AS 
+            (
+                SELECT CG.COMPANY_CD
+                     , CG.BU_CD
+                     , CG.ITEM_CD
+                     , SUM(IV.INV_QTY) AS INV_QTY
+                FROM W_ITEM_CUST_GROUP CG
+                INNER JOIN UV_DYN_INVENTORY IV WITH(NOLOCK)
+                   ON CG.COMPANY_CD = IV.COMPANY_CD
+                  AND CG.BU_CD      = IV.BU_CD
+                  AND CG.ITEM_CD    = IV.ITEM_CD
+                  AND IV.PLANT_CD   = 'WF01'
+                  AND IV.INV_DATE   = @{qtyDate}
+                GROUP BY CG.COMPANY_CD, CG.BU_CD, CG.ITEM_CD
+            ),
+        #end
+        #if($dim_WIP_MFG_QTY == "Y")
+            W_WIP_MFG_QTY AS 
+            (
+                SELECT DWR.COMPANY_CD
+                     , DWR.BU_CD
+                     , DPOH.ITEM_CD
+                     , SUM(DWR.REMAIN_QTY) AS WIP_MFG_QTY
+                FROM TB_DYN_WIP_ROUTING DWR WITH(NOLOCK)
+                INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+                   ON DPOH.COMPANY_CD = DWR.COMPANY_CD
+                  AND DPOH.BU_CD = DWR.BU_CD
+                  AND DPOH.PROD_ORDER_NO = DWR.PROD_ORDER_NO
+                WHERE DWR.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DWR.BU_CD = @{GV_BU_CD}
+                  AND DWR.WIP_DATE = @{qtyDate}
+                GROUP BY DWR.COMPANY_CD, DWR.BU_CD, DPOH.ITEM_CD
+            ),
+        #end
+        #if($dim_TOTAL_OPEN_SO == "Y")
+            W_OPEN_SO AS 
+            (
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.CUST_GROUP_CD
+                     , ISNULL(A1.TOTAL_OPEN_SO, 0) AS TOTAL_OPEN_SO
+                FROM
+                (
+                    SELECT SO.COMPANY_CD
+                         , SO.BU_CD
+                         , CM.CUST_GROUP_CD
+                         , SO.ITEM_CD
+                         , SUM(SO.SO_QTY - SO.GI_QTY) AS TOTAL_OPEN_SO
+                    FROM TB_MST_CUSTOMER CM WITH(NOLOCK)
+                    INNER JOIN TB_DYN_SALES_ORDER SO WITH(NOLOCK)
+                      ON CM.COMPANY_CD = SO.COMPANY_CD
+                     AND CM.BU_CD      = SO.BU_CD
+                     AND CM.CUST_CD    = SO.CUST_CD
+                     AND SO.CLOSE_YN   = 'N'
+                     AND SO.DEL_FLAG   = 'N'
+                     AND CM.VALID_FLAG = 'Y'
+                    INNER JOIN W_CODE CD
+                      ON SO.SO_TYPE   = CD.CODE_CD
+                     AND CD.GROUP_CD  = 'SO_TYPE'
+                     AND CD.ATTB_1_CD = 'Y'
+                    WHERE CM.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND CM.BU_CD = @{GV_BU_CD}
+                    GROUP BY SO.COMPANY_CD, SO.BU_CD, SO.ITEM_CD, CM.CUST_GROUP_CD
+                ) A1
+            ),
+        #end
+        #if($dim_SO_QTY == "Y")
+            W_OPEN_SO2 AS 
+            (
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.CUST_GROUP_CD
+                     , A1.ITEM_CD
+                     , ISNULL(A1.SO_QTY, 0) AS SO_QTY
+                FROM
+                (
+                    SELECT SO.COMPANY_CD
+                         , SO.BU_CD
+                         , CM.CUST_GROUP_CD
+                         , SO.ITEM_CD
+                         , SUM(SO.SO_QTY - SO.GI_QTY) AS SO_QTY
+                    FROM TB_MST_CUSTOMER CM WITH(NOLOCK)
+                    INNER JOIN TB_DYN_SALES_ORDER SO WITH(NOLOCK)
+                      ON CM.COMPANY_CD = SO.COMPANY_CD
+                     AND CM.BU_CD      = SO.BU_CD
+                     AND CM.CUST_CD    = SO.CUST_CD
+                     AND SO.CLOSE_YN   = 'N'
+                     AND SO.DEL_FLAG   = 'N'
+                     AND CM.VALID_FLAG = 'Y'
+                    INNER JOIN W_CODE CD
+                      ON SO.SO_TYPE   = CD.CODE_CD
+                     AND CD.GROUP_CD  = 'SO_TYPE'
+                     AND CD.ATTB_1_CD = 'Y'
+                    WHERE CM.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND CM.BU_CD = @{GV_BU_CD}
+                    GROUP BY SO.COMPANY_CD, SO.BU_CD, SO.ITEM_CD, CM.CUST_GROUP_CD
+                ) A1
+            ),
+        #end
+        #if($dim_DIM_PROD_PLAN_QTY == "Y")
+            W_DIM_PROD_PLAN_QTY AS 
+            (
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , SUM(A2.QTY) AS DIM_PROD_PLAN_QTY
+                FROM W_ITEM_CUST_GROUP A1
+                INNER JOIN 
+                (
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , QTY
+                    FROM TB_HIS_APS_PROD_PLAN_DAILY WITH(NOLOCK)
+                    WHERE PLAN_ID = (
+                                        SELECT TOP 1 PLAN_ID
+                                        FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+                                        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                          AND BU_CD = @{GV_BU_CD}
+                                          AND PLAN_TYPE_CD = 'FP'
+                                        #if($_parameter.pastFlag == "Y")
+                                          AND APS_START_DATE <![CDATA[<=]]> @{qtyDate}
+                                        #end 
+                                          AND RELEASE_FLAG = 'Y'
+                                        ORDER BY APS_START_DATE DESC
+                                     )
+                    #if($_parameter.pastFlag == "Y")
+                       AND YYYYMMDD BETWEEN @{startRemains} AND @{endRemains}
+                    #else
+                       AND YYYYMMDD BETWEEN @P_START_W1_DATE AND @P_END_W1_DATE
+                    #end
+                ) A2
+                ON A1.COMPANY_CD = A2.COMPANY_CD
+                AND A1.BU_CD = A2.BU_CD
+                AND A1.ITEM_CD = A2.ITEM_CD
+                GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+            ),
+        #end
+        #if($dim_OPEN_SO_SP == "Y")
+            W_OPEN_SO_HIDDEN AS 
+            (
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , A1.CUST_GROUP_CD
+                     , ISNULL(A1.SO_QTY, 0) AS SO_QTY
+                FROM
+                (
+                    SELECT SO.COMPANY_CD
+                         , SO.BU_CD
+                         , CM.CUST_GROUP_CD
+                         , SO.ITEM_CD
+                         , SUM(SO.SO_QTY - SO.GI_QTY) AS SO_QTY
+                    FROM TB_MST_CUSTOMER CM WITH(NOLOCK)
+                    INNER JOIN TB_DYN_SALES_ORDER SO WITH(NOLOCK)
+                      ON CM.COMPANY_CD = SO.COMPANY_CD
+                     AND CM.BU_CD      = SO.BU_CD
+                     AND CM.CUST_CD    = SO.CUST_CD
+                     AND SO.CLOSE_YN   = 'N'
+                     AND SO.DEL_FLAG   = 'N'
+                     AND CM.VALID_FLAG = 'Y'
+                    INNER JOIN W_CODE CD
+                      ON SO.SO_TYPE   = CD.CODE_CD
+                     AND CD.GROUP_CD  = 'SO_TYPE'
+                     AND CD.ATTB_1_CD = 'Y'
+                    WHERE CM.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND CM.BU_CD = @{GV_BU_CD}
+                    GROUP BY SO.COMPANY_CD, SO.BU_CD, SO.ITEM_CD, CM.CUST_GROUP_CD
+                ) A1
+            ),
+        #end
+        #if($dim_DIM_PROD_PLAN_QTY_REMAINS == "Y")
+            W_DIM_PROD_PLAN_QTY_REMAINS AS 
+            (
+                SELECT A1.COMPANY_CD
+                     , A1.BU_CD
+                     , A1.ITEM_CD
+                     , SUM(A2.QTY) AS DIM_PROD_PLAN_QTY_REMAINS
+                FROM W_ITEM_CUST_GROUP A1
+                INNER JOIN 
+                (
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , ITEM_CD
+                         , QTY
+                    FROM TB_HIS_APS_PROD_PLAN_DAILY WITH(NOLOCK)
+                    WHERE PLAN_ID = (
+                                        SELECT TOP 1 PLAN_ID
+                                        FROM TB_MST_PLAN_VERSION WITH(NOLOCK)
+                                        WHERE COMPANY_CD = @{GV_COMPANY_CD}
+                                          AND BU_CD = @{GV_BU_CD}
+                                          AND PLAN_TYPE_CD = 'FP'
+                                        #if($_parameter.pastFlag == "Y")
+                                          AND APS_START_DATE <![CDATA[<=]]> @{qtyDate}
+                                        #end 
+                                          AND RELEASE_FLAG = 'Y'
+                                        ORDER BY APS_START_DATE DESC
+                                     )
+                    #if($_parameter.pastFlag == "Y")
+                       AND YYYYMMDD BETWEEN @{startRemains} AND @{endRemains}
+                    #else
+                       AND YYYYMMDD BETWEEN @P_START_DATE AND @P_END_DATE
+                    #end
+                       AND YYYYMMDD <![CDATA[>=]]> @{qtyDate}
+                ) A2
+                ON A1.COMPANY_CD = A2.COMPANY_CD
+                AND A1.BU_CD = A2.BU_CD
+                AND A1.ITEM_CD = A2.ITEM_CD
+                GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
+            ),
+        #end
+        #if($dim_DIM_CPFR_QTY == "Y")
+            W_DIM_CPFR_QTY AS
+            (
+                SELECT COMPANY_CD
+                     , BU_CD
+                     , CUST_GROUP_CD
+                     , ITEM_CD
+                     , SUM(CASE WHEN MEAS_CD = 'CFM_DMD1_SP' THEN QTY END) AS DIM_CFM_DMD1_SP
+                     , SUM(CASE WHEN MEAS_CD = 'CFM_DMD2_SP' THEN QTY END) AS DIM_CFM_DMD2_SP
+                     , SUM(CASE WHEN MEAS_CD = 'CFM_DMD3_SP' THEN QTY END) AS DIM_CFM_DMD3_SP
+                     , SUM(CASE WHEN MEAS_CD = 'CFM_SP' THEN QTY END) AS DIM_CPFR_QTY
+                FROM TB_HIS_SALES_PLAN WITH(NOLOCK)
+                WHERE PLAN_ID = @{beforePlanId}
+                  AND COMPANY_CD = @{GV_COMPANY_CD}
+                  AND BU_CD = @{GV_BU_CD}
+                  AND MEAS_CD IN ('CFM_DMD1_SP', 'CFM_DMD2_SP', 'CFM_DMD3_SP', 'CFM_SP')
+                  AND YEARWEEK = @{planStartWeek}
+                GROUP BY COMPANY_CD, BU_CD, CUST_GROUP_CD, ITEM_CD
+            ),
+        #end
+        #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y"||$dim_DIM_CPFR_REMAIN_QTY == "Y")
+            W_DIM_CPFR_REMAIN_QTY AS
+            (
+                SELECT A.COMPANY_CD
+                     , A.BU_CD
+                     , A.CUST_GROUP_CD
+                     , A.ITEM_CD
+                     , CASE WHEN ISNULL(A.QTY, 0) - ISNULL(B.QTY, 0) <![CDATA[>]]> 0 THEN ISNULL(A.QTY, 0) - ISNULL(B.QTY, 0) ELSE 0 END QTY 
+                FROM
+                (
+                    SELECT COMPANY_CD
+                         , BU_CD
+                         , CUST_GROUP_CD
+                         , ITEM_CD
+                         , SUM(QTY) AS QTY
+                    FROM TB_HIS_SALES_PLAN WITH(NOLOCK)
+                    WHERE PLAN_ID = @{beforePlanId}
+                      AND COMPANY_CD = @{GV_COMPANY_CD}
+                      AND BU_CD = @{GV_BU_CD}
+                      AND MEAS_CD = 'CFM_SP'
+                      AND YEARWEEK = @{planStartWeek}
+                    GROUP BY COMPANY_CD, BU_CD, CUST_GROUP_CD, ITEM_CD
+                ) A
+                LEFT OUTER JOIN 
+                (
+                    SELECT DSR.COMPANY_CD
+                        , DSR.BU_CD
+                        , MC.CUST_GROUP_CD
+                        , DSR.ITEM_CD
+                        , SUM(QTY) AS QTY
+                    FROM TB_DYN_SALES_RESULT DSR WITH(NOLOCK)
+                    INNER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+                       ON MC.COMPANY_CD = DSR.COMPANY_CD
+                      AND MC.BU_CD = DSR.BU_CD
+                      AND MC.CUST_CD = DSR.CUST_CD
+                    INNER JOIN TB_MST_CALENDAR TMC WITH(NOLOCK)
+                       ON DSR.SALES_DATE = TMC.YYYYMMDD
+                    WHERE DSR.COMPANY_CD = @{GV_COMPANY_CD}
+                      AND DSR.BU_CD = @{GV_BU_CD}  
+                      AND DSR.DEL_FLAG = 'N'
+                      AND TMC.YEARWEEK = @{planStartWeek}
+                    GROUP BY DSR.COMPANY_CD, DSR.BU_CD, MC.CUST_GROUP_CD, DSR.ITEM_CD
+                ) B
+                ON A.COMPANY_CD = B.COMPANY_CD
+                AND A.BU_CD = B.BU_CD
+                AND A.CUST_GROUP_CD = B.CUST_GROUP_CD
+                AND A.ITEM_CD = B.ITEM_CD
+            ),
+        #end
+        /*2020-11-24 김지하k 요청, [release 대기수량 + start 대기수량 + open 오더수량] */
+        /* 기존 아래 TB DIM 조건 처러되어있었으나, open 오더수량을 계산하기 위해 조건처리 없앰 */
+            W_DIM_PROD_ORDER_QTY AS
+            (
+                SELECT DPOD.COMPANY_CD
+                     , DPOD.BU_CD
+                     , DPOD.ITEM_CD
+                     , SUM(DPOD.PROD_ORDER_QTY) AS PROD_ORDER_QTY
+                FROM TB_DYN_PROD_ORDER_HDR_DAILY DPOD WITH(NOLOCK)
+                WHERE DPOD.COMPANY_CD = @{GV_COMPANY_CD}
+                  AND DPOD.BU_CD = @{GV_BU_CD}
+                #if($_parameter.pastFlag == "Y")
+                  AND DPOD.YYYYMMDD = @{qtyDate}
+                #elseif($_parameter.pastFlag == "N")
+                  AND DPOD.YYYYMMDD = CONVERT(NVARCHAR, @P_CURRENT_DAY, 112)
+                #end
+                  AND DPOD.ORDER_STATUS = 'OP'
+                  AND DPOD.DEL_FLAG = 'N'
+                GROUP BY DPOD.COMPANY_CD, DPOD.BU_CD, DPOD.ITEM_CD
+            ),
+            
+            
+            
+        W_DIM AS 
+        (
+            SELECT CG.COMPANY_CD
+                 , CG.BU_CD
+                 , CG.PROD_LVL2_CD
+                 , CG.CUST_LVL2_CD_HIDDEN
+                 , CG.PROD_LVL3_CD
+                 , CG.PROD_LVL3_NM
+                 , CG.CUST_LVL2_CD
+                 , CG.CUST_LVL2_NM
+                 , CG.CUST_GROUP_CD
+                 , CG.CUST_GROUP_NM
+                 , CG.ITEM_CD
+                 , CG.ITEM_NM
+                 , CG.SPEC
+                 , CG.DRAW_NO
+                 
+                 /* 210122 이큰산K : 제조LT 추가 */
+                 , CG.MFG_LT
+                 ----------------------------------
+                 
+                 , CG.ROUTING_ID
+                 , ISNULL(CG.REMARK, '') AS REMARK
+                 , ISNULL(CG.CONFIRM_YN, 'N') AS CONFIRM_YN
+                 , ISNULL(CG.SALES_PRICE_KRW_HIDDEN, 0) AS SALES_PRICE_KRW_HIDDEN
+                 , ISNULL(CAST (CG.SALES_PRICE_KRW_HIDDEN AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+                 , CG.CLEANING_YN
+                 , CG.MAT_ISSUE_FLAG
+                 , CONVERT(VARCHAR, ISNULL(CG.MAX_MAT_PUR_LT, 0)) AS MAX_MAT_PUR_LT
+                 , CONVERT(VARCHAR, ISNULL(CG.SALES_QTY_M1, 0)) AS SALES_1M
+                 , CONVERT(VARCHAR, ISNULL(CG.SALES_QTY_M3, 0)) AS SALES_3M
+                 , CONVERT(VARCHAR, ISNULL(CG.SALES_QTY_M12, 0)) AS SALES_12M
+                 , CONVERT(VARCHAR, ISNULL(CG.SALES_QTY_M1_WEEK, 0)) AS SALES_1M_WEEK
+                 , CONVERT(VARCHAR, ISNULL(CG.SALES_QTY_M3_WEEK, 0)) AS SALES_3M_WEEK
+                 , CONVERT(VARCHAR, ISNULL(CG.SALES_QTY_M3_WEEK, 0)) AS SALES_3M_WEEK_HIDDEN
+                 , CONVERT(VARCHAR, ISNULL(CG.SALES_QTY_M12_WEEK, 0)) AS SALES_12M_WEEK
+                #if($dim_OPEN_SO_SP == "Y")             
+                 , CONVERT(VARCHAR, ISNULL(SOH.SO_QTY, 0)) AS SO_QTY_HIDDEN
+                #end
+                #if($dim_DIM_PROD_PLAN_QTY_REMAINS == "Y")
+                 , CONVERT(VARCHAR, ISNULL(DPPQR.DIM_PROD_PLAN_QTY_REMAINS, 0)) AS DIM_PROD_PLAN_QTY_REMAINS
+                #end
+                #if($dim_DIM_PROD_PLAN_QTY == "Y")
+                 , CONVERT(VARCHAR, ISNULL(PPQ.DIM_PROD_PLAN_QTY, 0)) AS DIM_PROD_PLAN_QTY 
+                #end             
+                #if($dim_SS_QTY == "Y")
+                 , CONVERT(VARCHAR, ISNULL(IP.SS_QTY, 0)) AS SS_QTY
+                #else
+                 , 0 AS SS_QTY
+                #end
+                #if($dim_INV_QTY == "Y")
+                 , CONVERT(VARCHAR, ISNULL(IV.INV_QTY, 0)) AS INV_QTY
+                #else
+                 , 0 AS INV_QTY
+                #end
+                
+                /*2020-11-24 김지하k 요청, [release 대기수량 + start 대기수량 + open 오더수량] */
+                /* [release 대기수량 + start 대기수량 + open 오더수량]계산하기 위해 ISNULL(POQ.PROD_ORDER_QTY, 0) 추가 */
+                #if($dim_WIP_MFG_QTY == "Y")
+                 , CONVERT(VARCHAR, ISNULL(WP.WIP_MFG_QTY, 0)+ISNULL(POQ.PROD_ORDER_QTY, 0)) AS WIP_MFG_QTY
+                #else
+                 , 0 AS WIP_MFG_QTY
+                #end
+                #if($dim_TOTAL_OPEN_SO == "Y")
+                 , CONVERT(VARCHAR, ISNULL(SO.TOTAL_OPEN_SO, 0)) AS TOTAL_OPEN_SO
+                #else
+                 , 0 AS TOTAL_OPEN_SO
+                #end
+                #if($dim_SO_QTY == "Y")
+                 , CONVERT(VARCHAR, ISNULL(SO2.SO_QTY, 0)) AS SO_QTY
+                #else
+                 , 0 AS SO_QTY
+                #end
+                #if($_parameter.dataAddSales == "INV_WIP" or $_parameter.soDataCheck == "OPEN_SO_INV_WIP")
+                 , (ISNULL(IV.INV_QTY, 0) + ISNULL(WP.WIP_MFG_QTY, 0)) AS INV_WIP_QTY
+                #else
+                 , 0 AS INV_WIP_QTY
+                #end
+                #if($dim_DIM_CPFR_QTY == "Y")
+                 , ISNULL(CONVERT(VARCHAR, DCQ.DIM_CFM_DMD1_SP), ' ') AS DIM_CFM_DMD1_SP
+                 , ISNULL(CONVERT(VARCHAR, DCQ.DIM_CFM_DMD2_SP), ' ') AS DIM_CFM_DMD2_SP
+                 , ISNULL(CONVERT(VARCHAR, DCQ.DIM_CFM_DMD3_SP), ' ') AS DIM_CFM_DMD3_SP
+                 , ISNULL(CONVERT(VARCHAR, DCQ.DIM_CPFR_QTY), ' ') AS DIM_CPFR_QTY
+                #end
+                #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y")
+                 , ISNULL(CONVERT(VARCHAR, DCRQ.QTY), ' ') AS DIM_CPFR_REMAIN_QTY
+                #end
+                #if($dim_MAJOR_ROUTING_YN == "Y")
+                 , ISNULL(HAV.MAJOR_ROUTING_YN, ' ') AS MAJOR_ROUTING_YN
+                #end
+                #if($dim_PROD_ORDER_QTY3 == "Y")
+                 , CONVERT(VARCHAR, ISNULL(POQ.PROD_ORDER_QTY, 0)) AS PROD_ORDER_QTY3
+                #else
+                 , 0 AS PROD_ORDER_QTY3
+                #end
+                #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y"||$dim_DIM_CPFR_REMAIN_QTY == "Y")
+                ,CONVERT(VARCHAR, ISNULL(CG.SHPMT_PERFRMNCE_QTY, 0)) AS SHPMT_PERFRMNCE_QTY
+                ,CONVERT(VARCHAR, ISNULL(CG.CFM_SHPMT_QTY_M, 0)) AS CFM_SHPMT_QTY_M
+                ,CONVERT(VARCHAR, ISNULL(CG.CFM_SHPMT_QTY_M, 0) - ISNULL(CG.SHPMT_PERFRMNCE_QTY, 0) - ISNULL(DCRQ.QTY,0)   ) AS ADDITIONAL_INPUT_AVAIL_QTY_M
+                ,CONVERT(INT, ISNULL(CG.CFM_SHPMT_QTY_M, 0) - ISNULL(CG.SHPMT_PERFRMNCE_QTY, 0) - ISNULL(DCRQ.QTY,0) - ISNULL(CG.AP2_SP,0) ) AS OVER_SHORT_M
+                ,CONVERT(INT, ISNULL(CG.AP2_SP, 0)) AS NEW_DEMAND_CUSTOM
+                #end
+                
+            FROM W_ITEM_CUST_GROUP CG
+            #if($dim_OPEN_SO_SP == "Y")
+            LEFT OUTER JOIN W_OPEN_SO_HIDDEN SOH
+              ON CG.COMPANY_CD    = SOH.COMPANY_CD
+             AND CG.BU_CD         = SOH.BU_CD
+             AND CG.ITEM_CD       = SOH.ITEM_CD
+             AND CG.CUST_GROUP_CD = SOH.CUST_GROUP_CD
+            #end
+            #if($dim_SS_QTY == "Y")
+            LEFT OUTER JOIN W_SS_QTY IP
+              ON CG.COMPANY_CD = IP.COMPANY_CD
+             AND CG.BU_CD      = IP.BU_CD
+             AND CG.ITEM_CD    = IP.ITEM_CD
+            #end
+            #if($dim_INV_QTY == "Y")
+            LEFT OUTER JOIN W_INV_QTY IV
+              ON CG.COMPANY_CD = IV.COMPANY_CD
+             AND CG.BU_CD      = IV.BU_CD
+             AND CG.ITEM_CD    = IV.ITEM_CD
+            #end
+            #if($dim_WIP_MFG_QTY == "Y")
+            LEFT OUTER JOIN W_WIP_MFG_QTY WP
+              ON CG.COMPANY_CD = WP.COMPANY_CD
+             AND CG.BU_CD      = WP.BU_CD
+             AND CG.ITEM_CD    = WP.ITEM_CD
+            #end
+            #if($dim_TOTAL_OPEN_SO == "Y")
+            LEFT OUTER JOIN W_OPEN_SO SO
+              ON CG.COMPANY_CD    = SO.COMPANY_CD
+             AND CG.BU_CD         = SO.BU_CD
+             AND CG.ITEM_CD       = SO.ITEM_CD
+             AND CG.CUST_GROUP_CD = SO.CUST_GROUP_CD
+            #end
+            #if($dim_SO_QTY == "Y")
+            LEFT OUTER JOIN W_OPEN_SO2 SO2
+              ON CG.COMPANY_CD    = SO2.COMPANY_CD
+             AND CG.BU_CD         = SO2.BU_CD
+             AND CG.ITEM_CD       = SO2.ITEM_CD
+             AND CG.CUST_GROUP_CD = SO2.CUST_GROUP_CD
+            #end
+            #if($dim_DIM_PROD_PLAN_QTY == "Y")
+            LEFT OUTER JOIN W_DIM_PROD_PLAN_QTY PPQ
+              ON CG.COMPANY_CD = PPQ.COMPANY_CD
+             AND CG.BU_CD      = PPQ.BU_CD
+             AND CG.ITEM_CD    = PPQ.ITEM_CD
+            #end
+            #if($dim_DIM_PROD_PLAN_QTY_REMAINS == "Y")
+            LEFT OUTER JOIN W_DIM_PROD_PLAN_QTY_REMAINS DPPQR
+              ON CG.COMPANY_CD = DPPQR.COMPANY_CD
+             AND CG.BU_CD      = DPPQR.BU_CD
+             AND CG.ITEM_CD    = DPPQR.ITEM_CD
+            #end
+            #if($dim_DIM_CPFR_QTY == "Y")
+            LEFT OUTER JOIN W_DIM_CPFR_QTY DCQ
+              ON CG.COMPANY_CD = DCQ.COMPANY_CD
+             AND CG.BU_CD      = DCQ.BU_CD
+             AND CG.CUST_GROUP_CD = DCQ.CUST_GROUP_CD
+             AND CG.ITEM_CD    = DCQ.ITEM_CD
+            #end
+            #if($dim_SHPMT_PERFRMNCE_QTY == "Y"||$dim_CFM_SHPMT_QTY_M == "Y"|| $dim_ADDITIONAL_INPUT_AVAIL_QTY_M == "Y"||$dim_OVER_SHORT_M == "Y"||$dim_DIM_CPFR_REMAIN_QTY == "Y")
+            LEFT OUTER JOIN W_DIM_CPFR_REMAIN_QTY DCRQ
+              ON CG.COMPANY_CD = DCRQ.COMPANY_CD
+             AND CG.BU_CD      = DCRQ.BU_CD
+             AND CG.CUST_GROUP_CD = DCRQ.CUST_GROUP_CD
+             AND CG.ITEM_CD    = DCRQ.ITEM_CD
+            #end
+            #if($dim_MAJOR_ROUTING_YN == "Y")
+            LEFT OUTER JOIN TB_HIS_APS_VALIDATION HAV WITH(NOLOCK)
+              ON CG.COMPANY_CD = HAV.COMPANY_CD
+             AND CG.BU_CD      = HAV.BU_CD
+             AND CG.ITEM_CD    = HAV.ITEM_CD
+             AND HAV.PLAN_ID   = @V_MP_PLAN_ID
+            #end
+            
+            /*2020-11-24 김지하k 요청, [release 대기수량 + start 대기수량 + open 오더수량] */
+            /* 기존 아래 TB DIM 조건 처러되어있었으나, open 오더수량을 계산하기 위해 조건처리 없앰 */
+            LEFT OUTER JOIN W_DIM_PROD_ORDER_QTY POQ
+              ON CG.COMPANY_CD = POQ.COMPANY_CD
+             AND CG.BU_CD      = POQ.BU_CD
+             AND CG.ITEM_CD    = POQ.ITEM_CD
+            
+            
+        ),
+        W_PLAN_HIDDEN AS 
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , CUST_GROUP_CD
+                 , ITEM_CD
+                 , SUM(QTY) AS SP_HIDDEN
+            FROM TB_DYN_SALES_PLAN WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MEAS_CD = 'AP2_SP'
+              AND YEARPWEEK BETWEEN @{fromPWeek} AND @{toPWeek}
+            GROUP BY COMPANY_CD, BU_CD, CUST_GROUP_CD, ITEM_CD
+        ),
+        W_PLAN AS 
+        (
+            #if($_parameter.excelFlag == "Y")
+                SELECT CG.COMPANY_CD
+                     , CG.BU_CD
+                     , CG.CUST_GROUP_CD
+                     , CG.ITEM_CD
+                     , SP.YEARPWEEK
+                     , 0 AS AP2_DMD1_SP_W1
+                     , 0 AS AP2_DMD2_SP_W1
+                     , 0 AS AP2_DMD3_SP_W1
+                     , 0 AS AP2_SP_W1
+                     , 0 AS AP2_DMD1_SP_AMT_KRW_W1
+                     , 0 AS AP2_DMD2_SP_AMT_KRW_W1
+                     , 0 AS AP2_DMD3_SP_AMT_KRW_W1
+                     , 0 AS AP2_SP_AMT_KRW_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD1_SP
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD2_SP
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD3_SP
+                     , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_SP
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) * CG.SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD1_SP_AMT_KRW
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) * CG.SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD2_SP_AMT_KRW
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) * CG.SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD3_SP_AMT_KRW
+                     , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) * CG.SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_SP_AMT_KRW
+                     , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN SP.ADJ_REASON END AS ADJ_REASON
+                FROM W_DIM CG
+                INNER JOIN TB_DYN_SALES_PLAN SP WITH(NOLOCK)
+                   ON CG.COMPANY_CD = SP.COMPANY_CD
+                  AND CG.BU_CD = SP.BU_CD
+                  AND CG.ITEM_CD = SP.ITEM_CD
+                  AND CG.CUST_GROUP_CD = SP.CUST_GROUP_CD
+                  AND SP.MEAS_CD IN ('AP1_DMD1_SP', 'AP1_DMD2_SP', 'AP1_DMD3_SP', 'AP1_SP', 'AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP', 'AP2_SP') 
+                  AND SP.YEARPWEEK <![CDATA[>=]]> @{fromPWeek} 
+                  AND SP.YEARPWEEK <![CDATA[<=]]> @{toPWeek} 
+            #else
+                /*W-1 주차 데이터*/
+                SELECT CG.COMPANY_CD
+                     , CG.BU_CD
+                     , CG.CUST_GROUP_CD
+                     , CG.ITEM_CD
+                     , SP.YEARPWEEK
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD1_SP_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD2_SP_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD3_SP_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_SP_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD1_SP_AMT_KRW_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD2_SP_AMT_KRW_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD3_SP_AMT_KRW_W1
+                     , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_SP_AMT_KRW_W1
+                     , 0 AS AP2_DMD1_SP
+                     , 0 AS AP2_DMD2_SP
+                     , 0 AS AP2_DMD3_SP
+                     , 0 AS AP2_SP
+                     , 0 AS AP2_DMD1_SP_AMT_KRW
+                     , 0 AS AP2_DMD2_SP_AMT_KRW
+                     , 0 AS AP2_DMD3_SP_AMT_KRW
+                     , 0 AS AP2_SP_AMT_KRW
+                     , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN SP.ADJ_REASON END AS ADJ_REASON
+                FROM W_DIM CG
+                INNER JOIN TB_HIS_SALES_PLAN SP WITH(NOLOCK)
+                   ON CG.COMPANY_CD = SP.COMPANY_CD
+                  AND CG.BU_CD = SP.BU_CD
+                  AND CG.ITEM_CD = SP.ITEM_CD
+                  AND CG.CUST_GROUP_CD = SP.CUST_GROUP_CD
+                  AND SP.MEAS_CD IN ('AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP', 'AP2_SP')
+                  AND SP.YEARPWEEK <![CDATA[>=]]> @{fromPWeek} 
+                  AND SP.YEARPWEEK <![CDATA[<=]]> @{toPWeek}
+                  AND SP.PLAN_ID = @{planIdPastW1}
+                UNION ALL
+                #if($_parameter.pastPlanIdStartWeek and $_parameter.pastPlanIdStartWeek != "")
+                    SELECT CG.COMPANY_CD
+                         , CG.BU_CD
+                         , CG.CUST_GROUP_CD
+                         , CG.ITEM_CD
+                         , SP.YEARPWEEK
+                         , 0 AS AP2_DMD1_SP_W1
+                         , 0 AS AP2_DMD2_SP_W1
+                         , 0 AS AP2_DMD3_SP_W1
+                         , 0 AS AP2_SP_W1
+                         , 0 AS AP2_DMD1_SP_AMT_KRW_W1
+                         , 0 AS AP2_DMD2_SP_AMT_KRW_W1
+                         , 0 AS AP2_DMD3_SP_AMT_KRW_W1
+                         , 0 AS AP2_SP_AMT_KRW_W1
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD1_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD2_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD3_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD1_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD2_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD3_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN SP.ADJ_REASON END AS ADJ_REASON
+                    FROM W_DIM CG
+                    INNER JOIN TB_KPI_SALES_PLAN SP WITH(NOLOCK)
+                       ON CG.COMPANY_CD = SP.COMPANY_CD
+                      AND CG.BU_CD = SP.BU_CD
+                      AND CG.ITEM_CD = SP.ITEM_CD
+                      AND CG.CUST_GROUP_CD = SP.CUST_GROUP_CD
+                      AND SP.MEAS_CD IN ('AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP', 'AP2_SP') 
+                      AND SP.YEARPWEEK <![CDATA[>=]]> @{pastPlanIdStartWeek} 
+                    #if($_parameter.futurePlanIdStartWeek and $_parameter.futurePlanIdStartWeek != "" )
+                      AND SP.YEARPWEEK <![CDATA[<]]> @{pastPlanIdEndWeek}
+                    #else
+                      AND SP.YEARPWEEK <![CDATA[<=]]> @{pastPlanIdEndWeek}
+                    #end
+                #end
+                #if($_parameter.pastPlanIdStartWeek and $_parameter.pastPlanIdStartWeek != "" and $_parameter.futurePlanIdStartWeek and $_parameter.futurePlanIdStartWeek != "" )
+                    UNION ALL
+                #end
+                #if($_parameter.futurePlanIdStartWeek and $_parameter.futurePlanIdStartWeek != "")
+                    SELECT CG.COMPANY_CD
+                         , CG.BU_CD
+                         , CG.CUST_GROUP_CD
+                         , CG.ITEM_CD
+                         , SP.YEARPWEEK
+                         , 0 AS AP2_DMD1_SP_W1
+                         , 0 AS AP2_DMD2_SP_W1
+                         , 0 AS AP2_DMD3_SP_W1
+                         , 0 AS AP2_SP_W1
+                         , 0 AS AP2_DMD1_SP_AMT_KRW_W1
+                         , 0 AS AP2_DMD2_SP_AMT_KRW_W1
+                         , 0 AS AP2_DMD3_SP_AMT_KRW_W1
+                         , 0 AS AP2_SP_AMT_KRW_W1
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD1_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD2_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_DMD3_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) ELSE 0 END AS AP2_SP
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD1_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD1_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD2_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD2_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_DMD3_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_DMD3_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN ISNULL(SP.QTY, 0) * SALES_PRICE_KRW_HIDDEN ELSE 0 END AS AP2_SP_AMT_KRW
+                         , CASE WHEN SP.MEAS_CD = 'AP2_SP' THEN SP.ADJ_REASON END AS ADJ_REASON
+                    FROM W_DIM CG
+                    #if($_parameter.pastFlag == "Y")
+                    INNER JOIN TB_HIS_SALES_PLAN SP WITH(NOLOCK)
+                    #elseif($_parameter.pastFlag == "N")
+                    INNER JOIN TB_DYN_SALES_PLAN SP WITH(NOLOCK)
+                    #end      
+                       ON CG.COMPANY_CD = SP.COMPANY_CD
+                      AND CG.BU_CD = SP.BU_CD
+                      AND CG.ITEM_CD = SP.ITEM_CD
+                      AND CG.CUST_GROUP_CD = SP.CUST_GROUP_CD
+                      AND SP.MEAS_CD IN ('AP2_DMD1_SP', 'AP2_DMD2_SP', 'AP2_DMD3_SP', 'AP2_SP')
+                      AND SP.YEARPWEEK <![CDATA[>=]]> @{futurePlanIdStartWeek} 
+                      AND SP.YEARPWEEK <![CDATA[<=]]> @{futurePlanIdEndWeek}
+                    #if($_parameter.pastFlag == "Y")
+                      AND SP.PLAN_ID = @{planIdPast}
+                    #end
+                #end
+            #end
+        ),
+        #if($dim_PROD_NO_REFLECTION == "Y")
+		        
+		        W_PROD_NO_REFLECTION AS 
+		        (
+		        
+		            SELECT CG.COMPANY_CD
+                     , CG.BU_CD
+                     , CG.CUST_GROUP_CD
+                     , CG.ITEM_CD
+                     , SP.YEARPWEEK
+           			, CASE WHEN MAX(ISNULL(CASE 
+                        WHEN SP.MEAS_CD = 'AP2_SP'
+                            THEN SP.QTY
+                        ELSE NULL
+                        END, 0)) - MAX(ISNULL(CASE 
+                        WHEN SP.MEAS_CD = 'AVAIL_QTY'
+                            THEN SP.QTY
+                        ELSE NULL
+                        END, 0)) <![CDATA[<]]> 0 THEN 0
+                       ELSE  
+                        MAX(ISNULL(CASE 
+                        WHEN SP.MEAS_CD = 'AP2_SP'
+                            THEN SP.QTY
+                        ELSE NULL
+                        END, 0)) - MAX(ISNULL(CASE 
+                        WHEN SP.MEAS_CD = 'AVAIL_QTY'
+                            THEN SP.QTY
+                        ELSE NULL
+                        END, 0))
+                      END  AS PROD_NO_REFLECTION
+                    FROM W_DIM CG
+	                INNER JOIN TB_HIS_SALES_PLAN SP WITH(NOLOCK)
+	                   ON CG.COMPANY_CD = SP.COMPANY_CD
+	                  AND CG.BU_CD = SP.BU_CD
+	                  AND CG.ITEM_CD = SP.ITEM_CD
+	                  AND CG.CUST_GROUP_CD = SP.CUST_GROUP_CD
+	                  AND SP.PLAN_ID = @{beforePlanId}
+	                  AND SP.MEAS_CD IN ('AP2_SP', 'AVAIL_QTY')
+	                  AND SP.YEARPWEEK BETWEEN (SELECT MIN(YEARPWEEK) FROM TB_MST_CALENDAR WHERE YEARWEEK = LEFT(@{planIdPast},6)) 
+	                  AND (SELECT MAX(YEARPWEEK) FROM TB_MST_CALENDAR WHERE YEARWEEK = LEFT(@{planIdPast},6)) 
+		        	 GROUP BY CG.COMPANY_CD
+					,CG.BU_CD
+					,CG.ITEM_CD
+					,CG.CUST_GROUP_CD
+					,SP.YEARPWEEK
+		        ),
+		        
+		        W_PROD_NO_REFLECTION_ORDER AS
+		        (
+		        
+			          SELECT COMPANY_CD
+	                 , BU_CD
+	                 , ITEM_CD
+	                 , CUST_GROUP_CD
+	                 , SUM(PROD_NO_REFLECTION) AS PROD_NO_REFLECTION
+	                 FROM W_PROD_NO_REFLECTION
+			         GROUP BY COMPANY_CD
+		             ,BU_CD
+		             ,ITEM_CD
+		             ,CUST_GROUP_CD
+		             
+		        ),
+		        
+        #end
+        W_PLAN_ORDER AS 
+        (
+            SELECT COMPANY_CD
+                 , BU_CD
+                 , ITEM_CD
+                 , CUST_GROUP_CD
+                 , YEARPWEEK
+                 , SUM(AP2_DMD1_SP_W1) AS AP2_DMD1_SP_W1
+                 , SUM(AP2_DMD2_SP_W1) AS AP2_DMD2_SP_W1
+                 , SUM(AP2_DMD3_SP_W1) AS AP2_DMD3_SP_W1
+                 , SUM(AP2_SP_W1) AS AP2_SP_W1
+                 , SUM(AP2_DMD1_SP_AMT_KRW_W1) AS AP2_DMD1_SP_AMT_KRW_W1
+                 , SUM(AP2_DMD2_SP_AMT_KRW_W1) AS AP2_DMD2_SP_AMT_KRW_W1
+                 , SUM(AP2_DMD3_SP_AMT_KRW_W1) AS AP2_DMD3_SP_AMT_KRW_W1
+                 , SUM(AP2_SP_AMT_KRW_W1) AS AP2_SP_AMT_KRW_W1
+                 , SUM(AP2_DMD1_SP) AS AP2_DMD1_SP
+                 , SUM(AP2_DMD2_SP) AS AP2_DMD2_SP
+                 , SUM(AP2_DMD3_SP) AS AP2_DMD3_SP
+                 , SUM(AP2_SP) AS AP2_SP
+                 , SUM(AP2_DMD1_SP_AMT_KRW) AS AP2_DMD1_SP_AMT_KRW
+                 , SUM(AP2_DMD2_SP_AMT_KRW) AS AP2_DMD2_SP_AMT_KRW
+                 , SUM(AP2_DMD3_SP_AMT_KRW) AS AP2_DMD3_SP_AMT_KRW
+                 , SUM(AP2_SP_AMT_KRW) AS AP2_SP_AMT_KRW
+                 , SUM(AP2_SP) - SUM(AP2_SP_W1) AS ADJ_QTY 
+                 , MAX(ADJ_REASON) AS ADJ_REASON
+            FROM W_PLAN TM
+            GROUP BY COMPANY_CD, BU_CD, ITEM_CD, CUST_GROUP_CD, YEARPWEEK
+        ),
+        W_DIM_ROW AS 
+        (
+            SELECT CG.*
+                 , PO.YEARPWEEK
+                 , PO.AP2_DMD1_SP_W1
+                 , PO.AP2_DMD2_SP_W1
+                 , PO.AP2_DMD3_SP_W1
+                 , PO.AP2_SP_W1
+                 , PO.AP2_DMD1_SP_AMT_KRW_W1
+                 , PO.AP2_DMD2_SP_AMT_KRW_W1
+                 , PO.AP2_DMD3_SP_AMT_KRW_W1
+                 , PO.AP2_SP_AMT_KRW_W1
+                 , PO.AP2_DMD1_SP
+                 , PO.AP2_DMD2_SP
+                 , PO.AP2_DMD3_SP
+                 , PO.AP2_SP
+                 , PO.AP2_DMD1_SP_AMT_KRW
+                 , PO.AP2_DMD2_SP_AMT_KRW
+                 , PO.AP2_DMD3_SP_AMT_KRW
+                 , PO.AP2_SP_AMT_KRW
+                 , PO.ADJ_QTY
+                 , PO.ADJ_REASON
+                 #if($dim_PROD_NO_REFLECTION == "Y")
+                 
+                 
+                 , CASE WHEN PNR.PROD_NO_REFLECTION IS NULL  THEN NULL
+                   ELSE CONVERT(NVARCHAR,PNR.PROD_NO_REFLECTION)
+                   END PROD_NO_REFLECTION
+                 
+                 
+                 #end
+            FROM
+            (
+                SELECT DIM.*
+                FROM W_DIM DIM
+                LEFT OUTER JOIN W_PLAN_HIDDEN SP
+                  ON DIM.COMPANY_CD    = SP.COMPANY_CD
+                 AND DIM.BU_CD         = SP.BU_CD
+                 AND DIM.ITEM_CD       = SP.ITEM_CD
+                 AND DIM.CUST_GROUP_CD = SP.CUST_GROUP_CD
+                WHERE 1 = 1
+                #if($_parameter.dataAddSales == "INV_WIP")
+                  AND SP.SP_HIDDEN <![CDATA[<]]> DIM.INV_WIP_QTY
+                #end
+                #if($_parameter.soDataCheck == "OPEN_SO_SP")
+                  AND EXISTS (
+                                SELECT * 
+                                FROM W_PLAN_HIDDEN SP
+                                WHERE DIM.COMPANY_CD = SP.COMPANY_CD
+                                  AND DIM.BU_CD = SP.BU_CD
+                                  AND DIM.ITEM_CD = SP.ITEM_CD
+                                  AND DIM.CUST_GROUP_CD = SP.CUST_GROUP_CD
+                                  AND DIM.SO_QTY_HIDDEN <![CDATA[<]]> SP.SP_HIDDEN
+                             )
+                #end
+                #if($_parameter.soDataCheck == "OPEN_SO_SP2")
+                  AND EXISTS (
+                                SELECT * 
+                                FROM W_PLAN_HIDDEN SP
+                                WHERE DIM.COMPANY_CD = SP.COMPANY_CD
+                                  AND DIM.BU_CD = SP.BU_CD
+                                  AND DIM.ITEM_CD = SP.ITEM_CD
+                                  AND DIM.CUST_GROUP_CD = SP.CUST_GROUP_CD
+                                  AND DIM.SO_QTY_HIDDEN <![CDATA[>]]> SP.SP_HIDDEN
+                             )
+                #end
+                #if($_parameter.soDataCheck == "OPEN_SO_INV_WIP")
+                  AND CONVERT(NUMERIC(21,4), DIM.SO_QTY_HIDDEN) <![CDATA[<]]> DIM.INV_WIP_QTY
+                #end 
+            ) CG
+            LEFT OUTER JOIN W_PLAN_ORDER PO
+              ON CG.COMPANY_CD = PO.COMPANY_CD
+             AND CG.BU_CD = PO.BU_CD
+             AND CG.ITEM_CD = PO.ITEM_CD
+             AND CG.CUST_GROUP_CD = PO.CUST_GROUP_CD
+            #if($dim_PROD_NO_REFLECTION == "Y")
+            LEFT OUTER JOIN W_PROD_NO_REFLECTION_ORDER PNR
+              ON CG.COMPANY_CD = PNR.COMPANY_CD
+             AND CG.BU_CD = PNR.BU_CD
+             AND CG.ITEM_CD = PNR.ITEM_CD
+             AND CG.CUST_GROUP_CD = PNR.CUST_GROUP_CD
+            #end    
+             
+        ),
+        W_ROW AS 
+        (
+            SELECT NULL AS COL_TMP
+                #foreach( $dimMap in $_parameter.dimList )
+                 , $dimMap.DIM_CD 
+                 , $dimMap.DIM_CD AS ${dimMap.DIM_CD}_NM 
+                #end
+                #foreach( $hiddenMap in $_parameter.hiddenList )
+                    #if($hiddenMap.CD.indexOf("MY_SELECT_ITEM") != -1) 
+                    #elseif($hiddenMap.CD.indexOf("PW") == -1)
+                     , $hiddenMap.CD
+                    #end
+                #end
+
+                 , YEARPWEEK
+                 , AP2_DMD1_SP_W1
+                 , AP2_DMD2_SP_W1
+                 , AP2_DMD3_SP_W1
+                 , AP2_SP_W1
+                 , AP2_DMD1_SP_AMT_KRW_W1
+                 , AP2_DMD2_SP_AMT_KRW_W1
+                 , AP2_DMD3_SP_AMT_KRW_W1 
+                 , AP2_SP_AMT_KRW_W1
+                 , AP2_DMD1_SP
+                 , AP2_DMD2_SP
+                 , AP2_DMD3_SP
+                 , AP2_SP
+                 , AP2_DMD1_SP_AMT_KRW
+                 , AP2_DMD2_SP_AMT_KRW
+                 , AP2_DMD3_SP_AMT_KRW 
+                 , AP2_SP_AMT_KRW
+                 , ADJ_QTY
+                 , ADJ_REASON
+            FROM W_DIM_ROW
+            WHERE 1 = 1
+            #if($_parameter.overShortMQtyCheckNeedYn and $_parameter.overShortMQtyCheckNeedYn != "") 
+                #if($_parameter.overShortMQtyCheckNeedYn == 'Y')
+                    AND OVER_SHORT_M        <![CDATA[ < ]]> 0
+                    AND NEW_DEMAND_CUSTOM   <![CDATA[ > ]]> 0
+                #elseif($_parameter.overShortMQtyCheckNeedYn == 'N')
+                    AND (
+                        
+                        OVER_SHORT_M        <![CDATA[ >= ]]> 0 
+                        OR NEW_DEMAND_CUSTOM<![CDATA[ <= ]]> 0
+                    
+                    )
+                #end
+            #end
+        ),
+        W_MAIN AS 
+        (
+            SELECT NULL AS TMP_COL 
+                #foreach( $dimMap in $_parameter.dimList )
+                 , $dimMap.DIM_CD 
+                 , MAX(${dimMap.DIM_CD}_NM) AS ${dimMap.DIM_CD}_NM
+                #end
+                #foreach( $hiddenMap in $_parameter.hiddenList )
+                    #if($hiddenMap.CD.indexOf("MY_SELECT_ITEM") != -1) 
+                    #elseif($hiddenMap.CD.indexOf("PW") == -1 and $hiddenMap.CD.indexOf("AP2") == -1)
+                    , MAX($hiddenMap.CD) AS $hiddenMap.CD
+                    #end
+                #end
+                <include refid="include.getGrpLvlId"/>
+                #foreach($bucketMap in $_parameter.bucketList)
+                #set($paramWeek = "$bucketMap.BUCKET_VAL")
+                    #if($_parameter.excelFlag == "Y")
+                        #if($bucketMap.CD.indexOf("_AP2_DMD1_SP") > -1)
+                            , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD1_SP END) AS $bucketMap.CD
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP") > -1)
+                            , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD2_SP END) AS $bucketMap.CD
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP") > -1)
+                            , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD3_SP END) AS $bucketMap.CD
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP") > -1)
+                            , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_SP END) AS $bucketMap.CD
+                        #end
+                    #else
+                        #if($bucketMap.ROOT_CD.indexOf("MT_") == -1)
+                            #if($bucketMap.CD.indexOf("_AP2_DMD1_SP_W1_HD") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD1_SP_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_HD") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD1_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_HD") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD2_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_HD") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD3_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_SP_HD") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_AMT_KRW_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD1_SP_AMT_KRW_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_AMT_KRW_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD2_SP_AMT_KRW_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_AMT_KRW_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD3_SP_AMT_KRW_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_SP_AMT_KRW_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_SP_AMT_KRW_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD1_SP_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD2_SP_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD3_SP_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_SP_W1") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_SP_W1 END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_AMT_KRW") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD1_SP_AMT_KRW END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_AMT_KRW") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD2_SP_AMT_KRW END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_AMT_KRW") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD3_SP_AMT_KRW END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_SP_AMT_KRW") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_SP_AMT_KRW END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD1_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD2_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_DMD3_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_AP2_SP") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN AP2_SP END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_ADJ_QTY") > -1)
+                                , SUM(CASE WHEN YEARPWEEK = '$paramWeek' THEN ADJ_QTY END) AS $bucketMap.CD
+                            #elseif($bucketMap.CD.indexOf("_ADJ_REASON") > -1)
+                                , MAX(CASE WHEN YEARPWEEK = '$paramWeek' THEN ADJ_REASON END) AS $bucketMap.CD  
+                            #end
+                        #end
+                    #end
+                #end
+            FROM W_ROW A
+            GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+        )
+        SELECT NULL AS TMP_COL
+            #foreach( $dimMap in $_parameter.dimList )
+             , C.$dimMap.DIM_CD 
+             , C.${dimMap.DIM_CD}_NM
+            #end
+            #foreach( $hiddenMap in $_parameter.hiddenList )
+                #if($hiddenMap.CD.indexOf("MY_SELECT_ITEM") != -1)
+                    #if($_parameter.excelFlag != "Y")
+                    , CASE WHEN D.ITEM_CD IS NULL THEN 'N' ELSE 'Y' END $hiddenMap.CD
+                    #end
+                #elseif($hiddenMap.CD.indexOf("PW_REMARK_YN") != -1)
+                , C.$hiddenMap.CD
+                #elseif($hiddenMap.CD.indexOf("PW") == -1)
+                , C.$hiddenMap.CD
+                #else
+                    #if($_parameter.excelFlag == "Y")
+                    , C.$hiddenMap.CD
+                    #else
+                    , CASE WHEN D.ITEM_CD IS NULL THEN 'N' ELSE C.$hiddenMap.CD END $hiddenMap.CD
+                    #end    
+                #end
+            #end
+            #foreach($bucketMap in $_parameter.bucketList)
+            #if($bucketMap.CD.indexOf("PW") == 0)
+             , C.$bucketMap.CD
+            #else
+                #if($bucketMap.CD.indexOf("_ADJ_REASON") == -1)
+                 , C.$bucketMap.CD
+                #end
+            #end
+            #end
+             , GRP_LVL_ID
+             , OMIT_FLAG
+        FROM
+        (
+            SELECT NULL AS TMP_COL
+
+
+			#set($rollupDot = ".")
+			#set($preCol = "")
+			#if(!$rollupAlias or $rollupAlias == "")
+			#set($rollupAlias = "")
+			#set($rollupDot = "")
+			#end
+			#foreach( $dimMap in $_parameter.dimList )
+			#if($velocityCount == 1)
+			         , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+			         , CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN @{gvTotal} ELSE ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+			#else
+			         , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+			         , CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN '' ELSE ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+			#end
+			#set($preCol = ${rollupAlias}+${rollupDot}+$dimMap.DIM_CD)
+			#end
+
+
+
+            #foreach( $hiddenMap in $_parameter.hiddenList )
+                #if($hiddenMap.CD.indexOf("MY_SELECT_ITEM") != -1)
+                #elseif($hiddenMap.CD.indexOf("PW") == -1)
+                , A.$hiddenMap.CD AS $hiddenMap.CD
+                #elseif($hiddenMap.CD.indexOf("PW_REMARK_YN") != -1)
+                , CASE WHEN GRP_LVL_ID = 0 AND @{pastFlag} = 'N' THEN 'Y' ELSE 'N' END $hiddenMap.CD
+                #else
+                , CASE WHEN GRP_LVL_ID = 0 AND CONFIRM_YN = 'N' THEN B.$hiddenMap.CD ELSE 'N' END $hiddenMap.CD 
+                #end
+            #end
+            
+            #set($strAp2Dmd1SpW1 = "")
+            #set($strAp2Dmd2SpW1 = "")
+            #set($strAp2Dmd3SpW1 = "")
+            #set($strAp2SpW1 = "")
+            #set($strAp2Dmd1SpAmtKrwW1 = "")
+            #set($strAp2Dmd2SpAmtKrwW1 = "")
+            #set($strAp2Dmd3SpAmtKrwW1 = "")
+            #set($strAp2SpAmtKrwW1 = "")
+            #set($strAp2Dmd1Sp = "")
+            #set($strAp2Dmd2Sp = "")
+            #set($strAp2Dmd3Sp = "")
+            #set($strAp2Sp = "")
+            #set($strAp2Dmd1SpAmtKrw = "")
+            #set($strAp2Dmd2SpAmtKrw = "")
+            #set($strAp2Dmd3SpAmtKrw = "")
+            #set($strAp2SpAmtKrw = "")
+            #set($strAdjQty = "")
+            #set($strAdjReason = "")
+            
+            #foreach($bucketMap in $_parameter.bucketList)
+            #set($paramWeek = "$bucketMap.BUCKET_VAL")
+                #if($_parameter.excelFlag == "Y")
+                    #if($bucketMap.CD.indexOf("_AP2_DMD1_SP") > -1)
+                        , $bucketMap.CD AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP") > -1)
+                        , $bucketMap.CD AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP") > -1)
+                        , $bucketMap.CD AS $bucketMap.CD
+                    #elseif($bucketMap.CD.indexOf("_AP2_SP") > -1)
+                        , $bucketMap.CD AS $bucketMap.CD
+                    #end
+                #else
+                    #if($bucketMap.ROOT_CD.indexOf("MT_") == -1)
+                        #if($bucketMap.CD.indexOf("_ADJ_REASON") > -1)
+                        , CASE WHEN GRP_LVL_ID = 0 THEN $bucketMap.CD END $bucketMap.CD
+                        #else
+                        , $bucketMap.CD AS $bucketMap.CD
+                        #end
+                        #if($bucketMap.CD.indexOf("_AP2_DMD1_SP_AMT_KRW_W1") > -1)
+                            #set($strAp2Dmd1SpAmtKrwW1 = $strAp2Dmd1SpAmtKrwW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_AMT_KRW_W1") > -1)
+                            #set($strAp2Dmd2SpAmtKrwW1 = $strAp2Dmd2SpAmtKrwW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_AMT_KRW_W1") > -1)
+                            #set($strAp2Dmd3SpAmtKrwW1 = $strAp2Dmd3SpAmtKrwW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP_AMT_KRW_W1") > -1)
+                            #set($strAp2SpAmtKrwW1 = $strAp2SpAmtKrwW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_W1") > -1)
+                            #set($strAp2Dmd1SpW1 = $strAp2Dmd1SpW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_W1") > -1)
+                            #set($strAp2Dmd2SpW1 = $strAp2Dmd2SpW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_W1") > -1)
+                            #set($strAp2Dmd3SpW1 = $strAp2Dmd3SpW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP_W1") > -1)
+                            #set($strAp2SpW1 = $strAp2SpW1 + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_AMT_KRW") > -1)
+                            #set($strAp2Dmd1SpAmtKrw = $strAp2Dmd1SpAmtKrw + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_AMT_KRW") > -1)
+                            #set($strAp2Dmd2SpAmtKrw = $strAp2Dmd2SpAmtKrw + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_AMT_KRW") > -1)
+                            #set($strAp2Dmd3SpAmtKrw = $strAp2Dmd3SpAmtKrw + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP_AMT_KRW") > -1)
+                            #set($strAp2SpAmtKrw = $strAp2SpAmtKrw + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP") > -1)
+                            #set($strAp2Dmd1Sp = $strAp2Dmd1Sp + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP") > -1)
+                            #set($strAp2Dmd2Sp = $strAp2Dmd2Sp + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP") > -1)
+                            #set($strAp2Dmd3Sp = $strAp2Dmd3Sp + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP") > -1)
+                            #set($strAp2Sp = $strAp2Sp + "," +$bucketMap.CD)
+                        #elseif($bucketMap.CD.indexOf("_ADJ_QTY") > -1)
+                            #set($strAdjQty = $strAdjQty + "," +$bucketMap.CD)
+                        #end
+                    #else
+                        #if($bucketMap.CD.indexOf("_AP2_DMD1_SP_AMT_KRW_W1") > -1)
+                            , ISNULL($strAp2Dmd1SpAmtKrwW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd1SpAmtKrwW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_AMT_KRW_W1") > -1)
+                            , ISNULL($strAp2Dmd2SpAmtKrwW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd2SpAmtKrwW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_AMT_KRW_W1") > -1)
+                            , ISNULL($strAp2Dmd3SpAmtKrwW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd3SpAmtKrwW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP_AMT_KRW_W1") > -1)
+                            , ISNULL($strAp2SpAmtKrwW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2SpAmtKrwW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_W1") > -1)
+                            , ISNULL($strAp2Dmd1SpW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd1SpW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_W1") > -1)
+                            , ISNULL($strAp2Dmd2SpW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd2SpW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_W1") > -1)
+                            , ISNULL($strAp2Dmd3SpW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd3SpW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP_W1") > -1)
+                            , ISNULL($strAp2SpW1.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2SpW1 = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP_AMT_KRW") > -1)
+                            , ISNULL($strAp2Dmd1SpAmtKrw.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd1SpAmtKrw = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP_AMT_KRW") > -1)
+                            , ISNULL($strAp2Dmd2SpAmtKrw.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd2SpAmtKrw = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP_AMT_KRW") > -1)
+                            , ISNULL($strAp2Dmd3SpAmtKrw.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd3SpAmtKrw = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP_AMT_KRW") > -1)
+                            , ISNULL($strAp2SpAmtKrw.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2SpAmtKrw = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD1_SP") > -1)
+                            , ISNULL($strAp2Dmd1Sp.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd1Sp = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD2_SP") > -1)
+                            , ISNULL($strAp2Dmd2Sp.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd2Sp = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_DMD3_SP") > -1)
+                            , ISNULL($strAp2Dmd3Sp.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Dmd3Sp = "")
+                        #elseif($bucketMap.CD.indexOf("_AP2_SP") > -1)
+                            , ISNULL($strAp2Sp.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAp2Sp = "")
+                        #elseif($bucketMap.CD.indexOf("_ADJ_QTY") > -1)
+                            , ISNULL($strAdjQty.substring(1).replace(",",",0)+ISNULL("),0) AS $bucketMap.CD
+                            #set($strAdjQty = "")   
+                        #end 
+                    #end
+                #end
+            #end
+                 , GRP_LVL_ID
+                 , 0.0
+            #foreach( $bucketMap in $_parameter.bucketList )
+                #if($bucketMap.ROOT_CD.indexOf("MT_") == -1 and $bucketMap.CD.indexOf("_HD") == -1 and $bucketMap.CD.indexOf("_ADJ_REASON") == -1)
+                + ISNULL(ABS($bucketMap.CD), 0)
+                #end
+            #end AS OMIT_FLAG
+            FROM W_MAIN A
+            #if($_parameter.authorityFlag == "Y")
+            LEFT OUTER JOIN W_OPEN_CONFIRM B
+              ON A.PROD_LVL2_CD = B.PROD_LVL2_CD
+             AND A.CUST_LVL2_CD_HIDDEN = B.CUST_LVL2_CD_OPEN
+            #end
+        ) C
+        #if($_parameter.excelFlag != "Y")
+        LEFT OUTER JOIN W_MY_SELECT_ITEM D
+          ON C.CUST_GROUP_CD = D.CUST_GROUP_CD
+         AND C.ITEM_CD = D.ITEM_CD
+        #end
+        ORDER BY TMP_COL
+        #foreach( $dimMap in $_parameter.dimList )
+               , C.$dimMap.DIM_CD 
+        #end
+    END;
+
+    </select>
+</mapper>

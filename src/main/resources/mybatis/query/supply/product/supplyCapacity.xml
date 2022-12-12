@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+
+    <select id="supplyCapacitySelect" parameterType="map" resultType="map">
+	    /****** [ supply.product.supplyCapacitySelect ] ******/
+	    <include refid="snop.common.w_cust" />
+	    SELECT *
+	    #foreach( $bucketMap in $_parameter.bucketList )
+	    	#if($bucketMap.CD.indexOf("_AP2") > -1)
+         	#elseif($bucketMap.CD.indexOf("_ADD_CFM") > -1)
+         	#elseif($bucketMap.CD.indexOf("_CAN_SHIP") > -1)
+        	#elseif($bucketMap.CD.indexOf("_CALC_EOH_QTY2") > -1)
+    		#elseif($bucketMap.CD.indexOf("_CFM") > -1)
+    		#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+    		, CASE WHEN ISNULL(${bucketMap.ROOT_CD}_CAN_SHIP, 0) - ISNULL(${bucketMap.ROOT_CD}_AP2, 0) <![CDATA[>]]> 0
+    		       THEN 100
+    		       ELSE ${bucketMap.ROOT_CD}_CAN_SHIP / NULLIF(${bucketMap.ROOT_CD}_AP2, 0) * 100 
+    		   END $bucketMap.CD
+    		#end
+	    #end
+	    FROM
+	    (
+		    SELECT NULL AS TMP_COL
+			    <include refid="include.getCdDimTotal"/>
+			    <include refid="include.getGrpLvlId"/>
+				#foreach( $bucketMap in $_parameter.bucketList )
+				#set( $week = "$bucketMap.BUCKET_VAL" )
+			  	#if($bucketMap.CD.indexOf("_AP2") > -1)
+		         , SUM ($bucketMap.CD) AS $bucketMap.CD
+		         , CASE WHEN SUM(CASE WHEN ISNULL(${bucketMap.ROOT_CD}_AP2, 0) - ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0) <![CDATA[>]]> 0
+		  		            		  THEN ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0)
+		  		            		  ELSE ISNULL(${bucketMap.ROOT_CD}_AP2, 0)
+		  		        		  END / NULLIF(${bucketMap.ROOT_CD}_AP2, 0)) * 100 <![CDATA[>]]> 100
+		  		        THEN 100
+		  		        ELSE SUM(CASE WHEN ISNULL(${bucketMap.ROOT_CD}_AP2, 0) - ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0) <![CDATA[>]]> 0
+		  		            		  THEN ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0)
+		  		            		  ELSE ISNULL(${bucketMap.ROOT_CD}_AP2, 0)
+		  		        		  END / NULLIF(${bucketMap.ROOT_CD}_AP2, 0)) * 100
+		  		 	END ${bucketMap.ROOT_CD}_RATE_HIDDEN
+		        #elseif($bucketMap.CD.indexOf("_ADD_CFM") > -1)
+		         , SUM(CASE WHEN ISNULL(${bucketMap.ROOT_CD}_AP2, 0) - ISNULL(${bucketMap.ROOT_CD}_CFM_HIDDEN, 0) <![CDATA[>]]> ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0) - ISNULL(${bucketMap.ROOT_CD}_CFM_HIDDEN, 0)
+		         			THEN CASE WHEN ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0) - ISNULL(${bucketMap.ROOT_CD}_CFM_HIDDEN, 0) <![CDATA[>]]> 0
+		         			          THEN ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0) - ISNULL(${bucketMap.ROOT_CD}_CFM_HIDDEN, 0)
+		         			          ELSE 0
+		         			      END
+		         			ELSE CASE WHEN ISNULL(${bucketMap.ROOT_CD}_AP2, 0) - ISNULL(${bucketMap.ROOT_CD}_CFM_HIDDEN, 0) <![CDATA[>]]> 0
+		         			          THEN ISNULL(${bucketMap.ROOT_CD}_AP2, 0) - ISNULL(${bucketMap.ROOT_CD}_CFM_HIDDEN, 0)
+		         			          ELSE 0
+		         			      END
+		        		END) AS $bucketMap.CD
+		        #elseif($bucketMap.CD.indexOf("_CAN_SHIP") > -1)
+		         , SUM(CASE WHEN ISNULL(${bucketMap.ROOT_CD}_AP2, 0) - ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0) <![CDATA[>]]> 0
+		                    THEN ISNULL(${bucketMap.ROOT_CD}_CALC_EOH_QTY2, 0)
+		                    ELSE ISNULL(${bucketMap.ROOT_CD}_AP2, 0)
+		             END) AS $bucketMap.CD 
+		        #elseif($bucketMap.CD.indexOf("_CALC_EOH_QTY2") > -1) 
+		         , ISNULL(SUM ($bucketMap.CD), 0) AS $bucketMap.CD
+		  		#elseif($bucketMap.CD.indexOf("_CFM") > -1)
+		         , ISNULL(SUM ($bucketMap.CD), 0) AS $bucketMap.CD
+		  		#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+		  		#end
+				#end
+				#foreach( $bucketMap in $_parameter.bucketList )
+		  		#set( $week = "$bucketMap.BUCKET_VAL" )
+		  		#if($velocityCount > 1)
+		    		#if($bucketMap.CD.indexOf("_AP2") > -1)
+		         	+ ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+		         	#elseif($bucketMap.CD.indexOf("_ADD_CFM") > -1)
+		        	#elseif($bucketMap.CD.indexOf("_CALC_EOH_QTY2") > -1) 
+		         	+ ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+		    		#elseif($bucketMap.CD.indexOf("_CFM") > -1)
+		         	+ ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+		    		#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+		    		#end
+		  		#else
+		         	, ISNULL(ABS(SUM ($bucketMap.CD)), 0)
+		  		#end
+				#end AS OMIT_FLAG
+			FROM 
+			(
+		    	SELECT CT.COMPANY_CD
+	                 , CT.BU_CD
+	                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD 
+	                 , ISNULL (CT.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM 
+	                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM 
+	                 , ISNULL (CT.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM 
+	                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID
+	                 , ISNULL (CT.ROUTING_ID, ' ')        AS ROUTING_ID_NM
+	                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+	                 , ISNULL (CT.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+	                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+	                 , ISNULL (CT.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+	                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD
+	                 , ISNULL (CT.CUST_GROUP_CD, ' ')     AS CUST_GROUP_CD_NM
+	                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM
+	                 , ISNULL (CT.CUST_GROUP_NM, ' ')     AS CUST_GROUP_NM_NM
+	                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD
+	                 , ISNULL (CT.ITEM_GROUP_CD, ' ')     AS ITEM_GROUP_CD_NM
+	                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM
+	                 , ISNULL (CT.ITEM_GROUP_NM, ' ')     AS ITEM_GROUP_NM_NM
+	                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD
+	                 , ISNULL (CT.ITEM_CD, ' ')           AS ITEM_CD_NM
+	                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM
+	                 , ISNULL (CT.ITEM_NM, ' ')           AS ITEM_NM_NM
+	                 , ISNULL (CT.SPEC, ' ')              AS SPEC
+	                 , ISNULL (CT.SPEC, ' ')              AS SPEC_NM
+	                 , ISNULL (CT.MFG_LT, ' ')            AS MFG_LT
+	                 , ISNULL (CT.MFG_LT, ' ')            AS MFG_LT_NM
+	                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO
+	                 , ISNULL (CT.DRAW_NO, ' ')           AS DRAW_NO_NM
+	                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD
+	                 , ISNULL (CT.ITEM_TYPE, ' ')         AS ITEM_TYPE_CD_NM
+	                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM
+	                 , ISNULL (CT.ITEM_TYPE_NM, ' ')      AS ITEM_TYPE_NM_NM
+	                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD
+	                 , ISNULL (CT.SALES_ORG_LVL4_CD, ' ') AS SALES_ORG_LVL4_CD_NM
+	                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM
+	                 , ISNULL (CT.SALES_ORG_LVL4_NM, ' ') AS SALES_ORG_LVL4_NM_NM
+	                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD
+	                 , ISNULL (CT.SALES_ORG_LVL5_CD, ' ') AS SALES_ORG_LVL5_CD_NM
+	                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM
+	                 , ISNULL (CT.SALES_ORG_LVL5_NM, ' ') AS SALES_ORG_LVL5_NM_NM
+	                 , ISNULL (CT.CLEANING_YN, ' ')       AS CLEANING_YN
+	                 , ISNULL (CT.CLEANING_YN, ' ')       AS CLEANING_YN_NM
+	                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW
+	                 , ISNULL (CAST (CT.SALES_PRICE_KRW AS NVARCHAR(20)), ' ') AS SALES_PRICE_KRW_NM
+					#foreach( $bucketMap in $_parameter.bucketList )
+		  			#set( $week = "$bucketMap.BUCKET_VAL" )
+		  			#if ($_parameter.rdoAqType == "QTY")
+		    			#if($bucketMap.CD.indexOf("_AP2") > -1)
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'AP2_SP' AND SP.YEARWEEK = '$week' THEN SP.QTY ELSE NULL END) AS $bucketMap.CD
+		                #elseif($bucketMap.CD.indexOf("_ADD_CFM") > -1)
+		                #elseif($bucketMap.CD.indexOf("_CAN_SHIP") > -1)
+		                #elseif($bucketMap.CD.indexOf("_CALC_EOH_QTY2") > -1)
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'AVAIL_QTY' AND SP.YEARWEEK = '$week' THEN SP.QTY ELSE NULL END) AS $bucketMap.CD
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'CFM_SP' AND SP.YEARWEEK = '$week' THEN SP.QTY ELSE NULL END) AS ${bucketMap.ROOT_CD}_CFM_HIDDEN
+		    			#elseif($bucketMap.CD.indexOf("_CFM") > -1)
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'CFM_SP' AND SP.YEARWEEK = '$week' THEN SP.QTY ELSE NULL END) AS $bucketMap.CD
+		    			#end
+		  			#elseif ($_parameter.rdoAqType == "AMT")
+		    			#if($bucketMap.CD.indexOf("_AP2") > -1)
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'AP2_SP' AND SP.YEARWEEK = '$week' THEN SP.AMT ELSE NULL END) AS $bucketMap.CD
+		                #elseif($bucketMap.CD.indexOf("_ADD_CFM") > -1)
+		                #elseif($bucketMap.CD.indexOf("_CALC_EOH_QTY2") > -1)        
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'AVAIL_QTY' AND SP.YEARWEEK = '$week' THEN CT.SALES_PRICE_KRW * SP.QTY ELSE NULL END) AS $bucketMap.CD  
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'CFM_SP' AND SP.YEARWEEK = '$week' THEN SP.AMT ELSE NULL END) AS ${bucketMap.ROOT_CD}_CFM_HIDDEN
+		    			#elseif($bucketMap.CD.indexOf("_CFM") > -1)
+		                 , SUM (CASE WHEN SP.MEAS_CD = 'CFM_SP' AND SP.YEARWEEK = '$week' THEN SP.AMT ELSE NULL END) AS $bucketMap.CD
+		    			#end
+		  			#end
+					#end
+				FROM W_CUST CT
+		        INNER JOIN 
+		        (
+					SELECT A1.COMPANY_CD
+			             , A1.BU_CD
+			             , A1.ITEM_CD
+			             , A1.CUST_GROUP_CD
+			             , A1.MEAS_CD
+			             , A1.YEARWEEK
+			             , A1.AMT
+			             , A1.QTY
+			        FROM TB_KPI_SALES_PLAN A1 WITH(NOLOCK)
+			        WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+			          AND A1.BU_CD = @{GV_BU_CD}
+			          AND A1.MEAS_CD IN ('AP2_SP', 'CFM_SP')
+			          AND A1.YEARWEEK <![CDATA[>=]]> @{fromWeek}
+					  AND A1.YEARWEEK <![CDATA[<=]]> @{toWeek}
+					UNION ALL
+					SELECT KSP.COMPANY_CD
+               			 , KSP.BU_CD
+		                 , KSP.ITEM_CD
+		                 , KSP.CUST_GROUP_CD
+		                 , KSP.MEAS_CD
+		                 , KSP.YEARWEEK
+		                 , NULL AS AMT
+		                 , SUM(KSP.QTY) AS QTY
+					FROM TB_KPI_SALES_PLAN KSP WITH(NOLOCK)
+		           	WHERE KSP.COMPANY_CD = @{GV_COMPANY_CD}
+		              AND KSP.BU_CD = @{GV_BU_CD}
+		              AND KSP.MEAS_CD = 'AVAIL_QTY'
+		              AND KSP.YEARWEEK <![CDATA[>=]]> @{fromWeek}
+		              AND KSP.YEARWEEK <![CDATA[<=]]> @{toWeek}
+		           	GROUP BY KSP.COMPANY_CD, KSP.BU_CD, KSP.ITEM_CD, KSP.CUST_GROUP_CD, KSP.MEAS_CD, KSP.YEARWEEK
+					
+					<!-- SELECT HAPPW.COMPANY_CD
+					     , HAPPW.BU_CD
+					     , HAPPW.ITEM_CD
+					     , MRC.CUST_GROUP_CD
+					     , 'AVAIL_QTY' AS MEAS_CD
+					     , HAPPW.YEARWEEK
+					     , NULL AS AMT
+					     , SUM(HAPPW.[VALUE]) AS QTY
+					FROM TB_HIS_APS_PROD_PSI_WEEKLY HAPPW WITH(NOLOCK)
+					INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+					   ON MI.COMPANY_CD = HAPPW.COMPANY_CD
+					  AND MI.BU_CD = HAPPW.BU_CD
+					  AND MI.ITEM_CD = HAPPW.ITEM_CD
+					INNER JOIN TB_MST_REP_CUST MRC WITH(NOLOCK)
+					   ON MRC.COMPANY_CD = MI.COMPANY_CD
+					  AND MRC.BU_CD = MI.BU_CD
+					  AND MRC.REP_CUST_CD = MI.REP_CUST_CD
+					WHERE HAPPW.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND HAPPW.BU_CD = @{GV_BU_CD}
+					  AND HAPPW.MEAS_CD IN ('CALC_BOH_QTY', 'PROD_PLAN_QTY')
+					  AND HAPPW.YEARWEEK <![CDATA[>=]]> @{fromWeek}
+					  AND HAPPW.YEARWEEK <![CDATA[<=]]> @{toWeek}
+					  AND EXISTS (
+					               SELECT 1
+					                 FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+					                INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+					                   ON MPVS.COMPANY_CD = MPV.COMPANY_CD
+					                  AND MPVS.BU_CD = MPV.BU_CD
+					                  AND MPVS.PLAN_TYPE_CD = MPV.PLAN_TYPE_CD
+					                  AND MPVS.PLAN_ID = MPV.PLAN_ID
+					                  AND MPVS.VERSION_TYPE_CD = 'F'
+					                WHERE MPV.PLAN_TYPE_CD = 'MP'
+					                  AND MPV.RELEASE_FLAG = 'Y'
+					                  AND MPV.COMPANY_CD = HAPPW.COMPANY_CD
+					                  AND MPV.BU_CD = HAPPW.BU_CD
+					                  AND MPV.PLAN_ID = HAPPW.PLAN_ID
+					                  AND MPVS.PROD_PART = HAPPW.PROD_PART
+					                  AND MPVS.VERSION_ID = HAPPW.VERSION_ID
+					                  AND MPV.START_WEEK = HAPPW.YEARWEEK
+					               )
+					GROUP BY HAPPW.COMPANY_CD, HAPPW.BU_CD, HAPPW.ITEM_CD, HAPPW.YEARWEEK, MRC.CUST_GROUP_CD -->
+		        ) SP
+				ON CT.COMPANY_CD     = SP.COMPANY_CD
+		        AND CT.BU_CD         = SP.BU_CD
+		        AND CT.ITEM_CD       = SP.ITEM_CD
+		        AND CT.CUST_GROUP_CD = SP.CUST_GROUP_CD
+				WHERE CT.COMPANY_CD = @{GV_COMPANY_CD}
+		          AND CT.BU_CD      = @{GV_BU_CD}
+		  		#if($_parameter.item_cd and $_parameter.item_cd != "")
+		          AND CT.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+		  		#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+		          AND (CT.ITEM_CD LIKE '%'+@{item_nm}+'%' OR CT.ITEM_NM LIKE '%'+@{item_nm}+'%')
+		  		#end
+			  	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+				  AND CT.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+			  	#end
+			  	#if($_parameter.route and $_parameter.route != "")
+			      AND CT.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+			  	#end
+			  	#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+			      AND CT.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+			  	#end
+			  	#if($_parameter.custGroup and $_parameter.custGroup != "")
+			      AND CT.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+			  	#end
+				GROUP BY CT.COMPANY_CD, CT.BU_CD, CT.REP_ITEM_GROUP_CD, CT.REP_ITEM_GROUP_NM, CT.ROUTING_ID, CT.REP_CUST_GROUP_CD, CT.REP_CUST_GROUP_NM, CT.CUST_GROUP_CD
+					   , CT.CUST_GROUP_NM, CT.ITEM_GROUP_CD, CT.ITEM_GROUP_NM, CT.ITEM_CD, CT.ITEM_NM, CT.SPEC, CT.MFG_LT, CT.DRAW_NO, CT.ITEM_TYPE, CT.ITEM_TYPE_NM, CT.SALES_ORG_LVL4_CD
+		               , CT.SALES_ORG_LVL4_NM, CT.SALES_ORG_LVL5_CD, CT.SALES_ORG_LVL5_NM, CT.SALES_PRICE_KRW, CT.CLEANING_YN
+		    ) A
+		    GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+	    ) B
+	    WHERE 1 = 1
+	    #if($_parameter.dailyCd and $_parameter.dailyCd != "")
+	    AND 
+	    #foreach( $bucketMap in $_parameter.bucketList )
+		#set( $week = "$bucketMap.BUCKET_VAL" )
+			(${bucketMap.ROOT_CD}_RATE_HIDDEN <![CDATA[<]]> $_parameter.dailyCd)
+	  		#if($_parameter.bucketList.size() > $foreach.count) OR #end
+		  	#if($bucketMap.CD.indexOf("_AP2") > -1)
+	        #elseif($bucketMap.CD.indexOf("_ADD_CFM") > -1)
+	        #elseif($bucketMap.CD.indexOf("_CAN_SHIP") > -1)
+	        #elseif($bucketMap.CD.indexOf("_CALC_EOH_QTY2") > -1) 
+	  		#elseif($bucketMap.CD.indexOf("_CFM") > -1)
+	  		#elseif($bucketMap.CD.indexOf("_RATE") > -1)
+	  		#end
+		#end
+	    #end
+	    ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+	           , B.$dimMap.DIM_CD
+		#end
+    </select>
+</mapper>

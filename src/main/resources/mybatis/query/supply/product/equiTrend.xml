@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.product">
+	<select id="equiTrendListSelect" parameterType="map" resultType="map">
+		/****** [ supply.product.equiTrendListSelect ] ******/
+		BEGIN
+		
+			DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(VARCHAR(8), dbo.UFN_GETDATE(), 112);
+		
+			SELECT *
+			    #if($_parameter.operRate and $_parameter.operRate != "")
+			    #foreach($hiddenMap in $_parameter.hiddenList)
+			    	#if($hiddenMap.CD.indexOf("AVG_VALUE") > -1)
+			    		#if($_parameter.operRatio == "INE01")
+				    	, CASE WHEN TOTAL / @{bucketSize} <![CDATA[>=]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#elseif($_parameter.operRatio == "INE02")
+				    	, CASE WHEN TOTAL / @{bucketSize} <![CDATA[<=]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#elseif($_parameter.operRatio == "INE03")
+				    	, CASE WHEN TOTAL / @{bucketSize} <![CDATA[>]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#elseif($_parameter.operRatio == "INE04")
+				    	, CASE WHEN TOTAL / @{bucketSize} <![CDATA[<]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#elseif($_parameter.operRatio == "INE05")
+				    	, CASE WHEN TOTAL / @{bucketSize} <![CDATA[=]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#end
+			    	#else
+			    		#if($_parameter.operRatio == "INE01")
+				    	, CASE WHEN $hiddenMap.BUCKET_ID <![CDATA[>=]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD	
+				    	#elseif($_parameter.operRatio == "INE02")
+				    	, CASE WHEN $hiddenMap.BUCKET_ID <![CDATA[<=]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#elseif($_parameter.operRatio == "INE03")
+				    	, CASE WHEN $hiddenMap.BUCKET_ID <![CDATA[>]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#elseif($_parameter.operRatio == "INE04")
+				    	, CASE WHEN $hiddenMap.BUCKET_ID <![CDATA[<]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#elseif($_parameter.operRatio == "INE05")
+				    	, CASE WHEN $hiddenMap.BUCKET_ID <![CDATA[=]]> @{operRate} THEN 'Y' ELSE 'N' END $hiddenMap.CD
+				    	#end
+			    	#end
+			    #end
+			    #end
+			    , ROUND(TOTAL / NULLIF(@{bucketSize}, 0), 0) AS AVG_VALUE
+			FROM
+			(
+				SELECT NULL AS TMP_COL
+					<include refid="include.getCdDimTotal"/>
+					<include refid="include.getGrpLvlId"/>
+					#foreach($bucketMap in $_parameter.bucketList)
+					#set($paramWeek = "$bucketMap.BUCKET_VAL")
+					 , ISNULL(ROUND(AVG(CASE WHEN YEARWEEK = '$paramWeek' THEN CONS_TIME / STD_TIME END) * 100, 0), 0) AS $bucketMap.CD
+					#end
+					#foreach($bucketMap in $_parameter.bucketList)
+					#set($paramWeek = "$bucketMap.BUCKET_VAL")
+						#if($velocityCount == 1)
+						, ISNULL(ROUND(AVG(CASE WHEN YEARWEEK = '$paramWeek' THEN CONS_TIME / STD_TIME END) * 100, 0), 0)						
+						#else
+						+ ISNULL(ROUND(AVG(CASE WHEN YEARWEEK = '$paramWeek' THEN CONS_TIME / STD_TIME END) * 100, 0), 0)
+						#end
+					#end AS TOTAL
+					 , ROUND(MIN(ISNULL(CONS_TIME / STD_TIME, 0)) * 100, 0) AS MIN_VALUE
+	                 , ROUND(MAX(ISNULL(CONS_TIME / STD_TIME, 0)) * 100, 0) AS MAX_VALUE
+				FROM
+				(
+					SELECT ISNULL(MR.ROUTING_ID, ' ') AS ROUTING_ID
+					     , ISNULL(MR.ROUTING_ID, ' ') AS ROUTING_ID_NM
+					     , ISNULL(MR.RESOURCE_GROUP_NM, ' ') AS RESOURCE_GROUP_NM
+					     , ISNULL(MR.RESOURCE_GROUP_NM, ' ') AS RESOURCE_GROUP_NM_NM
+					     , ISNULL(MR.RESOURCE_CD, ' ') AS RESOURCE_CD3
+					     , ISNULL(MR.RESOURCE_CD, ' ') AS RESOURCE_CD3_NM
+					     , ISNULL(MR.RESOURCE_NM, ' ') AS RESOURCE_NM3
+					     , ISNULL(MR.RESOURCE_NM, ' ') AS RESOURCE_NM3_NM
+					     , MCAL.YEARWEEK
+					     , ISNULL(SUM(DRR.CONS_TIME), 0) /3600.0 AS CONS_TIME
+					     , (SELECT CAST(ATTB_1_CD AS NUMERIC) * 5 FROM TB_MST_CODE WHERE BU_CD = 'QT' AND GROUP_CD = 'STD_WORK_HOUR' AND CODE_CD = @{stdWorkHour} AND USE_FLAG = 'Y') AS STD_TIME
+					FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+					CROSS JOIN TB_MST_CALENDAR MCAL WITH(NOLOCK)
+					LEFT OUTER JOIN TB_DYN_RESOURCE_RESULT DRR WITH(NOLOCK)
+					   ON DRR.COMPANY_CD = MR.COMPANY_CD
+					  AND DRR.BU_CD = MR.BU_CD
+					  AND DRR.PLANT_CD = MR.PLANT_CD
+					  AND DRR.RESOURCE_CD = MR.RESOURCE_CD
+					  AND DRR.YYYYMMDD = MCAL.YYYYMMDD
+					INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+					   ON MC.BU_CD = MR.BU_CD
+					  AND MC.GROUP_CD = 'PROD_L2'
+					  AND MC.CODE_CD = MR.ROUTING_ID
+					WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+					  AND MR.BU_CD = @{GV_BU_CD}
+					  AND MR.PLANT_CD = 'WF01'
+					  AND MR.RESOURCE_TYPE = 'M'
+					#if($_parameter.prodPart and $_parameter.prodPart != "")
+		       		  AND MC.ATTB_2_CD IN ('$_parameter.prodPart.replace(",","','")')
+		  			#end
+					#if($_parameter.workplaces and $_parameter.workplaces != "")
+		       		  AND MR.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+		  			#end  
+		  			  AND MCAL.YYYYMMDD BETWEEN @{swFromDate} AND @{swToDate}
+					  AND MR.VALID_FROM_DATE <![CDATA[<=]]> @V_CUR_DATE
+          			  AND MR.VALID_TO_DATE <![CDATA[>=]]> @V_CUR_DATE
+					GROUP BY MR.ROUTING_ID, MR.RESOURCE_GROUP_NM, MR.RESOURCE_CD, MR.RESOURCE_NM, MCAL.YEARWEEK
+				) A
+				GROUP BY ROLLUP (<include refid="include.getCdRollup"/>)
+			) B
+			ORDER BY B.TMP_COL
+			#foreach( $dimMap in $_parameter.dimList )
+		    , B.$dimMap.DIM_CD
+		    #end
+		END;
+	</select>
+	
+	<select id="equiTrendDetailListSelect" parameterType="map" resultType="map">
+		/****** [ supply.product.equiTrendDetailListSelect ] ******/
+		SELECT MR.ROUTING_ID
+		     , MR.RESOURCE_GROUP_NM
+		     , MR.RESOURCE_CD
+		     , MR.RESOURCE_NM
+		     , CONVERT(VARCHAR, CONVERT(DATETIME, DRR.YYYYMMDD), 23) AS YYYYMMDD
+		     , ROUND(SUM(DRR.CONS_TIME) / 3600.0, 1) AS CONS_TIME
+		FROM TB_MST_RESOURCE MR WITH(NOLOCK)
+		INNER JOIN TB_DYN_RESOURCE_RESULT DRR WITH(NOLOCK)
+		   ON DRR.COMPANY_CD = MR.COMPANY_CD
+		  AND DRR.BU_CD = MR.BU_CD
+		  AND DRR.PLANT_CD = MR.PLANT_CD
+		  AND DRR.RESOURCE_CD = MR.RESOURCE_CD
+		INNER JOIN TB_MST_CALENDAR MCAL WITH(NOLOCK)
+		   ON MCAL.YYYYMMDD = DRR.YYYYMMDD
+		INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+		   ON MC.BU_CD = MR.BU_CD
+		  AND MC.GROUP_CD = 'PROD_L2'
+		  AND MC.CODE_CD = MR.ROUTING_ID
+		WHERE MR.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND MR.BU_CD = @{GV_BU_CD}
+		  AND MR.PLANT_CD = 'WF01'
+		  AND MR.RESOURCE_TYPE = 'M'
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+      	  AND MC.ATTB_2_CD IN ('$_parameter.prodPart.replace(",","','")')
+		#end
+		#if($_parameter.workplaces and $_parameter.workplaces != "")
+      	  AND MR.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+		#end  
+ 		  AND DRR.YYYYMMDD BETWEEN @{fromCal} AND @{toCal}  
+		#if($_parameter.routing and $_parameter.routing != "")
+		  AND MR.ROUTING_ID IN ('$_parameter.routing.replace(",","','")')
+		#end  
+		#if($_parameter.facilityGroup and $_parameter.facilityGroup != "")
+		  AND MR.RESOURCE_GROUP_CD IN ('$_parameter.facilityGroup.replace(",","','")')
+		#end  
+		#if($_parameter.facility and $_parameter.facility != "")
+		  AND (MR.RESOURCE_CD LIKE '%'+@{facility}+'%' OR MR.RESOURCE_NM LIKE '%'+@{facility}+'%')
+		#end
+		GROUP BY MR.ROUTING_ID, MR.RESOURCE_GROUP_NM, MR.RESOURCE_CD, MR.RESOURCE_NM, DRR.YYYYMMDD
+		ORDER BY MR.ROUTING_ID, MR.RESOURCE_GROUP_NM, MR.RESOURCE_CD, MR.RESOURCE_NM, DRR.YYYYMMDD
+	</select>
+	
+	<select id="equiTrendDetailListExcelSqlSelect" parameterType="map" resultType="map">
+	/****** [ supply.product.equiTrendDetailListExcelSqlSelect ] ******/
+		SELECT CASE WHEN A2.MENU_CD = @{popUpMenuCd} THEN 'Y' ELSE 'N' END AS USE_FLAG
+		, A2.ACTION_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		         , ACTION_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD = @{popUpMenuCd}
+		      AND ACTION_CD IN ('EXCEL','SQL')
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+		, A2.ACTION_CD
+	
+	</select>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</mapper>
+

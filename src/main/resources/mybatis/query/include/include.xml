@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="include">
+	<sql id="macros">
+#macro(getProductTree)
+  #set($pLvl1 = "")
+  #set($pLvl2 = "")
+  #set($pLvl3 = "")
+  #set($pLvl4 = "")
+  #foreach($treeMap in $_parameter.productList)
+    #if($treeMap.level == "1")
+      #set($pLvl1 = $pLvl1 + ",'" + $treeMap.id1 + "'")
+    #elseif($treeMap.level == "2")
+      #set($pLvl2 = $pLvl2 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "')" )
+    #elseif($treeMap.level == "3")
+      #set($pLvl3 = $pLvl3 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "'+'" + $treeMap.id3 + "')" )
+    #elseif($treeMap.level == "4")
+      #set($pLvl4 = $pLvl4 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "'+'" + $treeMap.id3 + "'+'" + $treeMap.id4 + "')" )
+    #end
+  #end
+  #if($pLvl1 != "") #set($pLvl1 = $pLvl1.substring(1)) #end
+  #if($pLvl2 != "") #set($pLvl2 = $pLvl2.substring(1)) #end
+  #if($pLvl3 != "") #set($pLvl3 = $pLvl3.substring(1)) #end
+  #if($pLvl4 != "") #set($pLvl4 = $pLvl4.substring(1)) #end
+#end
+
+#macro(getCustomerTree)
+  #set($sLvl1 = "")
+  #set($sLvl2 = "")
+  #set($sLvl3 = "")
+  #set($sLvl4 = "")
+  #foreach($treeMap in $_parameter.customerList)
+    #if($treeMap.level == "1")
+      #set($sLvl1 = $sLvl1 + ",'" + $treeMap.id1 + "'")
+    #elseif($treeMap.level == "2")
+      #set($sLvl2 = $sLvl2 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "')" )
+    #elseif($treeMap.level == "3")
+      #set($sLvl3 = $sLvl3 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "'+'" + $treeMap.id3 + "')" )
+    #elseif($treeMap.level == "4")
+      #set($sLvl4 = $sLvl4 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "'+'" + $treeMap.id3 + "'+'" + $treeMap.id4 + "')" )
+    #end
+  #end
+  #if($sLvl1 != "") #set($sLvl1 = $sLvl1.substring(1)) #end
+  #if($sLvl2 != "") #set($sLvl2 = $sLvl2.substring(1)) #end
+  #if($sLvl3 != "") #set($sLvl3 = $sLvl3.substring(1)) #end
+  #if($sLvl4 != "") #set($sLvl4 = $sLvl4.substring(1)) #end
+#end
+
+#macro(getSalesOrgTree)
+  #set($soLvl1 = "")
+  #set($soLvl2 = "")
+  #set($soLvl3 = "")
+  #set($soLvl4 = "")
+  #set($soLvl5 = "")
+  #foreach($treeMap in $_parameter.salesOrgList)
+    #if($treeMap.level == "1")
+      #set($soLvl1 = $soLvl1 + ",'" + $treeMap.id1 + "'")
+    #elseif($treeMap.level == "2")
+      #set($soLvl2 = $soLvl2 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "')" )
+    #elseif($treeMap.level == "3")
+      #set($soLvl3 = $soLvl3 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "'+'" + $treeMap.id3 + "')" )
+    #elseif($treeMap.level == "4")
+      #set($soLvl4 = $soLvl4 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "'+'" + $treeMap.id3 + "'+'" + $treeMap.id4 + "')" )
+    #elseif($treeMap.level == "5")
+      #set($soLvl5 = $soLvl5 + ",('" + $treeMap.id1 + "'+'" + $treeMap.id2 + "'+'" + $treeMap.id3 + "'+'" + $treeMap.id4 + "'+'" + $treeMap.id5 + "')" )
+    #end
+  #end
+  #if($soLvl1 != "") #set($soLvl1 = $soLvl1.substring(1)) #end
+  #if($soLvl2 != "") #set($soLvl2 = $soLvl2.substring(1)) #end
+  #if($soLvl3 != "") #set($soLvl3 = $soLvl3.substring(1)) #end
+  #if($soLvl4 != "") #set($soLvl4 = $soLvl4.substring(1)) #end
+  #if($soLvl5 != "") #set($soLvl5 = $soLvl5.substring(1)) #end
+#end
+
+#macro(filters)
+  where 1=1
+#end
+#macro(order_by)
+  --
+#end
+	</sql>
+
+	<!-- ProductTree  -->
+	<sql id="productTree">
+#set($newLine = "
+        ")
+#set($pTreeQuery = "")
+#set($addOr = "")
+#if($pLvl1 != "")
+  #set($pTreeQuery = ${treeAlias}+".PROD_LVL1_CD IN ("+$pLvl1+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($pLvl2 != "")
+  #set($pTreeQuery = $pTreeQuery + $addOr+" ("+${treeAlias}+".PROD_LVL1_CD+"+${treeAlias}+".PROD_LVL2_CD) IN ("+$pLvl2+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($pLvl3 != "")
+  #set($pTreeQuery = $pTreeQuery + $addOr+" ("+${treeAlias}+".PROD_LVL1_CD+"+${treeAlias}+".PROD_LVL2_CD+"+${treeAlias}+".PROD_LVL3_CD) IN ("+$pLvl3+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($pLvl4 != "")
+  #set($pTreeQuery = $pTreeQuery + $addOr+" ("+${treeAlias}+".PROD_LVL1_CD+"+${treeAlias}+".PROD_LVL2_CD+"+${treeAlias}+".PROD_LVL3_CD+"+${treeAlias}+".PROD_LVL4_CD) IN ("+$pLvl4+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($pTreeQuery != "")
+        AND ($pTreeQuery)
+#end
+	</sql>
+
+	<!-- CustomerTree  -->
+	<sql id="customerTree">
+#set($newLine = "
+        ")
+#set($sTreeQuery = "")
+#set($addOr = "")
+#if($sLvl1 != "")
+  #set($sTreeQuery = ${treeAlias}+".CUST_LVL1_CD IN ("+$sLvl1+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($sLvl2 != "")
+  #set($sTreeQuery = $sTreeQuery + $addOr+" ("+${treeAlias}+".CUST_LVL1_CD+"+${treeAlias}+".CUST_LVL2_CD) IN ("+$sLvl2+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($sLvl3 != "")
+  #set($sTreeQuery = $sTreeQuery + $addOr+" ("+${treeAlias}+".CUST_LVL1_CD+"+${treeAlias}+".CUST_LVL2_CD+"+${treeAlias}+".CUST_LVL3_CD) IN ("+$sLvl3+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($sLvl4 != "")
+  #set($sTreeQuery = $sTreeQuery + $addOr+" ("+${treeAlias}+".CUST_LVL1_CD+"+${treeAlias}+".CUST_LVL2_CD+"+${treeAlias}+".CUST_LVL3_CD+"+${treeAlias}+".CUST_LVL4_CD) IN ("+$sLvl4+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($sTreeQuery != "")
+        AND ($sTreeQuery)
+#end
+	</sql>
+
+	<!-- SalesOrgTree  -->
+	<sql id="salesOrgTree">
+#set($newLine = "
+        ")
+#set($soTreeQuery = "")
+#set($addOr = "")
+#if($soLvl1 != "")
+  #set($soTreeQuery = ${treeAlias}+".SALES_ORG_LVL1_CD IN ("+$soLvl1+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($soLvl2 != "")
+  #set($soTreeQuery = $soTreeQuery + $addOr+" ("+${treeAlias}+".SALES_ORG_LVL1_CD+"+${treeAlias}+".SALES_ORG_LVL2_CD) IN ("+$soLvl2+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($soLvl3 != "")
+  #set($soTreeQuery = $soTreeQuery + $addOr+" ("+${treeAlias}+".SALES_ORG_LVL1_CD+"+${treeAlias}+".SALES_ORG_LVL2_CD+"+${treeAlias}+".SALES_ORG_LVL3_CD) IN ("+$soLvl3+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($soLvl4 != "")
+  #set($soTreeQuery = $soTreeQuery + $addOr+" ("+${treeAlias}+".SALES_ORG_LVL1_CD+"+${treeAlias}+".SALES_ORG_LVL2_CD+"+${treeAlias}+".SALES_ORG_LVL3_CD+"+${treeAlias}+".SALES_ORG_LVL4_CD) IN ("+$soLvl4+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($soLvl5 != "")
+  #set($soTreeQuery = $soTreeQuery + $addOr+" ("+${treeAlias}+".SALES_ORG_LVL1_CD+"+${treeAlias}+".SALES_ORG_LVL2_CD+"+${treeAlias}+".SALES_ORG_LVL3_CD+"+${treeAlias}+".SALES_ORG_LVL4_CD+"+${treeAlias}+".SALES_ORG_LVL5_CD) IN ("+$soLvl5+")")
+  #set($addOr = $newLine + " OR")
+#end
+#if($soTreeQuery != "")
+        AND ($soTreeQuery)
+#end
+	</sql>
+
+	<!-- menu  -->
+	<sql id="menuData">
+	WITH CTE (COMPANY_CD
+            , BU_CD
+            , UPPER_MENU_CD
+    		, MENU_LVL
+    		, MENU_CD
+    		, MENU_NM
+    		, MENU_NM_KR
+    		, MENU_NM_CN
+    		, URL
+    		, SORT
+    		, USE_FLAG
+    		, USE_DIM_FLAG
+    		, USE_MEAS_FLAG
+    		, USE_DECIMAL_FLAG
+    		, USE_ITEM_HIER_FLAG
+    		, USE_CUSTOMER_HIER_FLAG
+    		, USE_SALES_ORG_HIER_FLAG
+    		, USE_DIM_FIX_FLAG
+    		, MENU_TYPE
+    		, MENU_PARAM
+    		, PATH
+    		, NM_PATH
+    		, ROOT_CD
+    		, ROOT_SORT
+    		, TREE_PATH) AS (
+    	SELECT COMPANY_CD
+    	     , BU_CD
+    	     , UPPER_MENU_CD
+    	     , MENU_LVL
+    	     , MENU_CD
+    		 , MENU_NM
+    		 , MENU_NM_KR
+    		 , MENU_NM_CN
+    		 , URL
+    		 , SORT
+    		 , USE_FLAG
+    		 , USE_DIM_FLAG
+    		 , USE_MEAS_FLAG
+    		 , USE_DECIMAL_FLAG
+    		 , USE_ITEM_HIER_FLAG
+    		 , USE_CUSTOMER_HIER_FLAG
+    		 , USE_SALES_ORG_HIER_FLAG
+    		 , USE_DIM_FIX_FLAG
+    		 , MENU_TYPE
+    		 , MENU_PARAM
+    		 , CONVERT(VARCHAR(100),'|'+MENU_CD) AS PATH
+    		 
+    		 , CASE WHEN 'ko' = @{GV_LANG} THEN CONVERT(VARCHAR(100),'|'+MENU_NM_KR)
+                    WHEN 'cn' = @{GV_LANG} THEN CONVERT(VARCHAR(100),'|'+MENU_NM_CN)
+                    ELSE CONVERT(VARCHAR(100),'|'+MENU_NM)
+                END NM_PATH
+    		 <!-- , CONVERT(VARCHAR(100),'|'+MENU_NM) AS NM_PATH -->
+    		 , MENU_CD AS ROOT_CD
+    		 , CONVERT(VARCHAR(100),''+dbo.UFN_LPAD(SORT,3,'0')) AS ROOT_SORT
+    		 , CONVERT(VARCHAR(100),''+REPLACE(MENU_CD,'.','||'),3) AS TREE_PATH
+    	FROM TB_MST_MENU WITH(NOLOCK)
+    	WHERE ISNULL(UPPER_MENU_CD,' ') = ' '
+#if($_parameter.ACTIVE_USE_FLAG != "N")
+    	  AND USE_FLAG != 'N'
+#end
+#if($_parameter.SEARCH_COMPANY and $_parameter.SEARCH_COMPANY != "")
+    	  AND COMPANY_CD = @{SEARCH_COMPANY}
+    	  AND BU_CD = @{SEARCH_BU}
+#else
+    	  AND COMPANY_CD = @{GV_COMPANY_CD}
+    	  AND BU_CD = @{GV_BU_CD}
+#end
+    	UNION ALL
+    	SELECT A.COMPANY_CD
+    	     , A.BU_CD
+    		 , A.UPPER_MENU_CD
+    	     , A.MENU_LVL
+    	     , A.MENU_CD
+    		 , A.MENU_NM
+    		 , A.MENU_NM_KR
+    		 , A.MENU_NM_CN
+    		 , A.URL
+    		 , A.SORT
+    		 , A.USE_FLAG
+    		 , A.USE_DIM_FLAG
+    		 , A.USE_MEAS_FLAG
+    		 , A.USE_DECIMAL_FLAG
+    		 , A.USE_ITEM_HIER_FLAG
+    		 , A.USE_CUSTOMER_HIER_FLAG
+    		 , A.USE_SALES_ORG_HIER_FLAG
+    		 , A.USE_DIM_FIX_FLAG
+    		 , A.MENU_TYPE
+    		 , A.MENU_PARAM
+    		 , CONVERT(VARCHAR(100),B.PATH+'|'+A.MENU_CD) AS PATH
+    		 , CASE WHEN 'ko' = @{GV_LANG} THEN CONVERT(VARCHAR(100),B.NM_PATH+'|'+A.MENU_NM_KR)
+                    WHEN 'cn' = @{GV_LANG} THEN CONVERT(VARCHAR(100),B.NM_PATH+'|'+A.MENU_NM_CN)
+                    ELSE CONVERT(VARCHAR(100),B.NM_PATH+'|'+A.MENU_NM)
+                END NM_PATH
+    		 <!-- , CONVERT(VARCHAR(100),B.NM_PATH+'|'+A.MENU_NM) AS NM_PATH -->
+    		 , B.ROOT_CD
+    		 , CONVERT(VARCHAR(100),B.ROOT_SORT+CONVERT(VARCHAR(100),dbo.UFN_LPAD(A.SORT,3,'0'))) AS ROOT_SORT
+    		 , CONVERT(VARCHAR(100),B.TREE_PATH+'.'+CONVERT(VARCHAR(100),REPLACE(A.MENU_CD,'.','||'),3)) AS TREE_PATH
+    	FROM TB_MST_MENU A WITH(NOLOCK)
+    	   , CTE B
+    	WHERE A.COMPANY_CD    = B.COMPANY_CD
+    	  AND A.BU_CD         = B.BU_CD
+    	  AND A.UPPER_MENU_CD = B.MENU_CD
+#if($_parameter.ACTIVE_USE_FLAG != "N")
+    	  AND A.USE_FLAG     != 'N'
+#end
+    )
+	</sql>
+
+	<sql id="menuDataSelColumn">
+		  TREE_PATH
+    	, ISNULL(MENU_NM,'') AS MENU_NM
+    	, ISNULL(MENU_NM_KR,'') AS MENU_NM_KR
+    	, ISNULL(MENU_NM_CN,'') AS MENU_NM_CN
+        , COMPANY_CD
+        , BU_CD
+        , ISNULL(UPPER_MENU_CD,'') AS UPPER_MENU_CD
+    	, MENU_LVL
+    	, MENU_CD
+    	, ISNULL(URL,'') AS URL
+    	, SORT
+    	, ISNULL(USE_FLAG               , 'N') AS USE_FLAG               
+    	, ISNULL(USE_DIM_FLAG           , 'N') AS USE_DIM_FLAG           
+        , ISNULL(USE_MEAS_FLAG          , 'N') AS USE_MEAS_FLAG          
+        , ISNULL(USE_DECIMAL_FLAG       , 'N') AS USE_DECIMAL_FLAG       
+        , ISNULL(USE_ITEM_HIER_FLAG     , 'N') AS USE_ITEM_HIER_FLAG     
+    	, ISNULL(USE_CUSTOMER_HIER_FLAG , 'N') AS USE_CUSTOMER_HIER_FLAG 
+    	, ISNULL(USE_SALES_ORG_HIER_FLAG, 'N') AS USE_SALES_ORG_HIER_FLAG
+    	, ISNULL(USE_DIM_FIX_FLAG       , 'N') AS USE_DIM_FIX_FLAG       
+    	, MENU_TYPE
+        , MENU_PARAM
+    	, PATH
+    	, NM_PATH
+    	, ROOT_CD
+    	, ROOT_SORT
+	</sql>
+
+	<sql id="includeMenuAction">
+    SELECT A.MENU_CD AS MENU_CD_ACTION
+         , MAX(CASE WHEN A.ACTION_CD = 'SEARCH' THEN 'Y' END) AS SEARCH_ACTION
+         , MAX(CASE WHEN A.ACTION_CD = 'SAVE'   THEN 'Y' END) AS SAVE_ACTION
+         , MAX(CASE WHEN A.ACTION_CD = 'SQL'    THEN 'Y' END) AS SQL_ACTION
+         , MAX(CASE WHEN A.ACTION_CD = 'EXCEL'  THEN 'Y' END) AS EXCEL_ACTION
+    FROM TB_MAP_ROLE_MENU_ACTION A WITH(NOLOCK)
+    INNER JOIN TB_MST_ROLE B WITH(NOLOCK)
+      ON B.BU_CD   = A.BU_CD
+     AND B.ROLE_CD = A.ROLE_CD
+    INNER JOIN TB_MST_MENU C WITH(NOLOCK)
+      ON C.COMPANY_CD = A.COMPANY_CD
+     AND C.BU_CD      = A.BU_CD
+     AND C.MENU_CD    = A.MENU_CD
+#if($_parameter.chkUserYn and $_parameter.chkUserYn == "Y")
+    INNER JOIN TB_MAP_USER_ROLE D WITH(NOLOCK)
+      ON D.BU_CD   = A.BU_CD
+     AND D.ROLE_CD = A.ROLE_CD
+     AND D.USER_ID = @{GV_USER_ID}
+#end
+    WHERE 1=1
+#if($_parameter.SEARCH_COMPANY and $_parameter.SEARCH_COMPANY != "")
+      AND A.COMPANY_CD = @{SEARCH_COMPANY}
+      AND A.BU_CD      = @{SEARCH_BU}
+#else
+      AND A.COMPANY_CD = @{GV_COMPANY_CD}
+      AND A.BU_CD      = @{GV_BU_CD}
+#end
+#if($_parameter.SEARCH_ROLE_CD and $_parameter.SEARCH_ROLE_CD != "")
+      AND A.ROLE_CD    = @{SEARCH_ROLE_CD}
+#end
+#if($_parameter.menuCd and $_parameter.menuCd != "")
+      AND A.MENU_CD    = @{menuCd}
+#end
+      AND ISNULL(A.USE_FLAG,'Y') != 'N'
+    GROUP BY A.MENU_CD
+	</sql>
+
+	<sql id="getRollup">
+#set($rollupDot = ".")
+#if(!$rollupAlias or $rollupAlias == "")
+  #set($rollupAlias = "")
+  #set($rollupDot = "")
+#end
+#foreach( $dimMap in $_parameter.dimList )
+  #if($velocityCount == 1)
+               (${rollupAlias}${rollupDot}$dimMap.DIM_CD,${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+  #elseif($preLvl == $dimMap.LVL or $totalFlag != "Y")
+              , ${rollupAlias}${rollupDot}$dimMap.DIM_CD,${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+  #elseif($preLvl != $dimMap.LVL and $totalFlag == "Y")
+             ), (${rollupAlias}${rollupDot}$dimMap.DIM_CD,${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+  #end
+  #if($preLvl != $dimMap.LVL)
+    #set($totalFlag = $dimMap.SQL_TOTAL_FLAG)
+  #end
+  #set($preLvl = $dimMap.LVL)
+#end
+	          )
+	</sql>
+
+	<sql id="getCdRollup">
+#set($rollupDot = ".")
+#if(!$rollupAlias or $rollupAlias == "")
+  #set($rollupAlias = "")
+  #set($rollupDot = "")
+#end
+#foreach( $dimMap in $_parameter.dimList )
+  #if($velocityCount == 1)
+               (${rollupAlias}${rollupDot}$dimMap.DIM_CD
+  #elseif($preLvl == $dimMap.LVL or $totalFlag != "Y")
+              , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+  #elseif($preLvl != $dimMap.LVL and $totalFlag == "Y")
+             ), (${rollupAlias}${rollupDot}$dimMap.DIM_CD
+  #end
+  #if($preLvl != $dimMap.LVL)
+    #set($totalFlag = $dimMap.SQL_TOTAL_FLAG)
+  #end
+  #set($preLvl = $dimMap.LVL)
+#end
+	          )
+	</sql>
+
+	<sql id="getDimTotal">
+#set($rollupDot = ".")
+#set($preCol = "")
+#if(!$rollupAlias or $rollupAlias == "")
+#set($rollupAlias = "")
+#set($rollupDot = "")
+#end
+#foreach( $dimMap in $_parameter.dimList )
+#if($velocityCount == 1)
+	     , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+	     , CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN @{gvTotal} ELSE ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+#else
+	     , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+	     , CASE WHEN $preCol IS NOT NULL THEN CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN @{gvSubTotal} ELSE ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM END
+	            ELSE CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN '' ELSE ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM END
+	       END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+#end
+#set($preCol = ${rollupAlias}+${rollupDot}+$dimMap.DIM_CD)
+#end
+	</sql>
+	
+	
+	<sql id="getCdDimTotal">
+#set($rollupDot = ".")
+#set($preCol = "")
+#if(!$rollupAlias or $rollupAlias == "")
+#set($rollupAlias = "")
+#set($rollupDot = "")
+#end
+#foreach( $dimMap in $_parameter.dimList )
+#if($velocityCount == 1)
+	     , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+	     , CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN @{gvTotal} ELSE MAX ( ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM ) END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+#else
+	     , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
+	     , CASE WHEN $preCol IS NOT NULL THEN CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN @{gvSubTotal} ELSE MAX ( ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM ) END
+	            ELSE CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN '' ELSE MAX ( ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM ) END
+	       END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
+#end
+#set($preCol = ${rollupAlias}+${rollupDot}+$dimMap.DIM_CD)
+#end
+	</sql>
+
+
+	<sql id="getGrpLvlId">
+#set($grpLvlId = "")
+#set($rollupDot = ".")
+#if(!$rollupAlias or $rollupAlias == "")
+#set($rollupAlias = "")
+#set($rollupDot = "")
+#end
+#foreach( $dimMap in $_parameter.dimList )
+#if($velocityCount == 1)
+#set($grpLvlId = ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+#else
+#set($grpLvlId = ${grpLvlId} + ", " + ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
+#end
+#end
+		 , GROUPING_ID(${grpLvlId}) AS GRP_LVL_ID
+	</sql>
+	
+	<sql id="mstCodeNm">
+	, CASE WHEN UPPER(@{GV_LANG}) = 'KO' AND CODE_NM_KR != '' THEN ISNULL(CODE_NM_KR,CODE_NM)
+	       WHEN UPPER(@{GV_LANG}) = 'CN' AND CODE_NM_CN != '' THEN ISNULL(CODE_NM_CN,CODE_NM)
+	       ELSE CODE_NM
+	  END AS CODE_NM
+	</sql>
+	
+	<!-- 사용되는 공통코드 조회  -->
+	<sql id="mstCode">
+#if($_parameter.buAllYn != "Y")
+		SELECT *
+		FROM 
+		(
+		    SELECT BU_CD
+		         , GROUP_CD
+		         , GROUP_DESC
+		         , CODE_CD
+		         <include refid="include.mstCodeNm" />
+		         , USE_FLAG
+		         , SORT
+		         , ATTB_1_CD, ATTB_1_NM, ATTB_2_CD, ATTB_2_NM, ATTB_3_CD, ATTB_3_NM, ATTB_4_CD, ATTB_4_NM, ATTB_5_CD, ATTB_5_NM
+		         , ATTB_6_CD, ATTB_6_NM, ATTB_7_CD, ATTB_7_NM, ATTB_8_CD, ATTB_8_NM, ATTB_9_CD, ATTB_9_NM, ATTB_10_CD, ATTB_10_NM
+		         , GROUP_CD + CODE_CD AS ROW_KEY
+		         , DENSE_RANK() OVER(PARTITION BY BU_CD ORDER BY BU_CD DESC) AS RNUM
+		    FROM TB_MST_CODE WITH (NOLOCK)
+		    WHERE GROUP_CD IN ('$_parameter.groupCd.replace(",","','")')
+		      AND USE_FLAG != 'N'
+		      AND BU_CD IN ('ALL',@{GV_BU_CD})
+		) A
+		WHERE RNUM = 1
+#else
+		SELECT BU_CD
+		     , GROUP_CD
+		     , GROUP_DESC
+		     , CODE_CD
+		     <include refid="include.mstCodeNm" />
+		     , USE_FLAG
+		     , SORT
+		     , ATTB_1_CD, ATTB_1_NM, ATTB_2_CD, ATTB_2_NM, ATTB_3_CD, ATTB_3_NM, ATTB_4_CD, ATTB_4_NM, ATTB_5_CD, ATTB_5_NM
+		     , ATTB_6_CD, ATTB_6_NM, ATTB_7_CD, ATTB_7_NM, ATTB_8_CD, ATTB_8_NM, ATTB_9_CD, ATTB_9_NM, ATTB_10_CD, ATTB_10_NM
+		FROM TB_MST_CODE WITH (NOLOCK)
+		WHERE GROUP_CD IN ('$_parameter.groupCd.replace(",","','")')
+		  AND USE_FLAG != 'N'
+#end
+	</sql>
+
+</mapper>

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="admin">
+	
+	<select id="userMngSelect" parameterType="map" resultType="map">
+		/****** [ admin.userMngSelect ] ******/
+		WITH W_MAIN AS 
+		(
+			SELECT A.USER_ID
+		         , A.USER_NM
+		         , A.USER_TYPE
+		         , A.PWD
+		         , A.DEL_FLAG
+		         , A.USE_FLAG
+		         , A.LANG_CD
+		         , A.EMAIL
+		         , A.DASHBOARD_YN
+		         , A.FINAL_ACCESS_FINISH_DTTM
+		         , A.FINAL_ACCESS_START_DTTM
+			FROM TB_MST_USER A WITH(NOLOCK)
+			WHERE ISNULL(A.DEL_FLAG,'N') = 'N'
+			  AND ISNULL(A.USE_FLAG,'Y') = 'Y'
+			#if($_parameter.SEARCH_USER_ID and $_parameter.SEARCH_USER_ID != "")
+			  AND (A.USER_ID LIKE '%' + REPLACE(@{SEARCH_USER_ID},'_','[_]') + '%' 
+			    OR A.USER_NM LIKE '%' + REPLACE(@{SEARCH_USER_ID},'_','[_]') + '%')
+			#end
+		)
+		SELECT A.*
+		FROM W_MAIN A
+	</select>
+	
+	<insert id="userMngInsert" parameterType="map">
+		/****** [ admin.userMngInsert ] ******/
+		INSERT INTO TB_MST_USER 
+		(
+	        USER_ID
+	      , USER_NM
+	      , DEL_FLAG
+	      , USE_FLAG
+	      , EMAIL
+	      , DASHBOARD_YN
+	      , CREATE_ID
+	      , CREATE_DTTM
+	      , UPDATE_ID
+	      , UPDATE_DTTM
+		) VALUES (
+		    @{USER_ID}
+	      , @{USER_NM}
+	      , 'N'
+	      , 'Y'
+	      , @{EMAIL}
+	      , ISNULL(@{DASHBOARD_YN},'N')
+		  , @{GV_USER_ID}     
+		  , DBO.UFN_GETDATE()     
+		  , @{GV_USER_ID}       
+		  , DBO.UFN_GETDATE()     
+		)
+	</insert>
+	
+	<update id="userMngUpdate" parameterType="map">
+		/****** [ admin.userMngUpdate ] ******/
+		UPDATE TB_MST_USER 
+		SET USER_NM     = @{USER_NM}
+		  , EMAIL       = @{EMAIL}
+		  , DASHBOARD_YN = ISNULL(@{DASHBOARD_YN},'N')
+		  , UPDATE_ID   = @{GV_USER_ID}
+		  , UPDATE_DTTM = DBO.UFN_GETDATE() 
+		WHERE USER_ID = @{USER_ID}
+	</update>
+
+	<delete id="userMngDelete" parameterType="map">
+		/****** [ admin.userMngDelete ] ******/
+		DELETE FROM TB_MST_USER
+		WHERE USER_ID = @{USER_ID}
+	</delete>
+	
+	<update id="userMngPwResetUpdate" parameterType="map">
+		/****** [ admin.userMngPwResetUpdate ] ******/
+		UPDATE TB_MST_USER 
+		SET PWD         = NULL
+		  , UPDATE_ID   = @{GV_USER_ID}
+		  , UPDATE_DTTM = DBO.UFN_GETDATE() 
+		WHERE USER_ID = @{USER_ID}
+	</update>
+	
+	<!-- user Role 조회  -->
+	<select id="userMngRoleSelect" parameterType="map" resultType="map">
+		/****** [ admin.userMngRoleSelect ] ******/
+		SELECT A.BU_CD
+		     , A.ROLE_CD
+		     , A.ROLE_NM
+		     , @{SEARCH_USER_ID} AS USER_ID
+		     , MAX(CASE WHEN B.USER_ID = @{SEARCH_USER_ID} THEN 'Y'
+		                ELSE 'N'
+		           END) AS USE_YN
+		FROM TB_MST_ROLE A WITH(NOLOCK)
+		LEFT JOIN TB_MAP_USER_ROLE B WITH(NOLOCK)
+		    ON B.BU_CD   = A.BU_CD
+		   AND B.ROLE_CD = A.ROLE_CD
+		  AND B.USE_FLAG = 'Y'
+		WHERE A.USE_FLAG = 'Y'
+		  AND A.BU_CD = @{SEARCH_BU}
+		GROUP BY A.BU_CD, A.ROLE_CD, A.ROLE_NM
+	</select>
+	
+	<insert id="userMngRoleInsert" parameterType="map">
+		/****** [ admin.userMngRoleInsert ] ******/
+	    INSERT INTO TB_MAP_USER_ROLE 
+	    (
+            USER_ID
+          , BU_CD
+          , ROLE_CD
+          , USE_FLAG
+          , CREATE_ID
+          , CREATE_DTTM
+          , UPDATE_ID
+          , UPDATE_DTTM
+	    ) VALUES (
+    	    @{USER_ID}
+          , @{BU_CD}
+          , @{ROLE_CD}
+          , 'Y'
+    	  , @{GV_USER_ID}     
+    	  , DBO.UFN_GETDATE()     
+    	  , @{GV_USER_ID}       
+    	  , DBO.UFN_GETDATE()     
+	    )
+	</insert>
+	
+	<delete id="userMngRoleDelete" parameterType="map">
+		/****** [ admin.userMngRoleDelete ] ******/
+		DELETE FROM TB_MAP_USER_ROLE
+		WHERE USER_ID = @{USER_ID}
+		  AND ROLE_CD = @{ROLE_CD}
+		  AND BU_CD   = @{BU_CD}
+	</delete>
+
+</mapper>

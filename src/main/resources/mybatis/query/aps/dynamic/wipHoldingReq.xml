@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.dynamic">
+
+   <select id="wipHoldingReqSelect" parameterType="map" resultType="map">
+		/****** [ aps.dynamic.wipHoldingReqSelect ] ******/
+		DECLARE @V_CUR_DATE NVARCHAR(8) = CONVERT(NVARCHAR, DBO.UFN_GETDATE(), 112);
+		
+		SELECT MC2.CODE_NM AS PROD_PART
+		     , MC2.CODE_NM AS PROD_PART_NM
+		     , DPOH.ITEM_CD
+		     , DPOH.ITEM_CD AS ITEM_CD_NM
+		     , MI.ITEM_NM
+		     , MI.ITEM_NM AS ITEM_NM_NM
+		     , MI.SPEC
+		     , MI.SPEC AS SPEC_NM
+		     , MIP.ROUTING_ID
+		     , MIP.ROUTING_ID AS ROUTING_ID_NM
+		     , MIG.UPPER_ITEM_GROUP_NM
+		     , MIG.UPPER_ITEM_GROUP_NM AS UPPER_ITEM_GROUP_NM_NM
+		     , MIG.ITEM_GROUP_NM
+		     , MIG.ITEM_GROUP_NM AS ITEM_GROUP_NM_NM
+		     , MC3.CODE_NM AS PROCUR_TYPE
+		     , MC3.CODE_NM AS PROCUR_TYPE_NM
+		     , MI.ITEM_GRADE
+		     , MI.ITEM_GRADE AS ITEM_GRADE
+		     , MC.REP_CUST_GROUP_NM
+		     , MC.REP_CUST_GROUP_NM AS REP_CUST_GROUP_NM_NM
+		     , MC.CUST_GROUP_NM
+		     , MC.CUST_GROUP_NM AS CUST_GROUP_NM_NM
+		     , DPOH.PROD_ORDER_NO
+		     , DPOH.PROD_ORDER_NO AS PROD_ORDER_NO_NM
+		     , MC4.CODE_NM AS ORDER_STATUS
+		     , MC4.CODE_NM AS ORDER_STATUS_NM
+		     , DPOH.PROD_ORDER_QTY
+		     , DPOH.PROD_ORDER_QTY AS PROD_ORDER_QTY_NM
+		     , ISNULL(DPOH.PROD_ORDER_QTY, 0) - ISNULL(DRP.RESULT_QTY, 0) AS REMAIN_QTY
+		     , ISNULL(DPOH.PROD_ORDER_QTY, 0) - ISNULL(DRP.RESULT_QTY, 0) AS REMAIN_QTY_NM
+		     , DWH.HOLD_DATE
+		     , DWH.HOLD_DATE AS HOLD_DATE_NM
+		     , DWH.HOLD_REASON
+		     , DWH.HOLD_REASON AS HOLD_REASON_NM
+		     , DWH.REQ_USER_NM
+		     , DWH.REQ_USER_NM AS REQ_USER_NM_NM
+		     , DATEDIFF(D, @V_CUR_DATE, DWH.HOLD_DATE) AS HOLD_DAYS
+		     , DATEDIFF(D, @V_CUR_DATE, DWH.HOLD_DATE) AS HOLD_DAYS_NM
+		     , dbo.UFN_GET_USER_NAME(DWH.CREATE_ID) AS CREATE_ID
+		     , dbo.UFN_GET_USER_NAME(DWH.CREATE_ID) AS CREATE_ID_NM
+		     , DWH.CREATE_DTTM
+		     , DWH.CREATE_DTTM AS CREATE_DTTM_NM
+		     , DWH.COMPANY_CD
+		     , DWH.BU_CD
+		FROM TB_DYN_WIP_HOLDING DWH WITH(NOLOCK)
+		INNER JOIN TB_DYN_PROD_ORDER_HDR DPOH WITH(NOLOCK)
+		   ON DPOH.COMPANY_CD = DWH.COMPANY_CD
+		  AND DPOH.BU_CD = DWH.BU_CD
+		  AND DPOH.PROD_ORDER_NO = DWH.PROD_ORDER_NO
+		INNER JOIN TB_DYN_PROD_ORDER_DTL DPOD WITH(NOLOCK)
+		   ON DPOD.COMPANY_CD = DPOH.COMPANY_CD
+		  AND DPOD.BU_CD = DPOH.BU_CD
+		  AND DPOD.PROD_ORDER_NO = DPOH.PROD_ORDER_NO
+		  AND DPOD.ROUTE_ORDER IN ('L', 'S')
+		LEFT OUTER JOIN TB_DYN_ROUTING_PERFORMANCE DRP WITH(NOLOCK)
+		  ON DRP.COMPANY_CD = DPOD.COMPANY_CD
+		 AND DRP.BU_CD = DPOD.BU_CD
+		 AND DRP.PROD_ORDER_NO = DPOD.PROD_ORDER_NO
+		 AND DRP.OPERATION_NO = DPOD.OPERATION_NO
+		INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+		   ON MI.COMPANY_CD = DPOH.COMPANY_CD
+		  AND MI.BU_CD = DPOH.BU_CD
+		  AND MI.ITEM_CD = DPOH.ITEM_CD
+		INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+		   ON MIP.COMPANY_CD = MI.COMPANY_CD
+		  AND MIP.BU_CD = MI.BU_CD
+		  AND MIP.PLANT_CD = 'WF01'
+		  AND MIP.ITEM_CD = MI.ITEM_CD
+		LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+		  ON MC.COMPANY_CD = MI.COMPANY_CD
+		 AND MC.BU_CD = MI.BU_CD
+		 AND MC.CUST_CD = MI.REP_CUST_CD
+		LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+		  ON MIG.COMPANY_CD = MI.COMPANY_CD
+		 AND MIG.BU_CD = MI.BU_CD
+		 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = MIP.BU_CD
+		 AND MC1.GROUP_CD = 'PROD_L2'
+		 AND MC1.CODE_CD = MIP.ROUTING_ID
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = MC1.BU_CD
+		 AND MC2.GROUP_CD = 'PROD_PART'
+		 AND MC2.CODE_CD = MC1.ATTB_2_CD
+		 AND MC2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		  ON MC3.BU_CD = 'ALL'
+		 AND MC3.GROUP_CD = 'PROCUR_TYPE'
+		 AND MC3.CODE_CD = MIP.PROCUR_TYPE
+		 AND MC3.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC4 WITH(NOLOCK)
+		  ON MC4.BU_CD = DPOH.BU_CD
+		 AND MC4.GROUP_CD = 'ORDER_STATUS'
+		 AND MC4.CODE_CD = DPOH.ORDER_STATUS
+		 AND MC4.USE_FLAG = 'Y'
+		WHERE 1 = 1
+		  AND DWH.DEL_FLAG = 'N'
+		  /* 20210201 이큰산 추가 */
+		  AND DPOH.DEL_FLAG = 'N'
+		  --------------------------
+		#if($_parameter.item_nm and $_parameter.item_nm != ""  )
+          AND (DPOH.ITEM_CD  LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%' or 
+         	   DPOH.ITEM_CD IN (@{item_nm}.replace(",","','")) )
+		#end
+	  	#if($_parameter.route and $_parameter.route != "")
+		  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+	  	#end
+	  	#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+		  AND MC.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+	  	#end
+	  	#if($_parameter.custGroup and $_parameter.custGroup != "")
+	      AND MC.CUST_GROUP_CD IN ('$_parameter.custGroup.replace(",","','")')
+	  	#end
+	  	#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+	      AND MIG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+	  	#end
+	  	#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+	      AND MIG.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+		#end
+	  	#if($_parameter.prodPart and $_parameter.prodPart != "")
+	      AND MC2.CODE_CD IN ('$_parameter.prodPart.replace(",","','")')
+	  	#end
+	  	#if($_parameter.procurType and $_parameter.procurType != "")
+	      AND MC3.CODE_CD IN ('$_parameter.procurType.replace(",","','")')
+	  	#end
+	  	ORDER BY MC2.CODE_NM, DPOH.ITEM_CD, MI.ITEM_NM, MIG.UPPER_ITEM_GROUP_NM, DPOH.PROD_ORDER_NO; 
+	</select>
+	
+	<select id="wipHoldingReqAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.prodStand.workCalendarRscAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS30701', 'APS30702', 'APS30703', 'APS30704')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<update id="wipHoldingReqMerge" parameterType="map">
+		/****** [ aps.static.wipHoldingReqUpdate ] ******/
+		MERGE TB_DYN_WIP_HOLDING WITH (HOLDLOCK) AS T 
+	    USING 
+	    (
+			SELECT @{GV_COMPANY_CD} AS COMPANY_CD
+	             , @{GV_BU_CD} AS BU_CD
+	             , '$_parameter.PROD_ORDER_NO_NM' AS PROD_ORDER_NO
+				 , '$_parameter.HOLD_DATE_NM' AS HOLD_DATE
+				#if($_parameter.HOLD_REASON_NM and $_parameter.HOLD_REASON_NM != "")
+				 , '$_parameter.HOLD_REASON_NM' AS HOLD_REASON
+	            #end
+	            #if($_parameter.REQ_USER_NM_NM and $_parameter.REQ_USER_NM_NM != "")
+				 , '$_parameter.REQ_USER_NM_NM' AS REQ_USER_NM
+	            #end
+				 , @{GV_USER_ID} AS CREATE_ID
+				 , DBO.UFN_GETDATE() AS CREATE_DTTM
+				 , @{GV_USER_ID} AS UPDATE_ID
+				 , DBO.UFN_GETDATE() AS UPDATE_DTTM
+				 , 'N' AS DEL_FLAG
+		) AS S
+	    ON (
+	    	T.COMPANY_CD = S.COMPANY_CD 
+	        AND T.BU_CD = S.BU_CD
+	        AND T.PROD_ORDER_NO = S.PROD_ORDER_NO
+	    )
+	    WHEN MATCHED THEN 
+	    UPDATE SET HOLD_DATE = S.HOLD_DATE
+			#if($_parameter.HOLD_REASON_NM and $_parameter.HOLD_REASON_NM != "")
+	         , HOLD_REASON = S.HOLD_REASON
+	        #end
+	        #if($_parameter.REQ_USER_NM_NM and $_parameter.REQ_USER_NM_NM != "")
+	         , REQ_USER_NM = S.REQ_USER_NM
+	        #end
+	         , UPDATE_ID = S.UPDATE_ID
+	         , UPDATE_DTTM = S.UPDATE_DTTM
+	         , DEL_FLAG = S.DEL_FLAG
+		WHEN NOT MATCHED THEN
+	    INSERT 
+	    (
+			COMPANY_CD
+		  ,	BU_CD
+		  ,	PROD_ORDER_NO
+		  ,	HOLD_DATE
+		#if($_parameter.HOLD_REASON_NM and $_parameter.HOLD_REASON_NM != "")
+		  ,	HOLD_REASON
+		#end
+		#if($_parameter.REQ_USER_NM_NM and $_parameter.REQ_USER_NM_NM != "")
+		  ,	REQ_USER_NM
+		#end
+		  ,	CREATE_ID
+		  ,	CREATE_DTTM
+	 	  ,	UPDATE_ID
+		  ,	UPDATE_DTTM
+		  ,	DEL_FLAG
+		)VALUES( 
+			S.COMPANY_CD
+	      , S.BU_CD
+	      , S.PROD_ORDER_NO
+	      , S.HOLD_DATE
+	    #if($_parameter.HOLD_REASON_NM and $_parameter.HOLD_REASON_NM != "")
+	      , S.HOLD_REASON
+		#end
+	    #if($_parameter.REQ_USER_NM_NM and $_parameter.REQ_USER_NM_NM != "")
+	      , S.REQ_USER_NM
+	    #end
+	      , S.CREATE_ID
+	      , S.CREATE_DTTM
+	      , S.UPDATE_ID
+	      , S.UPDATE_DTTM
+	      , S.DEL_FLAG
+		);
+    </update>
+      
+      <delete id="wipHoldingReqDelete" parameterType="map">
+		/****** [ asp.aps.dynamic.wipHoldingReqDelete ] ******/
+		UPDATE TB_DYN_WIP_HOLDING
+		   SET DEL_FLAG         = 'Y'
+		     , UPDATE_ID        = @{GV_USER_ID}
+		     , UPDATE_DTTM      = dbo.UFN_GETDATE()
+		 WHERE COMPANY_CD       = '$_parameter.GV_COMPANY_CD'
+		   AND BU_CD            = '$_parameter.GV_BU_CD'
+		   AND PROD_ORDER_NO    = '$_parameter.PROD_ORDER_NO'
+	</delete>
+	  	
+</mapper>

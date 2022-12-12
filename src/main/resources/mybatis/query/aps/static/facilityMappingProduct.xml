@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="aps.static">
+	
+	<select id="itemDataListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.itemDataListSelect ] ******/
+		SELECT MRI.ITEM_CD
+		FROM TB_MST_RESOURCE_ITEM MRI WITH(NOLOCK)
+		INNER JOIN TB_MST_RESOURCE MR WITH(NOLOCK)
+		   ON MR.COMPANY_CD = MRI.COMPANY_CD
+		  AND MR.BU_CD = MRI.BU_CD
+		  AND MR.PLANT_CD = MRI.PLANT_CD
+		  AND MR.RESOURCE_CD = MRI.RESOURCE_CD
+		  AND MR.PLANT_CD = 'WF01'
+		INNER JOIN TB_MST_WORK_CENTER MWC WITH(NOLOCK)
+		   ON MWC.COMPANY_CD = MR.COMPANY_CD
+		  AND MWC.BU_CD = MR.BU_CD
+		  AND MWC.PLANT_CD = MR.PLANT_CD
+		  AND MWC.WC_CD = MR.WC_CD
+		  AND MWC.WC_MGR = 'M' 
+		INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		   ON MC1.BU_CD = MWC.BU_CD
+		  AND MC1.GROUP_CD = 'PROD_L2'
+		  AND MC1.CODE_CD = MWC.ROUTING_ID
+		INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		   ON MC2.BU_CD = MC1.BU_CD
+		  AND MC2.GROUP_CD = 'PROD_PART'
+		  AND MC2.CODE_CD = MC1.ATTB_2_CD
+		INNER JOIN TB_MST_CODE MC3 WITH(NOLOCK)
+		   ON MC3.BU_CD = MR.BU_CD
+		  AND MC3.GROUP_CD = 'CAMPUS_CD'
+		  AND MC3.CODE_CD = MR.CAMPUS_CD
+		WHERE MRI.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND MRI.BU_CD = @{GV_BU_CD}
+		  AND MC2.CODE_CD = @{prodPart}  
+		  AND MRI.PROD_GROUP = @{prodItemGroupMst}
+		  AND MWC.PLANT_CD = 'WF01'
+		  AND MRI.PLANT_CD = 'WF01'
+		  AND MRI.USE_FLAG = 'Y'
+		GROUP BY MRI.ITEM_CD
+	</select>
+	
+	<select id="bucketItemSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.bucketItemSelect ] ******/
+		#foreach( $itemMap in $_parameter.itemMappingData )
+		#if($velocityCount > 1)
+		UNION ALL
+		#end
+		SELECT NULL AS ROOT_CD
+		     , 'A' + '$velocityCount' AS CD
+		     , '$itemMap' AS NM
+		     , '$itemMap' AS BUCKET_ID
+		     , '$itemMap' AS BUCKET_VAL
+		     , 'group' AS TYPE
+		#end
+	</select>		
+	
+	<select id="bucketProductListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.bucketProductListSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                ELSE CODE_NM
+	           END AS CODE_NM
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE GROUP_CD = 'ROUTE_CD'
+		#if($_parameter.prodPart == "TEL")
+		  AND ATTB_5_CD = @{prodItemGroupMst}
+		#elseif($_parameter.prodPart == "LAM")
+		  AND ATTB_6_CD = @{prodItemGroupMst}
+		#elseif($_parameter.prodPart == "DIFFUSION")
+		  AND ATTB_7_CD = @{prodItemGroupMst}
+		#elseif($_parameter.prodPart == "MATERIAL")
+		  AND ATTB_8_CD = @{prodItemGroupMst}
+		#end
+		  AND USE_FLAG = 'Y'
+		ORDER BY SORT
+	</select>		
+
+	<select id="productCateCodeSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.productCateCodeSelect ] ******/
+		SELECT CODE_CD
+		     , CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+	                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+	                ELSE CODE_NM
+	           END AS CODE_NM
+		FROM TB_MST_CODE WITH(NOLOCK)
+		WHERE GROUP_CD = 'PROD_ITEM_GROUP_LIST'
+		  AND ATTB_1_CD = @{prodPart}
+		  AND ATTB_2_CD = @{productCate}
+		  AND USE_FLAG = 'Y'
+		ORDER BY SORT
+	</select>
+	
+	<select id="facilityProductPopSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.facilityProductPopSelect ] ******/
+		WITH W_CODE AS 
+		(
+			#set($_parameter.groupCd = "ITEM_TYPE")
+	      	<include refid="include.mstCode"/>
+	    ),
+	    W_PROD_CATE AS
+	    (
+   			SELECT MC2.CODE_CD
+		    	 , MC2.CODE_NM 
+			     , MI.ITEM_CD
+			     , MIPG.PROD_GROUP
+			     , MIPG.PROD_GROUP_DET
+			     , MI.COMPANY_CD
+			     , MI.BU_CD
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			   ON MIP.COMPANY_CD = MI.COMPANY_CD
+			  AND MIP.BU_CD = MI.BU_CD
+			  AND MIP.PLANT_CD = 'WF01'
+			  AND MIP.ITEM_CD = MI.ITEM_CD
+			INNER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			   ON MC1.BU_CD = MIP.BU_CD
+			  AND MC1.GROUP_CD = 'PROD_L2'
+			  AND MC1.CODE_CD = MIP.ROUTING_ID
+			INNER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			   ON MC2.BU_CD = MC1.BU_CD
+			  AND MC2.GROUP_CD = 'PROD_PART'
+			  AND MC2.CODE_CD = MC1.ATTB_2_CD
+			LEFT OUTER JOIN TB_MST_ITEM_PROD_GROUP MIPG WITH(NOLOCK)
+			  ON MIPG.COMPANY_CD = MI.COMPANY_CD
+			 AND MIPG.BU_CD = MI.BU_CD
+			 AND MIPG.ITEM_CD = MI.ITEM_CD 
+			 AND MIPG.PROD_GROUP = @{productCate}
+			 AND MIPG.DEL_FLAG = 'N' 
+			WHERE MC2.CODE_CD = @{prodPart}
+			  AND EXISTS 
+			  	(
+                	SELECT 1
+                    FROM TB_MST_ROUTING MR WITH(NOLOCK)
+                    INNER JOIN TB_MST_CODE MC WITH(NOLOCK)
+                       ON MC.BU_CD = MR.BU_CD
+                      AND MC.GROUP_CD = 'ROUTE_CD'
+                      AND MC.CODE_CD = MR.JOB_CD
+                      AND (MC.ATTB_5_CD = @{productCate} OR MC.ATTB_6_CD = @{productCate} OR MC.ATTB_7_CD = @{productCate} OR MC.ATTB_7_CD = @{productCate})
+                    WHERE MR.COMPANY_CD = MI.COMPANY_CD
+                      AND MR.BU_CD = MI.BU_CD
+                      AND MR.PLANT_CD = 'WF01'
+                      AND MR.ITEM_CD = MI.ITEM_CD
+				)
+			#if($_parameter.productCateList and $_parameter.productCateList != "")
+	          AND MIPG.PROD_GROUP_DET IN ('$_parameter.productCateList.replace(",","','")')
+	  	    #end
+	    )  
+		SELECT A.ITEM_CD
+		     , A.ITEM_NM
+		     , A.SPEC
+		     , A.ITEM_TYPE
+		     , C.CODE_NM AS ITEM_TYPE_NM
+		     , A.DRAW_NO
+		     , A.ITEM_GROUP_CD
+		     , B.ITEM_GROUP_NM
+		     , E.CUST_GROUP_CD
+		     , E.CUST_GROUP_NM
+		     , F.ROUTING_ID
+		FROM TB_MST_ITEM A WITH(NOLOCK)
+		LEFT JOIN TB_MST_ITEM_GROUP B
+		  ON B.COMPANY_CD    = A.COMPANY_CD
+		 AND B.BU_CD         = A.BU_CD
+		 AND B.ITEM_GROUP_CD = A.ITEM_GROUP_CD
+		 AND B.DEL_FLAG      = 'N'
+		LEFT JOIN W_CODE C
+		  ON C.CODE_CD = A.ITEM_TYPE
+		LEFT JOIN TB_MST_REP_CUST D WITH(NOLOCK)
+		  ON D.COMPANY_CD  = A.COMPANY_CD
+		 AND D.BU_CD       = A.BU_CD
+		 AND D.REP_CUST_CD = A.REP_CUST_CD
+		 AND D.VALID_FLAG  = 'Y'
+		LEFT JOIN TB_MST_CUST_GROUP E
+		  ON E.COMPANY_CD    = D.COMPANY_CD
+		 AND E.BU_CD         = D.BU_CD
+		 AND E.CUST_GROUP_CD = D.CUST_GROUP_CD
+		 AND E.USE_FLAG      = 'Y'
+		LEFT JOIN TB_MST_ITEM_PLANT F WITH(NOLOCK)
+		  ON A.COMPANY_CD = F.COMPANY_CD
+		 AND A.BU_CD       = F.BU_CD
+		 AND A.ITEM_CD     = F.ITEM_CD
+		 AND A.ITEM_TYPE   = F.ITEM_TYPE  
+		INNER JOIN W_PROD_CATE G
+		   ON A.COMPANY_CD = G.COMPANY_CD
+		  AND A.BU_CD = G.BU_CD
+		  AND A.ITEM_CD = G.ITEM_CD
+		WHERE A.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A.BU_CD      = @{GV_BU_CD}
+	      AND A.USE_FLAG   = 'Y'
+	      AND F.PLANT_CD   = 'WF01'
+		#if($_parameter.ITEM_NM and $_parameter.ITEM_NM != "")
+		  AND (A.ITEM_CD LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%'
+		    OR A.ITEM_NM LIKE '%' + REPLACE(@{ITEM_NM},'_','[_]') + '%')
+		#end
+		ORDER BY A.ITEM_CD, A.ITEM_NM	
+	</select>
+	
+	<select id="facilityMappingProductListSelect" parameterType="map" resultType="map">
+		/****** [ aps.static.facilityMappingProductListSelect ] ******/
+		<include refid="include.macros"/>
+		#getProductTree()
+		
+		SELECT A1.COMPANY_CD
+		     , A1.BU_CD
+		     , A1.WC_CD
+		     , A1.WC_NM
+		     , A1.WC_MGR
+		     , (
+			 	SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+			                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+			                ELSE CODE_NM
+			           END AS CODE_NM
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE BU_CD = A1.BU_CD
+				  AND GROUP_CD = 'RESOURCE_TYPE'
+			  	  AND CODE_CD = A1.WC_MGR
+			  	  AND USE_FLAG = 'Y'
+			   ) WC_MGR_NM
+		     , A2.PLANT_CD
+		     , A2.RESOURCE_CD
+		     , A2.RESOURCE_NM
+		     , A2.CAMPUS_CD
+		     , A2.CAMPUS_NM		     
+		     , A3.ATTB_2_CD AS PROD_PART
+		     , (
+			 	SELECT CASE WHEN 'ko' = @{GV_LANG} THEN CODE_NM_KR
+			                WHEN 'cn' = @{GV_LANG} THEN CODE_NM_CN
+			                ELSE CODE_NM
+			           END AS CODE_NM
+				FROM TB_MST_CODE WITH(NOLOCK)
+				WHERE BU_CD = A1.BU_CD
+				  AND GROUP_CD = 'PROD_PART'
+			  	  AND CODE_CD = A3.ATTB_2_CD
+			  	  AND USE_FLAG = 'Y'
+			   ) AS PROD_PART_NM
+		     , @{prodItemGroupMst} AS PROD_GROUP
+			#foreach($bucketMap in $_parameter.bucketList)
+		    #set($param = "$bucketMap.TYPE")
+		    #set($param2 = "$bucketMap.BUCKET_VAL")
+  		     , SUM(CASE WHEN A4.ITEM_CD = '$param2' AND A4.JOB_CD = '$param' AND A4.USE_FLAG = 'Y' THEN A4.PRIORITY END) AS '$bucketMap.BUCKET_ID'
+		    #end
+		FROM TB_MST_WORK_CENTER A1 WITH(NOLOCK)
+		INNER JOIN TB_MST_RESOURCE A2 WITH(NOLOCK)
+		   ON A1.COMPANY_CD = A2.COMPANY_CD
+		  AND A1.BU_CD = A2.BU_CD
+		  AND A1.WC_CD = A2.WC_CD
+		  AND A2.RESOURCE_TYPE = 'M'
+		  AND A1.PLANT_CD = 'WF01'
+		  AND A2.PLANT_CD = 'WF01'
+		INNER JOIN TB_MST_CODE A3 WITH(NOLOCK)
+	       ON A1.BU_CD = A3.BU_CD
+	      AND A1.ROUTING_ID = A3.CODE_CD
+	      AND A3.GROUP_CD = 'PROD_L2'
+	    LEFT OUTER JOIN TB_MST_RESOURCE_ITEM A4 WITH(NOLOCK)
+	      ON A1.COMPANY_CD = A4.COMPANY_CD
+	     AND A1.BU_CD = A4.BU_CD
+	     AND A2.PLANT_CD = A4.PLANT_CD
+	     AND A2.RESOURCE_CD = A4.RESOURCE_CD
+	     AND A4.PLANT_CD = 'WF01'
+	     AND A4.PROD_GROUP = @{prodItemGroupMst}
+        LEFT OUTER JOIN TB_MST_ITEM IT WITH(NOLOCK)
+          ON A4.COMPANY_CD = IT.COMPANY_CD
+         AND A4.BU_CD      = IT.BU_CD
+         AND A4.ITEM_CD    = IT.ITEM_CD
+         AND IT.VALID_FLAG = 'Y'
+         AND IT.USE_FLAG   = 'Y'
+		#set($treeAlias = "IT")
+        <include refid="include.productTree"/>
+		WHERE A1.COMPANY_CD = @{GV_COMPANY_CD}
+		  AND A1.BU_CD = @{GV_BU_CD}
+		  AND A2.USE_FLAG = 'Y'
+		#if($_parameter.prodPart and $_parameter.prodPart != "")
+	      AND A3.ATTB_2_CD IN ('$_parameter.prodPart.replace(",","','")')
+	  	#end
+	  	#if($_parameter.campus and $_parameter.campus != "")
+	      AND A2.CAMPUS_CD IN ('$_parameter.campus.replace(",","','")')
+	  	#end
+	  	#if($_parameter.facility and $_parameter.facility != "")
+	      AND (A2.RESOURCE_CD LIKE '%'+@{facility}+'%' OR A2.RESOURCE_NM LIKE '%'+@{facility}+'%')
+	  	#end
+	  	#if($_parameter.workplaces and $_parameter.workplaces != "")
+	  	  AND A1.WC_CD IN ('$_parameter.workplaces.replace(",","','")')
+	  	#end
+		GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.WC_CD, A1.WC_NM, A1.WC_MGR, A1.WC_MGR_NM, A2.PLANT_CD
+		       , A2.RESOURCE_CD, A2.RESOURCE_NM, A2.CAMPUS_CD, A2.CAMPUS_NM, A3.ATTB_2_CD
+	</select>
+	
+	<select id="facilityMappingProductAuthoritySelect" parameterType="map" resultType="map">
+		/****** [ aps.static.facilityAuthoritySelect ] ******/
+		SELECT A2.MENU_CD
+		FROM
+		(
+		  	SELECT BU_CD
+		         , ROLE_CD
+		  	FROM TB_MAP_USER_ROLE WITH(NOLOCK)
+		  	WHERE USER_ID = @{GV_USER_ID}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND USE_FLAG = 'Y'
+		) A1
+		INNER JOIN
+		(
+		  	SELECT COMPANY_CD
+		         , BU_CD
+		         , ROLE_CD
+		         , MENU_CD
+		  	FROM TB_MAP_ROLE_MENU_ACTION WITH(NOLOCK)
+		  	WHERE COMPANY_CD = @{GV_COMPANY_CD}
+		      AND BU_CD = @{GV_BU_CD}
+		      AND MENU_CD IN ('APS10801', 'APS10802', 'APS10803', 'APS10804')
+		      AND ACTION_CD = 'SAVE'
+		      AND USE_FLAG = 'Y'
+		) A2
+		ON A1.BU_CD = A2.BU_CD
+		AND A1.ROLE_CD = A2.ROLE_CD
+		GROUP BY A2.MENU_CD
+	</select>
+	
+	<update id="facilityMappingProductListUpdate" parameterType="map">
+		/****** [ aps.static.facilityMappingProductListUpdate ] ******/
+		BEGIN
+		
+			DECLARE BUCKET_LIST CURSOR FOR
+			#foreach ($bucketMap in $_parameter.BUCKET_LIST)
+			#if ($foreach.count != 1)
+			  UNION ALL
+			#end
+			  SELECT '$bucketMap.ITEM_CD' AS ITEM_CD
+			       , '$bucketMap.JOB_CD' AS JOB_CD
+			       , $bucketMap.PRIORITY AS PRIORITY
+			#end
+			
+			OPEN BUCKET_LIST
+	                
+	        DECLARE @ITEM_CD  nvarchar(18)
+	        DECLARE @JOB_CD   nvarchar(2)
+	        DECLARE @PRIORITY int
+	        
+	        FETCH NEXT FROM BUCKET_LIST INTO @ITEM_CD, @JOB_CD, @PRIORITY
+	        
+	        WHILE (@@FETCH_STATUS = 0)
+	            BEGIN
+					IF (@PRIORITY = -1)
+						BEGIN
+							UPDATE TB_MST_RESOURCE_ITEM
+							   SET PRIORITY = NULL
+							     , USE_FLAG = 'Y'
+							     , UPDATE_ID     = CASE WHEN PRIORITY IS NULL THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                             , UPDATE_DTTM   = CASE WHEN PRIORITY IS NULL THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+	                         WHERE COMPANY_CD    = @{COMPANY_CD}
+	                           AND BU_CD         = @{BU_CD}
+	                           AND PLANT_CD      = @{PLANT_CD}
+	                           AND RESOURCE_CD   = @{RESOURCE_CD}
+	                           AND ITEM_CD       = @ITEM_CD
+	                           AND PROD_GROUP    = @{PROD_GROUP}
+	                           AND JOB_CD        = @JOB_CD
+						END
+					ELSE
+						BEGIN
+							MERGE TB_MST_RESOURCE_ITEM AS A
+	                        USING (SELECT 'X' AS DUAL) AS B 
+	                        ON (   COMPANY_CD    = @{COMPANY_CD}
+	                           AND BU_CD         = @{BU_CD}
+	                           AND PLANT_CD      = @{PLANT_CD}
+	                           AND RESOURCE_CD   = @{RESOURCE_CD}
+	                           AND ITEM_CD       = @ITEM_CD
+	                           AND PROD_GROUP    = @{PROD_GROUP}
+	                           AND JOB_CD        = @JOB_CD
+	                           )
+							WHEN MATCHED THEN
+	                        UPDATE
+	                           SET PRIORITY = @PRIORITY
+	                             , USE_FLAG = 'Y'
+	                             , UPDATE_ID   = CASE WHEN PRIORITY = @PRIORITY THEN UPDATE_ID ELSE @{GV_USER_ID} END
+	                             , UPDATE_DTTM = CASE WHEN PRIORITY = @PRIORITY THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+							WHEN NOT MATCHED THEN
+	                        INSERT 
+	                        (
+	                        	COMPANY_CD
+						      , BU_CD
+						      , PLANT_CD
+						      , RESOURCE_CD
+						      , ITEM_CD
+						      , PROD_GROUP
+						      , JOB_CD
+						      , PRIORITY
+						      , USE_FLAG
+						      , CREATE_ID
+						      , CREATE_DTTM
+						      , UPDATE_ID
+	                          , UPDATE_DTTM
+							) VALUES (
+	                            @{COMPANY_CD}
+	                          , @{BU_CD}
+	                          , @{PLANT_CD}
+	                          , @{RESOURCE_CD}
+	                          , @ITEM_CD
+	                          , @{PROD_GROUP}
+	                          , @JOB_CD
+	                          , @PRIORITY
+	                          , 'Y'
+	                          , @{GV_USER_ID}
+	                          , DBO.UFN_GETDATE()
+	                          , @{GV_USER_ID}
+	                          , DBO.UFN_GETDATE()
+	                       );
+	                      END
+					FETCH NEXT FROM BUCKET_LIST INTO @ITEM_CD, @JOB_CD, @PRIORITY
+				END
+			CLOSE BUCKET_LIST
+			DEALLOCATE BUCKET_LIST
+		END;
+	</update>
+	
+	<update id="facilityMappingProductDelUpdate" parameterType="map">
+		/****** [ aps.static.facilityMappingProductDelUpdate ] ******/
+		UPDATE TB_MST_RESOURCE_ITEM
+	   	   SET USE_FLAG = 'N'
+	         , UPDATE_ID   = CASE WHEN PRIORITY IS NULL THEN UPDATE_ID ELSE @{GV_USER_ID} END
+             , UPDATE_DTTM = CASE WHEN PRIORITY IS NULL THEN UPDATE_DTTM ELSE DBO.UFN_GETDATE() END
+        WHERE COMPANY_CD  = @{COMPANY_CD}
+        AND BU_CD         = @{BU_CD}
+        AND PLANT_CD      = @{PLANT_CD}
+        AND ITEM_CD       = @{ITEM_CD}
+		AND PROD_GROUP    = @{PROD_GROUP}
+	</update>
+	
+	
+	
+	
+	
+</mapper>

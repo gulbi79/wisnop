@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="supply.purchase">
+	
+	<select id="materialCostOutsourcingListSelect" parameterType="map" resultType="map">
+		/****** [ supply.purchase.materialCostOutsourcingListSelect ] ******/
+		SELECT NULL AS TMP_COL
+			<include refid="include.getCdDimTotal"/>
+			<include refid="include.getGrpLvlId"/>
+			 , SUM(QTY) AS QTY
+			 , SUM(SALES_PRICE_KRW) AS SALES_PRICE_KRW
+			 , SUM(PROD_AMT) AS PROD_AMT
+			 , SUM(MAT_AMT) AS MAT_AMT
+			 , SUM(SUB_AMT) AS SUB_AMT
+			 , SUM(MAT_PRICE) AS MAT_PRICE
+			 , SUM(SUB_PRICE) AS SUB_PRICE
+			 <!-- , AVG(MAT_RATE) AS MAT_RATE
+			 , AVG(SUB_RATE) AS SUB_RATE -->
+			 <!-- , SUM(MAT_AMT / NULLIF(PROD_AMT, 0)) * 100 AS MAT_RATE
+			 , SUM(SUB_AMT / NULLIF(PROD_AMT, 0)) * 100 AS SUB_RATE -->
+			 , SUM(MAT_AMT) / NULLIF(SUM(PROD_AMT), 0) * 100 AS MAT_RATE
+			 , SUM(SUB_AMT) / NULLIF(SUM(PROD_AMT), 0) * 100 AS SUB_RATE
+		FROM
+		(
+			SELECT ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD
+				 , ISNULL(MI.ITEM_GROUP_CD, ' ') AS ITEM_GROUP_CD_NM
+			     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM
+			     , ISNULL(MIG.ITEM_GROUP_NM, ' ') AS ITEM_GROUP_NM_NM
+			     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD
+			     , ISNULL(MI.ITEM_CD, ' ') AS ITEM_CD_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM
+			     , ISNULL(MI.ITEM_NM, ' ') AS ITEM_NM_NM
+			     , ISNULL(MI.SPEC, ' ') AS SPEC
+			     , ISNULL(MI.SPEC, ' ') AS SPEC_NM
+			     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO
+			     , ISNULL(MI.DRAW_NO, ' ') AS DRAW_NO_NM
+			     , ISNULL(MIG.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD
+			     , ISNULL(MIG.REP_ITEM_GROUP_CD, ' ') AS REP_ITEM_GROUP_CD_NM
+			     , ISNULL(MRIG.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM
+			     , ISNULL(MRIG.REP_ITEM_GROUP_NM, ' ') AS REP_ITEM_GROUP_NM_NM
+			     , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID
+			     , ISNULL(MIP.ROUTING_ID, ' ') AS ROUTING_ID_NM
+			     , ISNULL(MC.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD
+			     , ISNULL(MC.REP_CUST_GROUP_CD, ' ') AS REP_CUST_GROUP_CD_NM
+			     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM
+			     , ISNULL(MC.REP_CUST_GROUP_NM, ' ') AS REP_CUST_GROUP_NM_NM
+			     , ISNULL(MC.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD
+			     , ISNULL(MC.CUST_GROUP_CD, ' ') AS CUST_GROUP_CD_NM
+			     , ISNULL(MC.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM
+			     , ISNULL(MC.CUST_GROUP_NM, ' ') AS CUST_GROUP_NM_NM
+			     , ISNULL(MI.UOM_CD, ' ') AS UOM_CD
+			     , ISNULL(MI.UOM_CD, ' ') AS UOM_CD_NM
+			     , PR.QTY
+			     , MICG.SALES_PRICE_KRW
+			     , PR.QTY * MICG.SALES_PRICE_KRW AS PROD_AMT
+			     , PR.QTY * MIC.MAT_PRICE AS MAT_AMT
+			     , PR.QTY * MIC.SUB_PRICE AS SUB_AMT
+			     , MIC.MAT_PRICE
+			     , MIC.SUB_PRICE
+			     <!-- , ((PR.QTY * MIC.MAT_PRICE) / NULLIF(PR.QTY * MICG.SALES_PRICE_KRW, 0)) * 100 AS MAT_RATE
+			     , ((PR.QTY * MIC.SUB_PRICE) / NULLIF(PR.QTY * MICG.SALES_PRICE_KRW, 0)) * 100 AS SUB_RATE -->
+			FROM TB_MST_ITEM MI WITH(NOLOCK)
+			INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+			   ON MIP.COMPANY_CD = MI.COMPANY_CD
+			  AND MIP.BU_CD = MI.BU_CD
+			  AND MIP.PLANT_CD = 'WF01'
+			  AND MIP.ITEM_CD = MI.ITEM_CD
+			LEFT OUTER JOIN TB_MST_ITEM_GROUP MIG WITH(NOLOCK)
+			  ON MIG.COMPANY_CD = MI.COMPANY_CD
+			 AND MIG.BU_CD = MI.BU_CD
+			 AND MIG.ITEM_GROUP_CD = MI.ITEM_GROUP_CD
+			LEFT OUTER JOIN TB_MST_REP_ITEM_GROUP MRIG WITH(NOLOCK)
+			  ON MRIG.COMPANY_CD = MIG.COMPANY_CD
+			 AND MRIG.BU_CD = MIG.BU_CD
+			 AND MRIG.REP_ITEM_GROUP_CD = MIG.REP_ITEM_GROUP_CD
+			LEFT OUTER JOIN TB_MST_CUSTOMER MC WITH(NOLOCK)
+			  ON MC.COMPANY_CD = MI.COMPANY_CD
+			 AND MC.BU_CD = MI.BU_CD
+			 AND MC.CUST_CD = MI.REP_CUST_CD
+			LEFT OUTER JOIN 
+			(
+				SELECT PR.COMPANY_CD
+	                 , PR.BU_CD
+	                 , PR.ITEM_CD
+	                 , SUM(PR.QTY) AS QTY
+				FROM UV_PROD_RESULT PR WITH(NOLOCK)
+	            WHERE PR.COMPANY_CD = @{GV_COMPANY_CD}
+	              AND PR.BU_CD = @{GV_BU_CD}
+	              AND PR.PLANT_CD = 'WF01'
+	              AND PR.PROD_DATE BETWEEN @{fromMon} + '01' AND @{fromMon} + '31'
+	            GROUP BY PR.COMPANY_CD, PR.BU_CD, PR.ITEM_CD
+			) PR
+			ON PR.COMPANY_CD = MI.COMPANY_CD
+			AND PR.BU_CD = MI.BU_CD
+			AND PR.ITEM_CD = MI.ITEM_CD
+			OUTER APPLY 
+			(
+				SELECT TOP 1 ISNULL(MIC.R_MAT_PRICE, MIC.S_MAT_PRICE) AS MAT_PRICE
+			    	 , ISNULL(MIC.R_SUB_PRICE, MIC.S_SUB_PRICE) AS SUB_PRICE
+				FROM TB_MST_ITEM_COST MIC WITH(NOLOCK)
+			    WHERE MIC.COMPANY_CD = MI.COMPANY_CD
+			      AND MIC.BU_CD = MI.BU_CD
+			      AND MIC.PLANT_CD = 'WF01'
+			      AND MIC.YEARMONTH <![CDATA[<=]]> @{fromMon}
+			      AND MIC.ITEM_CD = MI.ITEM_CD
+				ORDER BY MIC.YEARMONTH DESC
+			) MIC
+			LEFT OUTER JOIN TB_MAP_ITEM_CUST_GROUP MICG WITH(NOLOCK)
+    		  ON MICG.COMPANY_CD = MI.COMPANY_CD
+   			 AND MICG.BU_CD = MI.BU_CD
+   			 AND MICG.ITEM_CD = MI.ITEM_CD
+   			 AND MICG.CUST_GROUP_CD = MC.CUST_GROUP_CD
+			WHERE MI.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MI.BU_CD = @{GV_BU_CD}
+			  AND MI.ITEM_TYPE = '10'
+			#if($_parameter.item_cd and $_parameter.item_cd != "")
+			  AND MI.ITEM_CD IN ('$_parameter.item_cd.replace(",","','")')
+			#elseif($_parameter.item_nm and $_parameter.item_nm != "")
+       		  AND (MI.ITEM_CD LIKE '%'+@{item_nm}+'%' OR MI.ITEM_NM LIKE '%'+@{item_nm}+'%')
+			#end
+			#if($_parameter.upItemGroup and $_parameter.upItemGroup != "")
+      		  AND MIG.UPPER_ITEM_GROUP_CD IN ('$_parameter.upItemGroup.replace(",","','")')
+			#end
+			#if($_parameter.itemGroup and $_parameter.itemGroup != "")
+       		  AND MI.ITEM_GROUP_CD IN ('$_parameter.itemGroup.replace(",","','")')
+  			#end
+			#if($_parameter.reptCustGroup and $_parameter.reptCustGroup != "")
+		  	  AND MC.REP_CUST_GROUP_CD IN ('$_parameter.reptCustGroup.replace(",","','")')
+	 		#end
+			#if($_parameter.route and $_parameter.route != "")
+		  	  AND MIP.ROUTING_ID IN ('$_parameter.route.replace(",","','")')
+	 		#end
+		) A
+		GROUP BY ROLLUP ( <include refid="include.getCdRollup"/> )
+		ORDER BY TMP_COL
+		#foreach( $dimMap in $_parameter.dimList )
+		  , A.$dimMap.DIM_CD
+		#end 
+	</select>
+	
+</mapper>

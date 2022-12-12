@@ -1,0 +1,457 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="dashboard.purchase">
+
+	<select id="weekListSelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.weekListSelect ] [주차 가져오기]******/
+		SELECT 'W' + RIGHT(CASE WHEN A1.DAY_NM = 'FRI' OR A1.DAY_NM = 'SAT' THEN YEARWEEK ELSE (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(D, -7, DBO.UFN_GETDATE()), 112)) END, 2) AS FIRST_WEEK
+		     , 'W' + RIGHT(CASE WHEN A1.DAY_NM = 'FRI' OR A1.DAY_NM = 'SAT' THEN (SELECT YEARWEEK FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(D, 7, DBO.UFN_GETDATE()), 112)) ELSE YEARWEEK END, 2) AS SECOND_WEEK
+		FROM TB_MST_CALENDAR A1 WITH(NOLOCK)
+		WHERE A1.YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112)
+	</select>
+	
+	<select id="weekDaySelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.weekDaySelect ] [평일 가져오기]******/
+		WITH TEMP AS(
+		SELECT CASE WHEN A1.DAY_NM ='TUE' OR A1.DAY_NM ='WED' OR A1.DAY_NM ='THU'OR A1.DAY_NM ='FRI'OR A1.DAY_NM ='SAT' THEN ( SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(D, -1, DBO.UFN_GETDATE()), 112))
+		WHEN A1.DAY_NM = 'MON' THEN (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(D, -3, DBO.UFN_GETDATE()), 112))
+		WHEN A1.DAY_NM = 'SUN' THEN (SELECT YYYYMMDD FROM TB_MST_CALENDAR WHERE YYYYMMDD = CONVERT(VARCHAR, DATEADD(D, -2, DBO.UFN_GETDATE()), 112))
+		END  AS YYYYMMDD
+		FROM TB_MST_CALENDAR A1 WITH(NOLOCK)
+		WHERE A1.YYYYMMDD = CONVERT(VARCHAR, DBO.UFN_GETDATE(), 112)
+		)
+
+	SELECT CONVERT(nvarchar,CONVERT(datetime,T.YYYYMMDD),11) AS WEEK_DAY
+	FROM TEMP T
+	
+	</select>
+
+	<select id="priceCostChartSelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.priceCostChartSelect ] [재고 현황]******/
+		SELECT ITEM_TYPE
+		     , CASE WHEN ITEM_TYPE = 'DA' THEN dbo.UFN_GET_TRANSLATE('lbl', 'invNum', @{GV_LANG})
+		     		WHEN ITEM_TYPE = '10' THEN dbo.UFN_GET_TRANSLATE('lbl', 'itemPur', @{GV_LANG})
+		     		WHEN ITEM_TYPE = 'TOTAL' THEN dbo.UFN_GET_TRANSLATE('lbl', 'total', @{GV_LANG})
+		            ELSE CASE WHEN 'ko' = @{GV_LANG} THEN A2.CODE_NM_KR
+							  WHEN 'cn' = @{GV_LANG} THEN A2.CODE_NM_CN
+						   	  ELSE A2.CODE_NM
+						  END
+		        END CODE_NM
+		     , CASE WHEN ITEM_TYPE != 'DA' THEN ROUND(BOH_AMT_Y / @{unit}, 1) ELSE BOH_AMT_Y END BOH_AMT_Y
+		     , CASE WHEN ITEM_TYPE != 'DA' THEN ROUND(AVG_AMT_M3 / @{unit}, 1) ELSE AVG_AMT_M3 END AVG_AMT_M3
+		     , CASE WHEN ITEM_TYPE != 'DA' THEN ROUND(BOH_AMT_M / @{unit}, 1) ELSE BOH_AMT_M END BOH_AMT_M
+		     , CASE WHEN ITEM_TYPE != 'DA' THEN ROUND(BOH_AMT_D / @{unit}, 1) ELSE BOH_AMT_D END BOH_AMT_D
+		FROM
+		(
+			SELECT '10' AS ITEM_TYPE     
+			     , SUM(BOH_AMT_Y) AS BOH_AMT_Y
+			     , SUM(AVG_AMT_M3) AS AVG_AMT_M3
+			     , SUM(BOH_AMT_M) AS BOH_AMT_M
+			     , SUM(BOH_AMT_D) AS BOH_AMT_D     
+			     , '10' AS SORT
+			FROM TB_KPI_DASHBOARD_INV WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			#if($_parameter.priceCost == "price")
+			  AND MEAS_CD = 'PRICE'
+			#else
+			  AND MEAS_CD = 'COST'
+			#end		  
+			  AND ITEM_TYPE IN ('10', '50')
+			UNION ALL
+			SELECT 'TOTAL' AS ITEM_TYPE     
+			     , SUM(BOH_AMT_Y) AS BOH_AMT_Y
+			     , SUM(AVG_AMT_M3) AS AVG_AMT_M3
+			     , SUM(BOH_AMT_M) AS BOH_AMT_M
+			     , SUM(BOH_AMT_D) AS BOH_AMT_D
+			     , '40' AS SORT     
+			FROM TB_KPI_DASHBOARD_INV WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			#if($_parameter.priceCost == "price")
+			  AND MEAS_CD = 'PRICE'
+			#else
+			  AND MEAS_CD = 'COST'
+			#end	
+			  AND ITEM_TYPE != 'DA'  
+			UNION ALL
+			SELECT ITEM_TYPE     
+			     , SUM(BOH_AMT_Y) AS BOH_AMT_Y
+			     , SUM(AVG_AMT_M3) AS AVG_AMT_M3
+			     , SUM(BOH_AMT_M) AS BOH_AMT_M
+			     , SUM(BOH_AMT_D) AS BOH_AMT_D     
+			     , CASE WHEN ITEM_TYPE = 'DA' THEN '50' ELSE ITEM_TYPE END SORT
+			FROM TB_KPI_DASHBOARD_INV WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			#if($_parameter.priceCost == "price")
+			  AND MEAS_CD = 'PRICE'
+			#else
+			  AND MEAS_CD = 'COST'
+			#end	
+			  AND ITEM_TYPE NOT IN ('10', '50')  
+			GROUP BY ITEM_TYPE
+		) A1
+		LEFT OUTER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+		  ON A1.ITEM_TYPE = A2.CODE_CD
+		 AND A2.GROUP_CD = 'ITEM_TYPE'
+		 AND A2.USE_FLAG = 'Y'
+		 ORDER BY A1.SORT
+	</select> 
+	
+	<select id="invAgingChartSelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.invAgingChartSelect ] [재고 Aging 현황]******/
+		SELECT A1.ITEM_TYPE
+		     , CASE WHEN A1.ITEM_TYPE = '10' THEN dbo.UFN_GET_TRANSLATE('lbl', 'itemPur', @{GV_LANG})
+		            WHEN 'ko' = @{GV_LANG} THEN A2.CODE_NM_KR
+				    WHEN 'cn' = @{GV_LANG} THEN A2.CODE_NM_CN
+			   	    ELSE A2.CODE_NM
+			  	END CODE_NM
+			 , CASE WHEN A1.ITEM_TYPE = '10' THEN dbo.UFN_GET_TRANSLATE('lbl', 'invRate', 'ko') + '(' + dbo.UFN_GET_TRANSLATE('lbl', 'itemPur', 'ko') + ')'
+		            WHEN 'ko' = 'ko' THEN dbo.UFN_GET_TRANSLATE('lbl', 'invRate', 'ko') + '(' +A2.CODE_NM_KR + ')'
+				    WHEN 'cn' = 'ko' THEN dbo.UFN_GET_TRANSLATE('lbl', 'invRate', 'ko') + '(' +A2.CODE_NM_CN + ')'
+			   	    ELSE A2.CODE_NM
+			  	END CODE_LINE_NM
+			 , ROUND(YEAR_OVER / @{unit}, 1) AS YEAR_OVER
+			 , ROUND(BEF_LAST_OVER / @{unit}, 1) AS BEF_LAST_OVER
+			 , ROUND(LAST_OVER / @{unit}, 1) AS LAST_OVER
+			 , ROUND(CUR_OVER / @{unit}, 1) AS CUR_OVER
+			 , ROUND(A1.YEAR_OVER / BOH_AMT_Y * 100, 1) AS YEAR_OVER_LINE
+	         , ROUND(A1.BEF_LAST_OVER / [BOH_AMT_M-2] * 100, 1) AS BEF_LAST_OVER_LINE
+	         , ROUND(A1.LAST_OVER / [BOH_AMT_M-1] * 100, 1) AS LAST_OVER_LINE
+	         , ROUND(A1.CUR_OVER / BOH_AMT_M * 100, 1) AS CUR_OVER_LINE
+		FROM
+		(
+			SELECT '10' AS ITEM_TYPE 
+				#if($_parameter.monthFlag == "M3")
+				 , SUM(YEAR_OVER_M3_AMT) AS YEAR_OVER
+			     , SUM(BEF_LAST_OVER_M3_AMT) AS BEF_LAST_OVER
+			     , SUM(LAST_OVER_M3_AMT) AS LAST_OVER
+			     , SUM(CUR_OVER_M3_AMT) AS CUR_OVER
+				#elseif($_parameter.monthFlag == "M6")
+				 , SUM(YEAR_OVER_M6_AMT) AS YEAR_OVER
+			     , SUM(BEF_LAST_OVER_M6_AMT) AS BEF_LAST_OVER
+			     , SUM(LAST_OVER_M6_AMT) AS LAST_OVER
+			     , SUM(CUR_OVER_M6_AMT) AS CUR_OVER
+				#elseif($_parameter.monthFlag == "M12")
+				 , SUM(YEAR_OVER_Y1_AMT) AS YEAR_OVER
+			     , SUM(BEF_LAST_OVER_Y1_AMT) AS BEF_LAST_OVER
+			     , SUM(LAST_OVER_Y1_AMT) AS LAST_OVER
+			     , SUM(CUR_OVER_Y1_AMT) AS CUR_OVER
+				#end
+			FROM TB_KPI_DASHBOARD_INV_AGE WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND ITEM_TYPE IN ('10', '50')
+			UNION ALL
+			SELECT ITEM_TYPE 
+				#if($_parameter.monthFlag == "M3")
+				 , SUM(YEAR_OVER_M3_AMT) AS YEAR_OVER
+			     , SUM(BEF_LAST_OVER_M3_AMT) AS BEF_LAST_OVER
+			     , SUM(LAST_OVER_M3_AMT) AS LAST_OVER
+			     , SUM(CUR_OVER_M3_AMT) AS CUR_OVER
+				#elseif($_parameter.monthFlag == "M6")
+				 , SUM(YEAR_OVER_M6_AMT) AS YEAR_OVER
+			     , SUM(BEF_LAST_OVER_M6_AMT) AS BEF_LAST_OVER
+			     , SUM(LAST_OVER_M6_AMT) AS LAST_OVER
+			     , SUM(CUR_OVER_M6_AMT) AS CUR_OVER
+				#elseif($_parameter.monthFlag == "M12")
+				 , SUM(YEAR_OVER_Y1_AMT) AS YEAR_OVER
+			     , SUM(BEF_LAST_OVER_Y1_AMT) AS BEF_LAST_OVER
+			     , SUM(LAST_OVER_Y1_AMT) AS LAST_OVER
+			     , SUM(CUR_OVER_Y1_AMT) AS CUR_OVER
+				#end
+			FROM TB_KPI_DASHBOARD_INV_AGE WITH(NOLOCK)
+			WHERE COMPANY_CD = @{GV_COMPANY_CD}
+			  AND BU_CD = @{GV_BU_CD}
+			  AND ITEM_TYPE NOT IN ('10', '50')
+			GROUP BY ITEM_TYPE
+		) A1
+		LEFT OUTER JOIN TB_MST_CODE A2 WITH(NOLOCK)
+		  ON A1.ITEM_TYPE = A2.CODE_CD
+		 AND A2.GROUP_CD = 'ITEM_TYPE'
+		 AND A2.USE_FLAG = 'Y'
+		LEFT OUTER JOIN 
+		(
+        	SELECT REPLACE(ITEM_TYPE, '50', '10') AS ITEM_TYPE
+                 , SUM(BOH_AMT_Y) AS BOH_AMT_Y
+                 , SUM(BOH_AMT_M) AS BOH_AMT_M
+                 , SUM([BOH_AMT_M-1]) AS [BOH_AMT_M-1]
+                 , SUM([BOH_AMT_M-2]) AS [BOH_AMT_M-2]
+			FROM TB_KPI_DASHBOARD_INV WITH(NOLOCK)
+            WHERE COMPANY_CD = @{GV_COMPANY_CD}
+              AND BU_CD = @{GV_BU_CD}
+              AND MEAS_CD = 'PRICE'
+			GROUP BY REPLACE(ITEM_TYPE, '50', '10')
+		) A3
+      	ON A3.ITEM_TYPE = A1.ITEM_TYPE
+	</select>
+	
+	<select id="invPsiChartSelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.invPsiChartSelect ] [자재 PSI]******/
+		BEGIN
+			DECLARE @V_PLAN_ID NVARCHAR(8), @V_VERSION_ID NVARCHAR(20);
+
+			SELECT TOP 1 @V_PLAN_ID = MPV.PLAN_ID
+			     , @V_VERSION_ID = MPVS.VERSION_ID
+			FROM TB_MST_PLAN_VERSION MPV WITH(NOLOCK)
+			INNER JOIN TB_MST_PLAN_VERSION_SUB MPVS WITH(NOLOCK)
+			   ON MPVS.COMPANY_CD = MPV.COMPANY_CD
+			  AND MPVS.BU_CD = MPV.BU_CD
+			  AND MPVS.PLAN_TYPE_CD = MPV.PLAN_TYPE_CD
+			  AND MPVS.PLAN_ID = MPV.PLAN_ID
+			  AND MPVS.VERSION_TYPE_CD = 'F'
+			WHERE MPV.COMPANY_CD = @{GV_COMPANY_CD}
+			  AND MPV.BU_CD = @{GV_BU_CD}
+			  AND MPV.PLAN_TYPE_CD = 'MP'
+			  AND MPV.RELEASE_FLAG = 'Y'
+			ORDER BY MPV.START_WEEK DESC
+			;
+			
+			SELECT A1.MEAS_CD
+			     , CASE WHEN 'ko' = @{GV_LANG} THEN A2.MEAS_NM_KR
+					    WHEN 'cn' = @{GV_LANG} THEN A2.MEAS_NM_CN
+				   	    ELSE A2.MEAS_NM
+				  	END MEAS_NM
+				 , ROUND(ONE_DATA / @{unit}, 1) AS ONE_DATA
+				 , ROUND(TWO_DATA / @{unit}, 1) AS TWO_DATA
+				 , ROUND(THREE_DATA / @{unit}, 1) AS THREE_DATA
+				 , ROUND(FOUR_DATA / @{unit}, 1) AS FOUR_DATA
+			FROM
+			(    
+				SELECT REPLACE(MEAS_CD, '_QTY', '_AMT') AS MEAS_CD
+				     , SUM(HAMP.VALUE_W1 * MI.ITEM_COST_KRW) AS ONE_DATA
+				     , SUM(HAMP.VALUE_W2 * MI.ITEM_COST_KRW) AS TWO_DATA
+				     , SUM(HAMP.VALUE_W3 * MI.ITEM_COST_KRW) AS THREE_DATA
+				     , SUM(HAMP.VALUE_W4 * MI.ITEM_COST_KRW) AS FOUR_DATA
+				     , CASE WHEN MEAS_CD = 'BOH_QTY' THEN 1
+			                WHEN MEAS_CD = 'MRP_QTY' THEN 2
+			                WHEN MEAS_CD = 'EXP_QTY' THEN 3
+			            END SORT
+				FROM TB_HIS_APS_MAT_PSI HAMP WITH(NOLOCK)
+				INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+				   ON MI.COMPANY_CD = HAMP.COMPANY_CD
+				  AND MI.BU_CD = HAMP.BU_CD
+				  AND MI.ITEM_CD = HAMP.ITEM_CD
+				INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				   ON MIP.COMPANY_CD = HAMP.COMPANY_CD
+				  AND MIP.BU_CD = HAMP.BU_CD
+				  AND MIP.PLANT_CD = 'WF01'
+				  AND MIP.ITEM_CD = HAMP.ITEM_CD
+				WHERE HAMP.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND HAMP.BU_CD = @{GV_BU_CD}
+				  AND HAMP.PLAN_ID = @V_PLAN_ID
+				  AND HAMP.VERSION_ID = @V_VERSION_ID
+				  AND HAMP.MEAS_CD IN ('BOH_QTY', 'MRP_QTY', 'EXP_QTY')
+				#if($_parameter.invPsiFlag == "total")
+				  AND (MIP.PROCUR_TYPE = 'OH' OR MI.ITEM_TYPE = '30')
+				#elseif($_parameter.invPsiFlag == "osfp")
+				  AND MIP.PROCUR_TYPE = 'OH'
+				#elseif($_parameter.invPsiFlag == "rawMaterial")
+				  AND MI.ITEM_TYPE = '30'
+				#end
+				GROUP BY HAMP.MEAS_CD
+				UNION ALL
+				SELECT REPLACE(MEAS_CD, '_QTY', '_AMT') AS MEAS_CD
+				     , SUM(HAMP.VALUE_M0 * MI.ITEM_COST_KRW) AS ONE_DATA
+				     , SUM(HAMP.VALUE_M1 * MI.ITEM_COST_KRW) AS TWO_DATA
+				     , SUM(HAMP.VALUE_M2 * MI.ITEM_COST_KRW) AS THREE_DATA
+				     , SUM(HAMP.VALUE_M3 * MI.ITEM_COST_KRW) AS FOUR_DATA
+					 , CASE WHEN MEAS_CD = 'BOH_QTY' THEN 4
+			                WHEN MEAS_CD = 'MRP_QTY' THEN 5
+			                WHEN MEAS_CD = 'EXP_QTY' THEN 6
+			            END SORT
+				FROM TB_HIS_APS_MAT_PSI HAMP WITH(NOLOCK)
+				INNER JOIN TB_MST_ITEM MI WITH(NOLOCK)
+				   ON MI.COMPANY_CD = HAMP.COMPANY_CD
+				  AND MI.BU_CD = HAMP.BU_CD
+				  AND MI.ITEM_CD = HAMP.ITEM_CD
+				INNER JOIN TB_MST_ITEM_PLANT MIP WITH(NOLOCK)
+				   ON MIP.COMPANY_CD = HAMP.COMPANY_CD
+				  AND MIP.BU_CD = HAMP.BU_CD
+				  AND MIP.PLANT_CD = 'WF01'
+				  AND MIP.ITEM_CD = HAMP.ITEM_CD
+				WHERE HAMP.COMPANY_CD = @{GV_COMPANY_CD}
+				  AND HAMP.BU_CD = @{GV_BU_CD}
+				  AND HAMP.PLAN_ID = @V_PLAN_ID
+				  AND HAMP.VERSION_ID = @V_VERSION_ID
+				  AND HAMP.MEAS_CD IN ('BOH_QTY', 'MRP_QTY', 'EXP_QTY')
+				#if($_parameter.invPsiFlag == "total")
+				  AND (MIP.PROCUR_TYPE = 'OH' OR MI.ITEM_TYPE = '30')
+				#elseif($_parameter.invPsiFlag == "osfp")
+				  AND MIP.PROCUR_TYPE = 'OH'
+				#elseif($_parameter.invPsiFlag == "rawMaterial")
+				  AND MI.ITEM_TYPE = '30'
+				#end
+				GROUP BY HAMP.MEAS_CD
+			) A1
+			INNER JOIN TB_MST_MEAS A2 WITH(NOLOCK)
+			   ON A1.MEAS_CD = A2.MEAS_CD
+			  AND A2.USE_FLAG = 'Y'
+			ORDER BY A1.SORT
+		END;
+	</select>
+	
+	<select id="dueRateChartSelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.dueRateChartSelect ] [납기준수율(수량)]******/
+		SELECT ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+	            	ELSE MC1.CODE_NM
+		       END, ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+					    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+				   ELSE MC2.CODE_NM
+				   END, dbo.UFN_GET_TRANSLATE('lbl', 'all', @{GV_LANG}))) AS GUBUN
+		     , ISNULL(ROUND(KDO.LAST_COMP_RATE, 0), 0) AS LAST_COMP_RATE 
+		     , ISNULL(ROUND(KDO.COMP_RATE, 0), 0) AS COMP_RATE
+		     , ISNULL(ROUND(KDO.SCHED_QTY, 0), 0) AS SCHED_QTY
+		     , ISNULL(ROUND(KDO.PRE_RECV_QTY, 0), 0) AS PRE_RECV_QTY
+		     , ISNULL(DAY_ACC_SCHED_QTY, 0) AS DAY_ACC_SCHED_QTY
+		     , ISNULL(DAY_ACC_PRE_RECV_QTY, 0) AS DAY_ACC_PRE_RECV_QTY
+		     , ISNULL(DAY_ACC_COMP_RATE, 0) AS DAY_ACC_COMP_RATE
+		     , ISNULL(DAY_SCHED_QTY, 0) AS DAY_SCHED_QTY
+			 , ISNULL(DAY_PRE_RECV_QTY,0) AS DAY_PRE_RECV_QTY
+			 , ISNULL(DAY_COMP_RATE,0) AS DAY_COMP_RATE
+		FROM TB_KPI_DASHBOARD_OTD KDO WITH(NOLOCK)
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = 'ALL'
+		 AND MC1.GROUP_CD = 'ITEM_TYPE'
+		 AND MC1.CODE_CD = KDO.MEAS_CD
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = 'ALL'
+		 AND MC2.GROUP_CD = 'PROCUR_TYPE'
+		 AND MC2.CODE_CD = KDO.MEAS_CD
+		 AND MC2.USE_FLAG = 'Y'
+		ORDER BY ISNULL(MC1.SORT, 999), ISNULL(MC2.SORT, 999)
+		
+	</select>
+	
+				
+	<select id="warehousRateChartSelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.warehousRateChartSelect ] [입고 준수율]******/
+		SELECT ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+	            	ELSE MC1.CODE_NM
+		       END, ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+					    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+				   ELSE MC2.CODE_NM
+				   END, dbo.UFN_GET_TRANSLATE('lbl', 'all', @{GV_LANG}))) AS GUBUN
+		     , ISNULL(KDGC.LAST_COMP_RATE, 0) AS LAST_COMP_RATE
+		     , ISNULL(KDGC.COMP_RATE, 0) AS COMP_RATE
+		     , ISNULL(ROUND(KDGC.SCHED_QTY, 0), 0) AS SCHED_QTY
+		     , ISNULL(ROUND(KDGC.GR_QTY, 0), 0) AS GR_QTY
+		     , ISNULL(DAY_ACC_SCHED_QTY, 0) AS DAY_ACC_SCHED_QTY
+		     , ISNULL(DAY_ACC_GR_QTY, 0) AS DAY_ACC_GR_QTY
+		     , ISNULL(DAY_ACC_COMP_RATE, 0) AS DAY_ACC_COMP_RATE
+		     , ISNULL(DAY_SCHED_QTY, 0) AS DAY_SCHED_QTY
+		     , ISNULL(DAY_GR_QTY,0) AS DAY_GR_QTY
+		     , ISNULL(DAY_COMP_RATE,0) AS DAY_COMP_RATE
+		     
+		FROM TB_KPI_DASHBOARD_GR_COMP KDGC WITH(NOLOCK)
+		LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+		  ON MC1.BU_CD = 'ALL'
+		 AND MC1.GROUP_CD = 'ITEM_TYPE'
+		 AND MC1.CODE_CD = KDGC.MEAS_CD
+		 AND MC1.USE_FLAG = 'Y'
+		LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+		  ON MC2.BU_CD = 'ALL'
+		 AND MC2.GROUP_CD = 'PROCUR_TYPE'
+		 AND MC2.CODE_CD = KDGC.MEAS_CD
+		 AND MC2.USE_FLAG = 'Y'
+		ORDER BY ISNULL(MC1.SORT, 999), ISNULL(MC2.SORT, 999)
+		
+	</select>
+	
+	<select id="materialAvaRateChartSelect" parameterType="map" resultType="map">
+		/****** [ dashboard.purchase.materialAvaRateChartSelect ] [자재 준비율]******/
+		#if($_parameter.materialAvaRateFlag == "ava")
+		
+			SELECT ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+	            	ELSE MC1.CODE_NM
+		       END, ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+					    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+				   ELSE MC2.CODE_NM
+				   END, dbo.UFN_GET_TRANSLATE('lbl', 'all', @{GV_LANG}))) AS GUBUN
+			     , KDMAD.TARGET_VALUE
+			     , ROUND(KDMAD.LAST_WEEK_AVAIL_RATE, 0) AS LAST_WEEK_RATE
+			     , ROUND(KDMAD.CUR_WEEK_AVAIL_RATE, 0) AS CUR_WEEK_RATE
+			     , ROUND(KDMAD.PREP_CNT, 0) AS PREP_QTY
+			     , ROUND(KDMAD.NO_PREP_CNT, 0) AS NO_PREP_QTY
+			FROM TB_KPI_DASHBOARD_MAT_AVAIL_DET KDMAD WITH(NOLOCK)
+			LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			  ON MC1.BU_CD = 'ALL'
+			 AND MC1.GROUP_CD = 'ITEM_TYPE'
+			 AND MC1.CODE_CD = KDMAD.MEAS_CD
+			 AND MC1.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			  ON MC2.BU_CD = 'ALL'
+			 AND MC2.GROUP_CD = 'PROCUR_TYPE'
+			 AND MC2.CODE_CD = KDMAD.MEAS_CD
+			 AND MC2.USE_FLAG = 'Y'
+			ORDER BY ISNULL(MC1.SORT, 999), ISNULL(MC2.SORT, 999)
+		
+		#elseif($_parameter.materialAvaRateFlag == "ready")
+			SELECT ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC1.CODE_NM_KR
+	            	WHEN 'cn' = @{GV_LANG} THEN MC1.CODE_NM_CN
+	            	ELSE MC1.CODE_NM
+		       END, ISNULL(CASE WHEN 'ko' = @{GV_LANG} THEN MC2.CODE_NM_KR
+					    WHEN 'cn' = @{GV_LANG} THEN MC2.CODE_NM_CN
+				   ELSE MC2.CODE_NM
+				   END, dbo.UFN_GET_TRANSLATE('lbl', 'all', @{GV_LANG}))) AS GUBUN
+			     , KDMPD.TARGET_VALUE
+			     , ROUND(KDMPD.LAST_WEEK_PREP_RATE, 0) AS LAST_WEEK_RATE
+			     , ROUND(KDMPD.CUR_WEEK_PREP_RATE, 0) AS CUR_WEEK_RATE
+			     , ROUND(KDMPD.PREP_CNT, 0) AS PREP_QTY
+			     , ROUND(KDMPD.NO_PREP_CNT, 0) AS NO_PREP_QTY
+			FROM TB_KPI_DASHBOARD_MAT_PREP_DET KDMPD WITH(NOLOCK)
+			LEFT OUTER JOIN TB_MST_CODE MC1 WITH(NOLOCK)
+			  ON MC1.BU_CD = 'ALL'
+			 AND MC1.GROUP_CD = 'ITEM_TYPE'
+			 AND MC1.CODE_CD = KDMPD.MEAS_CD
+			 AND MC1.USE_FLAG = 'Y'
+			LEFT OUTER JOIN TB_MST_CODE MC2 WITH(NOLOCK)
+			  ON MC2.BU_CD = 'ALL'
+			 AND MC2.GROUP_CD = 'PROCUR_TYPE'
+			 AND MC2.CODE_CD = KDMPD.MEAS_CD
+			 AND MC2.USE_FLAG = 'Y'
+			ORDER BY ISNULL(MC1.SORT, 999), ISNULL(MC2.SORT, 999)
+		#end
+		
+		
+	</select>
+	
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</mapper>
