@@ -208,7 +208,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "week"  , _siq : popupChart._siq + "trendBucketWeek" }
 								  , { outDs : "month" , _siq : popupChart._siq + "trendBucketMonth" }];
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					popupChart.bucket = {};
@@ -287,7 +287,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					popupChart.drawChart(data);
@@ -307,7 +307,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -335,7 +335,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -364,7 +364,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -393,7 +393,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -422,7 +422,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -452,7 +452,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -485,7 +485,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -522,7 +522,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -567,7 +567,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -597,7 +597,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -627,7 +627,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -658,7 +658,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -688,7 +688,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -718,7 +718,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -748,7 +748,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -776,7 +776,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -805,7 +805,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -840,7 +840,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -869,7 +869,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -899,7 +899,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -929,7 +929,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					var arPreWeek = new Array();

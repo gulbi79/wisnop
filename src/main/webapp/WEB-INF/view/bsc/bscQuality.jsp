@@ -519,7 +519,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -567,7 +567,7 @@
 				FORM_SAVE.tranData = [{outDs:"saveCnt",_siq : bscQuality._siq, grdData : [{rowList : jsonData}]}];
 				
 				gfn_service({
-					url    : GV_CONTEXT_PATH + "/biz/obj.do",
+					url    : GV_CONTEXT_PATH + "/biz/obj",
 					data   : FORM_SAVE,
 					success: function(data) {
 						alert('<spring:message code="msg.saveOk"/>');

@@ -324,7 +324,7 @@
 					#set($rollupDot = "")
 				#end
 				#foreach( $dimMap in $_parameter.dimList )
-					#if($velocityCount == 1)
+					#if($foreach.count == 1)
 						(T.PO_SEQ, ${rollupAlias}${rollupDot}$dimMap.DIM_CD
 					#elseif($preLvl == $dimMap.LVL or $totalFlag != "Y")
 						, ${rollupAlias}${rollupDot}$dimMap.DIM_CD

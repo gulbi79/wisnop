@@ -57,7 +57,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					bsc.drawChart(data);

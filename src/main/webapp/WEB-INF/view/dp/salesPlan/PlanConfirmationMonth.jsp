@@ -41,7 +41,7 @@
 	function fn_getInitData() {
 		gfn_service({
 			async   : false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : {_mtd : "getList", menuParam : "CFM", tranData:[
 				{outDs:"planList",_siq:"dp.planMonth.planConfirmationVersion"},
 				{outDs:"roleList",_siq:"dp.planCommon.salesPlanRole"},
@@ -501,7 +501,7 @@
 		];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				

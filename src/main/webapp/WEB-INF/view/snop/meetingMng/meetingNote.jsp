@@ -561,7 +561,7 @@
 			
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -630,7 +630,7 @@
 			FORM_SEARCH.tranData = [{outDs:"saveCnt",_siq : meetingNote._siq, grdData : grdData}];
 			
 			var ajaxOpt = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function(data) {
 					if (data.errCode == -10) {
@@ -782,7 +782,7 @@
 		
 		var aOption = {
 			async   : false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : SCM_SEARCH,
 			success : function (data) {
 			

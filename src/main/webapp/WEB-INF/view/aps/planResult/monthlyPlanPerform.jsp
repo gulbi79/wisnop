@@ -40,7 +40,7 @@
          
          gfn_service({
              async   : false,
-             url     : GV_CONTEXT_PATH + "/biz/obj.do",
+             url     : GV_CONTEXT_PATH + "/biz/obj",
              data    : {_mtd : "getList", menuParam : "CFM", tranData:[
                         {outDs : "planIdPast", _siq : "dp.planMonth.planIdPast"}, 
                         {outDs:"currentWeek" ,_siq:"dp.planCommon.currentWeek"},
@@ -354,7 +354,7 @@
         FORM_SEARCH.tranData = [{ outDs : "resList", _siq : "aps.planResult.monthlyPlanPerform"}];
         console.log("FORM_SEARCH:",FORM_SEARCH);
         var aOption = {
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : FORM_SEARCH,
             success : function (data) {
                 if (FORM_SEARCH.sql == 'N') {

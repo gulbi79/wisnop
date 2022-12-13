@@ -346,7 +346,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -403,7 +403,7 @@
 				FORM_SEARCH.tranData = [{outDs:"saveCnt",_siq : issueMng._siq, grdData : grdData}];
 				
 				var ajaxOpt = {
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : FORM_SEARCH,
 					success : function(data) {
 						if (data.errCode == -10) {

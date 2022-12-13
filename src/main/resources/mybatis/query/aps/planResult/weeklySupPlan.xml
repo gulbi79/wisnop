@@ -498,7 +498,7 @@
 			           UNION ALL 
 			           SELECT '$meaMap.CD'
 			                , '$meaMap.NM'
-			                , $velocityCount 
+			                , $foreach.count 
 					#end
 				) A
 			    WHERE CATEGORY_CD IS NOT NULL
@@ -539,7 +539,7 @@
 			         , CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VALUE ELSE NULL END ${meaMap.CD}
 			        #end
 			        #foreach( $meaMap in $_parameter.meaList )
-			        	#if($velocityCount > 1)
+			        	#if($foreach.count > 1)
 							+ ISNULL(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VALUE ELSE NULL END), 0)
 						#else
 							, ISNULL(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.VALUE ELSE NULL END), 0)
@@ -731,7 +731,7 @@
 			    
 			    #foreach($bucketMap in $_parameter.bucketList)
 			    #if($bucketMap.TOT_TYPE != "MT")
-					#if($velocityCount > 1)
+					#if($foreach.count > 1)
 					 + ISNULL(TTT.${bucketMap.CD}_OMIT_FLAG, 0)
 					#else
 					 , ISNULL(TTT.${bucketMap.CD}_OMIT_FLAG, 0)

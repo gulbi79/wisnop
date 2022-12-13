@@ -434,7 +434,7 @@
 				    contentType: 'application/json',
 				    data:JSON.stringify(FORM_SEARCH),
 				    dataType: 'json',
-				    url: "${ctx}/biz/obj.do",
+				    url: "${ctx}/biz/obj",
 				    
 				    success:function(data) {
 				 	
@@ -492,7 +492,7 @@
 			$("#"+formId).append('<input type="hidden" name="FILE_SEQ" value="'+fileSeq+'" />');
 			
 			$("#"+formId).attr("method","post");
-			$("#"+formId).attr("action","${ctx}/file/download.do");
+			$("#"+formId).attr("action","${ctx}/file/download");
 			
 			
 			

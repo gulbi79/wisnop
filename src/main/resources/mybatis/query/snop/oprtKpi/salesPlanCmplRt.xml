@@ -323,7 +323,7 @@
        
        #foreach( $bucketMap in $_parameter.bucketList )
             #set( $week = "$bucketMap.BUCKET_VAL" )
-            #if($velocityCount > 1)
+            #if($foreach.count > 1)
                 #if ($_parameter.rdoAqType == "QTY")
                     #if($bucketMap.CD.indexOf("_PLAN") > -1)
                      + ISNULL(ABS(SUM ($bucketMap.CD)), 0)

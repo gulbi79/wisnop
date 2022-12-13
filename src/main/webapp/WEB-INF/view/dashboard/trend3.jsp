@@ -112,7 +112,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "week"  , _siq : trend3._siq + "trendBucketWeek" }
 								  , { outDs : "month" , _siq : trend3._siq + "trendBucketMonth" }];
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					trend3.bucket = {};
@@ -152,7 +152,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					trend3.drawChart(data);
@@ -173,7 +173,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -201,7 +201,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -230,7 +230,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -265,7 +265,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -295,7 +295,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -323,7 +323,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					

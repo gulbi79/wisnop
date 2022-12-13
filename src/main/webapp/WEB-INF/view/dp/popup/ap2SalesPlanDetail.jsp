@@ -207,7 +207,7 @@ function fn_getGridData() {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"dp.popup.ap2SalesPlanDetail"}];
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			//그리드 데이터 삭제

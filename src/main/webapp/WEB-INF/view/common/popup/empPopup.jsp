@@ -240,7 +240,7 @@ function fn_getGridData(data) {
 	data.EmpArr = tempArray;
 	
 	var sMap = {
-        url: "${ctx}/biz/obj.do",
+        url: "${ctx}/biz/obj",
         data: data,
         success: fn_gridCallback,
     }

@@ -129,7 +129,7 @@
     	FORM_SEARCH._mtd   = "getList";
     	FORM_SEARCH.tranData = [{outDs:"gridList",_siq:"common.temp001"}];
     	var sMap = {
-    		url: "${ctx}/biz/obj.do",
+    		url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
 		    	//그리드 데이터 생성

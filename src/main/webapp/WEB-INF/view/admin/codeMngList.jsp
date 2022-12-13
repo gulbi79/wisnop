@@ -334,7 +334,7 @@
     	FORM_SEARCH._mtd = "getList";
     	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"admin.codeMng"}];
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	dataProvider.clearRows(); //데이터 초기화
@@ -458,7 +458,7 @@
     		FORM_SAVE._mtd   = "saveAll";
     		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"admin.codeMng", grdData : grdData, custDupChkYn : {"insert":"Y"}}];
 	    	var sMap = {
-	            url: "${ctx}/biz/obj.do",
+	            url: "${ctx}/biz/obj",
 	            data: FORM_SAVE,
 	            success:function(data) {
 	            	if ( data.errCode == -10 ) {

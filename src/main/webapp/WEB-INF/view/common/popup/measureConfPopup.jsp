@@ -173,7 +173,7 @@ function fn_getGridData() {
 	FORM_SEARCH.tranData = [{outDs:"meaConfList",_siq:"common.meaConf"}];
 	
 	var sMap = {
-		url: "${ctx}/biz/obj.do",
+		url: "${ctx}/biz/obj",
         data: FORM_SEARCH,
         success:function(data) {
 			grdSub.cancel();
@@ -214,7 +214,7 @@ function fn_save() {
    		FORM_SAVE._mtd   = "saveAll";
    		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"common.meaConf",mergeFlag:"Y", grdData : grdData}];
 		var serviceMap = {
-			url: "${ctx}/biz/obj.do",
+			url: "${ctx}/biz/obj",
             data: FORM_SAVE,
             success:function(data) {
             	

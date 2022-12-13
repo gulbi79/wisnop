@@ -332,7 +332,7 @@
 		            UNION ALL 
 		            SELECT '$meaMap.CD'
 		                 , '$meaMap.NM'
-		                 , $velocityCount 
+		                 , $foreach.count 
 					#end
 				) A
 		        WHERE CATEGORY_CD IS NOT NULL
@@ -1007,7 +1007,7 @@
 	            UNION ALL 
 	            SELECT '$meaMap.CD'
 	                 , '$meaMap.NM'
-	                 , $velocityCount 
+	                 , $foreach.count 
 				#end
 			) A
 	        WHERE CATEGORY_CD IS NOT NULL
@@ -1386,12 +1386,12 @@
 		W_DATA AS
 		(
 		#foreach( $bucketMap in $_parameter.bucketList )
-			#set($sort1 = $velocityCount)
-			#set($sort2 = $velocityCount + 1)
-			#set($sort3 = $velocityCount + 2)
-			#set($sort4 = $velocityCount + 3)
-			#set($sort5 = $velocityCount + 4)
-			#if($velocityCount == 1)
+			#set($sort1 = $foreach.count)
+			#set($sort2 = $foreach.count + 1)
+			#set($sort3 = $foreach.count + 2)
+			#set($sort4 = $foreach.count + 3)
+			#set($sort5 = $foreach.count + 4)
+			#if($foreach.count == 1)
 				SELECT COMPANY_CD
 				     , BU_CD
 				     , PLAN_ID
@@ -1411,7 +1411,7 @@
 				  AND BU_CD = @{GV_BU_CD}
 				  AND PLAN_ID = '${bucketMap.BUCKET_VAL}'
 				  AND MEAS_CD = 'PLN'
-			#elseif($velocityCount <![CDATA[<]]> 13)
+			#elseif($foreach.count <![CDATA[<]]> 13)
 				UNION ALL
 				SELECT COMPANY_CD
 				     , BU_CD

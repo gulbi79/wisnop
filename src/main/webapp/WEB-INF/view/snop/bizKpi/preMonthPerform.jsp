@@ -320,7 +320,7 @@
 			FORM_SEARCH.tranData = [{outDs : "resList", _siq : preMonthPerform._siq}];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -359,7 +359,7 @@
 				FORM_SAVE.tranData = [{outDs:"saveCnt",_siq : preMonthPerform._siq, grdData : [{rowList : grdData}]}];
 				
 				var ajaxOpt = {
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : FORM_SAVE,
 					success : function(data) {
 						if (data.errCode == -10) {

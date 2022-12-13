@@ -70,7 +70,7 @@
 		    #end
 		    #foreach($bucketMap in $_parameter.bucketList)
 		    #set($paramData = "$bucketMap.BUCKET_VAL")
-		    	#if($velocityCount > 1)
+		    	#if($foreach.count > 1)
 		    		#if($bucketMap.CD.indexOf("_QTY") > -1)
 			    		+ ISNULL(ABS(SUM(CASE WHEN A.YEARWEEK = '$paramData' THEN WIP_QTY END)), 0)
 			    	#elseif($bucketMap.CD.indexOf("_AMT") > -1)

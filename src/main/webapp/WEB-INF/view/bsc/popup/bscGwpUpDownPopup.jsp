@@ -33,7 +33,7 @@ function fn_getFileNo(){
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"bsc.popup.gwpFileNo"}];
 	
 	var sMap = {
-        url: "${ctx}/biz/obj.do",
+        url: "${ctx}/biz/obj",
         data: FORM_SEARCH,
         success:function(data) {
         	$("#FILE_NO").val(data.rtnList);
@@ -45,7 +45,7 @@ function fn_getFileNo(){
 function getCode(){
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
 	    	_mtd     :"getList",
 	    	tranData : [
@@ -232,7 +232,7 @@ function fn_getGridData() {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"bsc.popup.gwpFileList"}];
 	
 	var sMap = {
-        url: "${ctx}/biz/obj.do",
+        url: "${ctx}/biz/obj",
         data: FORM_SEARCH,
         success:function(data) {
         	
@@ -379,7 +379,7 @@ function fn_fileDown(dbRow) {
 			</div>
 		</div>
 	</div>
-	<form id="fileFrm" method="post" enctype="multipart/form-data" action="${ctx}/file/upload.do" >
+	<form id="fileFrm" method="post" enctype="multipart/form-data" action="${ctx}/file/upload" >
 		<input type="hidden" id="DEL_FILE_SEQ" name="DEL_FILE_SEQ" value="" />
 		<input type="hidden" id="ROW_BIZ_YN" name="ROW_BIZ_YN" value="Y" />
 		<input type="hidden" id="KPI_ID_SEQ" name="KPI_ID_SEQ" value="" />

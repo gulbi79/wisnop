@@ -577,7 +577,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -629,7 +629,7 @@
 				//console.log("FORM_SAVE : ", FORM_SAVE);
 				
 				gfn_service({
-					url    : GV_CONTEXT_PATH + "/biz/obj.do",
+					url    : GV_CONTEXT_PATH + "/biz/obj",
 					data   : FORM_SAVE,
 					success: function(data) {
 						alert('<spring:message code="msg.saveOk"/>');

@@ -40,7 +40,7 @@
 				
 				gfn_service({
 					async   : false,
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : {_mtd:"getList",tranData:[{outDs:"dateList",_siq:"quality.defectStatusDetailDate"}]},
 					success : function(data) {
 						defectStatus.comCode.codeMap.DATE_INFO = data.dateList[0];
@@ -238,7 +238,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					

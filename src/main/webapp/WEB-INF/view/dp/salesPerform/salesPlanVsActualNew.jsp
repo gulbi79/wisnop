@@ -30,7 +30,7 @@
 					
 					gfn_service({
 						async   : false,
-						url     : GV_CONTEXT_PATH + "/biz/obj.do",
+						url     : GV_CONTEXT_PATH + "/biz/obj",
 						data    : {_mtd:"getList",tranData:[{outDs:"dateList",_siq:"dp.salesPerformNew.salesPlanVsActualDate"}]},
 						success : function(data) {
 							salesPlanVs.comCode.codeMap.DATE_INFO = data.dateList[0];
@@ -39,7 +39,7 @@
 					
 					gfn_service({
 						async   : false,
-						url     : GV_CONTEXT_PATH + "/biz/obj.do",
+						url     : GV_CONTEXT_PATH + "/biz/obj",
 						data    : {_mtd:"getList",tranData:[{outDs:"list",_siq:"dp.salesPerformNew.commonCode"}]},
 						success : function(data) {
 							salesPlanVs.comCode.codeReason = data.list;
@@ -133,7 +133,7 @@
 				
 				gfn_service({
 					async   : false,
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : {_mtd:"getList",typeCd:typeCd,tranData:[{outDs:"list",_siq:"dp.salesPerformNew.commonCode"}]},
 					success : function(data) {
 						var list    = data.list;
@@ -322,7 +322,7 @@
 				FORM_SEARCH.tranData = [{ outDs : "resList",_siq : "dp.salesPerformNew.salesPlanVsActual" }];
 				
 				var aOption = {
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : FORM_SEARCH,
 					success : function (data) {
 						
@@ -506,7 +506,7 @@
 				FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"dp.salesPerformNew.salesPlanVsActual",grdData:grdData}];
 				
 				gfn_service({
-					url    : GV_CONTEXT_PATH + "/biz/obj.do",
+					url    : GV_CONTEXT_PATH + "/biz/obj",
 					data   : FORM_SAVE,
 					success: function(data) {
 						alert('<spring:message code="msg.saveOk"/>');

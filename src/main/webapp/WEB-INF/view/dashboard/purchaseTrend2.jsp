@@ -279,7 +279,7 @@
 								  ,{ outDs : "chartList" , _siq : "dashboard.chartInfo.purchaseTrend2" }
 								  ];
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					purchaseTrend2.bucket = {};
@@ -317,7 +317,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					purchaseTrend2.drawChart(data);
@@ -779,7 +779,7 @@
 	        
 	        var aOption = {
 	            async   : false,
-	            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	            url     : GV_CONTEXT_PATH + "/biz/obj",
 	            data    : SCM_SEARCH,
 	            success : function (data) {
 	            

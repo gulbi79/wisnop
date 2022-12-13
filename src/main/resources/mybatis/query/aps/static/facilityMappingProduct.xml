@@ -44,11 +44,11 @@
 	<select id="bucketItemSelect" parameterType="map" resultType="map">
 		/****** [ aps.static.bucketItemSelect ] ******/
 		#foreach( $itemMap in $_parameter.itemMappingData )
-		#if($velocityCount > 1)
+		#if($foreach.count > 1)
 		UNION ALL
 		#end
 		SELECT NULL AS ROOT_CD
-		     , 'A' + '$velocityCount' AS CD
+		     , 'A' + '$foreach.count' AS CD
 		     , '$itemMap' AS NM
 		     , '$itemMap' AS BUCKET_ID
 		     , '$itemMap' AS BUCKET_VAL

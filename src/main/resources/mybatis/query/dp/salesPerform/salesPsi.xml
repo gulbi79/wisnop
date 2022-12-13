@@ -57,7 +57,7 @@
 		SELECT Z.*
 		     #foreach( $bucketMap in $_parameter.bucketList )
 		  	 #set( $week = "$bucketMap.BUCKET_VAL" )
-			  	 #if($velocityCount == 1) 
+			  	 #if($foreach.count == 1) 
 			 		, ISNULL(ABS($bucketMap.CD), 0) 	 
 			 	 #else
 			 	 	+ ISNULL(ABS($bucketMap.CD), 0)
@@ -251,7 +251,7 @@
 			            	UNION ALL 
 			            	SELECT '$meaMap.CD'
 			            	     , '$meaMap.NM'
-			            	     , $velocityCount 
+			            	     , $foreach.count 
 						#end
 					) SS
 			        WHERE CATEGORY_CD IS NOT NULL

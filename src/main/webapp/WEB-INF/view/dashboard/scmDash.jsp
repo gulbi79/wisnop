@@ -755,7 +755,7 @@
     						 ];    
 		
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -1209,7 +1209,7 @@
     	FORM_SEARCH.tranData = [{outDs:"companyConsChart", _siq:"dashboard.scmDash.companyConsChart"}];
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -1253,7 +1253,7 @@
     	FORM_SEARCH.tranData = [{outDs:"materialChart", _siq:"dashboard.scmDash.materialChart"}];
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -1298,7 +1298,7 @@
     	FORM_SEARCH.tranData = [{outDs:"materialsRateChart", _siq:"dashboard.scmDash.materialsRateChart"}];
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -1351,7 +1351,7 @@
     	FORM_SEARCH.tranData = [{outDs:"agingWipChart", _siq:"dashboard.scmDash.agingWipChart"}];
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -1418,7 +1418,7 @@ function fn_popUpAuthorityHasOrNot(){
         
         var aOption = {
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : SCM_SEARCH,
             success : function (data) {
             
@@ -1594,7 +1594,7 @@ function fn_popUpAuthorityHasOrNot(){
         return new Promise(function(resolve,reject){    gfn_service({
             
             
-            url    : GV_CONTEXT_PATH + "/biz/obj.do",
+            url    : GV_CONTEXT_PATH + "/biz/obj",
             data   : CODE_SEARCH,
             success: function(data) {
                  
@@ -1625,7 +1625,7 @@ function fn_popUpAuthorityHasOrNot(){
 	            ,{outDs:"prodAmtTotalChart", _siq:"dashboard.scmDash.prodAmtTotalChart"}
 	        	];
 	        var sMap = {
-	            url: "${ctx}/biz/obj.do",
+	            url: "${ctx}/biz/obj",
 	            data: FORM_SEARCH,
 	            success:function(data) {
 	            	prodAmtChart = null;
@@ -1749,7 +1749,7 @@ function fn_popUpAuthorityHasOrNot(){
                ];
            
            var sMap = {
-               url: "${ctx}/biz/obj.do",
+               url: "${ctx}/biz/obj",
                data: FORM_SEARCH,
                success:function(data) {
                    shipmentAmtChart = null;

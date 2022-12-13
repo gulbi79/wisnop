@@ -86,7 +86,7 @@
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {_mtd : "getList", weekly_daily : weeklyDaily,  
                 tranData : [
                     {outDs : "planList", _siq : "aps.planExecute.planIdControl"},
@@ -129,7 +129,7 @@
             
             gfn_service({
                 async   : false,
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : {_mtd : "getList", weekly_daily : weeklyDaily,  
                     tranData : [
                         {outDs : "planList", _siq : "aps.planExecute.planIdControl"}
@@ -165,7 +165,7 @@
             if(prodPart != ""){
                 gfn_service({
                     async   : false,
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : {_mtd : "getList", prodPart : prodPart, tranData:[
                         {outDs : "planOption", _siq : "aps.planExecute.planOption"},
                     ]},
@@ -285,7 +285,7 @@
         ];
         
         var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
                 
@@ -543,7 +543,7 @@ function fn_apply_customized_for_ConfirmCancel(sqlFlag) {
         fn_authorityReset();
         
         var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
                 
@@ -572,7 +572,7 @@ function fn_apply_customized_for_ConfirmCancel(sqlFlag) {
         fn_authorityReset();
         
         var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
                 
@@ -600,7 +600,7 @@ function fn_apply_customized_for_ConfirmCancel(sqlFlag) {
         fn_authorityReset();
         
         var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
                 
@@ -632,7 +632,7 @@ function fn_getGridData_customized(sqlFlag) {
         fn_authorityReset();
         
         var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
                 
@@ -655,7 +655,7 @@ function fn_getGridData_customized(sqlFlag) {
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {
                 _mtd : "getList",
                 tranData : [
@@ -908,7 +908,7 @@ function fn_getGridData_customized(sqlFlag) {
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {
                 _mtd : "getList",
                 tranData : [
@@ -1166,7 +1166,7 @@ function fn_gridCallback_customized_for_Confirm(dataA){
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {
                 _mtd : "getList",
                 tranData : [
@@ -1428,7 +1428,7 @@ function fn_gridCallback_customized_for_Confirm(dataA){
                         ];
                         
                         gfn_service({
-                            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                            url     : GV_CONTEXT_PATH + "/biz/obj",
                             data    : FORM_SAVE,
                             success : function(data) {
                                 alert('<spring:message code="msg.msgPlanConfirmExec"/>');
@@ -1449,7 +1449,7 @@ function fn_gridCallback_customized_for_ConfirmCancel(dataA){
     
     gfn_service({
         async   : false,
-        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+        url     : GV_CONTEXT_PATH + "/biz/obj",
         data    : {
             _mtd : "getList",
             tranData : [
@@ -1709,7 +1709,7 @@ function fn_gridCallback_customized_for_ConfirmCancel(dataA){
                     ];
                     
                     gfn_service({
-                        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                        url     : GV_CONTEXT_PATH + "/biz/obj",
                         data    : FORM_SAVE,
                         success : function(data) {
                             alert('<spring:message code="msg.msgPlanConfirmExecCancel"/>');
@@ -1750,7 +1750,7 @@ function fn_gridCallback_customized_for_ConfirmCancel(dataA){
         if(prodPart != ""){
             gfn_service({
                 async   : false,
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : {_mtd : "getList", planId : planId, prodPart : prodPart, tranData:[
                     {outDs : "planVersion", _siq : "aps.planExecute.planVersionControl"},
                 ]},
@@ -1791,7 +1791,7 @@ function fn_planVersionChg_customized(){
         if(prodPart != ""){
             gfn_service({
                 async   : false,
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : {_mtd : "getList", planId : planId, prodPart : prodPart, tranData:[
                     {outDs : "planVersion", _siq : "aps.planExecute.planVersionControl"},
                 ]},
@@ -1837,7 +1837,7 @@ function fn_planVersionChg_customized_for_Confirm(){
         if(prodPart != ""){
             gfn_service({
                 async   : false,
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : {_mtd : "getList", planId : planId, prodPart : prodPart, tranData:[
                     {outDs : "planVersion", _siq : "aps.planExecute.planVersionControl"},
                 ]},
@@ -1881,7 +1881,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
     if(prodPart != ""){
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {_mtd : "getList", planId : planId, prodPart : prodPart, tranData:[
                 {outDs : "planVersion", _siq : "aps.planExecute.planVersionControl"},
             ]},
@@ -1933,7 +1933,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
                 ];
                 
                 gfn_service({
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SAVE,
                     success : function(data) {
                         alert('<spring:message code="msg.msgVersionProdExcute"/>');
@@ -1960,7 +1960,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
                 ];
                 
                 gfn_service({
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SAVE,
                     success : function(data) {
                         alert('<spring:message code="msg.saveOk"/>');
@@ -1988,7 +1988,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
                 ];
                 
                 gfn_service({
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SAVE,
                     success : function(data) {
                         alert('<spring:message code="msg.saveOk"/>');
@@ -2017,7 +2017,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
                 ];
                 
                 gfn_service({
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SAVE,
                     success : function(data) {
                         alert('<spring:message code="msg.saveOk"/>');
@@ -2045,7 +2045,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
                 ];
                 
                 gfn_service({
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SAVE,
                     success : function(data) {
                         alert('<spring:message code="msg.saveOk"/>');
@@ -2334,7 +2334,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
                     ];
                              
                     gfn_service({
-                        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                        url     : GV_CONTEXT_PATH + "/biz/obj",
                         data    : FORM_SAVE,
                         success : function(data) {
                             
@@ -2350,7 +2350,7 @@ function fn_planVersionChg_customized_for_ConfirmCancel(){
                                     ];
                                     
                                     gfn_service({
-                                        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                                        url     : GV_CONTEXT_PATH + "/biz/obj",
                                         data    : FORM_SAVE,
                                         success : function(data) {
                                             

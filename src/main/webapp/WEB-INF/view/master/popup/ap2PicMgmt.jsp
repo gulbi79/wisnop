@@ -74,7 +74,7 @@ function fn_getAutoList() {
 	var rtnMap = {};
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
 	    	_mtd:"getList",
 	    	tranData:[
@@ -94,7 +94,7 @@ function fn_getAp1Team() {
 	var rtnMap;
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
 	    	_mtd:"getList",
 	    	tranData:[{outDs:"rtnList",_siq:"master.popup.ap2PicMgmtAp1Team"}]
@@ -270,7 +270,7 @@ function fn_getGridData(sqlFlag) {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"master.popup.ap2PicMgmt"}];
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			//그리드 데이터 삭제
@@ -311,7 +311,7 @@ function fn_save() {
 		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"master.popup.ap2PicMgmt",grdData:grdData}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SAVE,
 			success: function(data) {
 				alert('<spring:message code="msg.saveOk"/>');
@@ -329,7 +329,7 @@ function fn_excelSqlAuth() {
     
     gfn_service({
         async   : false,
-        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+        url     : GV_CONTEXT_PATH + "/biz/obj",
         data    : {
             _mtd : "getList",
             popUpMenuCd : popUpMenuCd,

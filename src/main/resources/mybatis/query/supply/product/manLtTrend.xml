@@ -82,7 +82,7 @@
 				#end
 				#foreach($bucketMap in $_parameter.bucketList)
 				#set($paramMon = "$bucketMap.BUCKET_VAL")
-				#if($velocityCount == 1)
+				#if($foreach.count == 1)
 				 , ISNULL(AVG(CASE WHEN YEARMONTH = '$paramMon' THEN DATEDIFF(DAY, RELEASE_DATE, COMP_DATE) END + 0.0), 0) 						
 				#else
 				 + ISNULL(AVG(CASE WHEN YEARMONTH = '$paramMon' THEN DATEDIFF(DAY, RELEASE_DATE, COMP_DATE) END + 0.0), 0)

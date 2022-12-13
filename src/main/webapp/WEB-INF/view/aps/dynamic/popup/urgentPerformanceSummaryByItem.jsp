@@ -161,7 +161,7 @@
             FORM_SEARCH._mtd     = "getList";
             FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq}];
             var aOption = {
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : FORM_SEARCH,
                 success : function (data) {
                     
@@ -304,7 +304,7 @@
         var bucketLen = ajaxMap.sqlId.length;
         gfn_service({
             async: false,
-            url: GV_CONTEXT_PATH + "/common/bucketInit.do",
+            url: GV_CONTEXT_PATH + "/common/bucketInit",
             data:ajaxMap,
             success:function(data) {
                 

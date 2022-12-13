@@ -357,7 +357,7 @@
             FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }, { outDs : "authorityList",_siq : this._siq + "AuthorityList"}, { outDs : "confirm",_siq : this._siq + "Confirm"}];
             
             var aOption = {
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : FORM_SEARCH,
                 success : function (data) {
                     
@@ -455,7 +455,7 @@
                 FORM_SAVE.tranData = [{outDs : "saveCnt", _siq : prepareMaterials._siq, grdData : grdData}];
                 
                 var sMap = {
-                    url: GV_CONTEXT_PATH + "/biz/obj.do",
+                    url: GV_CONTEXT_PATH + "/biz/obj",
                     data: FORM_SAVE,
                     success:function(data) {
                         alert('<spring:message code="msg.saveOk"/>');
@@ -827,7 +827,7 @@
             FORM_SAVE.tranData = [{outDs : "saveCnt", _siq : "snop.oprtKpi.prepareMaterialsConfirmYn", grdData : [{confirmYn : confirm_yn, fromWeek : $("#fromWeek").val()}]}];
             
             gfn_service({
-                url    : GV_CONTEXT_PATH + "/biz/obj.do",
+                url    : GV_CONTEXT_PATH + "/biz/obj",
                 data   : FORM_SAVE,
                 success: function(data) {
                     if(confirm_yn == "Y") {
@@ -847,7 +847,7 @@
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {_mtd : "getList", swFromDate : swFromDate, tranData : [
                 {outDs : "grList", _siq:"snop.oprtKpi.grDate"}
             ]},

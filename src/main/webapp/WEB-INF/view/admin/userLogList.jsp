@@ -116,7 +116,7 @@
     	FORM_SEARCH._mtd = "getList";
     	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"admin.userLog"}];
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	dataProvider.clearRows(); //데이터 초기화

@@ -219,7 +219,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : "${ctx}/biz/obj.do",
+				url     : "${ctx}/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -273,7 +273,7 @@
 				FORM_SEARCH.tranData = [{outDs:"saveCnt",_siq : trnaslateMng._siq, grdData : grdData, custDupChkYn : {"insert":"Y"}}];
 				
 				var ajaxOpt = {
-					url     : "${ctx}/biz/obj.do",
+					url     : "${ctx}/biz/obj",
 					data    : FORM_SEARCH,
 					success : function(data) {
 						if (data.errCode == -10) {
@@ -294,7 +294,7 @@
 		// 적용
 		domainApply : function () {
 			var ajaxOpt = {
-				url     : "${ctx}/locale/applyLocale.do",
+				url     : "${ctx}/locale/applyLocale",
 				data    : {},
 				success : function (data) {
 					if (data.errMsg == 'success') {

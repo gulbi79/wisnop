@@ -296,7 +296,7 @@
 				        UNION ALL 
 				        SELECT '$meaMap.CD'
 				             , '$meaMap.NM'
-				             , $velocityCount 
+				             , $foreach.count 
 						#end
 					) SS
 				    WHERE CATEGORY_CD IS NOT NULL

@@ -33,7 +33,7 @@
 		var rtnMap = [];
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {_mtd:"getList",tranData:[{outDs:"rtnList",_siq:"master.master.reptItemGroupUpperItemCode"}]},
 		    success :function(data) {
 		    	rtnMap = data.rtnList;
@@ -266,7 +266,7 @@
 		FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"master.master.reptItemGroup"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제
@@ -338,7 +338,7 @@
 			FORM_SAVE._mtd     = "saveUpdate";
 			FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"master.master.reptItemGroup",grdData:grdData}];
 			gfn_service({
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SAVE,
 				success : function(data) {
 					alert('<spring:message code="msg.saveOk"/>');

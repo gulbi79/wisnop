@@ -84,7 +84,7 @@
                 search   : function() {
                     gfn_service({
                         async   : false,
-                        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                        url     : GV_CONTEXT_PATH + "/biz/obj",
                         data    : {
                                     _mtd : "getList",
                                     tranData : [
@@ -642,7 +642,7 @@
                 FORM_SEARCH.tranData = [{outDs:"resList",_siq:"master.master.item"}];
                 
                 var aOption = {
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SEARCH,
                     success : function (data) {
                         
@@ -968,7 +968,7 @@
             FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"master.master.item", grdData : grdData}];
             
             var serviceMap = {
-                url: "${ctx}/biz/obj.do",
+                url: "${ctx}/biz/obj",
                 data: FORM_SAVE,
                 success:function(data) {
                     alert('<spring:message code="msg.saveOk"/>');
@@ -998,7 +998,7 @@
             FORM_SEARCH.tranData = [{outDs:"resList",_siq:"master.master.groupCode"}];
             
             var aOption = {
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : FORM_SEARCH,
                 success : function (data) {
                     
@@ -1073,7 +1073,7 @@
     	
         var aOption = {
         	async: false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : FORM_SEARCH,
             success : function (data) {
             	

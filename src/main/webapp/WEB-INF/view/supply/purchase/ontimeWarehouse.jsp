@@ -48,7 +48,7 @@
 				
 				gfn_service({
 					async   : false,
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : {
 						_mtd:"getList",
 						tranData:[
@@ -63,7 +63,7 @@
 				
 				gfn_service({
 					async   : false,
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : {
 						_mtd:"getList",
 						tranData:[
@@ -197,7 +197,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList", _siq : "supply.purchase.warehouse" }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					

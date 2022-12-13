@@ -101,7 +101,7 @@
 				#if ($_parameter.bucketList.size() > 0)
 					#foreach( $bucketMap in $_parameter.bucketList )
 					#set( $month = "$bucketMap.BUCKET_VAL" )
-			  			#if($velocityCount > 1)
+			  			#if($foreach.count > 1)
 						  
 						  #if($bucketMap.CD.indexOf("MT") > -1)
 						        #if(($month == $_parameter.startYear) and ($month == $_parameter.endYear))

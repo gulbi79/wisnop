@@ -57,7 +57,7 @@
 				
 				gfn_service({
 					async   : false,
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : {_mtd : "getList", tranData:[
 						{outDs : "planList", _siq : "aps.planExecute.planIdBasic"},
 					]},
@@ -221,7 +221,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -404,7 +404,7 @@ async   function fn_validChk(){
 	                     {outDs : "saveCnt", _siq : "aps.planExecute.validChk", grdData : data}
 	                 ];
 	                 gfn_service({
-	                     url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	                     url     : GV_CONTEXT_PATH + "/biz/obj",
 	                     data    : FORM_SAVE,
 	                     success : function(data) {
 	                         alert('<spring:message code="msg.validMsg"/>');
@@ -425,7 +425,7 @@ async   function fn_validChk(){
                      {outDs : "saveCnt", _siq : "aps.planExecute.validChk", grdData : data}
                  ];
                  gfn_service({
-                     url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                     url     : GV_CONTEXT_PATH + "/biz/obj",
                      data    : FORM_SAVE,
                      success : function(data) {
                          alert('<spring:message code="msg.validMsg"/>');
@@ -465,7 +465,7 @@ async   function fn_validChk(){
 	    	gfn_service({
 	            
 	            
-	            url    : GV_CONTEXT_PATH + "/biz/obj.do",
+	            url    : GV_CONTEXT_PATH + "/biz/obj",
 	            data   : VALIDATION_CHECK_SEARCH,
 	            success: function(data) {
 	            	
@@ -507,7 +507,7 @@ async   function fn_validChk(){
             gfn_service({
                 
                 
-                url    : GV_CONTEXT_PATH + "/biz/obj.do",
+                url    : GV_CONTEXT_PATH + "/biz/obj",
                 data   : VALIDATION_CHECK_DAY_SEARCH,
                 success: function(data) {
                 	

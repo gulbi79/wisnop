@@ -147,7 +147,7 @@
     	FORM_SEARCH._mtd   = "getList";
     	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"admin.fileMng"}];
     	var sMap = {
-   			url: "${ctx}/biz/obj.do",
+   			url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	dataProvider.clearRows(); //데이터 초기화
@@ -216,7 +216,7 @@
     		FORM_SAVE._mtd   = "saveAll";
     		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"admin.fileMng", grdData : grdData}];
     		var serviceMap = {
-    			url: "${ctx}/biz/obj.do",
+    			url: "${ctx}/biz/obj",
                 data: FORM_SAVE,
                 success:function(data) {
                 	alert('<spring:message code="msg.saveOk"/>');
@@ -351,7 +351,7 @@
   		params._mtd = "getList";
   		params.tranData = [{outDs:"rtnList",_siq:"common.file"}];
   		var sMap = {
-  	        url: "${ctx}/biz/obj.do",
+  	        url: "${ctx}/biz/obj",
   	        data: params,
   	        success:function(data) {
   	        	//dataProviderFile.clearRows(); //데이터 초기화
@@ -425,7 +425,7 @@
 			</div>
 		</div>
 		
-		<form id="fileFrm" method="post" enctype="multipart/form-data" action="${ctx}/file/upload.do" >
+		<form id="fileFrm" method="post" enctype="multipart/form-data" action="${ctx}/file/upload" >
 			<input type="hidden" id="DEL_FILE_SEQ" name="DEL_FILE_SEQ" value="" />
 			<input type="hidden" id="PATH_ID" name="PATH_ID" value="" />
 			<input type="hidden" id="FILE_NO" name="FILE_NO" value="" />

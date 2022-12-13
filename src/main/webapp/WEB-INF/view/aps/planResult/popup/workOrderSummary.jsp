@@ -197,7 +197,7 @@ function fn_apply(sqlFlag) {
 	data.tranData = [{outDs : "rtnList", _siq : "aps.planResult.workOrderSummary"}];
 	data.sql	= sqlFlag;	
 	var aOption = {
-			url : "${ctx}/biz/obj.do",
+			url : "${ctx}/biz/obj",
 		data    : data,
 		success : function (data) {
 			dataProvider.setRows(data.rtnList);
@@ -212,7 +212,7 @@ function fn_excelSqlAuth() {
 	
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
    			_mtd : "getList",
    			popUpMenuCd : popUpMenuCd,

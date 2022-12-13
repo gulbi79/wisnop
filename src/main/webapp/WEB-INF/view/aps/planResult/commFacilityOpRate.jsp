@@ -194,7 +194,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq}];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -263,7 +263,7 @@
 		params.tranData = [{outDs : "resList", _siq : "aps.planResult.versionTypeCd"}];
 		
 		var opt = {
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : params,
 			async   : false,
 			success : function(data) {
@@ -281,7 +281,7 @@
 		params.tranData = [{outDs:"meaList",_siq : commFacilityOpRate._siq + "Mea"}];
 		gfn_service({
 		    async: false,
-		    url: GV_CONTEXT_PATH + "/biz/obj.do",
+		    url: GV_CONTEXT_PATH + "/biz/obj",
 		    data:params,
 		    success:function(data) {
 		    	commFacilityOpRate.headerMeaList   = data.meaList;
@@ -303,7 +303,7 @@
 			}, pOption);
 			
 			gfn_service({
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : params,
 				async   : false,
 				success : function(data) {

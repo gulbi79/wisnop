@@ -33,7 +33,7 @@
 	function fn_getInitData() {
 		gfn_service({
 			async   : false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : {_mtd:"getList",tranData:[
 				{outDs:"roleList",_siq:"dp.salesPlan.prodCapaAllocMfgRole"},
 			]},
@@ -183,7 +183,7 @@
 		FORM_SEARCH.tranData = [{outDs:"gridList",_siq:"dp.salesPlan.prodCapaAllocMfg"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제
@@ -375,7 +375,7 @@
 			];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					alert('<spring:message code="msg.saveOk"/>');
@@ -408,7 +408,7 @@
 			];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					alert('<spring:message code="msg.saveOk"/>');
@@ -494,7 +494,7 @@
 			];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					alert('<spring:message code="msg.saveOk"/>');

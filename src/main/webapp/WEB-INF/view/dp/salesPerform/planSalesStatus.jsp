@@ -35,7 +35,7 @@
 
 		gfn_service({
 			async   : false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : {_mtd : "getList", menuParam : "CFM", tranData : [
 				{outDs:"dateList", _siq:"dp.salesPerform.planSalesStatusDate"},
 			]},
@@ -168,7 +168,7 @@
 		FORM_SEARCH.tranData = [{outDs:"gridList",_siq:"dp.salesPerform.planSalesStatus"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제

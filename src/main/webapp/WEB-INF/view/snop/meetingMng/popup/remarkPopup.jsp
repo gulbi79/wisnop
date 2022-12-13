@@ -101,7 +101,7 @@ function fn_getGridData() {
 	FORM_SEARCH._mtd = "getList";
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"snop.meetingMng.remark"}];
 	var sMap = {
-        url: "${ctx}/biz/obj.do",
+        url: "${ctx}/biz/obj",
         data: FORM_SEARCH,
         success:function(data) {
         	dataProvider.clearRows(); //데이터 초기화
@@ -137,7 +137,7 @@ function fn_save() {
 		FORM_SAVE._mtd   = "saveAll";
 		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"snop.meetingMng.remark", grdData : grdData}];
     	var sMap = {
-            url: GV_CONTEXT_PATH + "/biz/obj.do",
+            url: GV_CONTEXT_PATH + "/biz/obj",
             data: FORM_SAVE,
             success:function(data) {
             	alert('<spring:message code="msg.saveOk"/>', function() {

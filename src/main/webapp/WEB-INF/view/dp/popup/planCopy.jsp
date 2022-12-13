@@ -43,7 +43,7 @@ function fn_getCopyInfo() {
 	
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
 	    	_mtd     :"getList",
 	    	menuCd   : paramMenuCd,

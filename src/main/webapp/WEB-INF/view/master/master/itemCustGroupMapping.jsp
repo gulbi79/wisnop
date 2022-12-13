@@ -24,7 +24,7 @@
 	function fn_predData() {
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {
 		    	_mtd:"getList",
 		    	tranData:[
@@ -85,7 +85,7 @@
 		var rtnMap = {};
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {
 		    	_mtd:"getList",
 		    	CHECK_ROLE : userRoleMap.CHECK_ROLE,
@@ -106,7 +106,7 @@
 		var rtnMap = {};
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {
 		    	_mtd:"getList",
 		    	tranData:[
@@ -483,7 +483,7 @@
 		FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"master.master.itemCustGroupMapping"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				fn_initCheckbox();
@@ -604,7 +604,7 @@
 		    ];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 				    
@@ -613,7 +613,7 @@
                         {outDs : "saveCnt3", _siq : "master.master.executeACall"}
                     ];
 					gfn_service({
-                        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                        url     : GV_CONTEXT_PATH + "/biz/obj",
                         data    : FORM_SAVE,
                         success : function(data) {
                         	

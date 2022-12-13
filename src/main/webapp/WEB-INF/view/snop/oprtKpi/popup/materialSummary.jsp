@@ -187,7 +187,7 @@ function fn_getGridData(sqlFlag) {
 	//console.log("FORM_SEARCH : ", FORM_SEARCH);
  
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			
@@ -210,7 +210,7 @@ function fn_excelSqlAuth() {
 	
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
    			_mtd : "getList",
    			popUpMenuCd : popUpMenuCd,

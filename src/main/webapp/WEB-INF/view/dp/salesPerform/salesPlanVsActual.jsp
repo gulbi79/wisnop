@@ -29,7 +29,7 @@
 	function fn_getInitData() {
 		gfn_service({
 			async   : false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : {_mtd:"getList",tranData:[{outDs:"dateList",_siq:"dp.salesPerform.salesPlanVsActualDate"}]},
 			success : function(data) {
 				codeMap.DATE_INFO = data.dateList[0];
@@ -135,7 +135,7 @@
 		FORM_SEARCH.tranData = [{outDs:"gridList",_siq:"dp.salesPerform.salesPlanVsActual"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제

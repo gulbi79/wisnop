@@ -105,7 +105,7 @@ function fn_apply(sqlFlag) {
 	FORM_SEARCH.tranData = [{ outDs : "month" , _siq : "dashboard.portal.Month" }];
 	
 	var sMap = {
-		url	 : "${ctx}/biz/obj.do",
+		url	 : "${ctx}/biz/obj",
 		data	: FORM_SEARCH,
 		success : function(data) {
 			
@@ -162,7 +162,7 @@ function fn_getChartData() {
         },
         type: 'post', // POST 로 전송
         async: false,
-        url: "${ctx}/biz/obj.do",
+        url: "${ctx}/biz/obj",
         data: JSON.stringify(FORM_SEARCH),
         success:function(data) {
         	
@@ -712,7 +712,7 @@ function companyConsSearch(sqlFlag){
 	];
 	
 	var sMap = {
-		url	 : "${ctx}/biz/obj.do",
+		url	 : "${ctx}/biz/obj",
 		data	: FORM_SEARCH,
 		success : function(data) {
 			
@@ -774,7 +774,7 @@ function weekMaterialsAvailSearch(sqlFlag){
 	
 	
 	var sMap = {
-		url	 : "${ctx}/biz/obj.do",
+		url	 : "${ctx}/biz/obj",
 		data	: FORM_SEARCH,
 		success : function(data) {
 			

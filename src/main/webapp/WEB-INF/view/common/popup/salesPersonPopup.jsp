@@ -178,7 +178,7 @@ var fn_gridCallback = function(data) {
 //그리드 데이터 조회
 function fn_getGridData(data) {
 	var sMap = {
-        url: "${ctx}/common/salesPersonList.do",
+        url: "${ctx}/common/salesPersonList",
         data: data,
         success:fn_gridCallback,
     }

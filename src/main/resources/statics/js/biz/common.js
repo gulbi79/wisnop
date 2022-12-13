@@ -12,8 +12,6 @@
 
 //공통 서비스 함수
 function gfn_service(ajaxMap, appType) {
-	ajaxMap.url = ajaxMap.url.replace(".do","");
-	console.log(ajaxMap.url);
 	var tmpSuccess 	= ajaxMap.success; //성공시 처리로직
 	var tmpError	= ajaxMap.error; //실패시 처리로직
 
@@ -39,10 +37,10 @@ function gfn_service(ajaxMap, appType) {
             		
             		var tmpPath = "/login";
             		if (gfn_getCurWindow()) {
-            			gfn_getCurWindow().location.href = GV_CONTEXT_PATH + tmpPath + "/sessionFire.do";
+            			gfn_getCurWindow().location.href = GV_CONTEXT_PATH + tmpPath + "/sessionFire";
             			self.close();
             		} else {
-            			location.href = GV_CONTEXT_PATH + tmpPath + "/sessionFire.do";
+            			location.href = GV_CONTEXT_PATH + tmpPath + "/sessionFire";
             		}
             	
             	// Validate 결과일때는 success 호출.
@@ -100,7 +98,7 @@ function gfn_getDomainMsg(msgKey,msgParams) {
 	$.ajax({
 	    type: 'post', // POST 로 전송
 	    async: false,
-	    url: GV_CONTEXT_PATH + "/common/getDomainMsg.do",
+	    url: GV_CONTEXT_PATH + "/common/getDomainMsg",
 	    dataType: 'json',
 	    data:params,
 	    success:function(data) {
@@ -137,7 +135,7 @@ function gfn_setRoleBtn() {
 		//sub menu list 조회
 		gfn_service({
 			async: false,
-			url: GV_CONTEXT_PATH + "/common/subMenuList.do",
+			url: GV_CONTEXT_PATH + "/common/subMenuList",
 			data:{menuCd: $("#menuCd").val()},
 			success:function(data) {
 				var subMenuList = data.rtnList;
@@ -185,7 +183,7 @@ function gfn_getPlanId(pOption) {
 		}, pOption);
 		
 		gfn_service({
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : params,
 			async   : false,
 			success : function(data) {
@@ -263,7 +261,7 @@ function gfn_getHrcy() {
 
 function gfn_getTranHrcy(params, gubun, setting) {
 	gfn_service({
-		url: GV_CONTEXT_PATH + "/common/hrcy.do",
+		url: GV_CONTEXT_PATH + "/common/hrcy",
 		data:params,
 		success:function(data) {
 			$.each(HRCY.mapHrcy, function(n,v) {
@@ -355,7 +353,7 @@ function gfn_getMenuInit(dimYn, meaYn) {
 	                 , {outDs : "meaList", _siq : "common.measure"}];
 	gfn_service({
 	    async: false,
-	    url: GV_CONTEXT_PATH + "/biz/obj.do",
+	    url: GV_CONTEXT_PATH + "/biz/obj",
 	    data: params,
 	    success:function(data) {
 	    	
@@ -376,7 +374,7 @@ function gfn_getBucket(ajaxMap,meaFlag,callback) {
 	var bucketLen = ajaxMap.sqlId.length;
 	gfn_service({
 		async: false,
-		url: GV_CONTEXT_PATH + "/common/bucketInit.do",
+		url: GV_CONTEXT_PATH + "/common/bucketInit",
 		data:ajaxMap,
 		success:function(data) {
 			
@@ -464,7 +462,7 @@ function gfn_getComCode(grpCds,allYn,buAllYn) {
 	params.tranData = [{outDs:"rtnList",_siq:"common.comCode"}];
 	gfn_service({
 	    async: false,
-	    url: GV_CONTEXT_PATH + "/biz/obj.do",
+	    url: GV_CONTEXT_PATH + "/biz/obj",
 	    data: params,
 	    success:function(data) {
 	    	$.each(arrGrpCd, function (i,o) {
@@ -591,7 +589,7 @@ function gfn_getComCodeEx(arVal, allYn, param) {
 	
 	gfn_service({
 		async   : false,
-		url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		url     : GV_CONTEXT_PATH + "/biz/obj",
 		data    : FORM_SEARCH,
 		success : function (data) {
 			if (allYn == "Y") {
@@ -736,7 +734,7 @@ function gfn_importGrid(imParam) {
 				type : "post",
 				dataType : "json",
 				data : $("#"+formId).serialize(),
-				url : GV_CONTEXT_PATH + "/excel/load.do",
+				url : GV_CONTEXT_PATH + "/excel/load",
 				beforeSubmit : gfn_blockUI,
 				success : function(data) {
 					gfn_unblockUI();
@@ -848,7 +846,7 @@ function gfn_doSubNumberFormat() {
 	params.tranData = [{outDs:"saveCnt",_siq:"common.userAttb", grdData : [$("#commonForm").serializeObject()] }];
 	gfn_service({
 	    async: false,
-	    url: GV_CONTEXT_PATH + "/biz/obj.do",
+	    url: GV_CONTEXT_PATH + "/biz/obj",
 	    data:params,
 	    success:function(data) {}
 	}, "obj");
@@ -1101,7 +1099,7 @@ function gfn_getCommData(param) {
 	param.tranData = [{outDs:"rtnList",_siq: param._siq}];
 	gfn_service({
 	    async: false,
-	    url: GV_CONTEXT_PATH + "/biz/obj.do",
+	    url: GV_CONTEXT_PATH + "/biz/obj",
 	    data:param,
 	    success:function(data) {
 	    	rtnMap = data.rtnList;
@@ -1215,10 +1213,10 @@ function gfn_comPopupOpen(popType,params) {
 	}
 
 	if (!gfn_isNull(params.rootUrl) && !gfn_isNull(params.url)) {
-		url = GV_CONTEXT_PATH + "/" + params.rootUrl + "/popup/" + params.url + ".do";
+		url = GV_CONTEXT_PATH + "/" + params.rootUrl + "/popup/" + params.url + "";
 	} else {
 		if (gfn_isNull(url)) return;
-		url = GV_CONTEXT_PATH + "/common/popup/" + url + ".do";
+		url = GV_CONTEXT_PATH + "/common/popup/" + url + "";
 	}
 
 	var pPos  = gfn_getPopupXY(pWidth,pHeight);
@@ -1506,7 +1504,7 @@ function gfn_getRoleCd(roleCd) {
 	param.tranData = [{outDs:"rtnList",_siq:"common.comUserRole"}];
 	gfn_service({
 		async: false,
-		url: GV_CONTEXT_PATH + "/biz/obj.do",
+		url: GV_CONTEXT_PATH + "/biz/obj",
 		data: param,
 		success:function(data) {
 			rtnMap = data.rtnList;
@@ -1536,7 +1534,7 @@ function gfn_roleUserList(userRole,allYn,topAllYn) {
 	param.TOP_ALL_YN  = topAllYn;
 	gfn_service({
 	    async: false,
-	    url: GV_CONTEXT_PATH + "/biz/obj.do",
+	    url: GV_CONTEXT_PATH + "/biz/obj",
 	    data:param,
 	    success:function(data) {
 	    	rtnMap = data.rtnList;
@@ -1590,7 +1588,7 @@ function gfn_popresize() {
 		//sub menu list 조회
 		gfn_service({
 			async: false,
-			url: GV_CONTEXT_PATH + "/common/subMenuList.do",
+			url: GV_CONTEXT_PATH + "/common/subMenuList",
 			data:{menuCd: $("#menuCd").val(), UPPER_MENU_FLAG: "N"},
 			success:function(data) {
 				var menuInfo = data.rtnList;
@@ -1619,7 +1617,7 @@ function gfn_bookMark() {
 	params.tranData = [{outDs:"saveCnt",_siq:"common.bookMark", grdData : [$("#commonForm").serializeObject()]}];
 	gfn_service({
 	    async: false,
-	    url: GV_CONTEXT_PATH + "/biz/obj.do",
+	    url: GV_CONTEXT_PATH + "/biz/obj",
 	    data:params,
 	    success:function(data) {
 	    },
@@ -1683,7 +1681,7 @@ function gfn_fileDown(fileNo, arrFileSeq, params) {
 	
 	confirm(gfn_getDomainMsg("msg.download"), function() { 
 		$("#"+formId).attr("method","post");
-		$("#"+formId).attr("action",GV_CONTEXT_PATH+"/file/download.do");
+		$("#"+formId).attr("action",GV_CONTEXT_PATH+"/file/download");
 		$("#"+formId).submit();
 	});
 }

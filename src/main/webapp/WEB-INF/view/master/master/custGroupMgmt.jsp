@@ -30,7 +30,7 @@
 	function fn_getCustGroup() {
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {_mtd:"getList",tranData:[{outDs:"rtnList",_siq:"master.master.custGroupMgmtCustGroup"}]},
 		    success :function(data) {
 		    	codeMap.CUST = data.rtnList;
@@ -269,7 +269,7 @@
 		FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"master.master.custGroupMgmt"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제
@@ -356,7 +356,7 @@
 				{outDs:"saveCnt2",_siq:"master.master.custGroupMgmtPro",grdData:[{state:"updated"}]}
 			];
 			gfn_service({
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SAVE,
 				success : function(data) {
 					alert('<spring:message code="msg.saveOk"/>');

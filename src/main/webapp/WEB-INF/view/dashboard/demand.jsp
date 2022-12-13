@@ -308,7 +308,7 @@
     	                      , {outDs: "chartList" , _siq : "dashboard.chartInfo.demandDashboard" }
     	                   ];
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	mainList = data.mainList;
@@ -881,7 +881,7 @@ function fn_popUpAuthorityHasOrNot(){
         
         var aOption = {
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : SCM_SEARCH,
             success : function (data) {
             

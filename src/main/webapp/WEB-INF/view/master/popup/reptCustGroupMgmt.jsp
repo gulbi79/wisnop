@@ -292,7 +292,7 @@ function fn_getGridData(sqlFlag) {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"master.popup.reptCustGroupMgmt"}];
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			maxSeq = 0;
@@ -347,7 +347,7 @@ function fn_getReptCustGroupCodeMaxSeq() {
 	var rtnSeq;
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {_mtd:"getList",tranData:[{outDs:"rtnSeq",_siq:"master.popup.reptCustGroupMgmtMaxSeq"}]},
 	    success :function(data) {
 	    	rtnSeq = data.rtnSeq[0].MAX_SEQ;
@@ -378,7 +378,7 @@ function fn_save() {
 		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"master.popup.reptCustGroupMgmt", grdData : grdData, custDupChkYn : {"insert":"Y", "update":"Y", "delete":"Y"}}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SAVE,
 			success: function(data) {
 				
@@ -410,7 +410,7 @@ function fn_excelSqlAuth() {
   
   gfn_service({
       async   : false,
-      url     : GV_CONTEXT_PATH + "/biz/obj.do",
+      url     : GV_CONTEXT_PATH + "/biz/obj",
       data    : {
           _mtd : "getList",
           popUpMenuCd : popUpMenuCd,

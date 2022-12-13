@@ -70,7 +70,7 @@ var planSalesChart = {
 			FORM_SEARCH.tranData = [{ outDs : "week", _siq : planSalesChart._siq + "chartBucket" }
 			                      , { outDs : "repCustGroup", _siq : planSalesChart._siq + "chartRepCustGroup" }];
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -126,7 +126,7 @@ var planSalesChart = {
 			//console.log("FORM_SEARCH : ", FORM_SEARCH);
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					

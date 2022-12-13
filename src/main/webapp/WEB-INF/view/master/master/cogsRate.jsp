@@ -28,7 +28,7 @@
 	function fn_getInitData() {
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {
 		    	_mtd:"getList",
 		    	tranData:[
@@ -234,7 +234,7 @@
 		FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"master.master.cogsRate"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제
@@ -344,7 +344,7 @@
 			];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					if ( data.errCode == -20 ) {

@@ -286,7 +286,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -318,7 +318,7 @@
 		gridCallback : function(resList) {
 			gfn_service({
 			    async   : false,
-			    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			    url     : GV_CONTEXT_PATH + "/biz/obj",
 			    data    : {
 	    			_mtd : "getList",
 	    			tranData : [
@@ -439,7 +439,7 @@
 				];
 				
 	    		var serviceMap = {
-	   				url: "${ctx}/biz/obj.do",
+	   				url: "${ctx}/biz/obj",
 	                data: FORM_SAVE,
 	                success:function(data) {
 	                	alert('<spring:message code="msg.saveOk"/>');
@@ -477,7 +477,7 @@
 		params.tranData = [{outDs : "meaList", _siq : resource._siq + "Mes"}];
 		gfn_service({
 		    async : false,
-		    url : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url : GV_CONTEXT_PATH + "/biz/obj",
 		    data : params,
 		    success : function(data) {
 		    	MEASURE.user = data.meaList;

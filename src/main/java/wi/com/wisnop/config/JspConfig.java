@@ -7,9 +7,11 @@ import org.apache.tomcat.util.descriptor.web.JspConfigDescriptorImpl;
 import org.apache.tomcat.util.descriptor.web.JspPropertyGroup;
 import org.apache.tomcat.util.descriptor.web.JspPropertyGroupDescriptorImpl;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.DispatcherServlet;
 
 @Configuration
 public class JspConfig {
@@ -34,4 +36,16 @@ public class JspConfig {
             }
         };
     }
+	
+	/*
+	@Bean
+	public ServletRegistrationBean<DispatcherServlet> appServletBean() {
+	    ServletRegistrationBean<DispatcherServlet> registrationBean = new ServletRegistrationBean<DispatcherServlet>(new DispatcherServlet());
+	    registrationBean.addUrlMappings("/biz/*.do");
+        registrationBean.addInitParameter("isAbsolutePath", "true");
+        registrationBean.addInitParameter("propertyPath", "src/main/resources/public/rd/");
+		
+        return registrationBean;
+	}
+	*/
 }

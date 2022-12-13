@@ -608,7 +608,7 @@
 					#foreach($monthWeekMap in $_parameter.monthWeekBuckArry)
 		    			#set($monthWeekData = "$monthWeekMap.MONTH_WEEK_VAL")
 		    			#if($_parameter.bucket == "WEEK")
-		    				#if($velocityCount > 1)
+		    				#if($foreach.count > 1)
 			    				UNION ALL
 			    			#end
 							SELECT A1.COMPANY_CD
@@ -638,7 +638,7 @@
 					        GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
 					        
 		    			#else
-		    				#if($velocityCount > 1)
+		    				#if($foreach.count > 1)
 			    				UNION ALL
 			    			#end
 							SELECT A1.COMPANY_CD
@@ -696,7 +696,7 @@
 		    			#set($monthWeekData = "$monthWeekMap.MONTH_WEEK_VAL")
 		    			
 		    			#if($_parameter.bucket == "WEEK")
-		    				#if($velocityCount > 1)
+		    				#if($foreach.count > 1)
 			    				UNION ALL
 			    			#end
 							SELECT A1.COMPANY_CD
@@ -730,7 +730,7 @@
 					          AND A1.DEL_FLAG = 'N'
 					        GROUP BY A1.COMPANY_CD, A1.BU_CD, A1.ITEM_CD
 		    			#else
-		    				#if($velocityCount > 1)
+		    				#if($foreach.count > 1)
 			    				UNION ALL
 			    			#end
 							SELECT A1.COMPANY_CD
@@ -1187,7 +1187,7 @@
 		    		
 		    		#foreach($bucketMap in $_parameter.bucketList)
 		    			#set($paramData = "$bucketMap.BUCKET_VAL")
-		    			#if($velocityCount > 1)
+		    			#if($foreach.count > 1)
 		    				#if($_parameter.bucket == "WEEK")
 			    				#if($bucketMap.CD.indexOf("_INVEN") > -1)
 			   						+ ISNULL(ABS(SUM(CASE WHEN YEARWEEK = '$paramData' AND FLAG = 'INVENTORY' THEN QTY END)), 0)
@@ -1377,7 +1377,7 @@
 				) A
 				GROUP BY 
 				#foreach($dimMap in $_parameter.dimList)
-					#if($velocityCount > 1)
+					#if($foreach.count > 1)
 					 , A.$dimMap.DIM_CD
 					#else
 					   A.$dimMap.DIM_CD

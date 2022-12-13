@@ -136,7 +136,7 @@
     	                      , {outDs:"defectivesChart", _siq:"dashboard.scmDash.defectivesChart"}];
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	chart1List      = data.chart1List;

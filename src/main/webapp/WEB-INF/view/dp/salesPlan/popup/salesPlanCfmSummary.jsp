@@ -482,7 +482,7 @@ function fn_getGridData(flag) {
 	FORM_SEARCH.tranData = [{ outDs : "rtnList", _siq : "dp.planSalesCfm.salesPlanListCfmSummary"}];
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			

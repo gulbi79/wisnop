@@ -108,7 +108,7 @@ function fn_apply() {
 	data.tranData = [{outDs : "rtnList", _siq : "aps.planExecute.controlBoardAPop"}];
 	
 	var aOption = {
-			url : "${ctx}/biz/obj.do",
+			url : "${ctx}/biz/obj",
 		data    : data,
 		success : function (data) {
 			dataProvider.setRows(data.rtnList);

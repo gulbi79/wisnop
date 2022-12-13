@@ -1341,7 +1341,7 @@
 				#set($rollupDot = "")
 				#end
 				#foreach( $dimMap in $_parameter.dimList )
-				#if($velocityCount == 1)
+				#if($foreach.count == 1)
 				#set($grpLvlId = ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
 				#else
 				#set($grpLvlId = ${grpLvlId} + ", " + ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})

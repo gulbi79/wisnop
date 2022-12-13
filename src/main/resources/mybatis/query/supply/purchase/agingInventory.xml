@@ -6,7 +6,7 @@
 	<select id="bucketAgingSelect" parameterType="map" resultType="map">
 		/****** [ snop.agingInventory.bucketAgingSelect ] ******/
 		#foreach($bucketMap in $_parameter.param)
-			#if($velocityCount > 1)
+			#if($foreach.count > 1)
 				UNION ALL
 		 	#end
 				SELECT '$bucketMap.cd' AS BUCKET_ID
@@ -184,9 +184,9 @@
 				
 				#foreach($i in $dynamicMonthArray)
 					
-					#if($velocityCount == 1)
+					#if($foreach.count == 1)
 						
-						#if($velocityCount == $_parameter.monthCnt)
+						#if($foreach.count == $_parameter.monthCnt)
 							,SUM(CASE 
 								WHEN C.YEARMONTH <![CDATA[>=]]> @V_FROM_MON 
 									THEN QTY
@@ -198,8 +198,8 @@
 								END) M${i}_QTY
 						#end
 						
-					#elseif($velocityCount == 4)
-						#if($velocityCount == $_parameter.monthCnt)
+					#elseif($foreach.count == 4)
+						#if($foreach.count == $_parameter.monthCnt)
 							,SUM(CASE 
 								WHEN C.YEARMONTH <![CDATA[>=]]> LEFT(CONVERT(VARCHAR, DATEADD(mm, ${i}, @V_FROM_MON + '01'), 112), 6)
 									THEN QTY
@@ -213,7 +213,7 @@
 						#end
 					
 					#else
-						#if($velocityCount == $_parameter.monthCnt)
+						#if($foreach.count == $_parameter.monthCnt)
 							,SUM(CASE 
 								WHEN C.YEARMONTH <![CDATA[>=]]> LEFT(CONVERT(VARCHAR, DATEADD(mm, ${i}, @V_FROM_MON + '01'), 112), 6)
 									THEN QTY
@@ -227,7 +227,7 @@
 						#end
 					#end
 					
-					#if($velocityCount == $_parameter.monthCnt)
+					#if($foreach.count == $_parameter.monthCnt)
 						#break;
 					#end
 				#end
@@ -343,7 +343,7 @@
     	    	, A.PLANT_CD
 	    	    	#foreach($i in $dynamicMonthArray)
 						
-						#if($velocityCount == 4)
+						#if($foreach.count == 4)
 							,SUM(M${i}_OVER_QTY) AS M${i}_OVER_QTY 
 						
 						#else
@@ -351,7 +351,7 @@
 							,SUM(M${i}_QTY) 	 AS M${i}_QTY 
 						#end
 						
-						#if($velocityCount == $_parameter.monthCnt)
+						#if($foreach.count == $_parameter.monthCnt)
 							#break;
 						#end
 					#end
@@ -431,7 +431,7 @@
 				    #end
 				    #foreach($i in $dynamicMonthArray)
 						
-						#if($velocityCount == 4)
+						#if($foreach.count == 4)
 							,C4.M${i}_OVER_QTY AS M${i}_OVER_QTY 
 						
 						#else
@@ -439,7 +439,7 @@
 							,C4.M${i}_QTY 	   AS M${i}_QTY
 						#end
 						
-						#if($velocityCount == $_parameter.monthCnt)
+						#if($foreach.count == $_parameter.monthCnt)
 							#break;
 						#end
 					#end	   

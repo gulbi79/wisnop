@@ -32,7 +32,7 @@
 			initCode : function () {
 				gfn_service({
 					async   : false,
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : {_mtd:"getList",tranData:[
 						{outDs:"yearList" , _siq : product._siq + "productivityYear"},
 					]},
@@ -429,7 +429,7 @@
 			FORM_SEARCH.tranData = [{outDs : "resList", _siq : product._siq + "productivity"}];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -500,7 +500,7 @@
 			FORM_SAVE.tranData = [{outDs:"saveCnt",_siq: product._siq + "productivity",grdData:grdData, mergeFlag : "Y"}];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					alert('<spring:message code="msg.saveOk"/>');

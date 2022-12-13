@@ -50,7 +50,7 @@
 					#end
 					#foreach($bucketMap in $_parameter.bucketList)
 					#set($paramWeek = "$bucketMap.BUCKET_VAL")
-						#if($velocityCount == 1)
+						#if($foreach.count == 1)
 						, ISNULL(ROUND(AVG(CASE WHEN YEARWEEK = '$paramWeek' THEN CONS_TIME / STD_TIME END) * 100, 0), 0)						
 						#else
 						+ ISNULL(ROUND(AVG(CASE WHEN YEARWEEK = '$paramWeek' THEN CONS_TIME / STD_TIME END) * 100, 0), 0)

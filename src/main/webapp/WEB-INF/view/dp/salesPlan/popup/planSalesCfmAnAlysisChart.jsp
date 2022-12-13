@@ -82,7 +82,7 @@ function fn_getChartData() {
 	FORM_SEARCH.tranData = [{ outDs : "resList", _siq : "dp.salesPlan.planSalesCfmAnAlysisChart"}];
 	
 	var aOption = {
-		url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		url     : GV_CONTEXT_PATH + "/biz/obj",
 		data    : FORM_SEARCH,
 		success : function (data) {
 			

@@ -214,7 +214,7 @@ function fn_getGridData(data) {
 	data._mtd = "getList";
 	data.tranData = [{outDs:"rtnList",_siq:"common.comItemPopup"}];
 	var sMap = {
-		url: "${ctx}/biz/obj.do",
+		url: "${ctx}/biz/obj",
         data: data,
         success:fn_gridCallback,
     }

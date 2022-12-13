@@ -305,7 +305,7 @@ function fn_getGridData() {
 	FORM_SEARCH.tranData = [{outDs:"dimListAll",_siq:"admin.dimMapMenu"}
 	                      , {outDs:"dimList",_siq:"common.dimension"}];
 	var sMap = {
-		url: "${ctx}/biz/obj.do",
+		url: "${ctx}/biz/obj",
         data: FORM_SEARCH,
         success:function(data) {
 			orgSubData = []; //초기화
@@ -365,7 +365,7 @@ function fn_save() {
    		FORM_SAVE._mtd   = "saveAll";
    		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"common.dimConfMenu",mergeFlag:"Y", grdData : grdData}];
 		var serviceMap = {
-			url: "${ctx}/biz/obj.do",
+			url: "${ctx}/biz/obj",
             data: FORM_SAVE,
             success:function(data) {
             	//부모창 조회실행

@@ -354,7 +354,7 @@
 			    contentType: 'application/json',
 			    data:JSON.stringify(FORM_SEARCH),
 			    dataType: 'json',
-			    url: "${ctx}/biz/obj.do",
+			    url: "${ctx}/biz/obj",
 			    
 			    success:function(data) {
 			    	

@@ -35,7 +35,7 @@
 				
 				gfn_service({
 					async   : false,
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : {_mtd : "getList", tranData:[
 						{outDs : "planList", _siq : workerGroupProdPlan._siq + "PlanId"},
 					]},
@@ -304,7 +304,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -336,7 +336,7 @@
 		if(prodPart != ""){
 			gfn_service({
 				async   : false,
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : {_mtd : "getList", prodPart : prodPart, tranData:[
 					{outDs : "workplaces", _siq : workerGroupProdPlan._siq + "Workplaces"},
 				]},
@@ -357,7 +357,7 @@
 		if(prodPart != ""){
 			gfn_service({
 				async   : false,
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : {_mtd : "getList", prodPart : prodPart, tranData:[
 					{outDs : "workerGroup", _siq : workerGroupProdPlan._siq + "WorkerGroup"},
 				]},

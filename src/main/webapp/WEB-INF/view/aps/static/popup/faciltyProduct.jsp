@@ -33,7 +33,7 @@ function fn_init() {
 	
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
 	    	_mtd     :"getList",
 	    	prodPart   : prodPart,
@@ -177,7 +177,7 @@ function fn_getGridData(data) {
 	data.tranData = [{outDs:"rtnList",_siq:"aps.static.facilityProductPop"}];
 	
 	var sMap = {
-		url : "${ctx}/biz/obj.do",
+		url : "${ctx}/biz/obj",
         data : data,
         success : fn_gridCallback,
     }

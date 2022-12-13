@@ -66,7 +66,7 @@
         FROM (
             SELECT NULL AS CATEGORY_CD, NULL AS CATEGORY_NM, NULL AS CATEGORY_IDX
 #foreach( $meaMap in $_parameter.meaList )
-            UNION ALL SELECT '$meaMap.CD', '$meaMap.NM', $velocityCount 
+            UNION ALL SELECT '$meaMap.CD', '$meaMap.NM', $foreach.count 
 #end
         ) A
         WHERE CATEGORY_CD IS NOT NULL
@@ -253,7 +253,7 @@
 	USING
 	(
 #foreach( $bucketMap in $_parameter.bucketList )
-  #if($velocityCount == 1) 
+  #if($foreach.count == 1) 
 	    SELECT '$bucketMap.CD' AS YYYYMM , $_parameter.get("$bucketMap.CD") AS AMT
   #else
         UNION ALL SELECT '$bucketMap.CD', $_parameter.get("$bucketMap.CD") 

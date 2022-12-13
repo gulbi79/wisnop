@@ -1094,7 +1094,7 @@
 		    #foreach($bucketMap in $_parameter.weekList)
 			#set($paramWeek = "$bucketMap.YEARPWEEK")
 				
-				#if($velocityCount == 1)
+				#if($foreach.count == 1)
 	   				INSERT INTO $TMP_TAB
 	   				(
 						COMPANY_CD
@@ -1297,7 +1297,7 @@
 		            UNION ALL 
 		            SELECT '$meaMap.CD'
 		                 , '$meaMap.NM'
-		                 , $velocityCount 
+		                 , $foreach.count 
 					#end
 				) A
 		        WHERE CATEGORY_CD IS NOT NULL

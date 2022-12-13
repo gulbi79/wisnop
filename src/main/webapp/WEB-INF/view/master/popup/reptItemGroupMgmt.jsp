@@ -148,7 +148,7 @@ function fn_getGridData(sqlFlag) {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"master.popup.reptItemGroupMgmt"}];
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			maxSeq = 0;
@@ -203,7 +203,7 @@ function fn_getReptItemGroupCodeMaxSeq() {
 	var rtnSeq;
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {_mtd:"getList",tranData:[{outDs:"rtnSeq",_siq:"master.popup.reptItemGroupMgmtMaxSeq"}]},
 	    success :function(data) {
 	    	rtnSeq = data.rtnSeq[0].MAX_SEQ;
@@ -234,7 +234,7 @@ function fn_save() {
 		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"master.popup.reptItemGroupMgmt", grdData : grdData, custDupChkYn : {"delete":"Y"}}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SAVE,
 			success: function(data) {
 				if ( data.errCode == -10 ) {

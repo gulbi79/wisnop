@@ -384,7 +384,7 @@
     	FORM_SEARCH._mtd   = "getList";
     	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"admin.menuMng"}];
     	var sMap = {
-   			url: "${ctx}/biz/obj.do",
+   			url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
 		    	//그리드 데이터 생성
@@ -421,7 +421,7 @@
 	    	FORM_SEARCH.tranData = [{outDs:"saveCnt",_siq:"admin.menuMng", grdData : grdData}];
     		
     		var serviceMap = {
-   				url: "${ctx}/biz/obj.do",
+   				url: "${ctx}/biz/obj",
                 data: FORM_SEARCH,
                 success:function(data) {
                 	alert('<spring:message code="msg.saveOk"/>');

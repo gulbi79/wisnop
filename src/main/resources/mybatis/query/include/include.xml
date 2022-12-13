@@ -349,7 +349,7 @@
   #set($rollupDot = "")
 #end
 #foreach( $dimMap in $_parameter.dimList )
-  #if($velocityCount == 1)
+  #if($foreach.count == 1)
                (${rollupAlias}${rollupDot}$dimMap.DIM_CD,${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
   #elseif($preLvl == $dimMap.LVL or $totalFlag != "Y")
               , ${rollupAlias}${rollupDot}$dimMap.DIM_CD,${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
@@ -371,7 +371,7 @@
   #set($rollupDot = "")
 #end
 #foreach( $dimMap in $_parameter.dimList )
-  #if($velocityCount == 1)
+  #if($foreach.count == 1)
                (${rollupAlias}${rollupDot}$dimMap.DIM_CD
   #elseif($preLvl == $dimMap.LVL or $totalFlag != "Y")
               , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
@@ -394,7 +394,7 @@
 #set($rollupDot = "")
 #end
 #foreach( $dimMap in $_parameter.dimList )
-#if($velocityCount == 1)
+#if($foreach.count == 1)
 	     , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
 	     , CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN @{gvTotal} ELSE ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
 #else
@@ -416,7 +416,7 @@
 #set($rollupDot = "")
 #end
 #foreach( $dimMap in $_parameter.dimList )
-#if($velocityCount == 1)
+#if($foreach.count == 1)
 	     , ${rollupAlias}${rollupDot}$dimMap.DIM_CD
 	     , CASE WHEN ${rollupAlias}${rollupDot}$dimMap.DIM_CD IS NULL THEN @{gvTotal} ELSE MAX ( ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM ) END AS ${rollupAlias}${rollupDot}${dimMap.DIM_CD}_NM
 #else
@@ -438,7 +438,7 @@
 #set($rollupDot = "")
 #end
 #foreach( $dimMap in $_parameter.dimList )
-#if($velocityCount == 1)
+#if($foreach.count == 1)
 #set($grpLvlId = ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})
 #else
 #set($grpLvlId = ${grpLvlId} + ", " + ${rollupAlias} + ${rollupDot} + ${dimMap.DIM_CD})

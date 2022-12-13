@@ -1,6 +1,6 @@
 server:
   port: 8080
-  shutdown: graceful
+#  shutdown: graceful
   servlet:
     session:
       timeout: 120m
@@ -9,11 +9,13 @@ server:
       enabled: true
       force: true
 spring:
-  lifecycle:
-    timeout-per-shutdown-phase: 30s
+#  lifecycle:
+#    timeout-per-shutdown-phase: 30s
   datasource1:
-    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-    jdbc-url: jdbc:log4jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
+#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+#    jdbc-url: jdbc:log4jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    jdbc-url: jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
     username: WIQ-TEST-SQL
     password: WIxptmxmDB55%%66^^
   datasource2:

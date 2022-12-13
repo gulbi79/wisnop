@@ -149,7 +149,7 @@
 			(
 				SELECT NULL AS TMP_COL 
 					#foreach( $dimMap in $_parameter.dimList )
-					#if($velocityCount == 1)
+					#if($foreach.count == 1)
 					 , NULL AS $dimMap.DIM_CD  
 					 , 'Total'AS ${dimMap.DIM_CD}_NM
 					#else
@@ -261,13 +261,13 @@
 						#elseif($bucketMap.BUCKET_ID.indexOf("_OVER") != -1)
 						 , ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0) AS $bucketMap.CD
 						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_QTY") != -1)
-							#if($velocityCount == 4)
+							#if($foreach.count == 4)
 							 , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
 							#else
 							 , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
 							#end
 						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_RATE") != -1)
-							#if($velocityCount == 5)
+							#if($foreach.count == 5)
 							  , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
 							#else
 							  , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
@@ -314,7 +314,7 @@
 							#foreach($bucketMap in $_parameter.bucketList)
 							#set($paramDay = "$bucketMap.BUCKET_VAL")
 							#if($bucketMap.BUCKET_ID.indexOf("_PLAN") != -1)
-								#if($velocityCount == 1)
+								#if($foreach.count == 1)
 								, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD
 								#else
 									#if($_parameter.bucketList.size() - 4 == $foreach.count)
@@ -521,13 +521,13 @@
 						#elseif($bucketMap.BUCKET_ID.indexOf("_OVER") != -1)
 						 , ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0) AS $bucketMap.CD
 						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_QTY") != -1)
-							#if($velocityCount == 4)
+							#if($foreach.count == 4)
 							 , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
 							#else
 							 , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) AS $bucketMap.CD
 							#end
 						#elseif($bucketMap.BUCKET_ID.indexOf("_COMP_RATE") != -1)
-							#if($velocityCount == 5)
+							#if($foreach.count == 5)
 							  , DBO.UFN_LEAST(ISNULL(SUM($strRst.substring(1).replace(",",",0)+ISNULL(")),0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
 							#else
 							  , DBO.UFN_LEAST(DBO.UFN_GREATEST(ISNULL(SUM($strRstAcc.substring(1).replace(",",",0)+ISNULL(")),0) - ISNULL(SUM($strPlanAcc.substring(1).replace(",",",0)+ISNULL(")),0), 0), ISNULL(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")),0)) / NULLIF(SUM($strPlan.substring(1).replace(",",",0)+ISNULL(")), 0) * 100 AS $bucketMap.CD
@@ -574,7 +574,7 @@
 							#foreach($bucketMap in $_parameter.bucketList)
 							#set($paramDay = "$bucketMap.BUCKET_VAL")
 							#if($bucketMap.BUCKET_ID.indexOf("_PLAN") != -1)
-								#if($velocityCount == 1)
+								#if($foreach.count == 1)
 								, SUM(CASE WHEN MGSOD.SCHED_DATE_PRE_RECV <![CDATA[<=]]> '$paramDay' THEN MGSOD.SCHED_QTY END) AS $bucketMap.CD
 								#else
 									#if($_parameter.bucketList.size() - 4 == $foreach.count)

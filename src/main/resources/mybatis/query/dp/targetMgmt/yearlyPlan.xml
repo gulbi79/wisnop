@@ -345,7 +345,7 @@
 				FROM W_ROW
 				GROUP BY
 				#foreach( $dimMap in $_parameter.dimList )
-				#if($velocityCount == 1)
+				#if($foreach.count == 1)
 	              $dimMap.DIM_CD
 				#else
 	              , $dimMap.DIM_CD
@@ -367,7 +367,7 @@
 	            UNION ALL 
 	            SELECT '$meaMap.CD'
 	                 , '$meaMap.NM'
-	                 , $velocityCount 
+	                 , $foreach.count 
 				#end
 			) A
 	        WHERE CATEGORY_CD IS NOT NULL

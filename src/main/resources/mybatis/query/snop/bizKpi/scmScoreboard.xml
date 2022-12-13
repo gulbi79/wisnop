@@ -49,7 +49,7 @@
                   , ROUND((ISNULL(SCM12_SCORE, 0) + ISNULL(SCM13_SCORE, 0) + ISNULL(SCM14_SCORE, 0) + ISNULL(SCM15_SCORE, 0)) / NULLIF((CASE WHEN SCM12_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM13_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM14_SCORE IS NULL THEN 0 ELSE 1 END + CASE WHEN SCM15_SCORE IS NULL THEN 0 ELSE 1 END), 0), 0) AS FUTURE_SCORE
                 
 				#foreach($a in $SCM_NO)
-					#if($velocityCount <![CDATA[<]]> 10)
+					#if($foreach.count <![CDATA[<]]> 10)
 					#set($a = "0" + $a)
 					#end
 				 , SCM${a}_TARGET
@@ -82,7 +82,7 @@
 						
 					
 					#foreach($a in $SCM_NO)
-						#if($velocityCount <![CDATA[<]]> 10)
+						#if($foreach.count <![CDATA[<]]> 10)
 						#set($a = "0" + $a)
 						#end
 					 , SUM(SCM${a}_TARGET) AS SCM${a}_TARGET
@@ -140,7 +140,7 @@
 					     
 						
 						#foreach($a in $SCM_NO)
-							#if($velocityCount <![CDATA[<]]> 10)
+							#if($foreach.count <![CDATA[<]]> 10)
 							#set($a = "0" + $a)
 							#end
 							 , (CASE A3.SCM_SCORE_ID WHEN 'SCM${a}' THEN ISNULL(A3.USE_FLAG, 'N') ELSE 'N' END) AS SCM${a}_USE_FLAG

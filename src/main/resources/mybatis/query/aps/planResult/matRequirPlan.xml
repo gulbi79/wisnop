@@ -205,7 +205,7 @@
 			    UNION ALL 
 			    SELECT '$meaMap.CD'
 			         , '$meaMap.NM'
-			         , $velocityCount 
+			         , $foreach.count 
 				#end
 			) A
 		    WHERE CATEGORY_CD IS NOT NULL
@@ -271,7 +271,7 @@
 		         , SUM(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.NON_MOVING_QTY ELSE NULL END) AS ${meaMap.CD}_NON_MOVING_QTY
 				#end
 		        #foreach( $meaMap in $_parameter.meaList )
-		         	#if($velocityCount > 1)
+		         	#if($foreach.count > 1)
 						 + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W1 ELSE NULL END)), 0)
 				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W2 ELSE NULL END)), 0)
 				         + ISNULL(SUM(ABS(CASE WHEN T1.MEAS_CD = '${meaMap.CD}' THEN T1.MRP_QTY_W3 ELSE NULL END)), 0)

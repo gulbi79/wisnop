@@ -177,7 +177,7 @@ function fn_getGridData(data) {
 	data.tranData = [{outDs:"rtnList",_siq:"aps.static.facilitySupportPop2"}];
 	
 	var sMap = {
-		url : "${ctx}/biz/obj.do",
+		url : "${ctx}/biz/obj",
         data : data,
         success : fn_gridCallback,
     }

@@ -449,7 +449,7 @@
     	];
     	
     	var sMap = {
-    		url	 : "${ctx}/biz/obj.do",
+    		url	 : "${ctx}/biz/obj",
     		data	: FORM_SEARCH,
     		success : function(data) {
     			bucket = {};
@@ -485,7 +485,7 @@
     	
     	
     	var sMap = {
-			url: "${ctx}/biz/obj.do",
+			url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
          	   	
@@ -1000,7 +1000,7 @@
     	];
     	
     	var sMap = {
-    		url	 : "${ctx}/biz/obj.do",
+    		url	 : "${ctx}/biz/obj",
     		data	: FORM_SEARCH,
     		success : function(data) {
     			
@@ -1062,7 +1062,7 @@
     	
     	
     	var sMap = {
-    		url	 : "${ctx}/biz/obj.do",
+    		url	 : "${ctx}/biz/obj",
     		data	: FORM_SEARCH,
     		success : function(data) {
     			
@@ -1105,7 +1105,7 @@
     	
     	gfn_service({
     	    async   : false,
-    	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+    	    url     : GV_CONTEXT_PATH + "/biz/obj",
     	    data    : {
        			_mtd : "getList",
        			tranData : [
@@ -1144,7 +1144,7 @@ function fn_search(sqlFlag) {
   ];
   
   var sMap = {
-      url  : "${ctx}/biz/obj.do",
+      url  : "${ctx}/biz/obj",
       data    : FORM_SEARCH,
       success : function(data) {
           
@@ -1312,7 +1312,7 @@ function fn_search(sqlFlag) {
 	    
 	    var aOption = {
 	        async   : false,
-	        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	        url     : GV_CONTEXT_PATH + "/biz/obj",
 	        data    : SCM_SEARCH,
 	        success : function (data) {
 	        

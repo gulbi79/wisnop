@@ -46,7 +46,7 @@
 				this.codeMap = gfn_getComCode('FLAG_YN', 'Y'); //공통코드 조회
 				gfn_service({
 					async	: false,
-					url 	: GV_CONTEXT_PATH+"/biz/obj.do",
+					url 	: GV_CONTEXT_PATH+"/biz/obj",
 					data	: {_mtd	: "getList", tranData:[
 						{ outDs: "planList", _siq: "aps.planExecute.planIdBasic"},	
 					]},
@@ -163,7 +163,7 @@
 			
 			console.log("FORM_SEARCH:",FORM_SEARCH);
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -339,7 +339,7 @@
 			FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"nbalive21.criteriaValidationList",grdData:grdData}];
 			
 			gfn_service({
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SAVE,
 				success : function(data) {
 					alert('<spring:message code="msg.saveOk"/>');

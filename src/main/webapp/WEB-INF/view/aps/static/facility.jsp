@@ -386,7 +386,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -414,7 +414,7 @@
 			
 			gfn_service({
 			    async   : false,
-			    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			    url     : GV_CONTEXT_PATH + "/biz/obj",
 			    data    : {
 			    			_mtd : "getList",
 			    			tranData : [
@@ -499,7 +499,7 @@
 				];
 				
 				var ajaxOpt = {
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : FORM_SAVE,
 					success : function(data) {
 						

@@ -225,7 +225,7 @@ function fn_getGridData() {
 	FORM_SEARCH._mtd = "getList";
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"common.file"}];
 	var sMap = {
-        url: "${ctx}/biz/obj.do",
+        url: "${ctx}/biz/obj",
         data: FORM_SEARCH,
         success:function(data) {
         	dataProvider.clearRows(); //데이터 초기화
@@ -340,7 +340,7 @@ function fn_fileDown(dbRow) {
 			</div>
 		</div>		
 	</div>
-	<form id="fileFrm" method="post" enctype="multipart/form-data" action="${ctx}/file/upload.do" >
+	<form id="fileFrm" method="post" enctype="multipart/form-data" action="${ctx}/file/upload" >
 		<input type="hidden" id="DEL_FILE_SEQ" name="DEL_FILE_SEQ" value="" />
 		<c:forEach var="item" items="${param}">
 		<input type="hidden" id="${item.key}" name="${item.key}" value="${item.value}" />

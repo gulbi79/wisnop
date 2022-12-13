@@ -195,7 +195,7 @@ function fn_getGridData(sqlFlag) {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"supply.product.equiTrendDetailList"}];
 	
 	var sMap = {
-		url : "${ctx}/biz/obj.do",
+		url : "${ctx}/biz/obj",
         data : FORM_SEARCH,
         success :function(data) {
 			
@@ -246,7 +246,7 @@ function fn_excelSqlAuth() {
 	
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
    			_mtd : "getList",
    			popUpMenuCd : popUpMenuCd,

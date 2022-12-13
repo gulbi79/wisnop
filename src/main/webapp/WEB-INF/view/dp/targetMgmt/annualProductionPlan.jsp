@@ -34,7 +34,7 @@
 	function fn_getInitData() {
 		gfn_service({
 			async   : false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : {_mtd:"getList",menuParam:"YP",tranData:[
 				{outDs:"yearList",_siq:"dp.targetMgmt.yearlyPlanYear"},
 
@@ -191,7 +191,7 @@
 		
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제
@@ -304,7 +304,7 @@
 				{outDs:"saveCnt",_siq:"dp.targetMgmt.annualProductionPlan",grdData:jsonRows}
 			];
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					
@@ -316,7 +316,7 @@
 						{outDs:"saveSuccessYn",_siq:"dp.targetMgmt.annualProductionPlanChart", grdData : data}
 					];
 					gfn_service({
-						url    : GV_CONTEXT_PATH + "/biz/obj.do",
+						url    : GV_CONTEXT_PATH + "/biz/obj",
 						data   : FORM_SAVE,
 						success: function(data) {
 							alert('<spring:message code="msg.saveOk"/>');
@@ -391,7 +391,7 @@ function fn_annualProdPlanInputBlockYn()
 	
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			annualProdPlanInputBlockYn = data.resList[0].INPUT_BLOCK_YN;

@@ -297,7 +297,7 @@
 				FROM W_DIM_ROW
 	            GROUP BY
 				#foreach( $dimMap in $_parameter.dimList )
-				#if($velocityCount == 1)
+				#if($foreach.count == 1)
 				                   $dimMap.DIM_CD
 				#else
 				                 , $dimMap.DIM_CD
@@ -312,7 +312,7 @@
 	        (
 	        	SELECT NULL AS CATEGORY_CD, NULL AS CATEGORY_NM, NULL AS CATEGORY_IDX
 				#foreach( $meaMap in $_parameter.meaList )
-	            UNION ALL SELECT '$meaMap.CD', '$meaMap.NM', $velocityCount 
+	            UNION ALL SELECT '$meaMap.CD', '$meaMap.NM', $foreach.count 
 				#end
 			) A
 	        WHERE CATEGORY_CD IS NOT NULL
@@ -404,7 +404,7 @@
 			#set($preCol = "")
 			#foreach( $dimMap in $_parameter.dimList )
 	         , $dimMap.DIM_CD
-			#if($velocityCount == 1)
+			#if($foreach.count == 1)
 		     , CASE WHEN $dimMap.DIM_CD IS NULL THEN @{gvTotal} ELSE ${dimMap.DIM_CD}_NM END AS ${dimMap.DIM_CD}_NM
 		     , CASE WHEN $dimMap.DIM_CD IS NULL THEN '' ELSE ${dimMap.DIM_CD}_CD END AS ${dimMap.DIM_CD}_CD
 			#else

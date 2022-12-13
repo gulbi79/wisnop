@@ -489,7 +489,7 @@
 			    	<include refid="include.getGrpLvlId"/>
 			    	 , ROW_NUMBER() OVER(ORDER BY 
 						#foreach($dimMap in $_parameter.dimList)
-							#if($velocityCount > 1)
+							#if($foreach.count > 1)
 								, A.$dimMap.DIM_CD 
 							#else
 								A.$dimMap.DIM_CD

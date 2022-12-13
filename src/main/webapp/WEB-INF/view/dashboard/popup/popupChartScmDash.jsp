@@ -77,7 +77,7 @@
 								  , { outDs : "apsStartWeek" , _siq : popupChart._siq + "trendWeek" }
 			];
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					popupChart.bucket = {};
@@ -109,7 +109,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					popupChart.drawChart(data);

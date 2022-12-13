@@ -299,7 +299,7 @@ function fn_getGridData(initFlag) {
 	                      , {outDs:"meaList"   ,_siq:"common.meaMap"}
 	                      , {outDs:"meaMapList",_siq:"admin.meaMapMenu"}];
 	var sMap = {
-		url: GV_CONTEXT_PATH + "/biz/obj.do",
+		url: GV_CONTEXT_PATH + "/biz/obj",
         data: FORM_SEARCH,
         success:function(data) {
 			//그리드 데이터 생성
@@ -353,7 +353,7 @@ function fn_save() {
 		FORM_SAVE.tranData = [{outDs:"saveCnt1",_siq:"admin.dimMapMenu", grdData : grdData , mergeFlag : "Y"}
 		                    , {outDs:"saveCnt2",_siq:"admin.meaMapMenu", grdData : grdData2, mergeFlag : "Y"}];
 		var serviceMap = {
-			url: GV_CONTEXT_PATH + "/biz/obj.do",
+			url: GV_CONTEXT_PATH + "/biz/obj",
             data: FORM_SAVE,
             success:function(data) {
             	alert('<spring:message code="msg.saveOk"/>');

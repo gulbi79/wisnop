@@ -41,7 +41,7 @@
 				FORM_SEARCH.tranData.push( { "outDs" : "rtnList", "_siq" : "dp.planMonth.planConfirmationChart"} );
 
 				gfn_service({
-					url    : GV_CONTEXT_PATH + "/biz/obj.do",
+					url    : GV_CONTEXT_PATH + "/biz/obj",
 					data   : FORM_SEARCH,
 					success: function(data) {
 						monthChart.drawChart(data.rtnList);

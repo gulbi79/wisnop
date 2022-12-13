@@ -119,7 +119,7 @@
 			FROM
 			(
 				#foreach($bucketMap in $_parameter.month2)
-					#if($velocityCount == 1)
+					#if($foreach.count == 1)
 					SELECT '$bucketMap.YEARMONTH' AS YEARMONTH
 					#else
 					UNION ALL
@@ -191,7 +191,7 @@
 			FROM
 			(
 				#foreach($bucketMap in $_parameter.month2)
-					#if($velocityCount == 1)
+					#if($foreach.count == 1)
 					SELECT '$bucketMap.YEARMONTH' AS YEARMONTH
 					#else
 					UNION ALL

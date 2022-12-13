@@ -480,7 +480,7 @@ function fn_getGridData(sqlFlag) {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"snop.meetingMng.projectAdd"}];
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			//그리드 데이터 삭제
@@ -645,7 +645,7 @@ async function fn_save() {
                    
                  
                     gfn_service({
-                         url    : GV_CONTEXT_PATH + "/biz/obj.do",
+                         url    : GV_CONTEXT_PATH + "/biz/obj",
                          data   : FORM_SAVE,
                          success: function(data) {
                              
@@ -1372,7 +1372,7 @@ function fn_popUpAuthorityHasOrNot(){
 	
 	var aOption = {
 		async   : false,
-		url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		url     : GV_CONTEXT_PATH + "/biz/obj",
 		data    : SCM_SEARCH,
 		success : function (data) {
 		
@@ -1545,7 +1545,7 @@ function fn_pjtMemList_pjtRegMemList_UorI(grdData){
 	    	resolve(	
 						gfn_service({
 							async   : false,
-							url     : GV_CONTEXT_PATH + "/biz/obj.do",
+							url     : GV_CONTEXT_PATH + "/biz/obj",
 							data    : Mem_RegMem_SEARCH,
 							success : function (data) {
 								//resolve(grdData);
@@ -1721,7 +1721,7 @@ function gridCallback(resList){
 		FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"snop.meetingMng.divNm"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				
@@ -1757,7 +1757,7 @@ function fn_PROJECT_NO_VALIDATION(PROJECT_SUB_NO){
 	    return new Promise(function(resolve,reject){    gfn_service({
             
             
-            url    : GV_CONTEXT_PATH + "/biz/obj.do",
+            url    : GV_CONTEXT_PATH + "/biz/obj",
             data   : BREAKING_LIMIT_SEARCH,
             success: function(data) {
                 

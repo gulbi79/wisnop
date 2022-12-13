@@ -86,7 +86,7 @@ if (menuInfo != null) {
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {_mtd : "getList", menuParam : meaCd, tranData:[
                 {outDs : "planList", _siq : "dp.planCommon.salesPlanVersion"},
                 {outDs : "roleList", _siq : "dp.planCommon.salesPlanRole"},
@@ -121,7 +121,7 @@ if (menuInfo != null) {
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {_mtd : "getList", fCal : fCal, tCal : tCal, tranData:[
                 {outDs : "weekList", _siq : "dp.planCommon.weekList"},
             ]},
@@ -382,7 +382,7 @@ if (menuInfo != null) {
             
             gfn_service({
                 async   : false,
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : {_mtd : "getList", menuParam : meaCd, yearWeek : $("#planStartWeek").val(), pastFlag : pastFlag, 
                     tranData:[
                     {outDs : "qtyDate", _siq : "dp.planCommon.qtyDateSearch"},
@@ -444,7 +444,7 @@ if (menuInfo != null) {
         EXCEL_FORM.tranData   = [{outDs : "gridList", _siq : apMeaCdSql}];
         
         gfn_service({
-            url    : GV_CONTEXT_PATH + "/biz/obj.do",
+            url    : GV_CONTEXT_PATH + "/biz/obj",
             data   : EXCEL_FORM,
             success: function(data) {
                 
@@ -928,7 +928,7 @@ if (menuInfo != null) {
         
         gfn_service({
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : {
                 _mtd           : "getList",
                 SEARCH_MENU_CD : "${menuInfo.menuCd}",
@@ -1033,7 +1033,7 @@ if (menuInfo != null) {
             {outDs : "gridList", _siq : apMeaCdSql}
         ];
         gfn_service({
-            url    : GV_CONTEXT_PATH + "/biz/obj.do",
+            url    : GV_CONTEXT_PATH + "/biz/obj",
             data   : FORM_SEARCH,
             success: function(data) {
                 
@@ -1339,7 +1339,7 @@ if (menuInfo != null) {
             ];
             
             gfn_service({
-                url    : GV_CONTEXT_PATH + "/biz/obj.do",
+                url    : GV_CONTEXT_PATH + "/biz/obj",
                 data   : FORM_SAVE,
                 success: function(data) {
                     
@@ -1349,7 +1349,7 @@ if (menuInfo != null) {
                         ];
                         
                         gfn_service({
-                            url    : GV_CONTEXT_PATH + "/biz/obj.do",
+                            url    : GV_CONTEXT_PATH + "/biz/obj",
                             data   : FORM_SAVE,
                             success: function(data) {
                                 alert('<spring:message code="msg.saveOk"/>');
@@ -1401,7 +1401,7 @@ if (menuInfo != null) {
             FORM_SAVE.tranData = [{outDs : "saveCnt", _siq : "dp.planCommon.salesPlanConfirm", grdData : jsonRowsNew}];
             
             gfn_service({
-                url    : GV_CONTEXT_PATH + "/biz/obj.do",
+                url    : GV_CONTEXT_PATH + "/biz/obj",
                 data   : FORM_SAVE,
                 success: function(data) {
                     if(confirm_yn == "Y") {
@@ -2034,7 +2034,7 @@ if (menuInfo != null) {
         params.tranData = [{outDs:"meaList",_siq:"common.measure"}];
         gfn_service({
             async: false,
-            url: GV_CONTEXT_PATH + "/biz/obj.do",
+            url: GV_CONTEXT_PATH + "/biz/obj",
             data:params,
             success:function(data) {
                 fn_popCallback(data.meaList);               

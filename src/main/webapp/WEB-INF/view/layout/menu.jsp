@@ -50,7 +50,7 @@ function fn_getFavorite(type) {
 		var pMap = {
 		    type: 'post', // POST 로 전송
 		    async: false,
-		    url: "${ctx}/biz/obj.do",
+		    url: "${ctx}/biz/obj",
 		    dataType: 'json',
 		    data:params,
 		    success:function(data) {
@@ -127,7 +127,7 @@ function fn_removeBookMark(cd) {
 	var pMap = {
 	    type: 'post', // POST 로 전송
 	    async: false,
-	    url: "${ctx}/biz/obj.do",
+	    url: "${ctx}/biz/obj",
 	    dataType: 'json',
 	    data:params,
 	    success:function(data) {

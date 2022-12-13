@@ -138,7 +138,7 @@
 		FORM_SEARCH.tranData = [{outDs:"gridList",_siq:"dp.salesProfit.salesProfitList"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제

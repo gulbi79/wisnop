@@ -161,7 +161,7 @@
 						}, pOption);
 						
 						gfn_service({
-							url     : GV_CONTEXT_PATH + "/biz/obj.do",
+							url     : GV_CONTEXT_PATH + "/biz/obj",
 							data    : params,
 							async   : false,
 							success : function(data) {
@@ -314,7 +314,7 @@
 	        	
 	        	gfn_service({
 	    			async   : false,
-	    			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    			url     : GV_CONTEXT_PATH + "/biz/obj",
 	    			data    : {_mtd : "getList", weekly_daily : weeklyDaily,  
 	    				tranData : [
 							{outDs : "planList", _siq : "aps.planExecute.planIdControl"}
@@ -354,7 +354,7 @@
 			// 계획버전 
 			gfn_service({
 			    async   : false,
-			    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			    url     : GV_CONTEXT_PATH + "/biz/obj",
 			    data    : FORM_SEARCH,
 			    success : function(data) {
 			    	
@@ -570,7 +570,7 @@
 			FORM_SEARCH.bucketGroupDetailList = bucketGroupDetailList;
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -620,7 +620,7 @@
 		
 		var aOption = {
 			async: false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : FORM_SEARCH,
 			success : function (data) {
 					bucketGroupDetailList = null;
@@ -645,7 +645,7 @@
 				tranData : [{outDs:"rtnList",_siq:"common.planId"}]
 			}, pOption);
 			gfn_service({
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : params,
 				async   : false,
 				success : function(data) {

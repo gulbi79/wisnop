@@ -243,7 +243,7 @@
 							  , { outDs : "chartList" , _siq : "dashboard.chartInfo.scmDash2" }
 		];
 		var sMap = {
-			url	 : "${ctx}/biz/obj.do",
+			url	 : "${ctx}/biz/obj",
 			data	: FORM_SEARCH,
 			success : function(data) {
 				
@@ -606,7 +606,7 @@
 							  ]; 
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -806,7 +806,7 @@
     	FORM_SEARCH.tranData = [{outDs:"materialChart", _siq:"dashboard.scmDash.materialChart"}];
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -849,7 +849,7 @@
     	FORM_SEARCH.tranData = [{outDs:"materialsRateChart", _siq:"dashboard.scmDash.materialsRateChart"}];
     	
     	var sMap = {
-            url: "${ctx}/biz/obj.do",
+            url: "${ctx}/biz/obj",
             data: FORM_SEARCH,
             success:function(data) {
             	
@@ -1019,7 +1019,7 @@
       
       var aOption = {
           async   : false,
-          url     : GV_CONTEXT_PATH + "/biz/obj.do",
+          url     : GV_CONTEXT_PATH + "/biz/obj",
           data    : SCM_SEARCH,
           success : function (data) {
           

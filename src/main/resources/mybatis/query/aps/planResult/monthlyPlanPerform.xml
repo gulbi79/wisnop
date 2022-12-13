@@ -558,7 +558,7 @@
                                                                                                                                                                                                                                                     그외는       계획 내 예상 생산금액/생산계획금액 * 100   -->                                                                                                                                                                                                                       
                 
                   ,#foreach($bucketMap in $_parameter.bucketList)
-	                    #if($velocityCount > 1)
+	                    #if($foreach.count > 1)
 	                        + ISNULL(ABS($bucketMap.SALES_QTY),0)
 	                        + ISNULL(ABS($bucketMap.SALES_AMT),0)
 	                        + ISNULL(ABS($bucketMap.PROD_QTY),0)

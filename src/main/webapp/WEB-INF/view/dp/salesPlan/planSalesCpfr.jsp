@@ -72,7 +72,7 @@
 			// 계획버전 
 			gfn_service({
 			    async   : false,
-			    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			    url     : GV_CONTEXT_PATH + "/biz/obj",
 			    data    : FORM_SEARCH,
 			    success : function(data) {
 			    	
@@ -363,7 +363,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList", _siq : this._siq }];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -423,7 +423,7 @@
 			
 			gfn_service({
 			    async   : false,
-			    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			    url     : GV_CONTEXT_PATH + "/biz/obj",
 			    data    : {
 			    	_mtd           : "getList",
 			    	SEARCH_MENU_CD : "${menuInfo.menuCd}",
@@ -601,7 +601,7 @@
 	   		EXCEL_FORM.tranData   = [{outDs : "gridList", _siq : "dp.planSalesCpfr.planSalesCpfr"}];
 	   		
 	   		gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : EXCEL_FORM,
 				success: function(data) {
 					
@@ -766,7 +766,7 @@
 				];
 
 				gfn_service({
-					url    : GV_CONTEXT_PATH + "/biz/obj.do",
+					url    : GV_CONTEXT_PATH + "/biz/obj",
 					data   : FORM_SAVE,
 					success: function(data) {
 						
@@ -825,7 +825,7 @@
 					FORM_SAVE.tranData = [{outDs : "saveCnt", _siq : "dp.planSalesCpfr.salesPlanConfirmYn", grdData : jsonRowsNew}];
 					
 					gfn_service({
-						url    : GV_CONTEXT_PATH + "/biz/obj.do",
+						url    : GV_CONTEXT_PATH + "/biz/obj",
 						data   : FORM_SAVE,
 						success: function(data) {
 							if(confirm_yn == "Y") {
@@ -855,7 +855,7 @@
 		// 계획버전 
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : FORM_SEARCH,
 		    success : function(data) {
 		    	planIdSelect = data.versionList[0];

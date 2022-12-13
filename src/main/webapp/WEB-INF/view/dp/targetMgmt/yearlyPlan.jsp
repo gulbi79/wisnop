@@ -37,7 +37,7 @@
 	function fn_getInitData() {
 		gfn_service({
 			async   : false,
-			url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			url     : GV_CONTEXT_PATH + "/biz/obj",
 			data    : {_mtd:"getList",menuParam:"YP",tranData:[
 				{outDs:"yearList",_siq:"dp.targetMgmt.yearlyPlanYear"},
 				{outDs:"roleList",_siq:"dp.targetMgmt.yearlyPlanRole"},
@@ -249,7 +249,7 @@
 	function fn_getDimMeaInfo() {
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {
 		    	_mtd           : "getList",
 		    	SEARCH_MENU_CD : "${menuInfo.menuCd}",
@@ -291,7 +291,7 @@
 		FORM_SEARCH.tranData = [{outDs:"relsInfo",_siq:"dp.targetMgmt.yearlyPlanRelease"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			async  : false,
 			success: function(data) {
@@ -317,7 +317,7 @@
 		FORM_SEARCH.tranData   = [{outDs:"gridList",_siq:"dp.targetMgmt.yearlyPlan"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//엑셀데이터 정리 (로우 데이터만 추가)
@@ -476,7 +476,7 @@
 		FORM_SEARCH.tranData = [{outDs:"relsInfo",_siq:"dp.targetMgmt.yearlyPlanRelease"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			async  : false,
 			success: function(data) {
@@ -489,7 +489,7 @@
 		FORM_SEARCH.tranData   = [{outDs:"gridList",_siq:"dp.targetMgmt.yearlyPlan"}];
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SEARCH,
 			success: function(data) {
 				//그리드 데이터 삭제
@@ -704,7 +704,7 @@
 			];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					alert('<spring:message code="msg.saveOk"/>');
@@ -763,7 +763,7 @@
 			FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"dp.targetMgmt.yearlyPlanConfirm",grdData:jsonRows}];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					alert('<spring:message code="msg.saveOk"/>');
@@ -791,7 +791,7 @@
 			];
 			
 			gfn_service({
-				url    : GV_CONTEXT_PATH + "/biz/obj.do",
+				url    : GV_CONTEXT_PATH + "/biz/obj",
 				data   : FORM_SAVE,
 				success: function(data) {
 					alert('<spring:message code="msg.saveOk"/>');

@@ -200,7 +200,7 @@
 	            UNION ALL 
 	            SELECT '$meaMap.CD'
 	            	 , '$meaMap.NM'
-	            	 , $velocityCount 
+	            	 , $foreach.count 
 				#end
 			) A
 	        WHERE CATEGORY_CD IS NOT NULL
@@ -242,19 +242,19 @@
 					#foreach( $dimMap in $_parameter.dimList )
 						#if(${dimMap.DIM_CD} == "PROD_LVL2_CD" or ${dimMap.DIM_CD} == "PROD_LVL2_NM" or ${dimMap.DIM_CD} == "PROD_LVL3_CD" or ${dimMap.DIM_CD} == "PROD_LVL3_NM" or
 						    ${dimMap.DIM_CD} == "ITEM_NM" or ${dimMap.DIM_CD} == "SPEC" or ${dimMap.DIM_CD} == "DRAW_NO" or ${dimMap.DIM_CD} == "ROUTING_ID")
-					        #if($velocityCount == 1)
+					        #if($foreach.count == 1)
 								IT.${dimMap.DIM_CD}
 							#else
 					        	, IT.${dimMap.DIM_CD}
 							#end
 						#elseif(${dimMap.DIM_CD} == "ITEM_CD")
-					        #if($velocityCount == 1)
+					        #if($foreach.count == 1)
 								RO.${dimMap.DIM_CD}
 							#else
 					        	, RO.${dimMap.DIM_CD}
 							#end
 						#else
-					        #if($velocityCount == 1)
+					        #if($foreach.count == 1)
 								CG.${dimMap.DIM_CD}
 							#else
 					        	, CG.${dimMap.DIM_CD}

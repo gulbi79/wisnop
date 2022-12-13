@@ -251,7 +251,7 @@
             ];
             
             var aOption = {
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : FORM_SEARCH,
                 success : function (data) {
                     
@@ -332,7 +332,7 @@
             params.tranData = [{outDs : "resList", _siq : "supply.product.bucketProduct"}];
             
             var opt = {
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : params,
                 async   : false,
                 success : function(data) {
@@ -446,7 +446,7 @@
                 ];
                 
                 var ajaxOpt = {
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SAVE,
                     success : function(data) {
                         
@@ -470,7 +470,7 @@
             params.tranData = [{outDs : "resList", _siq : "common.planId"}];
             
             var opt = {
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : params,
                 async   : false,
                 success : function(data) {
@@ -795,7 +795,7 @@
             EXCEL_FORM.tranData   = [{outDs : "gridList", _siq : prodPlan._siq}];
 
             gfn_service({
-                url    : GV_CONTEXT_PATH + "/biz/obj.do",
+                url    : GV_CONTEXT_PATH + "/biz/obj",
                 data   : EXCEL_FORM,
                 success: function(data) {
                     //엑셀데이터 정리 (로우 데이터만 추가)
@@ -884,7 +884,7 @@
         getDimMeaInfo : function() {
             //엑셀다운로드 디멘전
             gfn_service({
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 async   : false,
                 data    : {
                     _mtd           : "getList",
@@ -925,7 +925,7 @@
                     {outDs : "saveCnt", _siq : prodPlan._siq + "Confirm", grdData : [{planId : $('#planId').val(), confirmYn : confirm_yn}]},
                 ];
                 var ajaxOpt = {
-                    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                    url     : GV_CONTEXT_PATH + "/biz/obj",
                     data    : FORM_SAVE,
                     success : function(data) {
                         
@@ -956,7 +956,7 @@
                         {outDs : "saveCnt", _siq : prodPlan._siq + "Loading", grdData : [{planId : $('#planId').val()}]},
                     ];
                     var ajaxOpt = {
-                        url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                        url     : GV_CONTEXT_PATH + "/biz/obj",
                         data    : FORM_SAVE,
                         success : function(data) {
                             alert(msg);
@@ -999,7 +999,7 @@
         
         var aOption = {
             async   : false,
-            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+            url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : SCM_ROLE_SEARCH,
             success : function (data) {
             

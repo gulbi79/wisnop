@@ -304,12 +304,12 @@
                          , ISNULL(DPOH.WORKER_GROUP, 'NONE') AS WORKER_GROUP
                         #foreach($bucketMap in $_parameter.bucketList)
                         #set($paramData = "$bucketMap.BUCKET_VAL")
-                         , CASE WHEN DI.RELEASE_DATE = '$paramData' THEN DI.GOODS_QTY ELSE 0 END AS QTY_D$velocityCount
+                         , CASE WHEN DI.RELEASE_DATE = '$paramData' THEN DI.GOODS_QTY ELSE 0 END AS QTY_D$foreach.count
                         #end
                         
                         #foreach($bucketMap in $_parameter.bucketList)
                         #set($paramData = "$bucketMap.BUCKET_VAL")
-                             #if($velocityCount == 1)
+                             #if($foreach.count == 1)
                              , CASE WHEN DI.RELEASE_DATE = '$paramData' THEN DI.GOODS_QTY *ISNULL(MICG.SALES_PRICE_KRW,0) ELSE 0 END 
                              #else
                              + CASE WHEN DI.RELEASE_DATE = '$paramData' THEN DI.GOODS_QTY *ISNULL(MICG.SALES_PRICE_KRW,0) ELSE 0 END 
@@ -382,11 +382,11 @@
                          , ISNULL(HAPP2.WORKER_GROUP, ISNULL(DPOH.WORKER_GROUP, 'NONE')) AS WORKER_GROUP
                         #foreach($bucketMap in $_parameter.bucketList)
                         #set($paramData = "$bucketMap.BUCKET_VAL")
-                         , CASE WHEN CONVERT(NVARCHAR, HAPP.END_DTTM, 112) = '$paramData' THEN HAPP.QTY ELSE 0 END AS QTY_D$velocityCount
+                         , CASE WHEN CONVERT(NVARCHAR, HAPP.END_DTTM, 112) = '$paramData' THEN HAPP.QTY ELSE 0 END AS QTY_D$foreach.count
                         #end
                         #foreach($bucketMap in $_parameter.bucketList)
                         #set($paramData = "$bucketMap.BUCKET_VAL")
-                            #if($velocityCount == 1)
+                            #if($foreach.count == 1)
                              , CASE WHEN CONVERT(NVARCHAR, HAPP.END_DTTM, 112) = '$paramData' THEN HAPP.QTY *ISNULL(MICG.SALES_PRICE_KRW,0)  ELSE 0 END 
                             #else
                               + CASE WHEN CONVERT(NVARCHAR, HAPP.END_DTTM, 112) = '$paramData' THEN HAPP.QTY *ISNULL(MICG.SALES_PRICE_KRW,0)  ELSE 0 END 

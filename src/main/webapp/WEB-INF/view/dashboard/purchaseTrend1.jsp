@@ -563,7 +563,7 @@
 								  , { outDs : "chartList" , _siq : "dashboard.chartInfo.purchaseTrend1" }
 								  ];
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					purchaseTrend1.bucket = {};
@@ -614,7 +614,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -638,7 +638,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					purchaseTrend1.drawMaterialOutSideTrendChart(data.materialTrendChart, "materialTrendChart");
@@ -659,7 +659,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					purchaseTrend1.drawMaterialOutSideTrendChart(data.outSideTrendChart, "outSideTrendChart");
@@ -681,7 +681,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -719,7 +719,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -748,7 +748,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					var arPreWeek = new Array();
@@ -786,7 +786,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					var arPreWeek = new Array();
@@ -1358,7 +1358,7 @@
 	        
 	        var aOption = {
 	            async   : false,
-	            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	            url     : GV_CONTEXT_PATH + "/biz/obj",
 	            data    : SCM_SEARCH,
 	            success : function (data) {
 	            

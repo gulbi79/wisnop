@@ -633,7 +633,7 @@ function fn_getGridData(sqlFlag) {
 	FORM_SEARCH.tranData = [{outDs:"rtnList",_siq:"aps.static.basicWorkCalendarRsc"}];
 	
 	gfn_service({
-		url    : GV_CONTEXT_PATH + "/biz/obj.do",
+		url    : GV_CONTEXT_PATH + "/biz/obj",
 		data   : FORM_SEARCH,
 		success: function(data) {
 			//그리드 데이터 삭제
@@ -752,7 +752,7 @@ function fn_save() {
 		
 		
 		gfn_service({
-			url    : GV_CONTEXT_PATH + "/biz/obj.do",
+			url    : GV_CONTEXT_PATH + "/biz/obj",
 			data   : FORM_SAVE,
 			success: function(data) {
 				alert('<spring:message code="msg.saveOk"/>');
@@ -775,7 +775,7 @@ function gridCallback(resList) {
 	
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
    			_mtd : "getList",
    			tranData : [
@@ -875,7 +875,7 @@ function fn_excelSqlAuth() {
 	
 	gfn_service({
 	    async   : false,
-	    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	    url     : GV_CONTEXT_PATH + "/biz/obj",
 	    data    : {
    			_mtd : "getList",
    			popUpMenuCd : popUpMenuCd,

@@ -122,7 +122,7 @@
 			
 			gfn_service({
 			    async   : false,
-			    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			    url     : GV_CONTEXT_PATH + "/biz/obj",
 			    data    : search,
 			    success :function(data) {
 			    	var startDate = "";
@@ -218,7 +218,7 @@
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq + "Detail"}];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -246,7 +246,7 @@
 			
 			gfn_service({
 			    async   : false,
-			    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+			    url     : GV_CONTEXT_PATH + "/biz/obj",
 			    data    : FORM_SEARCH,
 			    success : function(data) {
 			    	gfn_setMsCombo("versionId", data.versionList, [""], {allFlag:"Y"});
@@ -301,7 +301,7 @@
 			}, pOption);
 			
 			gfn_service({
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : params,
 				async   : false,
 				success : function(data) {
@@ -390,7 +390,7 @@
 		
 		gfn_service({
 		    async   : false,
-		    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+		    url     : GV_CONTEXT_PATH + "/biz/obj",
 		    data    : {
 	   			_mtd : "getList",
 	   			popUpMenuCd : popUpMenuCd,

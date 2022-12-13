@@ -88,7 +88,7 @@ function fn_apply() {
 	data._mtd = "getList";
 	data.tranData = [{outDs:"rtnList",_siq:"master.master.bscOrgMgmtScope"}];
 	var sMap = {
-		url: "${ctx}/biz/obj.do",
+		url: "${ctx}/biz/obj",
         data: data,
         success: function(data) {
         	grdMain.cancel();
@@ -124,7 +124,7 @@ function fn_save() {
 		FORM_SAVE._mtd   = "saveAll";
 		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"master.master.bscOrgMgmtScope", mergeFlag: "Y", grdData : grdData, custDupChkYn : {"insert":"Y"}}];
     	var sMap = {
-            url: GV_CONTEXT_PATH + "/biz/obj.do",
+            url: GV_CONTEXT_PATH + "/biz/obj",
             data: FORM_SAVE,
             success:function(data) {
             	if ( data.errCode == -20 ) {

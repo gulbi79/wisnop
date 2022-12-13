@@ -32,7 +32,7 @@
 		    <br/>
 		    <p>주소가 올바른지 확인해주시고, 잠시 후 다시 시도해주세요.</p>
 		    <br/>
-<%-- 		    <a href="<c:url value='/common/main.do'/>"><span>메인으로</span></a> --%>
+<%-- 		    <a href="<c:url value='/common/main'/>"><span>메인으로</span></a> --%>
 		</div>
 	</body>
 </html>

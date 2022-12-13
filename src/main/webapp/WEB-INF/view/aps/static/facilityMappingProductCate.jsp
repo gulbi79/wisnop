@@ -45,7 +45,7 @@
 			search : function() {
 				gfn_service({
 				    async   : false,
-				    url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				    url     : GV_CONTEXT_PATH + "/biz/obj",
 				    data    : {
 		    			_mtd : "getList",
 		    			tranData : [
@@ -395,7 +395,7 @@
 			FORM_SEARCH._mtd     = "getList";
 			FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq + "list" }];
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -541,7 +541,7 @@
 				];
 				
 				var ajaxOpt = {
-					url     : GV_CONTEXT_PATH + "/biz/obj.do",
+					url     : GV_CONTEXT_PATH + "/biz/obj",
 					data    : FORM_SAVE,
 					success : function(data) {
 						alert('<spring:message code="msg.saveOk"/>');
@@ -643,7 +643,7 @@
             }, pOption);
             
             gfn_service({
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : params,
                 async   : false,
                 success : function(data) {

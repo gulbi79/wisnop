@@ -8,7 +8,7 @@
 		/****** [ supply.purchase.mrVariationRateListSelect ] ******/
 		SELECT NULL AS TMP 
 			#foreach( $dimMap in $_parameter.dimList )
-			#if($velocityCount == 1)
+			#if($foreach.count == 1)
 			 , 'Total' AS ${dimMap.DIM_CD}_NM
 			#else
 			 , NULL AS ${dimMap.DIM_CD}_NM

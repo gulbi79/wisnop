@@ -364,7 +364,7 @@
             FORM_SEARCH._mtd     = "getList";
             FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq}];
             var aOption = {
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : FORM_SEARCH,
                 success : function (data) {
                     
@@ -554,7 +554,7 @@ function fn_getYearId(pOption) {
             }, pOption);
             
             gfn_service({
-                url     : GV_CONTEXT_PATH + "/biz/obj.do",
+                url     : GV_CONTEXT_PATH + "/biz/obj",
                 data    : params,
                 async   : false,
                 success : function(data) {
@@ -609,7 +609,7 @@ function fn_getMonth(){
          };
          
          gfn_service({
-             url     : GV_CONTEXT_PATH + "/biz/obj.do",
+             url     : GV_CONTEXT_PATH + "/biz/obj",
              data    : params,
              async   : false,
              success : function(data) {
@@ -645,7 +645,7 @@ function fn_getWeek(){
 	     
 	     
 	     gfn_service({
-             url     : GV_CONTEXT_PATH + "/biz/obj.do",
+             url     : GV_CONTEXT_PATH + "/biz/obj",
              data    : FORM_SEARCH,
              async   : false,
              success : function(data) {

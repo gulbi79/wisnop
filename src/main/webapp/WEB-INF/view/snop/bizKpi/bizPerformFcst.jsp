@@ -380,7 +380,7 @@
 			
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				success : function (data) {
 					
@@ -406,7 +406,7 @@
 			FORM_SEARCH.tranData = [{outDs : "res", _siq : "snop.bizKpi.bizPerformInit"}];
 			
 			var aOption = {
-				url     : GV_CONTEXT_PATH + "/biz/obj.do",
+				url     : GV_CONTEXT_PATH + "/biz/obj",
 				data    : FORM_SEARCH,
 				async   : false,
 				success : function (data) {

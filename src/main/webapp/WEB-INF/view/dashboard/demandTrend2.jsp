@@ -587,7 +587,7 @@
 								  , { outDs : "chartList" , _siq : "dashboard.chartInfo.demandTrend2" }  
 								  ];
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					demendTrend2.bucket = {};
@@ -636,7 +636,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					demendTrend2.drawChart(data);
@@ -660,7 +660,7 @@
 				];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					// cartegory
@@ -697,7 +697,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					var arPreCate = new Array();
@@ -730,7 +730,7 @@
 			];
 			
 			var sMap = {
-				url	 : "${ctx}/biz/obj.do",
+				url	 : "${ctx}/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
 					
@@ -1552,7 +1552,7 @@
 	        
 	        var aOption = {
 	            async   : false,
-	            url     : GV_CONTEXT_PATH + "/biz/obj.do",
+	            url     : GV_CONTEXT_PATH + "/biz/obj",
 	            data    : SCM_SEARCH,
 	            success : function (data) {
 	            
