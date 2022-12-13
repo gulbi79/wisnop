@@ -9,9 +9,11 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.springframework.stereotype.Component;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.web.servlet.view.AbstractView;
 
+@Component("downloadView")
 public class DownloadView extends AbstractView {
 	public DownloadView() {
 		setContentType("application/download; charset=utf-8");
