@@ -82,7 +82,11 @@ function fn_pdfPreview(fileNm) {
    		forcePDFJS : true, 
    		PDFJS_URL : "<spring:eval expression="@environment.getProperty('props.WEB_PATH')"/><spring:eval expression="@environment.getProperty('props.PDF_VIEWER')"/>" 
    	}
-   	PDFObject.embed(sFileNm, "#example1",option);
+   	//PDFObject.embed(sFileNm, "#example1",option);
+	
+	if (!gfn_isNull(fileNm)) {
+		PDFObject.embed("${ctx}/file/downloadpdf", "#example1");
+	}
 }
 
 //그리드를 그린다.

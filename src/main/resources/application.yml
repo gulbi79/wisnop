@@ -77,7 +77,7 @@ props:
   SERVER_FILE_PATH: D:\\myproject\\upload
   SERVER_FILE_MAX: 52428800
   PDF_FILE_PATH: D:\\myproject\\pdf
-  WEB_PATH: http://52.231.187.60:8081
+  WEB_PATH: http://localhost:8081
   PDF_VIEWER: /pdfjs/web/viewer.html
   
 ---

@@ -210,25 +210,7 @@ public class FileController {
 		
 		//zip file 처리
 		if (rtnList.size() > 1) {
-			/*
-			String[] filePath    = new String[rtnList.size()];
-			String[] fileName    = new String[rtnList.size()];
-			String[] orgFileName = new String[rtnList.size()];
-			int i = 0;
-			for (HashMap<String,Object> rtnFileMap : rtnList) {
-				filePath[i]    = (String)rtnFileMap.get("FILE_PATH");
-				fileName[i]    = (String)rtnFileMap.get("FILE_NM");
-				orgFileName[i] = (String)rtnFileMap.get("FILE_NM_ORG");
-
-				i++;
-			}
 			
-			fileMap.put("filePath"    ,filePath);
-			fileMap.put("fileName"    ,fileName);
-			fileMap.put("orgFileName" ,orgFileName);
-			*/
-
-			//String zipFileName         = System.nanoTime()+"";
 			String firstFilePath  = (String)rtnList.get(0).get("FILE_PATH");
 			String firstFileNm    = (String)rtnList.get(0).get("FILE_NM");
 			String firstFileNmOrg = (String)rtnList.get(0).get("FILE_NM_ORG");
@@ -295,5 +277,50 @@ public class FileController {
 		            .body(resource);
 			
 		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value="/downloadpdf", method = RequestMethod.GET)
+	public ResponseEntity<Resource> pdfDownloadApi(HttpServletRequest request) throws Exception {
+
+		HashMap<String,Object> paramMap = new HashMap<String,Object>();
+		
+		//db에서 조회된 정보로 처리 ---------
+		HashMap<String,Object> tranMap = new HashMap<String,Object>();
+        List<HashMap<String,Object>> tranData = new ArrayList<HashMap<String,Object>>();
+
+        tranMap.put("outDs" ,"fileList");
+        tranMap.put("_siq"  ,"file");
+        tranData.add(tranMap);
+		paramMap.put("tranData" ,tranData);
+		paramMap.put("FILE_NO"  ,381);
+		paramMap.put("FILE_SEQ" ,new String[] {"1"});
+		
+		Map<String, Object> rtnMap = bizService.getList(paramMap);
+		List<HashMap<String,Object>> rtnList = (List<HashMap<String,Object>>)rtnMap.get("fileList");
+		if(rtnList.isEmpty()) {
+			throw new FileNotFoundException("파일이 존재하지 않습니다.");
+		}
+		
+		String sFilePath  = (String)rtnList.get(0).get("FILE_PATH");
+		String sFileNm    = (String)rtnList.get(0).get("FILE_NM");
+		String sFileNmOrg = (String)rtnList.get(0).get("FILE_NM_ORG");
+		
+//		String sFilePath = "D:\\myproject\\upload\\pdf";
+//		String sFileNm = "3fcba015-363a-49f4-a48a-0cd5be561f7e";
+//		String sFileNmOrg = "pdf-test.pdf";
+		
+		Path filePath = Paths.get(sFilePath+"\\"+sFileNm);
+	    InputStreamResource resource = new InputStreamResource(new FileInputStream(filePath.toString()));
+	    String fileName = sFileNmOrg;
+	    
+	    log.info("Success download input pdf file : {}",filePath);
+	    
+	    return ResponseEntity.ok()
+	            .contentType(MediaType.APPLICATION_PDF)
+	            .cacheControl(CacheControl.noCache())
+	            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=" + fileName)
+	            .body(resource);
+			
 	}
 }
