@@ -40,6 +40,12 @@ server:
       enabled: true
       force: true
       
+jasypt:
+  encryptor:
+    #bean: jasyptStringEncryptor
+    algorithm: PBEWithMD5AndDES
+    iv-generator-classname: org.jasypt.iv.NoIvGenerator
+      
 ---
       
 spring:
@@ -48,16 +54,12 @@ spring:
       on-profile: "local"
     
   datasource1:
-#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-#    jdbc-url: jdbc:log4jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
-    jdbc-url: jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
-    username: WIQ-TEST-SQL
-    password: WIxptmxmDB55%%66^^
+    jdbc-url: ENC(DWKsmBz/S+wB6b/YI5ZDYdKfSvto0qvvfDNipUdsTfSrybgLZkzRo2w8N4s52mwj7mTCEvKBCy1bYGEEft8/SRcHPl5JLP+4xHXjVKV9K1Vp2WBHL2TWa7ZvzEyajjnH)
+    username: ENC(kNlVgvfcdBcMj/bo0FXONkXH26eW42NB)
+    password: ENC(ISkaG5TENa8AG08cbcAZl46aCcSaiN6T10GU7kgvK78=)
     
   datasource2:
-#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-#    jdbc-url: ENC(F569Wb4PMcSPZlENgatqPK4jD1a6m77m3qdL/E3kTnVwZ/ob8vt2fWqe6bg8kiAw5oYcw8wIt6JHorSy8z6Nmg==)
     driver-class-name: oracle.jdbc.OracleDriver
     jdbc-url: ENC(lbev09K62wfWB4gPZuxVBzdgG4WVN5vB8Uru7jhweYq4/qU1L05JHB6mGBnV9B1d7v63Ak9CM5g=)
     username: ENC(qTbbqN2iMpvPD6PPfQeELA==)
@@ -68,15 +70,15 @@ spring:
         enabled: true
     
 props:
-  SERVER_FILE_PATH: D:\\myproject\\upload
-  SERVER_FILE_MAX: 52428800
-  PDF_FILE_PATH: /home/wonikadmin/system_attach/snop_dev/pdf
-  WEB_PATH: https://snop-test.wonikqnc.com
-  PDF_VIEWER: /pdfjs/web/viewer.html
   devMode: LOCAL
   realgridLic: realgridjs-lic
   realgridjs: realgridjs_eval.1.1.39.min
   realgridapi: realgridjs-api.1.1.39
+  SERVER_FILE_PATH: D:\\myproject\\upload
+  SERVER_FILE_MAX: 52428800
+  PDF_FILE_PATH: D:\\myproject\\pdf
+  WEB_PATH: http://52.231.187.60:8081
+  PDF_VIEWER: /pdfjs/web/viewer.html
   
 ---
       
@@ -86,31 +88,27 @@ spring:
       on-profile: "dev"
     
   datasource1:
-#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-#    jdbc-url: jdbc:log4jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
-    jdbc-url: jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
-    username: WIQ-TEST-SQL
-    password: WIxptmxmDB55%%66^^
+    jdbc-url: ENC(DWKsmBz/S+wB6b/YI5ZDYdKfSvto0qvvfDNipUdsTfSrybgLZkzRo2w8N4s52mwj7mTCEvKBCy1bYGEEft8/SRcHPl5JLP+4xHXjVKV9K1Vp2WBHL2TWa7ZvzEyajjnH)
+    username: ENC(kNlVgvfcdBcMj/bo0FXONkXH26eW42NB)
+    password: ENC(ISkaG5TENa8AG08cbcAZl46aCcSaiN6T10GU7kgvK78=)
     
   datasource2:
-#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-#    jdbc-url: ENC(F569Wb4PMcSPZlENgatqPK4jD1a6m77m3qdL/E3kTnVwZ/ob8vt2fWqe6bg8kiAw5oYcw8wIt6JHorSy8z6Nmg==)
     driver-class-name: oracle.jdbc.OracleDriver
     jdbc-url: ENC(lbev09K62wfWB4gPZuxVBzdgG4WVN5vB8Uru7jhweYq4/qU1L05JHB6mGBnV9B1d7v63Ak9CM5g=)
     username: ENC(qTbbqN2iMpvPD6PPfQeELA==)
     password: ENC(nDW5tU9l95j7PBy1d+JW/A==)
     
 props:
+  devMode: DEV
+  realgridLic: realgridjs-lic
+  realgridjs: realgridjs_eval.1.1.39.min
+  realgridapi: realgridjs-api.1.1.39
   SERVER_FILE_PATH: /home/wonikadmin/system_attach/snop_dev/upload
   SERVER_FILE_MAX: 52428800
   PDF_FILE_PATH: /home/wonikadmin/system_attach/snop_dev/pdf
   WEB_PATH: https://snop-test.wonikqnc.com
   PDF_VIEWER: /pdfjs/web/viewer.html
-  devMode: DEV
-  realgridLic: realgridjs-lic
-  realgridjs: realgridjs_eval.1.1.39.min
-  realgridapi: realgridjs-api.1.1.39
   
 ---
       
@@ -120,29 +118,25 @@ spring:
       on-profile: "prod"
     
   datasource1:
-#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-#    jdbc-url: jdbc:log4jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
-    jdbc-url: jdbc:sqlserver://wiq-test-sql.database.windows.net:1433;DatabaseName=WIQ-TEST-DB
-    username: WIQ-TEST-SQL
-    password: WIxptmxmDB55%%66^^
+    jdbc-url: ENC(GL/wpGAN6KSfoHIuov0bTkyCm9wHPxIYW4oS2i3B5aVjstmoD/y67PpPL7rBl0R9w+/zDSQpYV4ILEfyZrGBuh8CnV7/2ihqDW4gFLhj5A9Cr4NxSxnYMooq3aaWD22D)
+    username: ENC(xWPlnWT19WjF9LBO9HR8B7+cdFj7EOeq)
+    password: ENC(JfbgUUoGHBxhcjA6HXlFslQ0P833e5HTxJf7G7v9fcQ=)
     
   datasource2:
-#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-#    jdbc-url: ENC(F569Wb4PMcSPZlENgatqPK4jD1a6m77m3qdL/E3kTnVwZ/ob8vt2fWqe6bg8kiAw5oYcw8wIt6JHorSy8z6Nmg==)
     driver-class-name: oracle.jdbc.OracleDriver
     jdbc-url: ENC(lbev09K62wfWB4gPZuxVBzdgG4WVN5vB8Uru7jhweYq4/qU1L05JHB6mGBnV9B1d7v63Ak9CM5g=)
     username: ENC(qTbbqN2iMpvPD6PPfQeELA==)
     password: ENC(nDW5tU9l95j7PBy1d+JW/A==)
     
 props:
+  devMode: REAL
+  realgridLic: realgridjs-lic
+  realgridjs: realgridjs_eval.1.1.39.min
+  realgridapi: realgridjs-api.1.1.39
   SERVER_FILE_PATH: /home/wonikadmin/system_attach/snop_dev/upload
   SERVER_FILE_MAX: 52428800
   PDF_FILE_PATH: /home/wonikadmin/system_attach/snop_dev/pdf
   WEB_PATH: https://snop-test.wonikqnc.com
   PDF_VIEWER: /pdfjs/web/viewer.html
-  devMode: REAL
-  realgridLic: realgridjs-lic
-  realgridjs: realgridjs_eval.1.1.39.min
-  realgridapi: realgridjs-api.1.1.39
 

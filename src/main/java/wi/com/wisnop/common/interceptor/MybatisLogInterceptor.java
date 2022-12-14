@@ -8,18 +8,25 @@ import java.util.Properties;
 
 import org.apache.ibatis.executor.statement.StatementHandler;
 import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.mapping.ParameterMapping;
 import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Invocation;
 import org.apache.ibatis.plugin.Plugin;
 import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.reflection.DefaultReflectorFactory;
+import org.apache.ibatis.reflection.MetaObject;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.apache.ibatis.session.ResultHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StopWatch;
 
+import lombok.extern.slf4j.Slf4j;
 import wi.com.wisnop.common.webutil.SharedInfoHolder;
 
+@Slf4j
 @Intercepts({
     @Signature(type=StatementHandler.class, method="batch", args={Statement.class}),
     @Signature(type=StatementHandler.class, method="update", args={Statement.class}),
@@ -27,12 +34,16 @@ import wi.com.wisnop.common.webutil.SharedInfoHolder;
 })
 public class MybatisLogInterceptor implements Interceptor {
 
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
     	
         StatementHandler handler = (StatementHandler)invocation.getTarget();
+        MetaObject metaObject = MetaObject.forObject(handler, SystemMetaObject.DEFAULT_OBJECT_FACTORY,
+        							SystemMetaObject.DEFAULT_OBJECT_WRAPPER_FACTORY, new DefaultReflectorFactory());
+
+		MappedStatement mappedStatement = (MappedStatement) metaObject.getValue("delegate.mappedStatement");
+		String sqlId = mappedStatement.getId();
+		
         BoundSql boundSql = handler.getBoundSql();
         
         // 쿼리문을 가져온다(이 상태에서의 쿼리는 값이 들어갈 부분에 ?가 있다)
@@ -108,14 +119,22 @@ public class MybatisLogInterceptor implements Interceptor {
         }
          
         //logger.info("=====================================================================");
-        logger.info("sql : {}", sql);
+        log.info("sql : {}", sql);
         //logger.info("=====================================================================");
         
         if ("Y".equals(SharedInfoHolder.getJobType())) {
         	SharedInfoHolder.setJobSql(sql.concat(";"));
         	return null;
         } else {
-        	return invocation.proceed(); // 쿼리 실행
+        	long startTime = System.currentTimeMillis();
+//        	String methodName = invocation.getMethod().getName();
+        	StopWatch sw = new StopWatch();
+        	sw.start("SQL_"+startTime);
+        	Object rtnObj = invocation.proceed(); // 쿼리 실행
+        	sw.stop();
+        	log.info("[SQL ID] : {} was called. [SQL 처리시간] : {}", sqlId, sw.getTotalTimeSeconds());
+            
+        	return rtnObj;
         }
         
     }

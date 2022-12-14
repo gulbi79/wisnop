@@ -166,6 +166,10 @@
 		   AND ITEM_CD       = @{ITEM_CD}
 	</update>
 	
-	
+	<select id="oracledbselect" parameterType="map" resultType="map">
+     SELECT PRODUCTGROUP
+     FROM TB_DYN_SAMPLE2
+     GROUP BY PRODUCTGROUP
+	</select>
 	
 </mapper>
