@@ -2,12 +2,12 @@ package wi.com.wisnop;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
 
-//@ComponentScan(nameGenerator = CustomBeanNameGenerator.class)
-//@EnableAutoConfiguration
-//@ComponentScan(excludeFilters = { @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
-//		@Filter(type = FilterType.CUSTOM, classes = AutoConfigurationExcludeFilter.class) })
+import wi.com.wisnop.config.CustomBeanNameGenerator;
+
 @SpringBootApplication
+@ComponentScan(nameGenerator = CustomBeanNameGenerator.class)
 public class WisnopApplication {
 
 	public static void main(String[] args) {

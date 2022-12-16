@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
+<head>
+ 	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>Login</title>
+	
+	<link th:href="@{/statics/css/jquery-ui.css}" href="/statics/css/jquery-ui.css" rel="stylesheet" />
+	<link th:href="@{/statics/css/style.css}" href="/statics/css/style.css" rel="stylesheet"/>
+</head>
+<body id="login">
+    <div id="loginBox">
+		<div id="tbox">
+			<div class="thead">
+				<h1><a href="#"><img th:attr="src=@{/statics/images/common/logo_hd.png}" src="/statics/images/common/logo_hd.png" alt="WonIk"></a></h1>
+				<h1 id="serverChk" style="text-align: center;font-size: 50px;display:none;">NEW개발서버</h1>
+			</div>
+			<form id="mainForm" name="mainForm" method="POST" th:action="@{/auth/submit}">
+			<div class="frm">
+				<div class="fst"><input type="text"  id="userId" name="userId" placeholder="ID"/></div>
+				<div class="fst"><input type="password" id="userPw" name="userPw" placeholder="PASSWORD"/></div>
+			</div>
+			<a href="#" id="loginSubmitBtn" class="btn_login">LOGIN</a>
+			</form>
+		</div>
+	</div>
+	<script th:attr="src=@{/statics/js/jquery/jquery-3.1.0.min.js}" src="/statics/js/jquery/jquery-3.1.0.min.js"></script>
+	<script th:inline="javascript">
+   	const CONTEXT_PATH = "[(@{/})]"
+	const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
+	$(function() {
+		console.log("GV_CONTEXT_PATH",GV_CONTEXT_PATH);
+		var devMode = "${@environment.getProperty('props.devMode')}";
+		if (devMode != "REAL"){
+			$("#serverChk").val(devMode);
+			$("#serverChk").show();
+		}
+		
+		/*[# th:if="${loginMap} != null and ${loginMap.get('errCode')} == '-1'"]*/
+	    	alert('${loginMap.errMsg}');
+			$("#userPw").focus();
+	    /*[/]*/
+	    
+	    /*[# th:if="${loginMap} != null and ${loginMap.get('errCode')} == '-3'"]*/
+			$("#userPw").val('${loginMap.userPw}');
+			alert('${loginMap.errMsg}');
+			$("#cfnDiv").show();
+			//$("#userPw").val("");
+			$("#userPw").focus();
+		/*[/]*/
+		
+		let session = /*[[${session}]]*/;
+		if (session.GV_USER_ID) {
+			location.href = GV_CONTEXT_PATH + "/auth/goPortal";
+		}
+		
+	    $("#loginSubmitBtn").on("click",function() {
+	    	const userId = $("#userId").val();
+	    	const userPw = $("#userPw").val();
+	    	if (userId == undefined || userId == null || userId == "") {
+	    		alert("아이디를 입력해주세요!");
+	    		$("#userId").focus();
+	    		return; 
+	    	}
+	    	
+	    	if (userPw == undefined || userPw == null || userPw == "") {
+	    		alert("패스워드를 입력해주세요!");
+	    		$("#userPw").focus();
+	    		return; 
+	    	}
+	    	
+	    	goLogin();
+	    });
+	    
+	    $('form input').keydown(function (e) {
+	        if (e.keyCode == 13) {
+	        	if (this.id == "userPw") {
+	        		$("#loginSubmitBtn").trigger("click");
+	        	} else {
+		        	var inputs = $(this).parents("form").eq(0).find(":input");
+		            if (inputs[inputs.index(this) + 1] != null) {                    
+		                inputs[inputs.index(this) + 1].focus();
+		            }
+		            e.preventDefault();
+		            return false;
+	        	}
+	        }
+	    });
+	});
+	
+	function goLogin() {
+	    $("#mainForm").attr("onSubmit", "return true");
+	    $("#mainForm").submit().attr("onSubmit", "return false");
+	}
+    </script>
+</body>
+</html>

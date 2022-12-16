@@ -1,16 +1,16 @@
 spring:
   profiles:
+    active: local
     group:
-      "local": "local,common"
-      "dev":  "dev,common"
-      "prod": "prod,common"
+      local: local,common
+      dev:  dev,common
+      prod: prod,common
 
 ---
-
 spring:
   config:
     activate:
-      on-profile: "common"
+      on-profile: common
       
   lifecycle:
     timeout-per-shutdown-phase: 30s
@@ -19,7 +19,8 @@ spring:
     prefix: classpath:templates/
     suffix: .html
     cache: false
-    view-names: thymeleaf/*
+    view-names: th/*
+    encoding: UTF-8
     
   mvc:
     view:
@@ -32,6 +33,8 @@ server:
   shutdown: graceful
 
   servlet:
+    context-path: /wisnop
+    
     session:
       timeout: 120m
       
@@ -42,16 +45,14 @@ server:
       
 jasypt:
   encryptor:
-    #bean: jasyptStringEncryptor
     algorithm: PBEWithMD5AndDES
     iv-generator-classname: org.jasypt.iv.NoIvGenerator
       
 ---
-      
 spring:
   config:
     activate:
-      on-profile: "local"
+      on-profile: local
     
   datasource1:
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
@@ -76,16 +77,15 @@ props:
   realgridapi: realgridjs-api.1.1.39
   SERVER_FILE_PATH: D:\\myproject\\upload
   SERVER_FILE_MAX: 52428800
-  PDF_FILE_PATH: D:\\myproject\\pdf
+  PDF_FILE_PATH: D:\\myproject\\upload\\pdf
   WEB_PATH: http://localhost:8081
   PDF_VIEWER: /pdfjs/web/viewer.html
   
 ---
-      
 spring:
   config:
     activate:
-      on-profile: "dev"
+      on-profile: dev
     
   datasource1:
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
@@ -111,11 +111,10 @@ props:
   PDF_VIEWER: /pdfjs/web/viewer.html
   
 ---
-      
 spring:
   config:
     activate:
-      on-profile: "prod"
+      on-profile: prod
     
   datasource1:
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver

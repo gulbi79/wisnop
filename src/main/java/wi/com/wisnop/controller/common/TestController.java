@@ -16,7 +16,7 @@ public class TestController {
 	 */
 	@GetMapping
     public String hello() {
-        return "thymeleaf/test";
+        return "th/test";
     }
 	
 }

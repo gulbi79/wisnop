@@ -73,7 +73,7 @@ function fn_initEvent() {
 	fn_apply();
 }
 
-function fn_pdfPreview(fileNm) {
+function fn_pdfPreview(fileNm, fileNo, fileSeq) {
 	var sFileNm = "";
 	if (!gfn_isNull(fileNm)) {
 		sFileNm = "<spring:eval expression="@environment.getProperty('props.WEB_PATH')"/>/pdf/"+fileNm;
@@ -85,7 +85,7 @@ function fn_pdfPreview(fileNm) {
    	//PDFObject.embed(sFileNm, "#example1",option);
 	
 	if (!gfn_isNull(fileNm)) {
-		PDFObject.embed("${ctx}/file/downloadpdf", "#example1");
+		PDFObject.embed("${ctx}/file/downloadpdf?FILE_NO="+fileNo+"&FILE_SEQ="+fileSeq, "#example1");
 	}
 }
 
@@ -128,9 +128,11 @@ function fn_initGrid() {
   	//row 상태에따른 컬럼 속성정의
     grdFile.onCurrentRowChanged = function (grid, oldRow, newRow) {
     	if (newRow >= 0) {
-	  		var fileNm = dataProviderFile.getValue(newRow, "FILE_NM");
+	  		var fileNm  = dataProviderFile.getValue(newRow, "FILE_NM");
+	  		var fileNo  = dataProviderFile.getValue(newRow, "FILE_NO");
+	  		var fileSeq = dataProviderFile.getValue(newRow, "FILE_SEQ");
 	   		if (dataProviderFile.getRowState(newRow) === "none" && !gfn_isNull(fileNm)) {
-	   			fn_pdfPreview(fileNm);
+	   			fn_pdfPreview(fileNm, fileNo, fileSeq);
 	   			return;
 	   		}
     	}
