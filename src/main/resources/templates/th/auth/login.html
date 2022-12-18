@@ -37,14 +37,15 @@
 		}
 		
 		/*[# th:if="${loginMap} != null and ${loginMap.get('errCode')} == '-1'"]*/
-	    	alert('${loginMap.errMsg}');
+	    	alert(/*[[${loginMap.get('errMsg')}]]*/'');
+			$("#userId").val(/*[[${loginMap.get('userId')}]]*/'');
 			$("#userPw").focus();
 	    /*[/]*/
 	    
 	    /*[# th:if="${loginMap} != null and ${loginMap.get('errCode')} == '-3'"]*/
 			$("#userPw").val('${loginMap.userPw}');
-			alert('${loginMap.errMsg}');
-			$("#cfnDiv").show();
+			alert(/*[[${loginMap.get('errMsg')}]]*/'');
+			//$("#cfnDiv").show();
 			//$("#userPw").val("");
 			$("#userPw").focus();
 		/*[/]*/
