@@ -36,7 +36,7 @@ import wi.com.wisnop.service.common.LoginService;
 @RequestMapping(value = "/auth")
 @RequiredArgsConstructor
 //@Slf4j
-public class AuthrController {
+public class AuthController {
 
     private final CommonService commonService;
     private final LoginService loginService;

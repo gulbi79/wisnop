@@ -160,7 +160,7 @@
 					<Strong th:text="${session.userInfo.userNm} + '님'"></Strong> 환영합니다.
 					&nbsp;<img id="btn_logout" style="cursor:pointer;" th:attr="src=@{/statics/images/portal/btn_logout.png}" src="/statics/images/portal/btn_logout.png" alt="">
 				</div>
-		    	<form id="mainForm2" name="mainForm2" method="POST" onSubmit="return false;">
+		    	<form id="mainForm2" name="mainForm2" method="POST">
 				<input type="hidden" id="bu" name="bu" value="">
 		  		<div class="sel">
 		  			<select name="company" title="company" style="margin-bottom:4px;">
@@ -175,7 +175,7 @@
 			        </select>
 	    		</div>
 		    	</form>
-		    	<form id="commonPopForm" name="commonPopForm" method="POST" onSubmit="return false;">
+		    	<form id="commonPopForm" name="commonPopForm" method="POST">
 		    	</form>
 	
 	    	<div class="btn">
@@ -210,32 +210,13 @@
    	});
    	
    	function fn_init() {
+   		const buList = /*[[${session.GV_BU_LIST}]]*/'';
+   		buList.forEach(v => {
+   			$(".tmp"+v.CODE_CD).removeClass("off").addClass("on");
+   			$(".tmp"+v.CODE_CD).on("click", () => fn_goDashboard(v.CODE_CD));
+   		});
    		
-   		const buList = /*[[${session.GV_BU_LIST}]]*/
-   		for (var i=0; i<buList.length; i++) {
-   			if (buList[i].CODE_CD == "QT") {
-   				$(".tmpQT").removeClass("off").addClass("on");
-   				$(".tmpQT").on("click", function() {
-   					fn_goDashboard('QT');
-   				});
-   				
-   			} else if (buList[i].CODE_CD == "CR") {
-   				$(".tmpCR").removeClass("off").addClass("on");
-   				$(".tmpCR").on("click", function() {
-   					fn_goDashboard('CR');
-   				});
-   				
-   			} else if (buList[i].CODE_CD == "CL") {
-   				$(".tmpCL").removeClass("off").addClass("on");
-   				$(".tmpCL").on("click", function() {
-   					fn_goDashboard('CL');
-   				});
-   				
-   			}
-   		}
-   		
-   		
-   		var userLang = /*[[${session.GV_LANG}]]*/;
+   		var userLang = /*[[${session.GV_LANG}]]*/'';
    		var cDate = gfn_getCurrentDate();
    		var pDate = gfn_getAddDate(cDate.YYYYMMDD, -7);
    		var nDate = gfn_getAddDate(cDate.YYYYMMDD, 7);
@@ -387,7 +368,7 @@
    				
    				/*[# th:if="${session.userInfo.dashboardYn} == 'Y'"]*/
    				if (n == 1) {
-   					tmpAmt1 = rAmtY+/*[[#{lbl.billion}]]*/;
+   					tmpAmt1 = rAmtY+/*[[#{lbl.billion}]]*/'';
    					tmpAmt2 = rAmtM+/*[[#{lbl.billion}]]*/'<sup>1)</sup>';
    					$(".help_txt").show();
    				}
@@ -615,19 +596,19 @@
    		        	
    		        	if(x == flag){
    		        		if(this.colorIndex == 0 || this.colorIndex == 2){
-   		        			result = /*[[#{lbl.cpfrY}]]*/;
+   		        			result = /*[[#{lbl.cpfrY}]]*/'';
    			        	}else{
-   			        		result = /*[[#{lbl.cpfrN}]]*/;
+   			        		result = /*[[#{lbl.cpfrN}]]*/'';
    			        	}
    		        	}else{
    		        		if(this.colorIndex == 0){
-   		        			result = /*[[#{lbl.cpfrExpResult}]]*/;
+   		        			result = /*[[#{lbl.cpfrExpResult}]]*/'';
    			        	}else if(this.colorIndex == 1){
-   			        		result = /*[[#{lbl.mormalExpResult}]]*/;
+   			        		result = /*[[#{lbl.mormalExpResult}]]*/'';
    			        	}else if(this.colorIndex == 2){
-   			        		result = /*[[#{lbl.cpfrResult}]]*/;
+   			        		result = /*[[#{lbl.cpfrResult}]]*/'';
    			        	}else if(this.colorIndex == 3){
-   			        		result = /*[[#{lbl.normalResult}]]*/;
+   			        		result = /*[[#{lbl.normalResult}]]*/'';
    			        	}
    		        	}
    		            return result;
@@ -761,9 +742,9 @@
    		        	var result = "";
    		        	
    		        	if(this.colorIndex == 0){
-   		        		result = /*[[#{lbl.cpfrY}]]*/;
+   		        		result = /*[[#{lbl.cpfrY}]]*/'';
    		        	}else{
-   		        		result = /*[[#{lbl.cpfrN}]]*/;
+   		        		result = /*[[#{lbl.cpfrN}]]*/'';
    		        	}
    		        	
    		            return result;
