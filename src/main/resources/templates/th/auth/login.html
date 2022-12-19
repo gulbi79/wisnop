@@ -15,7 +15,7 @@
 				<h1><a href="#"><img th:attr="src=@{/statics/images/common/logo_hd.png}" src="/statics/images/common/logo_hd.png" alt="WonIk"></a></h1>
 				<h1 id="serverChk" style="text-align: center;font-size: 50px;display:none;">NEW개발서버</h1>
 			</div>
-			<form id="mainForm" name="mainForm" method="POST" th:action="@{/auth/submit}">
+			<form id="mainForm" name="mainForm" method="POST" th:action="@{/th/auth/submit}">
 			<div class="frm">
 				<div class="fst"><input type="text"  id="userId" name="userId" placeholder="ID"/></div>
 				<div class="fst"><input type="password" id="userPw" name="userPw" placeholder="PASSWORD"/></div>
@@ -30,7 +30,7 @@
 	const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
 	$(function() {
 		console.log("GV_CONTEXT_PATH",GV_CONTEXT_PATH);
-		var devMode = "${@environment.getProperty('props.devMode')}";
+		const devMode = "${@environment.getProperty('props.devMode')}";
 		if (devMode != "REAL"){
 			$("#serverChk").val(devMode);
 			$("#serverChk").show();
@@ -52,7 +52,7 @@
 		
 		let session = /*[[${session}]]*/'';
 		if (session.GV_USER_ID) {
-			location.href = GV_CONTEXT_PATH + "/auth/goPortal";
+			location.href = GV_CONTEXT_PATH + "/th/auth/goPortal";
 		}
 		
 	    $("#loginSubmitBtn").on("click",function() {

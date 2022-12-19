@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title></title>
+</head>
+<body>
+	<div>
+		<form id="menuForm" name="menuForm" method="POST" onSubmit="return false;">
+			<input type="hidden" id="moduleCd" name="moduleCd" th:value="${paramMap.moduleCd}" />
+			<input type="hidden" id="menuCd" name="menuCd" th:value="${paramMap.menuCd}" />
+			<input type="hidden" id="menuUrl" name="menuUrl" th:value="${paramMap.menuUrl}" />
+			<input type="hidden" id="frameMenuCd" name="frameMenuCd" th:value="${paramMap.frameMenuCd}" />
+			<div id="menuFormArgs"></div>
+		</form>
+	</div>
+	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}"></script>
+
+	<script th:inline="javascript">
+	
+		$(document).ready(function(){
+			const CONTEXT_PATH = "[(@{/})]"
+			const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
+			
+			var brheight = $(top.document).height() - 156;
+			$(top.document).find("iframe[name='${frameMenuCd}']").css('height',brheight);
+			
+			//동적 hidden 데이터 생성
+			$("#menuFormArgs").html("");
+			$("#menuFormArgs").html(parent.$("#menuFormArgs").html());
+			
+			$("#menuForm").attr("onSubmit","return true");
+			
+			if ("${paramMap.menuCd}" == "HOME") {
+		    	$("#menuForm").attr("action",CONTEXT_PATH + "/th/common/goHome");
+			} else {
+		    	$("#menuForm").attr("action",CONTEXT_PATH + "/th/common/gomenu");
+			}
+		    $("#menuForm").submit().attr("onSubmit","return false");
+		});
+		
+	</script>
+</body>
+</html>
