@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.i18n.SessionLocaleResolver;
 
+import lombok.extern.slf4j.Slf4j;
 import wi.com.wisnop.common.constant.Namespace;
 import wi.com.wisnop.common.webutil.CommUtil;
 import wi.com.wisnop.common.webutil.SessionUtil;
@@ -34,6 +35,7 @@ import wi.com.wisnop.service.common.CommonService;
 /**
  * Handles requests for the application home page.
  */
+@Slf4j
 @Controller
 @RequestMapping(value="/th/common")
 public class MainController {
@@ -91,8 +93,6 @@ public class MainController {
 		List<Object> isSalesTeamList = commonService.getList(paramMap);
 		SessionUtil.setAttribute("isSalesTeam",isSalesTeamList);
 		
-		
-		
 		mav.setViewName("th/layout/layout");
 		return mav;
 	}
@@ -129,7 +129,40 @@ public class MainController {
 		return mav;
 	}
     
-    
+    @RequestMapping(value = "/gomenu", method = RequestMethod.POST)
+	public ModelAndView goMenu(@RequestParam Map<String, Object> paramMap
+			, HttpServletRequest request, HttpServletResponse response) throws Exception {
+
+		ModelAndView mav = new ModelAndView();
+
+		//UI 마스터에서 해당 화면에 사용될 기본 정보를 조회한다.
+		//1. dimension 사용여부 2. measure 사용여부 3. chart 사용여부 4. excel 사용여부
+		paramMap.put("sqlId",Namespace.COMMON_SSCD+"uiMaster");
+		MenuVO menuInfo = commonService.getOne(paramMap);
+
+		//권한없는 페이지 처리
+		if (menuInfo == null || ObjectUtils.isEmpty(menuInfo.getUrl())) {
+			mav.setViewName("error/commonException");
+		} else {
+			//접속로그 처리
+			paramMap.put("ACCESS_TYPE_CD", "MENU");
+			paramMap.put("URL", menuInfo.getUrl());
+
+			paramMap.put("CLIENT_HOST", " ");
+			paramMap.put("CLIENT_ADDR", CommUtil.getClientIpAddr(request));
+			commonService.saveInsert(Namespace.COMMON_SSCD+"userLog", paramMap);
+
+			menuInfo.setFrameMenuCd(paramMap.get("frameMenuCd").toString());
+
+			log.info("MENU URL : {}",menuInfo.getUrl());
+			
+			mav.setViewName(menuInfo.getUrl());
+			mav.addObject("menuInfo", menuInfo);
+			mav.addObject("paramMap", paramMap);
+		}
+
+		return mav;
+	}
     
     
     
@@ -163,38 +196,7 @@ public class MainController {
 		return mav;
 	}
 	
-	@RequestMapping(value = "/gomenu", method = RequestMethod.POST)
-	public ModelAndView goMenu(@RequestParam Map<String, Object> paramMap
-			, HttpServletRequest request, HttpServletResponse response) throws Exception {
-
-		ModelAndView mav = new ModelAndView();
-
-		//UI 마스터에서 해당 화면에 사용될 기본 정보를 조회한다.
-		//1. dimension 사용여부 2. measure 사용여부 3. chart 사용여부 4. excel 사용여부
-		paramMap.put("sqlId",Namespace.COMMON_SSCD+"uiMaster");
-		MenuVO menuInfo = commonService.getOne(paramMap);
-
-		//권한없는 페이지 처리
-		if (menuInfo == null || StringUtils.isEmpty(menuInfo.getUrl())) {
-			mav.setViewName("error/commonException");
-		} else {
-			//접속로그 처리
-			paramMap.put("ACCESS_TYPE_CD", "MENU");
-			paramMap.put("URL", menuInfo.getUrl());
-
-			paramMap.put("CLIENT_HOST", " ");
-			paramMap.put("CLIENT_ADDR", CommUtil.getClientIpAddr(request));
-			commonService.saveInsert(Namespace.COMMON_SSCD+"userLog", paramMap);
-
-			menuInfo.setFrameMenuCd(paramMap.get("frameMenuCd").toString());
-
-			mav.setViewName(menuInfo.getUrl());
-			mav.addObject("menuInfo", menuInfo);
-			mav.addObject("paramMap", paramMap);
-		}
-
-		return mav;
-	}
+	
 
 	@RequestMapping(value="/subMenuList", method=RequestMethod.POST)
 	public @ResponseBody HashMap<String,Object> getSubMenuList(@RequestParam Map<String, Object> paramMap

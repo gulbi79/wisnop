@@ -29,8 +29,8 @@
    	const CONTEXT_PATH = "[(@{/})]"
 	const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
 	$(function() {
-		console.log("GV_CONTEXT_PATH",GV_CONTEXT_PATH);
-		const devMode = "${@environment.getProperty('props.devMode')}";
+		const devMode = /*[[${@environment.getProperty('props.devMode')}]]*/'';
+		console.log(GV_CONTEXT_PATH,devMode);
 		if (devMode != "REAL"){
 			$("#serverChk").val(devMode);
 			$("#serverChk").show();

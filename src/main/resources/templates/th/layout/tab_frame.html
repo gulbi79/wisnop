@@ -24,7 +24,7 @@
 			const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
 			
 			var brheight = $(top.document).height() - 156;
-			$(top.document).find("iframe[name='${frameMenuCd}']").css('height',brheight);
+			$(top.document).find("iframe[name='${paramMap.frameMenuCd}']").css('height',brheight);
 			
 			//동적 hidden 데이터 생성
 			$("#menuFormArgs").html("");
@@ -32,11 +32,11 @@
 			
 			$("#menuForm").attr("onSubmit","return true");
 			
-			if ("${paramMap.menuCd}" == "HOME") {
-		    	$("#menuForm").attr("action",CONTEXT_PATH + "/th/common/goHome");
-			} else {
-		    	$("#menuForm").attr("action",CONTEXT_PATH + "/th/common/gomenu");
-			}
+			let tmpUrl = "goMenu";
+			/*[# th:if="${paramMap.get('menuCd')} == 'HOME'"]*/
+			tmpUrl = "goHome";
+			/*[/]*/
+	    	$("#menuForm").attr("action",GV_CONTEXT_PATH + "/th/common/"+tmpUrl);
 		    $("#menuForm").submit().attr("onSubmit","return false");
 		});
 		

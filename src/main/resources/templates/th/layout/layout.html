@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
+<html xmlns:th="http://www.thymeleaf.org" >
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -55,7 +55,7 @@
 	  	<header class="hdt2">
 		    <h1><a th:href="@{/th/auth/goPortal}"><img th:src="@{/statics/images/common/logo.png}" alt="WonIk"></a></h1>
 			<nav id="gnb"><h2><a href="#" onclick="fn_leftClose();return false;"><img id="btnNav" th:src="@{/statics/images/common/btn_nav.gif}" alt=""></a></h2></nav>
-			<!-- <%@ include file="/WEB-INF/view/layout/menu.jsp" %> -->
+			<th:block th:replace="~{th/layout/fragments/menu :: menuHiddenFragment}"></th:block>
 	  	</header>
 	</div>
 	<div id="tt" class="easyui-tabs" style="width:100%;"></div>
@@ -65,14 +65,19 @@
 			<li><a href="#" onClick="copyFrame();">COPY</a></li>
 		</ul>
 	  </div>
-	  <!-- <%@ include file="/WEB-INF/view/layout/bottom.jsp" %>  -->
+	  <th:block th:replace="~{th/layout/fragments/bottom :: bottomFragment}"></th:block>
 	</div>
+	
 	
 	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}"></script>
 	<script th:src="@{/statics/js/pub/pubCommon.js}"></script>
 	<script th:src="@{/statics/js/jquery/jquery.easyui.min.js}"></script>
 	<script th:src="@{/statics/js/biz/comutil.js}"></script>
 	<script th:src="@{/statics/js/biz/common.js}"></script>
+
+	<th:block th:replace="~{th/layout/fragments/bottom :: bottomScriptFragment}"></th:block>
+
+	<th:block th:replace="~{th/layout/fragments/menu :: menuFragment}"></th:block>
 	
 	<script th:inline="javascript">
 		const CONTEXT_PATH = "[(@{/})]"
@@ -86,7 +91,7 @@
 	 4. 각가의 팝업은 전달받은 NOTICE_ID를 기준으로 팝업에 표시할 CONTENT를 조회 후 표시
 	 
 	 */
-	    const devMode = "${@environment.getProperty('props.devMode')}";
+	    const devMode = /*[[${@environment.getProperty('props.devMode')}]]*/'';
 		if (devMode != "REAL"){
 			window.document.title = "WonIk S&OP TEST"
 		}
@@ -295,7 +300,7 @@
 		function createFrame(title, menuCd, menuUrl, args, frameMenuCd) {
 			frameMenuCd = frameMenuCd || menuCd;
 			
-			console.log(frameMenuCd);
+			console.log("11111",frameMenuCd);
 			
 			if ($("iframe").length > 10) {
 				alert(/*[[#{msg.availableToOpenMax10Tabs.}]]*/'');
@@ -325,6 +330,8 @@
 			$("#menuForm").attr("onSubmit","return true");
 		    $("#menuForm").attr("action",GV_CONTEXT_PATH + "/th/common/goFrame");
 		    $("#menuForm").attr("target",frameMenuCd);
+		    
+		    console.log("22222",frameMenuCd);
 		    
 		    $("#menuForm").submit().attr("onSubmit","return false");
 		}

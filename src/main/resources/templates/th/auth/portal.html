@@ -169,9 +169,9 @@
 			  			</th:block>
 					</select>
 					<select id="userLang" name="userLang" title="언어설정">
-						<option value="en">영문(English)</option>
-			            <option value="ko">국문(Korean)</option>
-			            <option value="cn">중문(Chinese)</option>
+						<option value="en" th:selected="${session.GV_LANG} == 'en'">영문(English)</option>
+			            <option value="ko" th:selected="${session.GV_LANG} == 'ko'">국문(Korean)</option>
+			            <option value="cn" th:selected="${session.GV_LANG} == 'cn'">중문(Chinese)</option>
 			        </select>
 	    		</div>
 		    	</form>
