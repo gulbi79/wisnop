@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+	  xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+	<th:block th:replace="~{th/layout/fragments/head :: headFragment('N')}"></th:block>
+	<!-- content script -->
+    <th:block layout:fragment="headStyle"></th:block>
+</head>
+<body id="framesb">
+	<div id="a" class="split content split-horizontal">
+		<form id="searchForm" name="searchForm">
+		
+		<!-- hidden form -->
+    	<th:block layout:fragment="searchFormHidden"></th:block>
+    
+		<div id="filterDv">
+			<div class="inner">
+				<h3>Filter</h3>
+				
+				<th:block th:replace="~{th/layout/fragments/filter :: filterMonthSumFragment}"></th:block>
+				
+				<div class="tabMargin"></div>
+				<div class="scroll">
+					<!-- filter scroll html -->
+	    			<th:block layout:fragment="filterScroll"></th:block>
+				</div>
+				<div class="bt_btn">
+					<a href="#" class="fl_app" id="btnSearch" th:text="#{lbl.search}"></a>
+				</div>
+			</div>
+		</div>
+		</form>
+	</div>
+	
+	<!-- contents -->
+	<div id="b" class="split split-horizontal">
+		<div id="grid1" class="fconbox">
+			<th:block th:replace="~{th/layout/fragments/commonLocation :: viewFragment}"></th:block>
+			<div class="scroll">
+				<th:block layout:fragment="contentScroll"></th:block>
+			</div>
+		</div>
+    </div>
+	
+	<!-- hidden form -->
+	<th:block th:replace="~{th/layout/fragments/script :: commonFormFragment('N')}"></th:block>
+
+	<!-- 공통 script -->
+    <th:block th:replace="~{th/layout/fragments/script :: scriptFragment('N','Y')}"></th:block>
+
+	<!-- location 공통 script -->
+    <th:block th:replace="~{th/layout/fragments/commonLocation :: scriptFragment}"></th:block>
+
+	<!-- content script -->
+    <th:block layout:fragment="contentjs"></th:block>
+</body>
+</html>
