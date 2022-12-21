@@ -129,7 +129,7 @@ public class MainController {
 		return mav;
 	}
     
-    @RequestMapping(value = "/gomenu", method = RequestMethod.POST)
+    @RequestMapping(value = "/goMenu", method = RequestMethod.POST)
 	public ModelAndView goMenu(@RequestParam Map<String, Object> paramMap
 			, HttpServletRequest request, HttpServletResponse response) throws Exception {
 
@@ -139,11 +139,15 @@ public class MainController {
 		//1. dimension 사용여부 2. measure 사용여부 3. chart 사용여부 4. excel 사용여부
 		paramMap.put("sqlId",Namespace.COMMON_SSCD+"uiMaster");
 		MenuVO menuInfo = commonService.getOne(paramMap);
-
+		
 		//권한없는 페이지 처리
 		if (menuInfo == null || ObjectUtils.isEmpty(menuInfo.getUrl())) {
-			mav.setViewName("error/commonException");
+			mav.setViewName("th/error/commonException");
 		} else {
+			
+			//thymeleaf 페이지로 이동
+			menuInfo.setUrl("th/"+menuInfo.getUrl());
+			
 			//접속로그 처리
 			paramMap.put("ACCESS_TYPE_CD", "MENU");
 			paramMap.put("URL", menuInfo.getUrl());
@@ -164,8 +168,22 @@ public class MainController {
 		return mav;
 	}
     
+    /**
+	 * 공통팝업 처리
+	 */
+	@RequestMapping(value = "/popup/{popupGubun}")
+	public ModelAndView goPopup(@PathVariable("popupGubun") String popupGubun, @RequestParam Map<String, Object> paramMap
+			, HttpServletRequest request, HttpServletResponse response) throws Exception {
+
+		ModelAndView mav = new ModelAndView();
+		mav.addObject(popupGubun, paramMap);
+		return mav;
+	}
     
     
+	
+	
+	
     
     
     
@@ -179,23 +197,6 @@ public class MainController {
 	public String layout(Locale locale, Model model) {
 		return "common/layout";
 	}
-
-	
-
-	
-	
-	/**
-	 * 공통팝업 처리
-	 */
-	@RequestMapping(value = "/popup/{popupGubun}")
-	public ModelAndView goPopup(@PathVariable("popupGubun") String popupGubun, @RequestParam Map<String, Object> paramMap
-			, HttpServletRequest request, HttpServletResponse response) throws Exception {
-
-		ModelAndView mav = new ModelAndView();
-		mav.addObject(popupGubun, paramMap);
-		return mav;
-	}
-	
 	
 
 	@RequestMapping(value="/subMenuList", method=RequestMethod.POST)

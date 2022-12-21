@@ -35,18 +35,18 @@
 					</form>
 				</li>
 				<!-- 즐겨찾기 버튼 및 클릭시 나오는 화면 시작 -->
-				<li><a href="#" id="btnHelp"><img th:src="@{/statics/images/common/btn_listview.png}" alt="View" th:attr="title=#{lbl.pdfViewer}" /></a></li>
-	            <li class="myfav"><a href="#" id="myRecent"><img th:src="@{/statics/images/common/btn_menual.png}" alt="Menual" th:attr="title=#{lbl.menual}" /></a>
+				<li><a href="#" id="btnHelp"><img th:src="@{/statics/images/common/btn_listview.png}" alt="View" th:title="#{lbl.pdfViewer}" /></a></li>
+	            <li class="myfav"><a href="#" id="myRecent"><img th:src="@{/statics/images/common/btn_menual.png}" alt="Menual" th:title="#{lbl.menual}" /></a>
 					<div class="subbox cMyRecent">
 					<ul id="myRecentList"></ul>
 					</div>
 	            </li>
-	            <li class="myfav"><a href="#" id="myFav"><img th:src="@{/statics/images/common/btn_favorite.png}" alt="MY FAVORITE" th:attr="title=#{lbl.myFavorite}" /></a>
+	            <li class="myfav"><a href="#" id="myFav"><img th:src="@{/statics/images/common/btn_favorite.png}" alt="MY FAVORITE" th:title="#{lbl.myFavorite}" /></a>
 					<div class="subbox cMyFav">
 					<ul id="myfavList"></ul>
 					</div>
 				</li>
-				<li class="layout"><a href="#" id="btnLogOut"><img th:src="@{/statics/images/common/btn_logout.png}" alt="LogOut" th:attr="title=#{lbl.logOuts}" /></a></li>
+				<li class="layout"><a href="#" id="btnLogOut"><img th:src="@{/statics/images/common/btn_logout.png}" alt="LogOut" th:title="#{lbl.logOuts}" /></a></li>
 				<!-- 즐겨찾기 버튼 및 클릭시 나오는 화면 끝 -->
 			</ul>
 			</div>
@@ -55,7 +55,9 @@
 	  	<header class="hdt2">
 		    <h1><a th:href="@{/th/auth/goPortal}"><img th:src="@{/statics/images/common/logo.png}" alt="WonIk"></a></h1>
 			<nav id="gnb"><h2><a href="#" onclick="fn_leftClose();return false;"><img id="btnNav" th:src="@{/statics/images/common/btn_nav.gif}" alt=""></a></h2></nav>
+			
 			<th:block th:replace="~{th/layout/fragments/menu :: menuHiddenFragment}"></th:block>
+	  	
 	  	</header>
 	</div>
 	<div id="tt" class="easyui-tabs" style="width:100%;"></div>
@@ -300,8 +302,6 @@
 		function createFrame(title, menuCd, menuUrl, args, frameMenuCd) {
 			frameMenuCd = frameMenuCd || menuCd;
 			
-			console.log("11111",frameMenuCd);
-			
 			if ($("iframe").length > 10) {
 				alert(/*[[#{msg.availableToOpenMax10Tabs.}]]*/'');
 				return; //tab 10개까지만 구성	
@@ -330,8 +330,6 @@
 			$("#menuForm").attr("onSubmit","return true");
 		    $("#menuForm").attr("action",GV_CONTEXT_PATH + "/th/common/goFrame");
 		    $("#menuForm").attr("target",frameMenuCd);
-		    
-		    console.log("22222",frameMenuCd);
 		    
 		    $("#menuForm").submit().attr("onSubmit","return false");
 		}

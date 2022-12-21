@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:fragment="filterMonthSumFragment">
+<ul class="treeNav">
+	<li><a id="btnMonthOut" href="#" style="display:none;">MonthOut</a></li>
+	<li><a id="btnMonth" href="#">Month</a></li>
+	<li><a id="btnSum" href="#">Omit Sum</a></li>
+	<li><a id="btnOmit0" href="#">Omit 0</a></li>
+</ul>
+</th:block>
+
+<th:block th:fragment="filterViewHorizonMonthFragment">
+<div id="view_Her">
+	<strong class="filter_tit" id="filter_tit">View Horizon</strong>
+	<div class="tlist">
+		<div class="tit" th:text="#{lbl.month}"></div>
+		<input type="text" id="fromMon" name="fromMon" class="iptdate datepicker2 monthpicker" value="2016-08"/> <span class="ihpen">~</span>
+		<input type="text" id="toMon" name="toMon" class="iptdate datepicker2 monthpicker" value="2016-12"/>
+	</div>
+</div>
+</th:block>
+
+</html>

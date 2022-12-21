@@ -334,11 +334,11 @@
    		var userLang = $("#userLang").val();
    		var cData1=0, cData2=0, cData3=0, cData4=0, cDataT=0, cDataTT=0, cDataC="green_f";
    		
-   		if(userLang == "ko"){
+   		if (userLang == "ko") {
    			unit = 100000000;
    			roundNum = 0;
    			format = "y:,.0f";
-   		}else if(userLang == "en" || userLang == "cn"){
+   		} else if (userLang == "en" || userLang == "cn") {
    			unit = 1000000000;
    			roundNum = 1;
    			format = "y:,.1f";
@@ -358,7 +358,6 @@
    			var yRateCls,mRateCls;
    			var tmpAmt1 = "", tmpAmt2 = "";
    			$.each(dBiz, function(n,v) {
-   				
    				rAmtY    = gfn_getNumberFmt(v.RESULT_AMT_Y / unit, roundNum,'R','Y');
    				rAmtM    = gfn_getNumberFmt(v.RESULT_AMT_M / unit, roundNum,'R','Y');
    				yRate    = gfn_getNumberFmt(v.AMT_Y_RATE, 0,'R','Y');
@@ -392,7 +391,6 @@
    		//제품 재고 현황 
    		var arMonth = new Array();
    		var tmpInvData = new Array();
-
    		$.each (bucket.month, function (i, el) {
    			arMonth.push(el.DISMONTH);
    		});
@@ -457,7 +455,7 @@
    			columnData.push({name: v.TEAM_NM, y: gfn_getNumberFmt(v.DEF_RATE, 2, 'R')});
    			lineData.push({name: v.TEAM_NM, y: gfn_getNumberFmt(v.TARGET_DEF_RATE, 2, 'R')});
    			
-   			if(n == 0){
+   			if (n == 0) {
    				targetDefRate = gfn_getNumberFmt(v.ATTAIN_RATE, 0,'R');
    				defDataC = v.CHART_C;
    				maxData = v.MAX_DATA;
@@ -530,12 +528,11 @@
    			}
    		});
    		
-   		
    		//5.출하 예상
    		//set Data
    		var cData5 = 0, cData6 = 0; 
    		cData1=0, cData2=0, cData3=0, cData4=0, cDataT=0, cDataC="green_f";
-   		if(userLang == "ko"){
+   		if (userLang == "ko") {
    			if (!gfn_isNull(chartMap.ACTION_PLAN)) {
    	    		cData1 = gfn_getNumberFmt(chartMap.ACTION_PLAN.CHART_1 / unit, 0,'R');  
    	    		cData2 = gfn_getNumberFmt(chartMap.ACTION_PLAN.CHART_2 / unit, 0,'R');  
@@ -546,7 +543,7 @@
    	    		cDataT = Number(chartMap.ACTION_PLAN.CHART_T.toFixed(0));
    	    		cDataC = chartMap.ACTION_PLAN.CHART_C;
    	    	}
-   		}else if(userLang == "en" || userLang == "cn"){
+   		} else if(userLang == "en" || userLang == "cn") {
    			if (!gfn_isNull(chartMap.ACTION_PLAN)) {
    	    		cData1 = gfn_getNumberFmt(chartMap.ACTION_PLAN.CHART_1 / unit, 1,'R');  
    	    		cData2 = gfn_getNumberFmt(chartMap.ACTION_PLAN.CHART_2 / unit, 1,'R');  
@@ -590,24 +587,22 @@
    		    tooltip: {
    		    	enabled: false,
    		        formatter: function() {
-   		        	
    		        	var x = this.x;
    		        	var result = "";
-   		        	
-   		        	if(x == flag){
-   		        		if(this.colorIndex == 0 || this.colorIndex == 2){
+   		        	if (x == flag) {
+   		        		if (this.colorIndex == 0 || this.colorIndex == 2) {
    		        			result = /*[[#{lbl.cpfrY}]]*/'';
-   			        	}else{
+   			        	} else {
    			        		result = /*[[#{lbl.cpfrN}]]*/'';
    			        	}
-   		        	}else{
-   		        		if(this.colorIndex == 0){
+   		        	} else {
+   		        		if (this.colorIndex == 0) {
    		        			result = /*[[#{lbl.cpfrExpResult}]]*/'';
-   			        	}else if(this.colorIndex == 1){
+   			        	} else if (this.colorIndex == 1) {
    			        		result = /*[[#{lbl.mormalExpResult}]]*/'';
-   			        	}else if(this.colorIndex == 2){
+   			        	} else if (this.colorIndex == 2) {
    			        		result = /*[[#{lbl.cpfrResult}]]*/'';
-   			        	}else if(this.colorIndex == 3){
+   			        	} else if (this.colorIndex == 3) {
    			        		result = /*[[#{lbl.normalResult}]]*/'';
    			        	}
    		        	}
@@ -628,7 +623,7 @@
    		//7.주간 생산계획 준수율
    		//set Data
    		cData1=0, cData2=0, cData3=0, cData4=0, cDataT=0, cDataTT=0, cDataC="green_f";
-   		if(userLang == "ko"){
+   		if (userLang == "ko") {
    			if (!gfn_isNull(chartMap.PROD_COMP)) {
    	    		cData1  = gfn_getNumberFmt(chartMap.PROD_COMP.CHART_1 / unit, 0,'R');  
    	    		cData2  = gfn_getNumberFmt(chartMap.PROD_COMP.CHART_2 / unit, 0,'R');  
@@ -636,7 +631,7 @@
    	    		cDataTT = Number(chartMap.PROD_COMP.CHART_TT.toFixed(0));
    	    		cDataC  = chartMap.PROD_COMP.CHART_C;
    	    	}
-   		}else if(userLang == "en" || userLang == "cn"){
+   		} else if (userLang == "en" || userLang == "cn") {
    			if (!gfn_isNull(chartMap.PROD_COMP)) {
    	    		cData1  = gfn_getNumberFmt(chartMap.PROD_COMP.CHART_1 / unit, 1,'R');  
    	    		cData2  = gfn_getNumberFmt(chartMap.PROD_COMP.CHART_2 / unit, 1,'R');  
@@ -673,7 +668,7 @@
 
    		//8.주간 출하계획 준수율
    		cData1=0, cData2=0, cData3=0, cData4=0, cDataT=0, cDataTT=0, cDataC="green_f";
-   		if(userLang == "ko"){
+   		if (userLang == "ko") {
    			if (!gfn_isNull(chartMap.SALES_COMP)) {
    	    		cData1  = gfn_getNumberFmt(chartMap.SALES_COMP.CHART_1 / unit, 0,'R');  
    	    		cData2  = gfn_getNumberFmt(chartMap.SALES_COMP.CHART_2 / unit, 0,'R');
@@ -684,9 +679,7 @@
    	    		cDataC  = chartMap.SALES_COMP.CHART_C;
    	    	}
    			
-   			
-   		}else if(userLang == "en" || userLang == "cn"){
-   			
+   		} else if(userLang == "en" || userLang == "cn") {
    			if (!gfn_isNull(chartMap.SALES_COMP)) {
    	    		cData1  = gfn_getNumberFmt(chartMap.SALES_COMP.CHART_1 / unit, 1,'R');
    	    		cData2  = gfn_getNumberFmt(chartMap.SALES_COMP.CHART_2 / unit, 1,'R');
@@ -802,8 +795,6 @@
    	}
 
    	function companyConsSearch(sqlFlag){
-   		
-   		
    		FORM_SEARCH = {}
    		FORM_SEARCH.unitQuery = unitQuery;
    		FORM_SEARCH.PORTAL_YN = "Y";
@@ -817,10 +808,8 @@
    			url	 : GV_CONTEXT_PATH + "/biz/obj",
    			data	: FORM_SEARCH,
    			success : function(data) {
-   				
    				var arMonth = new Array();
    				var tmpInvData = new Array();
-
    				$.each (bucket.month, function (i, el) {
    					arMonth.push(el.DISMONTH);
    				});
@@ -854,8 +843,7 @@
    		gfn_service(sMap, "obj");
    	}
 
-   	function weekMaterialsAvailSearch(sqlFlag){
-   		
+   	function weekMaterialsAvailSearch(sqlFlag) {
    		FORM_SEARCH = {}
    		FORM_SEARCH.unitQuery = unitQuery;
    		FORM_SEARCH.PORTAL_YN = "Y";
@@ -865,19 +853,16 @@
    			{outDs : "weekMaterialsAvail", _siq : "dashboard.portal.weekMaterialsAvail"}
    		];
    		var xAxisCategories = [];
-   		if ($(':radio[name=weekMaterialsAvail]:checked').val()=='') {
+   		if ($(':radio[name=weekMaterialsAvail]:checked').val() == '') {
    			xAxisCategories = [ /*[[#{lbl.target}]]*/,/*[[#{lbl.actual}]]*/ ];
    		} else {
    			xAxisCategories = [ /*[[#{lbl.target}]]*/,/*[[#{lbl.actual}]]*/ ];
    		}
    		
-   		
    		var sMap = {
    			url	 : GV_CONTEXT_PATH + "/biz/obj",
    			data	: FORM_SEARCH,
    			success : function(data) {
-   				
-   				
    				chartId = "chartMatPrepRate";
    		    	chartTxt = $("#chartMatPrepRate_changeRate");
    		    	chartTxt.empty();
@@ -906,8 +891,6 @@
    			}
    		}
    		gfn_service(sMap, "obj");	
-   		
-   		
    	}
 
    	function fn_goDashboard(gubun) {

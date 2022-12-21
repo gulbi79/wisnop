@@ -85,7 +85,7 @@
 		var params = params || {}; //재정의
 		params.popupYn = "Y";
 	
-		var url = GV_CONTEXT_PATH + "/common/popup/pdfViewerPopup";
+		var url = GV_CONTEXT_PATH + "/th/common/popup/pdfViewerPopup";
 		var popupTitle = params.popupTitle || "PDF Viewer";
 		var pWidth = params.width || 1200;
 		var pHeight = params.height || 800;
@@ -97,10 +97,6 @@
 		window.open('', 'pdf_popup', popOption);
 		
 		//동적 hidden 데이터 생성
-		var elem = $("#pdfPopForm > input[type='hidden']");
-		$.each(elem, function(n,v) {
-			if (v.name != "_csrf") $(v).remove();
-		});
 		$.each(params, function(n, v) {
 		    $("#pdfPopForm").append('<input type="hidden" name="'+n+'" value="'+v+'" />');
 		});
@@ -151,13 +147,13 @@
 		$("#userTimeInt").val(userTimeInt+1);
 		
 		$("#mainForm").attr("onSubmit","return true");
-	    $("#mainForm").attr("action",GV_CONTEXT_PATH + "/common/godashboard");
+	    $("#mainForm").attr("action",GV_CONTEXT_PATH + "/th/common/godashboard");
 	    $("#mainForm").submit().attr("onSubmit","return false");
 	}
 	
 	function fn_goLogOut() {
 	    $("#mainForm").attr("onSubmit","return true");
-	    $("#mainForm").attr("action",GV_CONTEXT_PATH + "$/login/logout");
+	    $("#mainForm").attr("action",GV_CONTEXT_PATH + "/th/auth/logout");
 	    $("#mainForm").submit().attr("onSubmit","return false");
 	}
 	</script>
@@ -184,7 +180,7 @@
 						<a href="#"><span class="down" th:text="${item2.MENU_NM}"></span></a>
 						<ul class="depth3" style="display:none;">
 						<th:block th:each="item3 : ${menuList}" th:if="${item3.MENU_LVL == 3 && item3.UPPER_MENU_CD == item2.MENU_CD}">
-							<li><a href="#" ><span th:menuCd="${item3.MENU_CD}" th:menuUrl="${item3.URL}" th:onclick="addTab(this.getAttribute('menuCd'),this.getAttribute('menuUrl'))" th:text="${item3.MENU_NM}"></span></a></li>
+							<li><a href="#" ><span th:menuCd="${item3.MENU_CD}" th:menuUrl="${item3.URL}" th:onclick="addTab('',this.getAttribute('menuCd'),this.getAttribute('menuUrl'))" th:text="${item3.MENU_NM}"></span></a></li>
 						</th:block>
 						</ul>
 					</li>

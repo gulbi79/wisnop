@@ -11,9 +11,9 @@
 	<link rel="stylesheet" th:href="@{/statics/css/style.css}" type="text/css" />
 	<link rel="stylesheet" th:href="@{/statics/css/themes/normalize.css}" type="text/css" />
 	
-	<th:block th:if="${popupYn =='Y'}">
-	<link rel="stylesheet" th:href="@{//statics/css/zTreeStyle/zTreeStyle.css}" type="text/css" />
-	<th:block th:if="${chartYn =='Y'}">
+	<th:block th:if="${popupYn !='Y'}">
+	<link rel="stylesheet" th:href="@{/statics/css/zTreeStyle/zTreeStyle.css}" type="text/css" />
+	</th:block>
 
 	<link th:href="@{/statics/js/quill/quill.snow.css}" rel="stylesheet"> 
     

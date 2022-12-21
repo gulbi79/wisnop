@@ -86,7 +86,7 @@ public class FileDownload {
 		String sFileNm    = (String)rtnList.get(0).get("FILE_NM");
 		String sFileNmOrg = (String)rtnList.get(0).get("FILE_NM_ORG");
 		
-//		sFilePath = PDF_FILE_PATH; //임시
+		sFilePath = PDF_FILE_PATH; //임시
 		
 		return createResponse(MediaType.APPLICATION_PDF, sFilePath+"\\"+sFileNm, sFileNmOrg);
 	}

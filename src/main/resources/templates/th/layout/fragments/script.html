@@ -8,7 +8,6 @@
    		var GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
 		var monthMessage = 'msg.filterMonth 사용하는곳 찾아야함';
 		var monthOutMessage = 'msg.filterMonthOut 사용하는곳 찾아야함';
-		
 	</script>
 	
 	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}"></script>
@@ -25,7 +24,7 @@
 	<script th:src="@{/statics/js/biz/gridutil.js}"></script>
 	<script th:src="@{/statics/js/biz/common.js}"></script>
 	
-	<th:block th:if="${popupYn == '' or popupYn == null}">
+	<th:block th:if="${popupYn} != 'Y'">
 	<script th:src="@{/statics/js/jquery/jquery.ztree.core.js}"></script>
 	<script th:src="@{/statics/js/jquery/jquery.ztree.excheck.js}"></script>
 	</th:block>
@@ -36,7 +35,7 @@
 	<script th:src="@{/statics/js/jquery/jquery.ui.monthpicker.js}"></script>
 	
 	<!-- Publish -->
-	<th:block th:if="${popupYn == '' or popupYn == null}">
+	<th:block th:if="${popupYn} != 'Y'">
 	<script th:src="@{/statics/js/pub/pubCommon.js}"></script>
 	</th:block>
 
@@ -45,7 +44,7 @@
 	<script th:src="@{/statics/js/jquery/jquery.inputmask.bundle.min.js}"></script>
 	
 	<!-- chart -->
-	<th:block th:if="${chartYn =='Y'}">
+	<th:block th:if="${chartYn} == 'Y'">
 	<script th:src="@{/statics/js/highcharts/highcharts.js}"></script>
 	<script th:src="@{/statics/js/highcharts/highcharts-more.js}"></script>
 	<script th:src="@{/statics/js/highcharts/heatmap.js}"></script>
@@ -55,19 +54,17 @@
 	<script th:src="@{/statics/js/quill/quill.js}"></script>
 	<script th:src="@{/statics/js/node_modules/quill-image-resize-module/image-resize.min.js}"></script>
 	<script th:src="@{/statics/js/node_modules/quill-image-drop-module/image-drop.min.js}"></script>
-</th:block>
-
-<th:block th:fragment="commonFormFragment(popupYn, siteMapYn)">
+	
 	<script th:inline="javascript">
 
-	/*[# th:if="${popupYn} == '' or ${popupYn} == null"]*/
+	/*[# th:if="${popupYn} != 'Y'"]*/
 	$(window).resize(function(event) {
 		var browser_width = window.innerWidth || document.body.clientWidth;
-		
 		if (browser_width < 450) {			
 			event.preventDefault();
 			return false;
-		}		
+		}
+		
 		gfn_tabresize();
 	}).resize();
 	/*[/]*/
@@ -96,7 +93,7 @@
 		
 		if ((typeof(enterSearchFlag) != "undefined" && enterSearchFlag == "Y") || tmpEnFlag == "Y") gfn_setEnterSearch();
 
-		/*[# th:if="${popupYn == '' or popupYn== null}"]*/
+		/*[-# th:if="${popupYn != 'Y'}"]*/
 		gfn_tabresize();
 		if($("#filterDv .scroll").hasVerticalScrollBar()){
 			selectorAWidth = "270px";
@@ -104,77 +101,38 @@
 			selectorAWidth = "249px";
 		}
 		gfn_tabresize();
-		/*[/]*/
+		/*[/-]*/
 	});
 	
-	/*[# th:if="${siteMapYn == 'Y'}"]*/
-	function fn_siteMap() {
-    	var menuHtml = '';
-		var tmpChk1 = false;
-		var tmpChk2 = false;
-		var dsMenu = gfn_getGlobal("DS_MENU");
-		$.each(dsMenu, function(n,v) {
-			
-			if (v.MENU_LVL == 1) {
-				menuHtml += '<h3>'+v.MENU_NM+'</h3>\n';
-				menuHtml += '<ul class="list_site">\n';
-			}
-				
-			tmpChk1 = false;
-			$.each(dsMenu, function(n2,v2) {
-				if (v.MENU_CD == v2.UPPER_MENU_CD && v2.MENU_LVL == 2) {
-					menuHtml += '	<li><a href="#">'+v2.MENU_NM+'</a>\n';
-					menuHtml += '		<ul>\n';
-					
-					tmpChk2 = false;
-					$.each(dsMenu, function(n3,v3) {
-						if (v2.MENU_CD == v3.UPPER_MENU_CD && v3.MENU_LVL == 3) {
-							menuHtml += '			<li><a href="javascript:gfn_newTab(\''+v3.MENU_CD+'\');">'+v3.MENU_NM+'</a></li>\n';
-							tmpChk2 = true;
-						} else if (tmpChk2 == true) {
-							menuHtml += '		</ul>\n';
-							menuHtml += '	</li>\n';
-							return false;
-						}
-					});
-					
-				} else if (tmpChk1 == true) {
-					return false;
-				}
-			});
-		});
-		if (menuHtml != "") menuHtml += '</ul>\n';
-		
-		$("#sitemappop .scroll").html(menuHtml);
-    }
-	/*[/]*/
 	</script>
-	
+</th:block>
+
+<th:block th:fragment="commonFormFragment(popupYn)">
 	<div>
-		<th:block th:if="${popupYn == '' or popupYn == null}">
+		<th:block th:if="${popupYn} != 'Y'">
 	   	<form id="commonForm" name="commonForm" method="POST" onSubmit="return false;">
-	       	<input type="hidden" id="menuCd" name="menuCd" th:value="${menuInfo.menuCd}" />
-	       	<input type="hidden" id="frameMenuCd" name="frameMenuCd" th:value="${menuInfo.frameMenuCd}" />
-	       	<input type="hidden" id="dimensionYn" name="dimensionYn" th:value="${menuInfo.dimensionYn}" />
-	       	<input type="hidden" id="measureYn" name="measureYn" th:value="${menuInfo.measureYn}" />
-	       	<input type="hidden" id="producthrcyYn" name="producthrcyYn" th:value="${menuInfo.producthrcyYn}" />
-	       	<input type="hidden" id="customerhrcyYn" name="customerhrcyYn" th:value="${menuInfo.customerhrcyYn}" />
-	       	<input type="hidden" id="salesOrghrcyYn" name="salesOrghrcyYn" th:value="${menuInfo.salesOrghrcyYn}" />
-	       	<input type="hidden" id="dimFixYn" name="dimFixYn" th:value="${menuInfo.dimFixYn}" />
-	       	<input type="hidden" id="saveYn" name="saveYn" th:value="${menuInfo.saveYn}" />
-	       	<input type="hidden" id="subMenuCnt" name="subMenuCnt" th:value="${menuInfo.subMenuCnt}" />
-	       	<input type="hidden" id="comBucketMask" name="comBucketMask" th:value="${menuInfo.comBucketMask}" />
-	       	<input type="hidden" id="menuType" name="menuType" th:value="${menuInfo.menuType}" />
-	       	<input type="hidden" id="menuParam" name="menuParam" th:value="${menuInfo.menuParam}" />
+	       	<input type="hidden" id="menuCd" name="menuCd" th:value="${menuInfo?.menuCd}" />
+	       	<input type="hidden" id="frameMenuCd" name="frameMenuCd" th:value="${menuInfo?.frameMenuCd}" />
+	       	<input type="hidden" id="dimensionYn" name="dimensionYn" th:value="${menuInfo?.dimensionYn}" />
+	       	<input type="hidden" id="measureYn" name="measureYn" th:value="${menuInfo?.measureYn}" />
+	       	<input type="hidden" id="producthrcyYn" name="producthrcyYn" th:value="${menuInfo?.producthrcyYn}" />
+	       	<input type="hidden" id="customerhrcyYn" name="customerhrcyYn" th:value="${menuInfo?.customerhrcyYn}" />
+	       	<input type="hidden" id="salesOrghrcyYn" name="salesOrghrcyYn" th:value="${menuInfo?.salesOrghrcyYn}" />
+	       	<input type="hidden" id="dimFixYn" name="dimFixYn" th:value="${menuInfo?.dimFixYn}" />
+	       	<input type="hidden" id="saveYn" name="saveYn" th:value="${menuInfo?.saveYn}" />
+	       	<input type="hidden" id="subMenuCnt" name="subMenuCnt" th:value="${menuInfo?.subMenuCnt}" />
+	       	<input type="hidden" id="comBucketMask" name="comBucketMask" th:value="${menuInfo?.comBucketMask}" />
+	       	<input type="hidden" id="menuType" name="menuType" th:value="${menuInfo?.menuType}" />
+	       	<input type="hidden" id="menuParam" name="menuParam" th:value="${menuInfo?.menuParam}" />
 	   	</form>
 	   	</th:block>
 	   	
 	   	<form id="commonPopForm" name="commonPopForm" method="POST" onSubmit="return false;">
 	   	</form>
 	   	
-	   	<th:block th:if="${popupYn != '' or popupYn != null}">
-       	<input type="hidden" id="menuCd" name="menuCd" value="${menuInfo.menuCd}" />
-   	   	<input type="hidden" id="saveYn" name="saveYn" value="${menuInfo.saveYn}" />
+	   	<th:block th:if="${popupYn} == 'Y'">
+       	<input type="hidden" id="menuCd" name="menuCd" th:value="${menuInfo?.menuCd}" />
+   	   	<input type="hidden" id="saveYn" name="saveYn" th:value="${menuInfo?.saveYn}" />
 	   	</th:block>
 	</div>
 	<div id="divFindPopup" class="popup" style="display:none"></div>

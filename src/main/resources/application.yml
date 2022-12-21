@@ -37,6 +37,7 @@ server:
     
     session:
       timeout: 120m
+      tracking-modes: cookie
       
     encoding:
       charset: UTF-8

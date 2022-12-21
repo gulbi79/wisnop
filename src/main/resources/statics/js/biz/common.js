@@ -118,7 +118,9 @@ function gfn_formLoad() {
 	gfn_setRoleBtn();
 	gfn_setLoadParams(); //파라미터 설정
 	gfn_setSearchRow(""); //초기화
-	gfn_formResize(); //폼 리사이즈
+	setTimeout(function() {
+		gfn_formResize(); //폼 리사이즈
+	},10);
 	gfn_getHrcy(); //하이라키 데이터 조회
 }
 
@@ -1922,6 +1924,46 @@ function gfn_pasteValueToLabel(grids, dp, colsArray){
 			}
 		};
 	}
+}
+
+function gfn_siteMap() {
+	var menuHtml = '';
+	var tmpChk1 = false;
+	var tmpChk2 = false;
+	var dsMenu = gfn_getGlobal("DS_MENU");
+	$.each(dsMenu, function(n,v) {
+		
+		if (v.MENU_LVL == 1) {
+			menuHtml += '<h3>'+v.MENU_NM+'</h3>\n';
+			menuHtml += '<ul class="list_site">\n';
+		}
+			
+		tmpChk1 = false;
+		$.each(dsMenu, function(n2,v2) {
+			if (v.MENU_CD == v2.UPPER_MENU_CD && v2.MENU_LVL == 2) {
+				menuHtml += '	<li><a href="#">'+v2.MENU_NM+'</a>\n';
+				menuHtml += '		<ul>\n';
+				
+				tmpChk2 = false;
+				$.each(dsMenu, function(n3,v3) {
+					if (v2.MENU_CD == v3.UPPER_MENU_CD && v3.MENU_LVL == 3) {
+						menuHtml += '			<li><a href="javascript:gfn_newTab(\''+v3.MENU_CD+'\');">'+v3.MENU_NM+'</a></li>\n';
+						tmpChk2 = true;
+					} else if (tmpChk2 == true) {
+						menuHtml += '		</ul>\n';
+						menuHtml += '	</li>\n';
+						return false;
+					}
+				});
+				
+			} else if (tmpChk1 == true) {
+				return false;
+			}
+		});
+	});
+	if (menuHtml != "") menuHtml += '</ul>\n';
+	
+	$("#sitemappop .scroll").html(menuHtml);
 }
 
 

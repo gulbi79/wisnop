@@ -202,7 +202,14 @@ function gfn_formResize() {
 }
 
 //callback 함수
-function gfn_availableSize(pWidth){
+function gfn_availableSize(pWidth) {
+	
+	if($("#filterDv .scroll").hasVerticalScrollBar()){
+		selectorAWidth = "270px";
+	} else {
+		selectorAWidth = "249px";
+	}
+	
 	if (pWidth){
 		selectorAWidth = pWidth;
 	} 
@@ -219,13 +226,18 @@ function gfn_tabresize(col) {
 	
 	/* 영역 지정 */
 	// col = 좌우분할화면 이동여부 / 좌우 분할 화면이 움직일때는 아래의 구문이 동작하면 안됨.
-	if (gfn_availableSize() != undefined && col!="col") {
+	
+	var availSize = gfn_availableSize();
+	
+	if (availSize != undefined && col!="col") {
 		if ($("#a").css("display") != "none") {  
 			// 브라우저가 IE8 일때는 document.documentElement.clientWidth 이걸로..			
 			var browser_width = window.innerWidth || document.body.clientWidth;
-			$('#a').css('width', gfn_availableSize()+'px');
-			// 25 는 영역외의 짜투리 값
-			$('#b').css('width', (browser_width - gfn_availableSize()-25)+'px');	
+			setTimeout(function() {
+				$('#a').css('width', availSize+'px');
+				// 25 는 영역외의 짜투리 값
+				$('#b').css('width', (browser_width - availSize-25)+'px');	
+			},10);
 		}
 	}
 

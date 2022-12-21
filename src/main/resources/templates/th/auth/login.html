@@ -12,7 +12,7 @@
     <div id="loginBox">
 		<div id="tbox">
 			<div class="thead">
-				<h1><a href="#"><img th:attr="src=@{/statics/images/common/logo_hd.png}" src="/statics/images/common/logo_hd.png" alt="WonIk"></a></h1>
+				<h1><a href="#"><img th:src="@{/statics/images/common/logo_hd.png}" src="/statics/images/common/logo_hd.png" alt="WonIk"></a></h1>
 				<h1 id="serverChk" style="text-align: center;font-size: 50px;display:none;">NEW개발서버</h1>
 			</div>
 			<form id="mainForm" name="mainForm" method="POST" th:action="@{/th/auth/submit}">
@@ -24,7 +24,7 @@
 			</form>
 		</div>
 	</div>
-	<script th:attr="src=@{/statics/js/jquery/jquery-3.1.0.min.js}" src="/statics/js/jquery/jquery-3.1.0.min.js"></script>
+	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}" src="/statics/js/jquery/jquery-3.1.0.min.js"></script>
 	<script th:inline="javascript">
    	const CONTEXT_PATH = "[(@{/})]"
 	const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
