@@ -8,28 +8,40 @@
 </head>
 <body id="framesb">
 	<div id="a" class="split content split-horizontal">
-		<form id="searchForm" name="searchForm">
-		
-		<!-- hidden form -->
-    	<th:block layout:fragment="searchFormHidden"></th:block>
-    
-		<div id="filterDv">
-			<div class="inner">
-				<h3>Filter</h3>
-				
-				<th:block th:replace="~{th/layout/fragments/filter :: filterMonthSumFragment}"></th:block>
-				
-				<div class="tabMargin"></div>
-				<div class="scroll">
-					<!-- filter scroll html -->
-	    			<th:block layout:fragment="filterScroll"></th:block>
-				</div>
-				<div class="bt_btn">
-					<a href="#" class="fl_app" id="btnSearch" th:text="#{lbl.search}"></a>
+        <div id="c" class="split content" th:if="${menuInfo.producthrcyYn == 'Y' or menuInfo.customerhrcyYn == 'Y' or menuInfo.salesOrghrcyYn == 'Y'}">
+		 	<!-- left tree -->
+        	<th:block th:replace="~{th/layout/fragments/leftTree :: treeFragment}"></th:block>
+        </div>
+        
+		<th:block th:if="${menuInfo.producthrcyYn == 'Y' or menuInfo.customerhrcyYn == 'Y' or menuInfo.salesOrghrcyYn == 'Y'}">
+        <div id="d" class="split content">
+		</th:block>
+        	<!-- left filter -->
+			<form id="searchForm" name="searchForm">
+			
+			<!-- hidden form -->
+	    	<th:block layout:fragment="searchFormHidden"></th:block>
+	    
+			<div id="filterDv">
+				<div class="inner">
+					<h3>Filter</h3>
+					
+					<th:block th:replace="~{th/layout/fragments/filter :: filterMonthSumFragment}"></th:block>
+					
+					<div class="tabMargin"></div>
+					<div class="scroll">
+						<!-- filter scroll html -->
+		    			<th:block layout:fragment="filterScroll"></th:block>
+					</div>
+					<div class="bt_btn">
+						<a href="#" class="fl_app" id="btnSearch" th:text="#{lbl.search}"></a>
+					</div>
 				</div>
 			</div>
+			</form>
+		<th:block th:if="${menuInfo.producthrcyYn == 'Y' or menuInfo.customerhrcyYn == 'Y' or menuInfo.salesOrghrcyYn == 'Y'}">
 		</div>
-		</form>
+		</th:block>
 	</div>
 	
 	<!-- contents -->

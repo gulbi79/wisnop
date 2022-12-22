@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" >
+
+<th:block th:fragment="treeFragment">
+<th:block th:if="${menuInfo.producthrcyYn == 'Y' or menuInfo.customerhrcyYn == 'Y' or menuInfo.salesOrghrcyYn == 'Y'}">
+	<div id="treewrap">
+		<div class="inner">
+			<div class="content_wrap">
+				<ul id="treeTab" class="treeNav">
+					<li><a id="treeTab1" href="#" th:class="${menuInfo.producthrcyYn == 'Y' ? 'on' : 'off'}">Product</a></li>
+					<li><a id="treeTab2" href="#" th:class="${menuInfo.customerhrcyYn == 'Y' ? 'on' : 'off'}">Customer</a></li>
+					<li><a id="treeTab3" href="#" th:class="${menuInfo.salesOrghrcyYn == 'Y' ? 'on' : 'off'}">Sales Org</a></li>
+				</ul>
+				<div class="treeborder">
+					<div class="scroll">
+						<div id="treeMenu1" class="zTreeDemoBackground left" th:style="${menuInfo.producthrcyYn == 'Y' ? 'display:;' : 'display:none;'}">
+							<ul id="treeProduct" class="ztree"></ul>
+						</div>
+						<div id="treeMenu2" class="zTreeDemoBackground left" th:style="${menuInfo.customerhrcyYn == 'Y' ? 'display:;' : 'display:none;'}">
+							<ul id="treeCustomer" class="ztree"></ul>
+						</div>
+						<div id="treeMenu3" class="zTreeDemoBackground left" th:style="${menuInfo.salesOrghrcyYn == 'Y' ? 'display:;' : 'display:none;'}">
+							<ul id="treeSalesOrg" class="ztree"></ul>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</th:block>
+
+<script th:inline="javascript">
+$(function() {
+	//input 이벤트 정의
+	$("#treewrap").bind("keydown", function() {
+		if (event.ctrlKey == true && event.keyCode == 70) {
+			var inHtml = '';
+			inHtml += '<div class="popup2" style="width:250px;" id="treeFind">';
+			inHtml += '	<div class="drag">';
+			inHtml += '	<div class="pop_tit">Find Hierarchy</div>';
+			inHtml += '	<div class="popCont" style="height:23px;">';
+			inHtml += '		<div class="view_combo">';
+			inHtml += '			<div class="ilist">';
+			inHtml += '				<input type="text" id="SEARCH_TREE" name="SEARCH_TREE" class="ipt" style="width:157px;"> <a onClick="gfn_findTree();" href="#" class="app">Find</a>';
+			inHtml += '			</div>';
+			inHtml += '		</div>';
+			inHtml += '	</div>';
+			inHtml += '	</div>';
+			inHtml += '	<a href="#" class="popClose"><img src="'+ GV_CONTEXT_PATH +'/statics/images/common/pop_close.png" alt=""></a>';
+			inHtml += '</div>';
+
+			$("#divTreeFindPopup").html(""); //초기화
+			$("#divTreeFindPopup").html(inHtml);
+			
+			$("#divTreeFindPopup").draggable({
+				containment: '#wrap', 
+				scroll: false,
+				handle:'.drag .pop_tit'
+			});
+			
+			$("#divTreeFindPopup").css('zIndex',99999);
+			$("#divTreeFindPopup").show();
+			$("#SEARCH_TREE").focus();
+			//$(".back_white").show();
+			$(".back_white").on("click", function() {
+				//$(".popup2").hide();
+				$("#divTreeFindPopup").hide();
+				$(".back_white").hide();
+			});
+
+			$(".popClose").click(function() {
+				$(".back_white").trigger("click");
+			});
+			
+			//text 초기화
+			$("#SEARCH_TREE").unbind();
+			$("#SEARCH_TREE").bind("keydown", function() {
+				if (event.keyCode == 13) {
+					gfn_findTree();
+					return false;
+				}
+				if (event.key == "Escape") {
+					$(".back_white").trigger("click");
+				}
+			});
+			
+			$("#divTreeFindPopup").click( function( e ) {
+		        return false;
+		    });
+
+			/*
+			var w = $("#divTreeFindPopup").height() / 2; // 레이어 팝업의 가로 길이의 절반
+			var h = $("#divTreeFindPopup").width() / 2; // 레이어 팝업의 세로 길이의 절반
+			$("#divTreeFindPopup").css("left", "calc(20% - "+w+"px)");
+			$("#divTreeFindPopup").css("top", "calc(35% - "+h+"px)");
+			*/
+			$("#divTreeFindPopup").css("left", $("#treewrap").width()+10);
+			$("#divTreeFindPopup").css("top", $("#treewrap").offset().top+25);
+			
+			return false;
+		}
+	});
+});
+
+function gfn_findTree() {
+	var person = $("#SEARCH_TREE").val();
+	if (gfn_isNull(person)) {
+		return false;
+	}
+	
+	var treeObj;
+	var treeTabId = $("#treeTab > li > .on")[0].id;
+	$.each(HRCY.mapHrcy, function(n,v) {
+		if (v.treeTabId == treeTabId) {
+			treeObj = gv_zTreeObj[v.id];
+		}
+	});
+	
+	var sNodeNm = "";
+	var sPath   = "";
+	var sIdx    = 0;
+	var sNodes = treeObj.getSelectedNodes();
+	if (sNodes.length > 0) {
+		sNodeNm = sNodes[0].name;
+		//sPath   = sNodes[0].PATH;
+		sPath   = sNodes[0].pId;
+		sIdx    = Number(sNodes[0].ROW_IDX);
+	}
+	
+   	var nodes = treeObj.getNodesByParamFuzzy("name", person, null);
+	var selIdx = -1;
+	var wrapFlag = true;
+	if (!gfn_isNull(sPath)) {
+		$.each(nodes, function(n,v) {
+			selIdx++;
+			if (sIdx < Number(v.ROW_IDX)) {
+				wrapFlag = false;
+				return false;
+			}
+		});
+
+		if (wrapFlag == true) {
+			selIdx = -1;
+			$.each(nodes, function(n,v) {
+				selIdx++;
+				if (sIdx >= Number(v.ROW_IDX)) {
+					return false;
+				}
+			});
+		}
+	}
+	
+	if (selIdx == -1) selIdx = 0;
+	
+	if (nodes.length == 0) {
+		alert(/*[[#{msg.noDataFound}]]*/'', function() {
+			$("#treewrap").attr("tabindex", -1).focus();
+		});
+	} else {
+	   	treeObj.selectNode(nodes[selIdx]);
+	}
+   	
+   	return false;
+}
+</script>
+</th:block>
+</html>

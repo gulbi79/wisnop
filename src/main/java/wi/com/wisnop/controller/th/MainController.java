@@ -1,6 +1,5 @@
 package wi.com.wisnop.controller.th;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -12,11 +11,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,8 +39,8 @@ public class MainController {
     @Autowired
     private CommonService commonService;
 
-    @Autowired
-    private MessageSource messageSource;
+//    @Autowired
+//    private MessageSource messageSource;
     
     @RequestMapping(value = "/godashboard", method = RequestMethod.POST)
 	public ModelAndView goDashBoard(@RequestParam Map<String, Object> paramMap
@@ -93,7 +89,7 @@ public class MainController {
 		List<Object> isSalesTeamList = commonService.getList(paramMap);
 		SessionUtil.setAttribute("isSalesTeam",isSalesTeamList);
 		
-		mav.setViewName("th/layout/layout");
+		mav.setViewName("th/frame/layout");
 		return mav;
 	}
     
@@ -110,7 +106,7 @@ public class MainController {
     @RequestMapping(value = "/goFrame", method = RequestMethod.POST)
 	public ModelAndView goFrame(@RequestParam Map<String, Object> paramMap) {
 		ModelAndView mav = new ModelAndView();
-		mav.setViewName("th/layout/tab_frame");
+		mav.setViewName("th/frame/tab_frame");
 		mav.addObject("paramMap",paramMap);
 		return mav;
 	}
@@ -181,13 +177,7 @@ public class MainController {
 	}
     
     
-	
-	
-	
-    
-    
-    
-
+	/*
 	@RequestMapping(value = "/main", method = RequestMethod.GET)
 	public String home(Locale locale, Model model) {
 		return "index";
@@ -297,4 +287,5 @@ public class MainController {
 		hm.put("rtnMsg" ,messageSource.getMessage(msgKey, params, (Locale)SessionUtil.getAttribute(SessionLocaleResolver.LOCALE_SESSION_ATTRIBUTE_NAME)));
 		return hm;
 	}
+	*/
 }

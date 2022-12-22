@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+	  xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+	<th:block th:replace="~{th/layout/fragments/head :: headFragment('N')}"></th:block>
+	<!-- content script -->
+    <th:block layout:fragment="headStyle"></th:block>
+</head>
+<body id="framesb">
+	<!-- contents -->
+	<div id="grid1" class="fconbox">
+		<th:block th:replace="~{th/layout/fragments/commonLocation :: viewFragment}"></th:block>
+
+		<!-- 조회조건 -->
+		<div class="srhwrap">
+			<form id="searchForm" name="searchForm" method="POST">
+			
+			<!-- hidden form -->
+    		<th:block layout:fragment="searchFormHidden"></th:block>
+    		
+			<!-- search condition html -->
+   			<th:block layout:fragment="searchForm"></th:block>
+			
+			</form>
+
+			<div class="bt_btn">
+				<a id="btnSearch" href="#" class="fl_app" th:text="#{lbl.search}"></a>
+			</div>
+		</div>
+
+		<div class="scroll">
+			<th:block layout:fragment="contentScroll"></th:block>
+		</div>
+		
+		<!-- 하단버튼 영역 -->
+		<th:block layout:fragment="contentBottomButton"></th:block>
+			
+	</div>
+
+	<!-- hidden form -->
+	<th:block th:replace="~{th/layout/fragments/script :: commonFormFragment('N')}"></th:block>
+
+	<!-- 공통 script -->
+    <th:block th:replace="~{th/layout/fragments/script :: scriptFragment('N','Y')}"></th:block>
+
+	<!-- location 공통 script -->
+    <th:block th:replace="~{th/layout/fragments/commonLocation :: scriptFragment}"></th:block>
+
+	<!-- content script -->
+    <th:block layout:fragment="contentjs"></th:block>
+</body>
+</html>

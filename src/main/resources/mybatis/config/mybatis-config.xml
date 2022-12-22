@@ -11,6 +11,7 @@
         <setting name="defaultExecutorType" value="BATCH" /><!-- batch 처리 설정 -->
         <setting name="logImpl" value="SLF4J" /><!-- logging 구현체 -->
         <setting name="defaultScriptingLanguage" value="velocity"/>
+        <setting name="defaultFetchSize" value="500"/>
     </settings>
 
     <typeAliases>
