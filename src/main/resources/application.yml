@@ -33,7 +33,7 @@ server:
   shutdown: graceful
 
   servlet:
-    context-path: /
+    context-path: /wisnop
     
     session:
       timeout: 120m
