@@ -15,34 +15,41 @@
 </th:block>
 
 <!-- filter -->
-<th:block layout:fragment="filterScroll">
-	<div class="view_combo" id="divItem"></div>
-	<div class="view_combo" id="divProcurType"></div>
-	<div class="view_combo" id="divUpItemGroup"></div>
-	<div class="view_combo" id="divItemGroup"></div>
-	<div class="view_combo" id="divRoute"></div>
-	<div class="view_combo" id="divReptItemGroup"></div>
-	<div class="view_combo" id="divKey"></div>
-	<div class="view_combo" id="divFirst"></div>
-	<div class="view_combo" id="divItemType"></div>
+<th:block layout:fragment="filter">
 	
-	<th:block th:replace="~{th/layout/fragments/filter :: filterViewHorizonMonthFragment}"></th:block>
-	
-	<div class="view_combo">
-		<strong class="filter_tit">Column Widths</strong>
-		<div class="ilist">
-			<div class="itit" style="margin-left:5px;" th:text="#{lbl.ispQty}"></div>
-			<input type="text" id="txtIspW" name="txtIspW" class="ipt" maxlength="3" value="50" style="width:123px;">
-		</div>
-		<div class="ilist">
-			<div class="itit" style="margin-left:5px;" th:text="#{lbl.defectQty}"></div>
-			<input type="text" id="txtDefectW" name="txtDefectW" class="ipt" maxlength="3" value="50" style="width:123px;">
-		</div>
-		<div class="ilist">
-			<div class="itit" style="margin-left:5px;" th:text="#{lbl.defectRate}"></div>
-			<input type="text" id="txtRateW" name="txtRateW" class="ipt" maxlength="3" value="50" style="width:123px;">
+	<th:block th:replace="~{th/layout/fragments/filter :: filterMonthSumFragment}"></th:block>
+					
+	<div class="tabMargin"></div>
+	<div class="scroll">
+		<div class="view_combo" id="divItem"></div>
+		<div class="view_combo" id="divProcurType"></div>
+		<div class="view_combo" id="divUpItemGroup"></div>
+		<div class="view_combo" id="divItemGroup"></div>
+		<div class="view_combo" id="divRoute"></div>
+		<div class="view_combo" id="divReptItemGroup"></div>
+		<div class="view_combo" id="divKey"></div>
+		<div class="view_combo" id="divFirst"></div>
+		<div class="view_combo" id="divItemType"></div>
+		
+		<th:block th:replace="~{th/layout/fragments/filter :: filterViewHorizonMonthFragment}"></th:block>
+		
+		<div class="view_combo">
+			<strong class="filter_tit">Column Widths</strong>
+			<div class="ilist">
+				<div class="itit" style="margin-left:5px;" th:text="#{lbl.ispQty}"></div>
+				<input type="text" id="txtIspW" name="txtIspW" class="ipt" maxlength="3" value="50" style="width:123px;">
+			</div>
+			<div class="ilist">
+				<div class="itit" style="margin-left:5px;" th:text="#{lbl.defectQty}"></div>
+				<input type="text" id="txtDefectW" name="txtDefectW" class="ipt" maxlength="3" value="50" style="width:123px;">
+			</div>
+			<div class="ilist">
+				<div class="itit" style="margin-left:5px;" th:text="#{lbl.defectRate}"></div>
+				<input type="text" id="txtRateW" name="txtRateW" class="ipt" maxlength="3" value="50" style="width:123px;">
+			</div>
 		</div>
 	</div>
+	
 </th:block>
 
 <!-- grid 영역 -->
@@ -66,6 +73,7 @@
 		fn_initFilter();
 		fn_events();
 		fn_initGrid();
+		gfn_tabresize();
 	});
 	
 	var _siq = "quality.defectStatus";

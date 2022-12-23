@@ -118,9 +118,7 @@ function gfn_formLoad() {
 	gfn_setRoleBtn();
 	gfn_setLoadParams(); //파라미터 설정
 	gfn_setSearchRow(""); //초기화
-	setTimeout(function() {
-		gfn_formResize(); //폼 리사이즈
-	},10);
+	gfn_formResize(); //폼 리사이즈
 	gfn_getHrcy(); //하이라키 데이터 조회
 }
 

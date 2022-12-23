@@ -26,13 +26,9 @@
 				<div class="inner">
 					<h3>Filter</h3>
 					
-					<th:block th:replace="~{th/layout/fragments/filter :: filterMonthSumFragment}"></th:block>
-					
-					<div class="tabMargin"></div>
-					<div class="scroll">
-						<!-- filter scroll html -->
-		    			<th:block layout:fragment="filterScroll"></th:block>
-					</div>
+					<!-- filter html -->
+	    			<th:block layout:fragment="filter"></th:block>
+	    			
 					<div class="bt_btn">
 						<a href="#" class="fl_app" id="btnSearch" th:text="#{lbl.search}"></a>
 					</div>
@@ -64,6 +60,9 @@
 
 	<!-- location 공통 script -->
     <th:block th:replace="~{th/layout/fragments/commonLocation :: scriptFragment}"></th:block>
+    
+    <!-- left tree script -->
+   	<th:block th:replace="~{th/layout/fragments/leftTree :: treeScriptFragment}" th:if="${menuInfo.producthrcyYn == 'Y' or menuInfo.customerhrcyYn == 'Y' or menuInfo.salesOrghrcyYn == 'Y'}"></th:block>
 
 	<!-- content script -->
     <th:block layout:fragment="contentjs"></th:block>

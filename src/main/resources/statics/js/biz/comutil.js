@@ -8,7 +8,7 @@
 // 세로 스크롤바
 (function($) {
     $.fn.hasVerticalScrollBar = function() {
-        return this.get(0) ? this.get(0).scrollHeight > this.innerHeight() : false;
+        return this.get(0) ? this.get(0).scrollHeight > Math.round(this.innerHeight()) : false;
     }
 })(jQuery);
 
