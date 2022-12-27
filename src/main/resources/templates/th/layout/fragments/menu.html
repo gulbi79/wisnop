@@ -153,7 +153,7 @@
 	
 	function fn_goLogOut() {
 	    $("#mainForm").attr("onSubmit","return true");
-	    $("#mainForm").attr("action",GV_CONTEXT_PATH + "/th/auth/logout");
+	    $("#mainForm").attr("action",GV_CONTEXT_PATH + "/th/auth/logoutProc");
 	    $("#mainForm").submit().attr("onSubmit","return false");
 	}
 	</script>

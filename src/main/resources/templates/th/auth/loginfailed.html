@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
+<head>
+ 	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>로그인 실패</title>
+	
+	<link th:href="@{/statics/css/jquery-ui.css}" href="/statics/css/jquery-ui.css" rel="stylesheet" />
+	<link th:href="@{/statics/css/style.css}" href="/statics/css/style.css" rel="stylesheet"/>
+</head>
+<body>
+	<h1>로그인 실패</h1>
+	<hr>
+	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}" src="/statics/js/jquery/jquery-3.1.0.min.js"></script>
+	<script th:inline="javascript">
+   	const CONTEXT_PATH = "[(@{/})]"
+	const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
+	$(function() {
+		alert("로그인 실패!");
+		location.href = GV_CONTEXT_PATH + "/th/auth/loign";
+	});
+    </script>
+</body>
+</html>

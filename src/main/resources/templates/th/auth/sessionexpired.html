@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  	<!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  	<title>세션만료</title>
+  	
+  	<link th:href="@{/statics/css/jquery-ui.css}" href="/statics/css/jquery-ui.css" rel="stylesheet" />
+	<link th:href="@{/statics/css/style.css}" href="/statics/css/style.css" rel="stylesheet"/>
+</head>
+<body>
+	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}" src="/statics/js/jquery/jquery-3.1.0.min.js"></script>
+	
+    <script th:inline="javascript">
+    	const CONTEXT_PATH = "[(@{/})]"
+    	const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);
+    	alert("세션이 만료되었습니다.",function() {
+			top.location.replace(GV_CONTEXT_PATH + "th/auth/login");
+		});
+    </script>
+</body>
+</html>

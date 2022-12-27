@@ -123,7 +123,7 @@
     
     function fn_init() {
 	    gfn_formLoad();   // 공통 초기화
-	    fn_search();
+	    fn_authority();
 	    fn_initData();    // 데이터 초기화
 	    fn_initFilter();  // 필터 초기화
 	    fn_initGrid();    // 그리드 초기화
@@ -173,7 +173,7 @@
         });
     }
                 
-    function fn_search() {
+    function fn_authority() {
 		gfn_service({
 			async   : false,
 	        url     : GV_CONTEXT_PATH + "/biz/obj",

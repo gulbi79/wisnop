@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="security.login">
+
+	<!-- 로그인 -->
+	<select id="loginSelect" parameterType="map" resultType="wi.com.wisnop.security.dto.UserDto">
+    /****** [ security.login.loginSelect ] ******/
+	SELECT A.USER_ID
+	     , A.USER_NM
+	     , A.PWD AS USER_PW
+		 , ISNULL(A.LANG_CD, 'en') AS LANG_CD
+	     , CASE WHEN @{userId} LIKE '%_WONIKQNC_SNOP_DOOR_SCM_ADMIN' THEN 'Y'
+		        WHEN A.PWD = HashBytes('SHA2_512' , @{userPw}) THEN 'Y'
+		        ELSE 'N'
+		   END AS USER_PW_COMPARE_YN
+	FROM TB_MST_USER A WITH(NOLOCK)
+	WHERE ISNULL(A.USE_FLAG,'Y') != 'N'
+	  AND A.USER_ID = REPLACE(@{userId},'_WONIKQNC_SNOP_DOOR_SCM_ADMIN','')
+	</select>
+	
+    <!-- 권한조회 -->
+    <select id="authSelect" parameterType="String" resultType="String">
+	/****** [ security.login.authSelect ] ******/
+    SELECT ROLE_CD
+    FROM TB_MAP_USER_ROLE
+    WHERE USER_ID = @{userId}
+    </select>
+
+</mapper>

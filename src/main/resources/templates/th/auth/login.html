@@ -17,8 +17,8 @@
 			</div>
 			<form id="mainForm" name="mainForm" method="POST" th:action="@{/th/auth/submit}">
 			<div class="frm">
-				<div class="fst"><input type="text"  id="userId" name="userId" placeholder="ID"/></div>
-				<div class="fst"><input type="password" id="userPw" name="userPw" placeholder="PASSWORD"/></div>
+				<div class="fst"><input type="text"  id="username" name="username" placeholder="ID"/></div>
+				<div class="fst"><input type="password" id="password" name="password" placeholder="PASSWORD"/></div>
 			</div>
 			<a href="#" id="loginSubmitBtn" class="btn_login">LOGIN</a>
 			</form>
@@ -36,37 +36,18 @@
 			$("#serverChk").show();
 		}
 		
-		/*[# th:if="${loginMap} != null and ${loginMap.get('errCode')} == '-1'"]*/
-	    	alert(/*[[${loginMap.get('errMsg')}]]*/'');
-			$("#userId").val(/*[[${loginMap.get('userId')}]]*/'');
-			$("#userPw").focus();
-	    /*[/]*/
-	    
-	    /*[# th:if="${loginMap} != null and ${loginMap.get('errCode')} == '-3'"]*/
-			$("#userPw").val('${loginMap.userPw}');
-			alert(/*[[${loginMap.get('errMsg')}]]*/'');
-			//$("#cfnDiv").show();
-			//$("#userPw").val("");
-			$("#userPw").focus();
-		/*[/]*/
-		
-		let session = /*[[${session}]]*/'';
-		if (session.GV_USER_ID) {
-			location.href = GV_CONTEXT_PATH + "/th/auth/goPortal";
-		}
-		
 	    $("#loginSubmitBtn").on("click",function() {
-	    	const userId = $("#userId").val();
-	    	const userPw = $("#userPw").val();
+	    	const userId = $("#username").val();
+	    	const userPw = $("#password").val();
 	    	if (userId == undefined || userId == null || userId == "") {
 	    		alert("아이디를 입력해주세요!");
-	    		$("#userId").focus();
+	    		$("#username").focus();
 	    		return; 
 	    	}
 	    	
 	    	if (userPw == undefined || userPw == null || userPw == "") {
 	    		alert("패스워드를 입력해주세요!");
-	    		$("#userPw").focus();
+	    		$("#password").focus();
 	    		return; 
 	    	}
 	    	
@@ -75,7 +56,7 @@
 	    
 	    $('form input').keydown(function (e) {
 	        if (e.keyCode == 13) {
-	        	if (this.id == "userPw") {
+	        	if (this.id == "password") {
 	        		$("#loginSubmitBtn").trigger("click");
 	        	} else {
 		        	var inputs = $(this).parents("form").eq(0).find(":input");
