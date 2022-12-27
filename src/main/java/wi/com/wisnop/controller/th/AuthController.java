@@ -46,9 +46,6 @@ public class AuthController {
 
     @GetMapping("/login")
     public ModelAndView loginView(@AuthenticationPrincipal UserVO uservo) {
-//    	if (uservo != null && !StringUtils.isEmpty(uservo.getUserId())) return "redirect:/home";
-//    	else return "th/auth/login";
-    	
     	ModelAndView mav = new ModelAndView();
     	mav.setViewName("th/auth/login");
     	return mav;
@@ -80,7 +77,6 @@ public class AuthController {
 		setSNOPLogin(request, mav, paramMap, rtnMap, userDto);
     	mav.addObject("loginMap",rtnMap);
     	
-//    	mav.setViewName("th/auth/login");
     	mav.setViewName("redirect:/th/auth/goPortal");
 
     	return mav;
@@ -124,40 +120,14 @@ public class AuthController {
     private void setSNOPLogin(HttpServletRequest request, ModelAndView mav, 
 			Map<String, Object> paramMap, Map<String, Object> rtnMap, UserDetailsDto userDto) throws Exception {
 		paramMap.put("userPw"    ,userDto.getUserPw());
-		
 //		//user 정보조회
 		UserVO userVo = loginService.getLogin(paramMap);
-		
-		//사용자 아이디가 없음
-//    	if (userVo == null || StringUtils.isEmpty(userVo.getUserId())) {
-//    		rtnMap.put("errCode", -1);
-//    		rtnMap.put("errMsg", "로그인 사용자가 없습니다.");
-//    		
-//    	} else {
-    		//비밀번호 일치
-//			if ("Y".equals(userVo.getPwCompareYn())) {
-				setSessionInit(request, userVo, mav, paramMap, userDto);
-				mav.setViewName("redirect:/th/auth/goPortal");
-
-//			} else if (StringUtils.isEmpty(userVo.getPwd())) {
-//				rtnMap.put("errCode", -3);
-//				rtnMap.put("errMsg", "최초등록자용자입니다. 패스워드를 한번더 입력해주십시오.");
-//				rtnMap.put("userPw", paramMap.get("userPw").toString());
-//					
-//			} else {
-//				rtnMap.put("errCode", -1);
-//				rtnMap.put("errMsg", "비밀번호가 다릅니다.");
-//			}
-//    	}
+		setSessionInit(request, userVo, mav, paramMap, userDto);
 	}
     
     //세션 초기화 및 재정의
   	private void setSessionInit(HttpServletRequest request, UserVO userVo
   			, ModelAndView mav, Map<String, Object> paramMap, UserDetailsDto userDto) throws Exception {
-  		
-//  		HttpSession session = request.getSession();
-//  		session.invalidate(); //세션 삭제
-//  		SessionUtil.getSessionDestory(); //세션 삭제
   		
   		//개발모드 설정
   		SessionUtil.setAttribute(Namespace.DEV_MODE ,devMode);

@@ -12,8 +12,6 @@ import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
-import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -37,7 +35,7 @@ public class SecurityConfig {
         // 정적 자원에 대해서 Security를 적용하지 않음으로 설정
 //        return (web) -> web.ignoring().requestMatchers(PathRequest.toStaticResources().atCommonLocations());
     	return (web) -> web.ignoring().mvcMatchers(
-                "/v3/api-docs/**",
+                "/static/**",
                 "/statics/**" // 임시
         );
     }
@@ -52,14 +50,14 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        // [STEP1] 서버에 인증정보를 저장하지 않기에 csrf를 사용하지 않는다.
+        // 서버에 인증정보를 저장하지 않기에 csrf를 사용하지 않는다.
         http.csrf().disable();
 
         http.authorizeHttpRequests()
         	.antMatchers("/th/**").authenticated()
         	.anyRequest().permitAll();
         
-        // [STEP2] form 기반의 로그인
+        // form 기반의 로그인
         http.formLogin()
 	        .loginPage("/th/auth/login")
 	    	.loginProcessingUrl("/th/auth/submit")
@@ -67,10 +65,7 @@ public class SecurityConfig {
 	    	.failureUrl("/th/auth/loginFailed")
 			.permitAll(); 
 
-        // [STEP3] 토큰을 활용하는 경우 모든 요청에 대해 '인가'에 대해서 사용.
-//        http.authorizeHttpRequests((authz) -> authz.anyRequest().permitAll());
-
-        // [STEP4] Spring Security Custom Filter Load - Form '인증'에 대해서 사용
+        // Spring Security Custom Filter Load - Form '인증'에 대해서 사용
         http.addFilterBefore(customAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         // [STEP5] Session 기반의 인증설정
@@ -90,7 +85,7 @@ public class SecurityConfig {
         http.headers()
 			.frameOptions().sameOrigin();
 
-        // [STEP6] 최종 구성한 값을 사용함.
+        // 최종 구성한 값을 사용함.
         return http.build();
     }
     
@@ -140,8 +135,8 @@ public class SecurityConfig {
 //        filter.afterPropertiesSet();
         
 //        filter.setAuthenticationManager(authenticationManagerBean());
-        filter.setAuthenticationSuccessHandler(new SimpleUrlAuthenticationSuccessHandler("/hello"));
-        filter.setAuthenticationFailureHandler(new SimpleUrlAuthenticationFailureHandler("/login?error"));
+//        filter.setAuthenticationSuccessHandler(new SimpleUrlAuthenticationSuccessHandler("/th/auth/login"));
+//        filter.setAuthenticationFailureHandler(new SimpleUrlAuthenticationFailureHandler("/th/auth/denied"));
         
         return filter;
     }
@@ -166,16 +161,6 @@ public class SecurityConfig {
         return new CustomAuthFailureHandler();
     }
 
-    /**
-     * 로그인 인증 처리 메소드
-     * @param auth
-     * @throws Exception
-     */
-//    @Override
-//    public void configure(AuthenticationManagerBuilder auth) throws Exception {
-//        auth.userDetailsService(userService).passwordEncoder(new BCryptPasswordEncoder());
-//    }
-    
     // logout 후 login할 때 정상동작을 위함
     @Bean
     public SessionRegistry sessionRegistry() {

@@ -4,11 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import lombok.extern.slf4j.Slf4j;
-import wi.com.wisnop.common.constant.Namespace;
 import wi.com.wisnop.dao.CommonDao;
 import wi.com.wisnop.security.dto.UserDto;
 import wi.com.wisnop.security.service.UserService;
@@ -41,7 +39,6 @@ public class UserServiceImpl implements UserService {
     	Map param = new HashMap();
     	param.put("userId", userDto.getUserId());
     	param.put("userPw", userDto.getUserPw());
-    	UserDto userdto = (UserDto)commonDao.selectOne("security.login.loginSelect", param);
-        return Optional.of(userdto);
+        return Optional.ofNullable((UserDto)commonDao.selectOne("security.login.loginSelect", param));
     }
 }

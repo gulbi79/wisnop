@@ -12,6 +12,8 @@ import javax.servlet.http.HttpSession;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
@@ -84,7 +86,7 @@ public class LoginController {
 	}
 	
 	@RequestMapping(value = "/logout", method = RequestMethod.POST)
-	public ModelAndView logout(HttpServletRequest request) {
+	public ModelAndView logout(HttpServletRequest request, HttpServletResponse response) {
 		
 		ModelAndView mav = new ModelAndView();
 		mav.setViewName("login/login");
@@ -92,6 +94,9 @@ public class LoginController {
 		//세션 삭제
 		HttpSession session = request.getSession();
 		session.invalidate(); //세션 삭제
+		
+		//spring security logout
+		new SecurityContextLogoutHandler().logout(request, response, SecurityContextHolder.getContext().getAuthentication());
 		
 		Map<String, Object> rtnMap = new HashMap<String, Object>();
 		mav.addObject("loginMap",rtnMap);

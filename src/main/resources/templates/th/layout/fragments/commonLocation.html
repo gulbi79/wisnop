@@ -54,18 +54,18 @@
 			if (params.P_MENU_CD == "APS304") {
 				var vPlan = $('input[name="planSummary"]:checked').val();
 				if (vPlan == "PROD_PART_CD") {
-					gfn_doExportExcel({fileNm:"${menuInfo.menuNm}", conFirmFlag: lv_conFirmFlag, topView : true});
+					gfn_doExportExcel({fileNm: /*[[${menuInfo.menuNm}]]*/"", conFirmFlag: lv_conFirmFlag, topView : true});
 				} else if(vPlan == "REP_CUST_GROUP_CD"){
-					gfn_doExportExcel({fileNm:"${menuInfo.menuNm}", conFirmFlag: lv_conFirmFlag, gridIdx : 1, topView : true});
+					gfn_doExportExcel({fileNm:/*[[${menuInfo.menuNm}]]*/"", conFirmFlag: lv_conFirmFlag, gridIdx : 1, topView : true});
 				}
 			} else {
-				gfn_doExportExcel({fileNm:"${menuInfo.menuNm}", conFirmFlag: lv_conFirmFlag, topView : true});	
+				gfn_doExportExcel({fileNm:/*[[${menuInfo.menuNm}]]*/"", conFirmFlag: lv_conFirmFlag, topView : true});	
 			}
 		});
 		
 		if (params.P_MENU_CD == "APS405") {
 			$("#viewfnc7").show();
-			$(".viewfnc7").click("on", function() { gfn_doExportExcel({fileNm:"${menuInfo.menuNm}", conFirmFlag: lv_conFirmFlag, gridIdx : 1}); });
+			$(".viewfnc7").click("on", function() { gfn_doExportExcel({fileNm:/*[[${menuInfo.menuNm}]]*/"", conFirmFlag: lv_conFirmFlag, gridIdx : 1}); });
 		}
 		
 		$(".viewfnc6").click("on", function() { gfn_bookMark(); }); //즐겨찾기
@@ -76,8 +76,8 @@
 	            url        : "matRequirPlanDetailItemAll",
 	            width      : 1200,
 	            height     : 680,
-	            companyCd  : "${sessionScope.GV_COMPANY_CD}",
-	            buCd       : "${sessionScope.GV_BU_CD}",
+	            companyCd  : /*[[${session.GV_COMPANY_CD}]]*/"",
+	            buCd       : /*[[${session.GV_BU_CD}]]*/"",
 	            planId     : $('#planId').val(),
 	            
 	            procurType : $('#procurType').val(),
