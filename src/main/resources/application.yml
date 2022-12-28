@@ -57,9 +57,9 @@ spring:
     
   datasource1:
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
-    jdbc-url: ENC(DWKsmBz/S+wB6b/YI5ZDYdKfSvto0qvvfDNipUdsTfSrybgLZkzRo2w8N4s52mwj7mTCEvKBCy1bYGEEft8/SRcHPl5JLP+4xHXjVKV9K1Vp2WBHL2TWa7ZvzEyajjnH)
-    username: ENC(kNlVgvfcdBcMj/bo0FXONkXH26eW42NB)
-    password: ENC(ISkaG5TENa8AG08cbcAZl46aCcSaiN6T10GU7kgvK78=)
+    jdbc-url: ENC(KuwtIZTAL2GYqn6qweCip0iDZIJSG8XgnOi3NHVASI02drkx01MiQDlZ2mDyZpirzSfe7uob59dlFVmImroPqYhRxn/u+eCVJZ9plrCurlzAW5rAac/OtLftIhjqiW6Q)
+    username: ENC(9F6uHdLbUbEfDd2wQB8TaaRpfM1Hky5G)
+    password: ENC(bzQqoqWpcPxTnZXeFpoq0eBSZk5Flc6J2CX7aCDIaEc=)
     
   datasource2:
     driver-class-name: oracle.jdbc.OracleDriver
@@ -90,9 +90,9 @@ spring:
     
   datasource1:
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
-    jdbc-url: ENC(DWKsmBz/S+wB6b/YI5ZDYdKfSvto0qvvfDNipUdsTfSrybgLZkzRo2w8N4s52mwj7mTCEvKBCy1bYGEEft8/SRcHPl5JLP+4xHXjVKV9K1Vp2WBHL2TWa7ZvzEyajjnH)
-    username: ENC(kNlVgvfcdBcMj/bo0FXONkXH26eW42NB)
-    password: ENC(ISkaG5TENa8AG08cbcAZl46aCcSaiN6T10GU7kgvK78=)
+    jdbc-url: ENC(KuwtIZTAL2GYqn6qweCip0iDZIJSG8XgnOi3NHVASI02drkx01MiQDlZ2mDyZpirzSfe7uob59dlFVmImroPqYhRxn/u+eCVJZ9plrCurlzAW5rAac/OtLftIhjqiW6Q)
+    username: ENC(9F6uHdLbUbEfDd2wQB8TaaRpfM1Hky5G)
+    password: ENC(bzQqoqWpcPxTnZXeFpoq0eBSZk5Flc6J2CX7aCDIaEc=)
     
   datasource2:
     driver-class-name: oracle.jdbc.OracleDriver

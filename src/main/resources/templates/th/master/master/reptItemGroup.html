@@ -95,7 +95,7 @@
 		// 콤보박스
 		gfn_setMsComboAll([
 			{ target : 'divReptItemGroup' , id : 'reptItemGroup' , title : /*[[#{lbl.reptItemGroup}]]*/'' , data : codeReptMap    , exData:[] },
-			{ target : 'divUpItemGroup', id : 'upperItemGroup', title : /*[[#{lbl.upperItemGroup}]]*/'', data : upperCodeMap   , exData:[] },
+			{ target : 'divUpItemGroup'	  , id : 'upperItemGroup', title : /*[[#{lbl.upperItemGroup}]]*/'', data : upperCodeMap   , exData:[] },
 			{ target : 'divNewItemGroup'  , id : 'newItemGroup'  , title : /*[[#{lbl.newItemGroup}]]*/''  , data : codeMap.FLAG_YN, exData:[], type : "S" }
 		]);
 	}
@@ -297,7 +297,6 @@
 		
 		//그리드 데이터 조회
 		fn_getGridData(sqlFlag);
-		fn_getExcelData();
 	}
 	
 	//그리드 데이터 조회
@@ -320,6 +319,9 @@
 				dataProvider.savePoint();
 				// 그리드 데이터 건수 출력
 				gfn_setSearchRow(dataProvider.getRowCount());
+				
+				//excel download condition area
+				EXCEL_SEARCH_DATA = gfn_getExcelCondition($("#searchForm")); 
 			}
 		}, "obj");
 	}
@@ -392,65 +394,6 @@
 		return gfn_getGrdSaveCount(grdMain) == 0;
 	}
 	
-	function fn_getExcelData() {
-		/*
-		EXCEL_SEARCH_DATA = "";
-		var excelForm = $("#searchForm").serializeObject();
-		for (key in excelForm) {
-			let exTitle = $("#"+key).parent().parent().find(".itit").text();
-			let exValue = excelForm[key];
-			
-			EXCEL_SEARCH_DATA += (gfn_isNull(EXCEL_SEARCH_DATA) ? "" : "\n") + exTitle + " : " + exValue;
-		}
-		*/
-		
-		$.each($(".view_combo"), function(i, val){
-			var temp = "";
-			var id = gfn_nvl($(this).attr("id"), "");
-			
-			if(id != ""){
-				var name = $("#" + id + " .ilist .itit").html();
-				
-				//타이틀
-				if(i == 0){
-					EXCEL_SEARCH_DATA = name + " : ";	
-				}else{
-					EXCEL_SEARCH_DATA += "\n" + name + " : ";	
-				}
-				
-				//데이터
-				if(id == "divReptItemGroup"){
-					$.each($("#reptItemGroup option:selected"), function(i2, val2){
-						
-						var txt = gfn_nvl($(this).text(), "");
-						
-						if(i2 == 0){
-							temp = txt;								
-						}else{
-							temp += ", " + txt;
-						}
-					});		
-					EXCEL_SEARCH_DATA += temp;
-				}else if(id == "divUpItemGroup"){
-					$.each($("#upperItemGroup option:selected"), function(i2, val2){
-						
-						var txt = gfn_nvl($(this).text(), "");
-						
-						if(i2 == 0){
-							temp = txt;								
-						}else{
-							temp += ", " + txt;
-						}
-					});		
-					EXCEL_SEARCH_DATA += temp;
-				}else if(id == "divItemGroup"){
-					EXCEL_SEARCH_DATA += $("#itemGroup").val();
-				}else if(id == "divNewItemGroup"){
-					EXCEL_SEARCH_DATA += $("#newItemGroup option:selected").text();
-				}
-			}
-		});
-	}
 	</script>
 </th:block>
 </html>

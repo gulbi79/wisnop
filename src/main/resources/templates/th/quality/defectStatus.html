@@ -164,94 +164,6 @@
 		});
 	}
 	
-	function fn_excelSubSearch() {
-		$.each($(".view_combo"), function(i, val){
-			var temp = "";
-			var id = gfn_nvl($(this).attr("id"), "");
-			if (id != "") {
-				var name = $("#" + id + " .ilist .itit").html();
-				//타이틀
-				if (i == 0) {
-					EXCEL_SEARCH_DATA = name + " : ";	
-				} else {
-					EXCEL_SEARCH_DATA += "\n" + name + " : ";	
-				}
-				
-				//데이터
-				if (id == "divItem") {
-					EXCEL_SEARCH_DATA += $("#item_nm").val();
-				} else if (id == "divProcurType") {
-					$.each($("#procurType option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-							temp = txt;								
-						} else {
-							temp += ", " + txt;
-						}
-					});		
-					EXCEL_SEARCH_DATA += temp;
-				} else if(id == "divUpItemGroup") {
-					$.each($("#upItemGroup option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-							temp = txt;								
-						} else {
-							temp += ", " + txt;
-						}
-					});
-					EXCEL_SEARCH_DATA += temp;
-				} else if (id == "divItemGroup") {
-					$.each($("#itemGroup option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-							temp = txt;								
-						} else {
-							temp += ", " + txt;
-						}
-					});		
-					EXCEL_SEARCH_DATA += temp;
-				} else if (id == "divRoute") {
-					$.each($("#route option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-							temp = txt;								
-						} else {
-							temp += ", " + txt;
-						}
-					});
-					EXCEL_SEARCH_DATA += temp;
-				} else if (id == "divReptItemGroup") {
-					$.each($("#reptItemGroup option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-							temp = txt;								
-						} else {
-							temp += ", " + txt;
-						}
-					});
-					EXCEL_SEARCH_DATA += temp;
-				} else if (id == "divKey") {
-					EXCEL_SEARCH_DATA += $("#keyGroupYn option:selected").text();
-				} else if (id == "divFirst") {
-					EXCEL_SEARCH_DATA += $("#firstYn option:selected").text();
-				} else if (id == "divItemType") {
-					$.each($("#itemType option:selected"), function(i2, val2) {
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-							temp = txt;								
-						} else {
-							temp += ", " + txt;
-						}
-					});		
-					EXCEL_SEARCH_DATA += temp;
-				}
-			}
-		});
-		
-		EXCEL_SEARCH_DATA += "\n" + $("#view_Her .tlist .tit").html() + " : ";
-		EXCEL_SEARCH_DATA += $("#fromMon").val() + " ~ " + $("#toMon").val();
-	}
-	
 	// 조회
 	function fn_search() {
 		FORM_SEARCH._mtd     = "getList";
@@ -270,6 +182,18 @@
 					gfn_actionMonthSum(gridInstance);
 					gfn_setRowTotalFixed(grdMain);
 					fn_gridCallBack();
+					
+					//excel download condition area
+					EXCEL_SEARCH_DATA = gfn_getExcelCondition($("#searchForm"), function(id) {
+						let filterTitle = "";
+						switch(id) {
+							case "fromMon" :
+							case "toMon" :
+								filterTitle = "View Horizon(확정일 기준)"
+								break;
+						}
+						return filterTitle;
+					}); 
 				}
 			}
 		}
@@ -371,7 +295,6 @@
    		FORM_SEARCH.endYear	   = $("#toMon").val().substring(0,4);
    		
    		fn_search();
-		fn_excelSubSearch();
 	}
 
 	//그리드 접힘 펼침 처리

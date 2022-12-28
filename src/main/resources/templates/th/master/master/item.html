@@ -201,99 +201,6 @@
 		}, "obj");
 	}
             
-    function fn_excelSubSearch() {
-		EXCEL_SEARCH_DATA = "";
-        EXCEL_SEARCH_DATA += "Product" + " : ";
-        EXCEL_SEARCH_DATA += $("#loc_product").html();
-		$.each($(".view_combo"), function(i, val) {
-			var temp = "";
-            var id = gfn_nvl($(this).attr("id"), "");
-			if (id != "") {
-				var name = $("#" + id + " .ilist .itit").html();
-				//타이틀
-                EXCEL_SEARCH_DATA += "\n" + name + " : ";   
-                        
-                //데이터
-                if (id == "divItem") {
-					EXCEL_SEARCH_DATA += $("#item_nm").val();
-				
-                } else if (id == "divProcurType") {
-					$.each($("#procurType option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-							temp = txt;                             
-						} else {
-							temp += ", " + txt;
-						}
-					});     
-					EXCEL_SEARCH_DATA += temp;
-				
-                } else if (id == "divItemType") {
-					$.each($("#itemType option:selected"), function(i2, val2) {
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-                        	temp = txt;                             
-                        } else {
-                            temp += ", " + txt;
-                        }
-                    });     
-					EXCEL_SEARCH_DATA += temp;
-				
-                } else if (id == "divReptItemGroup") {
-					$.each($("#reptItemGroup option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-                        if (i2 == 0) {
-                        	temp = txt;                             
-                        } else {
-                            temp += ", " + txt;
-                        }
-                    });     
-                    EXCEL_SEARCH_DATA += temp;
-                
-                } else if (id == "divRoute") {
-                    $.each($("#route option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-						if (i2 == 0) {
-                        	temp = txt;                             
-                        } else {
-                            temp += ", " + txt;
-                        }
-                    });     
-                    EXCEL_SEARCH_DATA += temp;
-                    
-                } else if (id == "divRepCust") {
-                    EXCEL_SEARCH_DATA += $("#reptCust").val();
-                
-                } else if (id == "divRepCustGroup") {
-					$.each($("#reptCustGroup option:selected"), function(i2, val2){
-						var txt = gfn_nvl($(this).text(), "");
-                        if (i2 == 0) {
-                        	temp = txt;                             
-                        } else {
-                            temp += ", " + txt;
-                        }
-                    });     
-                    EXCEL_SEARCH_DATA += temp;
-                        
-                } else if (id == "divFireWorkYn") {
-					EXCEL_SEARCH_DATA += $("#fireworkYn option:selected").text();
-                } else if (id == "divCleaningYn") {
-					EXCEL_SEARCH_DATA += $("#cleaningYn option:selected").text();
-                } else if (id == "divLpYn") {
-					EXCEL_SEARCH_DATA += $("#lpYn option:selected").text();
-                } else if(id == "divOsYn") {
-					EXCEL_SEARCH_DATA += $("#osYn option:selected").text();
-                } else if (id == "divValidYn") {
-					EXCEL_SEARCH_DATA += $("#validYn option:selected").text();
-                } else if (id == "divValidYnERP") {
-					EXCEL_SEARCH_DATA += $("#validYnERP option:selected").text();
-                } else if (id == "divValiDate") {
-					EXCEL_SEARCH_DATA += $("#validDateFrom").val() + " ~ " + $("#validDateTo").val();
-                }
-            }
-		});
-	}
-            
 	function fn_initGrid() {
 		gridInstance = new GRID();
         gridInstance.init("realgrid");
@@ -619,12 +526,15 @@
 	                //fn_authority();
 	                fn_gridCallback(data.resList);
 	                func_setColumnProperty();
+	                
+	              	//excel download condition area
+					EXCEL_SEARCH_DATA = gfn_getExcelCondition($("#searchForm")); 
 	            }
 			}
         }
         gfn_service(aOption, "obj");
 	}
-            
+	
 	function fn_gridCallback(resList) {
 	    getReset.campus = [];
 	    getReset.campus2 = [];
@@ -869,7 +779,6 @@
         FORM_SEARCH.meaList    = MEASURE.user;
         
         fn_search();
-        fn_excelSubSearch();
     }
     
     function fn_save() {
