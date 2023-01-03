@@ -12,18 +12,20 @@ import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
-import wi.com.wisnop.security.filter.CustomAuthenticationFilter;
-import wi.com.wisnop.security.handler.CustomAuthFailureHandler;
-import wi.com.wisnop.security.handler.CustomAuthSuccessHandler;
+import lombok.RequiredArgsConstructor;
 import wi.com.wisnop.security.handler.CustomAuthenticationProvider;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+	
+	/* 로그인 실패 핸들러 의존성 주입 */
+    private final AuthenticationFailureHandler customFailureHandler;
 	
 	/**
      * 1. 정적 자원(Resource)에 대해서 인증된 사용자가  정적 자원의 접근에 대해 ‘인가’에 대한 설정을 담당하는 메서드이다.
@@ -54,21 +56,18 @@ public class SecurityConfig {
         http.csrf().disable();
 
         http.authorizeHttpRequests()
-        	.antMatchers("/th/**").authenticated()
+        	.antMatchers("/th/common/**").authenticated()
         	.anyRequest().permitAll();
         
         // form 기반의 로그인
         http.formLogin()
 	        .loginPage("/th/auth/login")
-	    	.loginProcessingUrl("/th/auth/submit")
-	    	.defaultSuccessUrl("/th/auth/loginAfter", true)
-	    	.failureUrl("/th/auth/loginFailed")
+	    	.loginProcessingUrl("/th/auth/loginProc")
+	    	.defaultSuccessUrl("/th/common/loginAfter", true)
+	    	.failureHandler(customFailureHandler) // 로그인 실패 핸들러
 			.permitAll(); 
-
-        // Spring Security Custom Filter Load - Form '인증'에 대해서 사용
-        http.addFilterBefore(customAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
-
-        // [STEP5] Session 기반의 인증설정
+        
+        // Session 기반의 인증설정
         http.sessionManagement()
 	        .maximumSessions(1)
 	        .maxSessionsPreventsLogin(false)
@@ -120,47 +119,7 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
     
-    /**
-     * 6. 커스텀을 수행한 '인증' 필터로 접근 URL, 데이터 전달방식(form) 등 인증 과정 및 인증 후 처리에 대한 설정을 구성하는 메서드입니다.
-     *
-     * @return CustomAuthenticationFilter
-     */
-    @Bean
-    public CustomAuthenticationFilter customAuthenticationFilter() {
-        CustomAuthenticationFilter filter = new CustomAuthenticationFilter(authenticationManager());
-//        filter.setFilterProcessesUrl("/th/auth/login");     // 접근 URL
-        
-//        filter.setAuthenticationSuccessHandler(customLoginSuccessHandler());    // '인증' 성공 시 해당 핸들러로 처리를 전가한다.
-//        filter.setAuthenticationFailureHandler(customLoginFailureHandler());    // '인증' 실패 시 해당 핸들러로 처리를 전가한다.
-//        filter.afterPropertiesSet();
-        
-//        filter.setAuthenticationManager(authenticationManagerBean());
-//        filter.setAuthenticationSuccessHandler(new SimpleUrlAuthenticationSuccessHandler("/th/auth/login"));
-//        filter.setAuthenticationFailureHandler(new SimpleUrlAuthenticationFailureHandler("/th/auth/denied"));
-        
-        return filter;
-    }
     
-    /**
-     * 7. Spring Security 기반의 사용자의 정보가 맞을 경우 수행이 되며 결과값을 리턴해주는 Handler
-     *
-     * @return CustomLoginSuccessHandler
-     */
-    @Bean
-    public CustomAuthSuccessHandler customLoginSuccessHandler() {
-        return new CustomAuthSuccessHandler();
-    }
-    
-    /**
-     * 8. Spring Security 기반의 사용자의 정보가 맞지 않을 경우 수행이 되며 결과값을 리턴해주는 Handler
-     *
-     * @return CustomAuthFailureHandler
-     */
-    @Bean
-    public CustomAuthFailureHandler customLoginFailureHandler() {
-        return new CustomAuthFailureHandler();
-    }
-
     // logout 후 login할 때 정상동작을 위함
     @Bean
     public SessionRegistry sessionRegistry() {

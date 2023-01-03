@@ -45,7 +45,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         // Spring Security - UserDetailsService를 통해 DB에서 아이디로 사용자 조회
         UserDetailsDto userDetailsDto = (UserDetailsDto) customUserDetailsService.loadUserByUsername(userId, userPw);
 
-        log.info("userDetailsDto.getUserPw() : {}, userPw : {}", userDetailsDto.getUserPw(), passwordEncoder.encode(userPw));
+//        log.info("userDetailsDto.getUserPw() : {}, userPw : {}", userDetailsDto.getUserPw(), passwordEncoder.encode(userPw));
         
         /* - 기존 db 암호화로 사용못함
         if (!this.passwordEncoder.matches(passwordEncoder.encode(userPw), userDetailsDto.getPassword())) {

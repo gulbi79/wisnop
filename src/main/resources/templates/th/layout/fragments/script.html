@@ -10,50 +10,50 @@
 		var monthOutMessage = 'msg.filterMonthOut 사용하는곳 찾아야함';
 	</script>
 	
-	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}"></script>
-	<script th:src="@{/statics/js/jquery/jquery.form.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery-3.1.0.min.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery.form.js}"></script>
 	
-	<script th:src="@{'/statics/js/realgrid/'+${@environment.getProperty('props.realgridLic')}+'.js'}"></script>
-	<script th:src="@{'/statics/js/realgrid/'+${@environment.getProperty('props.realgridjs')}+'.js'}"></script>
-	<script th:src="@{'/statics/js/realgrid/'+${@environment.getProperty('props.realgridapi')}+'.js'}"></script>
-	<script th:src="@{/statics/js/realgrid/RealGridSkins.js}"></script>
-	<script th:src="@{/statics/js/realgrid/jszip.min.js}"></script>
+	<script th:src="@{'/static/js/realgrid/'+${@environment.getProperty('props.realgridLic')}+'.js'}"></script>
+	<script th:src="@{'/static/js/realgrid/'+${@environment.getProperty('props.realgridjs')}+'.js'}"></script>
+	<script th:src="@{'/static/js/realgrid/'+${@environment.getProperty('props.realgridapi')}+'.js'}"></script>
+	<script th:src="@{/static/js/realgrid/RealGridSkins.js}"></script>
+	<script th:src="@{/static/js/realgrid/jszip.min.js}"></script>
 	
-	<script th:src="@{/statics/js/biz/comutil.js}"></script>
-	<script th:src="@{/statics/js/biz/objutil.js}"></script>
-	<script th:src="@{/statics/js/biz/gridutil.js}"></script>
-	<script th:src="@{/statics/js/biz/common.js}"></script>
+	<script th:src="@{/static/js/biz/comutil.js}"></script>
+	<script th:src="@{/static/js/biz/objutil.js}"></script>
+	<script th:src="@{/static/js/biz/gridutil.js}"></script>
+	<script th:src="@{/static/js/biz/common.js}"></script>
 	
 	<th:block th:if="${popupYn} != 'Y'">
-	<script th:src="@{/statics/js/jquery/jquery.ztree.core.js}"></script>
-	<script th:src="@{/statics/js/jquery/jquery.ztree.excheck.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery.ztree.core.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery.ztree.excheck.js}"></script>
 	</th:block>
 
-	<script th:src="@{/statics/js/jquery/jquery.blockUI.js}"></script>
-	<script th:src="@{/statics/js/jquery/multiple-select.js}"></script>
-	<script th:src="@{/statics/js/jquery/jquery-ui.js}"></script>
-	<script th:src="@{/statics/js/jquery/jquery.ui.monthpicker.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery.blockUI.js}"></script>
+	<script th:src="@{/static/js/jquery/multiple-select.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery-ui.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery.ui.monthpicker.js}"></script>
 	
 	<!-- Publish -->
 	<th:block th:if="${popupYn} != 'Y'">
-	<script th:src="@{/statics/js/pub/pubCommon.js}"></script>
+	<script th:src="@{/static/js/pub/pubCommon.js}"></script>
 	</th:block>
 
-	<script th:src="@{/statics/js/pub/datepicker.kr.js}"></script>
-	<script th:src="@{/statics/js/pub/split.js}"></script>
-	<script th:src="@{/statics/js/jquery/jquery.inputmask.bundle.min.js}"></script>
+	<script th:src="@{/static/js/pub/datepicker.kr.js}"></script>
+	<script th:src="@{/static/js/pub/split.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery.inputmask.bundle.min.js}"></script>
 	
 	<!-- chart -->
 	<th:block th:if="${chartYn} == 'Y'">
-	<script th:src="@{/statics/js/highcharts/highcharts.js}"></script>
-	<script th:src="@{/statics/js/highcharts/highcharts-more.js}"></script>
-	<script th:src="@{/statics/js/highcharts/heatmap.js}"></script>
-	<script th:src="@{/statics/js/highcharts/exporting.js}"></script>
+	<script th:src="@{/static/js/highcharts/highcharts.js}"></script>
+	<script th:src="@{/static/js/highcharts/highcharts-more.js}"></script>
+	<script th:src="@{/static/js/highcharts/heatmap.js}"></script>
+	<script th:src="@{/static/js/highcharts/exporting.js}"></script>
 	</th:block>
 	
-	<script th:src="@{/statics/js/quill/quill.js}"></script>
-	<script th:src="@{/statics/js/node_modules/quill-image-resize-module/image-resize.min.js}"></script>
-	<script th:src="@{/statics/js/node_modules/quill-image-drop-module/image-drop.min.js}"></script>
+	<script th:src="@{/static/js/quill/quill.js}"></script>
+	<script th:src="@{/static/js/node_modules/quill-image-resize-module/image-resize.min.js}"></script>
+	<script th:src="@{/static/js/node_modules/quill-image-drop-module/image-drop.min.js}"></script>
 	
 	<script th:inline="javascript">
 
@@ -72,7 +72,7 @@
 
 	//그리드 설정 ----------------------------------------------------------------
 	try {
-		RealGridJS.setRootContext(GV_CONTEXT_PATH + "/statics/js/realgrid");
+		RealGridJS.setRootContext(GV_CONTEXT_PATH + "/static/js/realgrid");
 	} catch(e) {
 		console.log(e);
 	}

@@ -5,8 +5,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 	<title>wonik qnc</title>
 	
-	<link th:href="@{/statics/css/jquery-ui.css}" href="/statics/css/jquery-ui.css" rel="stylesheet"/>
-	<link th:href="@{/statics/css/style.css}" href="/statics/css/style.css" rel="stylesheet"/>
+	<link th:href="@{/static/css/jquery-ui.css}" href="/static/css/jquery-ui.css" rel="stylesheet"/>
+	<link th:href="@{/static/css/style.css}" href="/static/css/style.css" rel="stylesheet"/>
 	
 	<style type="text/css">
 	#cont_chart .col_3 { margin:0; width:calc((100% - 14px) / 3) ; height:calc((100% - 4px) / 3); }
@@ -38,7 +38,7 @@
 	<div id="portal">
 		<header>
   			<div class="hd">
-				<h1><img th:attr="src=@{/statics/images/common/logo.png}" src="/statics/images/common/logo.png" alt="WonIk"></h1>
+				<h1><img th:attr="src=@{/static/images/common/logo.png}" src="/static/images/common/logo.png" alt="WonIk"></h1>
 			</div>
   		</header>
 	  	<div id="container" class="bg">
@@ -158,7 +158,7 @@
 			<div id="cont_right">
 				<div class="sel_tit">
 					<Strong th:text="${session.userInfo.userNm} + '님'"></Strong> 환영합니다.
-					&nbsp;<img id="btn_logout" style="cursor:pointer;" th:attr="src=@{/statics/images/portal/btn_logout.png}" src="/statics/images/portal/btn_logout.png" alt="">
+					&nbsp;<img id="btn_logout" style="cursor:pointer;" th:attr="src=@{/static/images/portal/btn_logout.png}" src="/static/images/portal/btn_logout.png" alt="">
 				</div>
 		    	<form id="mainForm2" name="mainForm2" method="POST">
 				<input type="hidden" id="bu" name="bu" value="">
@@ -179,23 +179,23 @@
 		    	</form>
 	
 	    	<div class="btn">
-    			<a href="#" class="tmpQT off"><img th:attr="src=@{/statics/images/portal/rbtn_1.gif}" src="/statics/images/portal/rbtn_1.gif"></a>
-    			<a href="#" class="tmpCR off"><img th:attr="src=@{/statics/images/portal/rbtn_2.gif}" src="/statics/images/portal/rbtn_2.gif"></a>
-    			<a href="#" class="tmpCL off"><img th:attr="src=@{/statics/images/portal/rbtn_4.gif}" src="/statics/images/portal/rbtn_4.gif"></a>
+    			<a href="#" class="tmpQT off"><img th:attr="src=@{/static/images/portal/rbtn_1.gif}" src="/static/images/portal/rbtn_1.gif"></a>
+    			<a href="#" class="tmpCR off"><img th:attr="src=@{/static/images/portal/rbtn_2.gif}" src="/static/images/portal/rbtn_2.gif"></a>
+    			<a href="#" class="tmpCL off"><img th:attr="src=@{/static/images/portal/rbtn_4.gif}" src="/static/images/portal/rbtn_4.gif"></a>
 	    	</div>
 		  </div>
 		</div>
 	</div>
 	
-	<script th:attr="src=@{/statics/js/jquery/jquery-3.1.0.min.js}" src="/statics/js/jquery/jquery-3.1.0.min.js"></script>
-	<script th:attr="src=@{/statics/js/jquery/jquery-ui.js}" src="/statics/js/jquery/jquery-ui.js"></script>
-	<script th:attr="src=@{/statics/js/jquery/jquery.blockUI.js}" src="/statics/js/jquery/jquery.blockUI.js"></script>
-	<script th:attr="src=@{/statics/js/highcharts/highcharts.js}" src="/statics/js/highcharts/highcharts.js"></script>
-	<script th:attr="src=@{/statics/js/highcharts/exporting.js}" src="/statics/js/highcharts/exporting.js"></script>
-	<script th:attr="src=@{/statics/js/biz/comutil.js}" src="/statics/js/biz/comutil.js"></script>
-	<script th:attr="src=@{/statics/js/biz/objutil.js}" src="/statics/js/biz/objutil.js"></script>
-	<script th:attr="src=@{/statics/js/biz/gridutil.js}" src="/statics/js/biz/gridutil.js"></script>
-	<script th:attr="src=@{/statics/js/biz/common.js}" src="/statics/js/biz/common.js"></script>
+	<script th:attr="src=@{/static/js/jquery/jquery-3.1.0.min.js}" src="/static/js/jquery/jquery-3.1.0.min.js"></script>
+	<script th:attr="src=@{/static/js/jquery/jquery-ui.js}" src="/static/js/jquery/jquery-ui.js"></script>
+	<script th:attr="src=@{/static/js/jquery/jquery.blockUI.js}" src="/static/js/jquery/jquery.blockUI.js"></script>
+	<script th:attr="src=@{/static/js/highcharts/highcharts.js}" src="/static/js/highcharts/highcharts.js"></script>
+	<script th:attr="src=@{/static/js/highcharts/exporting.js}" src="/static/js/highcharts/exporting.js"></script>
+	<script th:attr="src=@{/static/js/biz/comutil.js}" src="/static/js/biz/comutil.js"></script>
+	<script th:attr="src=@{/static/js/biz/objutil.js}" src="/static/js/biz/objutil.js"></script>
+	<script th:attr="src=@{/static/js/biz/gridutil.js}" src="/static/js/biz/gridutil.js"></script>
+	<script th:attr="src=@{/static/js/biz/common.js}" src="/static/js/biz/common.js"></script>
 	
 	<script th:inline="javascript">
 	const CONTEXT_PATH = "[(@{/})]"
@@ -368,17 +368,17 @@
    				/*[# th:if="${session.userInfo.dashboardYn} == 'Y'"]*/
    				if (n == 1) {
    					tmpAmt1 = rAmtY+/*[[#{lbl.billion}]]*/'';
-   					tmpAmt2 = rAmtM+/*[[#{lbl.billion}]]*/'<sup>1)</sup>';
+   					tmpAmt2 = rAmtM+/*[[#{lbl.billion} + '<sup>1)</sup>']]*/'';
    					$(".help_txt").show();
    				}
    				/*[/]*/
    				
    				inHtml += '<tr>';
    				inHtml += '  <td>'+v.MEAS_NM+'</td>';
-   				if (n == 0) inHtml += '  <td>'+rAmtM+/*[[#{lbl.billion}]]*/'</td>'; 
+   				if (n == 0) inHtml += '  <td>'+rAmtM+/*[[#{lbl.billion} + '</td>']]*/''; 
    			    else inHtml += '  <td>'+tmpAmt2+'</td>';
    			    inHtml += '  <td class="'+mRateCls+'">'+mRate+'%</td>';
-   			 if (n == 0) inHtml += '  <td>'+rAmtY+/*[[#{lbl.billion}]]*/'</td>';
+   			 if (n == 0) inHtml += '  <td>'+rAmtY+/*[[#{lbl.billion} + '</td>']]*/'';
    			    else inHtml += '  <td>'+tmpAmt1+'</td>';
    			    inHtml += '  <td class="'+yRateCls+'">'+yRate+'%</td>';
    			    inHtml += '</tr>';
@@ -562,7 +562,7 @@
    		chartTxt.append('<p class="per_txt '+cDataC+'"><strong>'+cDataT+'</strong>%</p>');
    		Highcharts.chart(chartId, {
    		    chart: { type: 'column' },
-   		 	xAxis: { categories: [ /*[[#{lbl.target}]]*/, /*[[#{lbl.salesForecasting}]]*/ ] },
+   		 	xAxis: { categories: [ /*[[#{lbl.target}]]*/ , /*[[#{lbl.salesForecasting}]]*/ ] },
    		    yAxis: {
    		    	stackLabels: {
    		    		allowOverlap : true, //total 안나올때 옵션 주는거
@@ -648,7 +648,7 @@
    		chartTxt2.append('<p class="per_txt" style="color:#a0a0a0;"><strong style="font-size:30px;">'+cDataTT+'</strong>%</p>');
    		Highcharts.chart(chartId, {
    		    chart: { type: 'column' },
-   		 xAxis: { categories: [ /*[[#{lbl.target}]]*/, /*[[#{lbl.performance}]]*/ ] },
+   		 xAxis: { categories: [ /*[[#{lbl.target}]]*/ , /*[[#{lbl.performance}]]*/ ] },
    		    plotOptions: {
    		        column: {
    		            dataLabels: {
@@ -698,7 +698,7 @@
    		chartTxt2.append('<p class="per_txt" style="color:#a0a0a0;"><strong style="font-size:30px;">'+cDataTT+'</strong>%</p>');
    		Highcharts.chart(chartId, {
    		    chart: { type: 'column' },
-   		 xAxis: { categories: [ /*[[#{lbl.target}]]*/, /*[[#{lbl.performance}]]*/ ] },
+   		 xAxis: { categories: [ /*[[#{lbl.target}]]*/ , /*[[#{lbl.performance}]]*/ ] },
    		    yAxis: {
    		    	stackLabels:{
    		    		enabled : true,
@@ -775,7 +775,7 @@
    		chartTxt.append('<p class="per_txt '+cDataC+'"><strong>'+cDataT+'</strong>%</p>');
    		Highcharts.chart(chartId, {
    		    chart: { type: 'column' },
-   		 	xAxis: { categories: [ /*[[#{lbl.target}]]*/, /*[[#{lbl.actual}]]*/ ] },
+   		 	xAxis: { categories: [ /*[[#{lbl.target}]]*/ , /*[[#{lbl.actual}]]*/ ] },
    		    plotOptions: {
    		        column: {
    		            dataLabels: {
@@ -854,9 +854,9 @@
    		];
    		var xAxisCategories = [];
    		if ($(':radio[name=weekMaterialsAvail]:checked').val() == '') {
-   			xAxisCategories = [ /*[[#{lbl.target}]]*/,/*[[#{lbl.actual}]]*/ ];
+   			xAxisCategories = [ /*[[#{lbl.target}]]*/ ,  /*[[#{lbl.actual}]]*/ ];
    		} else {
-   			xAxisCategories = [ /*[[#{lbl.target}]]*/,/*[[#{lbl.actual}]]*/ ];
+   			xAxisCategories = [ /*[[#{lbl.target}]]*/ , /*[[#{lbl.actual}]]*/ ];
    		}
    		
    		var sMap = {

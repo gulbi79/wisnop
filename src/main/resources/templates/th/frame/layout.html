@@ -5,9 +5,9 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 	<title>WonIk S&OP</title>
 	
-	<link th:href="@{/statics/css/style.css}" href="/statics/css/style.css" rel="stylesheet" />
-	<link th:href="@{/statics/css/themes/easyui.css}" href="/statics/css/themes/easyui.css" rel="stylesheet" />
-	<link th:href="@{/statics/css/themes/icon.css}" href="/statics/css/themes/icon.css" rel="stylesheet" />
+	<link th:href="@{/static/css/style.css}" href="/static/css/style.css" rel="stylesheet" />
+	<link th:href="@{/static/css/themes/easyui.css}" href="/static/css/themes/easyui.css" rel="stylesheet" />
+	<link th:href="@{/static/css/themes/icon.css}" href="/static/css/themes/icon.css" rel="stylesheet" />
 </head>
 
 <body class="mainFrame" oncontextmenu="return false">
@@ -35,26 +35,26 @@
 					</form>
 				</li>
 				<!-- 즐겨찾기 버튼 및 클릭시 나오는 화면 시작 -->
-				<li><a href="#" id="btnHelp"><img th:src="@{/statics/images/common/btn_listview.png}" alt="View" th:title="#{lbl.pdfViewer}" /></a></li>
-	            <li class="myfav"><a href="#" id="myRecent"><img th:src="@{/statics/images/common/btn_menual.png}" alt="Menual" th:title="#{lbl.menual}" /></a>
+				<li><a href="#" id="btnHelp"><img th:src="@{/static/images/common/btn_listview.png}" alt="View" th:title="#{lbl.pdfViewer}" /></a></li>
+	            <li class="myfav"><a href="#" id="myRecent"><img th:src="@{/static/images/common/btn_menual.png}" alt="Menual" th:title="#{lbl.menual}" /></a>
 					<div class="subbox cMyRecent">
 					<ul id="myRecentList"></ul>
 					</div>
 	            </li>
-	            <li class="myfav"><a href="#" id="myFav"><img th:src="@{/statics/images/common/btn_favorite.png}" alt="MY FAVORITE" th:title="#{lbl.myFavorite}" /></a>
+	            <li class="myfav"><a href="#" id="myFav"><img th:src="@{/static/images/common/btn_favorite.png}" alt="MY FAVORITE" th:title="#{lbl.myFavorite}" /></a>
 					<div class="subbox cMyFav">
 					<ul id="myfavList"></ul>
 					</div>
 				</li>
-				<li class="layout"><a href="#" id="btnLogOut"><img th:src="@{/statics/images/common/btn_logout.png}" alt="LogOut" th:title="#{lbl.logOuts}" /></a></li>
+				<li class="layout"><a href="#" id="btnLogOut"><img th:src="@{/static/images/common/btn_logout.png}" alt="LogOut" th:title="#{lbl.logOuts}" /></a></li>
 				<!-- 즐겨찾기 버튼 및 클릭시 나오는 화면 끝 -->
 			</ul>
 			</div>
 		</div>
 
 	  	<header class="hdt2">
-		    <h1><a th:href="@{/th/auth/goPortal}"><img th:src="@{/statics/images/common/logo.png}" alt="WonIk"></a></h1>
-			<nav id="gnb"><h2><a href="#" onclick="fn_leftClose();return false;"><img id="btnNav" th:src="@{/statics/images/common/btn_nav.gif}" alt=""></a></h2></nav>
+		    <h1><a th:href="@{/th/common/goPortal}"><img th:src="@{/static/images/common/logo.png}" alt="WonIk"></a></h1>
+			<nav id="gnb"><h2><a href="#" onclick="fn_leftClose();return false;"><img id="btnNav" th:src="@{/static/images/common/btn_nav.gif}" alt=""></a></h2></nav>
 			
 			<th:block th:replace="~{th/layout/fragments/menu :: menuHiddenFragment}"></th:block>
 	  	
@@ -71,11 +71,11 @@
 	</div>
 	
 	
-	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}"></script>
-	<script th:src="@{/statics/js/pub/pubCommon.js}"></script>
-	<script th:src="@{/statics/js/jquery/jquery.easyui.min.js}"></script>
-	<script th:src="@{/statics/js/biz/comutil.js}"></script>
-	<script th:src="@{/statics/js/biz/common.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery-3.1.0.min.js}"></script>
+	<script th:src="@{/static/js/pub/pubCommon.js}"></script>
+	<script th:src="@{/static/js/jquery/jquery.easyui.min.js}"></script>
+	<script th:src="@{/static/js/biz/comutil.js}"></script>
+	<script th:src="@{/static/js/biz/common.js}"></script>
 
 	<th:block th:replace="~{th/layout/fragments/bottom :: bottomScriptFragment}"></th:block>
 
@@ -372,12 +372,12 @@
 	 			// 왼쪽 트리 or 필터 가 있다면
 	 			if ($(tabDoc).find("#a").html()) {
 	  				if ($(tabDoc).find("#a").css("display") == "none") {
-	  					$("#btnNav").attr("src", GV_CONTEXT_PATH + "/statics/images/common/btn_nav_view.gif");
+	  					$("#btnNav").attr("src", GV_CONTEXT_PATH + "/static/images/common/btn_nav_view.gif");
 	  				} else {
-	  					$("#btnNav").attr("src", GV_CONTEXT_PATH + "/statics/images/common/btn_nav.gif");
+	  					$("#btnNav").attr("src", GV_CONTEXT_PATH + "/static/images/common/btn_nav.gif");
 	  				}
 	 			} else {
-  					$("#btnNav").attr("src", GV_CONTEXT_PATH + "/statics/images/common/btn_nav.gif");
+  					$("#btnNav").attr("src", GV_CONTEXT_PATH + "/static/images/common/btn_nav.gif");
 	 			}
 			}
 		}

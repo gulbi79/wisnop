@@ -5,26 +5,29 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 	<title>Login</title>
 	
-	<link th:href="@{/statics/css/jquery-ui.css}" href="/statics/css/jquery-ui.css" rel="stylesheet" />
-	<link th:href="@{/statics/css/style.css}" href="/statics/css/style.css" rel="stylesheet"/>
+	<link th:href="@{/static/css/jquery-ui.css}" href="/static/css/jquery-ui.css" rel="stylesheet" />
+	<link th:href="@{/static/css/style.css}" href="/static/css/style.css" rel="stylesheet"/>
 </head>
 <body id="login">
     <div id="loginBox">
 		<div id="tbox">
 			<div class="thead">
-				<h1><a href="#"><img th:src="@{/statics/images/common/logo_hd.png}" src="/statics/images/common/logo_hd.png" alt="WonIk"></a></h1>
+				<h1><a href="#"><img th:src="@{/static/images/common/logo_hd.png}" src="/static/images/common/logo_hd.png" alt="WonIk"></a></h1>
 				<h1 id="serverChk" style="text-align: center;font-size: 50px;display:none;">NEW개발서버</h1>
 			</div>
-			<form id="mainForm" name="mainForm" method="POST" th:action="@{/th/auth/submit}">
+			<form id="mainForm" name="mainForm" method="POST" th:action="@{/th/auth/loginProc}">
 			<div class="frm">
 				<div class="fst"><input type="text"  id="username" name="username" placeholder="ID"/></div>
 				<div class="fst"><input type="password" id="password" name="password" placeholder="PASSWORD"/></div>
+			</div>
+			<div th:if="error">
+			   <p id="valid" style="color: red; font-size:12px;" th:text="${errormsg}"></p>
 			</div>
 			<a href="#" id="loginSubmitBtn" class="btn_login">LOGIN</a>
 			</form>
 		</div>
 	</div>
-	<script th:src="@{/statics/js/jquery/jquery-3.1.0.min.js}" src="/statics/js/jquery/jquery-3.1.0.min.js"></script>
+	<script th:src="@{/static/js/jquery/jquery-3.1.0.min.js}" src="/static/js/jquery/jquery-3.1.0.min.js"></script>
 	<script th:inline="javascript">
    	const CONTEXT_PATH = "[(@{/})]"
 	const GV_CONTEXT_PATH = CONTEXT_PATH.substr(0, CONTEXT_PATH.length-1);

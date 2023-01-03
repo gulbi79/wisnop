@@ -1133,7 +1133,9 @@ function gfn_getDateConvert(dateObj) {
 }
 
 //공통팝업오픈
-function gfn_comPopupOpen(popType,params) {
+function gfn_comPopupOpen(popType,params,strTh) {
+	
+	strTh = strTh || "";
 	
 	params = params || {}; //재정의
 	params.popupYn = "Y";
@@ -1213,10 +1215,10 @@ function gfn_comPopupOpen(popType,params) {
 	}
 
 	if (!gfn_isNull(params.rootUrl) && !gfn_isNull(params.url)) {
-		url = GV_CONTEXT_PATH + "/" + params.rootUrl + "/popup/" + params.url + "";
+		url = GV_CONTEXT_PATH + strTh + "/" + params.rootUrl + "/popup/" + params.url + "";
 	} else {
 		if (gfn_isNull(url)) return;
-		url = GV_CONTEXT_PATH + "/common/popup/" + url + "";
+		url = GV_CONTEXT_PATH + strTh + "/common/popup/" + url + "";
 	}
 
 	var pPos  = gfn_getPopupXY(pWidth,pHeight);

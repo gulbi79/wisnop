@@ -1,7 +1,5 @@
 package wi.com.wisnop.security.service;
 
-import java.util.Optional;
-
 import wi.com.wisnop.security.dto.UserDto;
 
 /**
@@ -10,5 +8,5 @@ import wi.com.wisnop.security.dto.UserDto;
  *
  */
 public interface UserService {
-	Optional<UserDto> login(UserDto userVo);
+	UserDto login(String userId, String userPw);
 }

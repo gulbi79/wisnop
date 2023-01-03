@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{th/layout/basebiz}">
+      
+<!-- style add -->
+<th:block layout:fragment="headStyle">
+</th:block>
+
+<!-- searchForm hidden add -->
+<th:block layout:fragment="searchFormHidden">
+	<input type="hidden" id="itemType" name="itemType" value="10,50"/> 
+</th:block>
+
+<!-- filter -->
+<th:block layout:fragment="filter">
+	<th:block th:replace="~{th/layout/fragments/filter :: filterMonthSumFragment}"></th:block>
+	
+	<div class="tabMargin"></div>
+	<div class="scroll">
+		<div class="view_combo" id="divUpItemGroup"></div>
+		<div class="view_combo" id="divItemGroup"></div>
+		<div class="view_combo" id="divRoute"></div>
+		<div class="view_combo" id="divReptItemGroup"></div>
+		<div class="view_combo" id="divKey"></div>
+		
+		<th:block th:replace="~{th/layout/fragments/filter :: filterViewHorizonMonthFragment}"></th:block>
+		
+		<!-- check box case -->
+		<div class="view_combo">
+			<strong class="filter_tit">Column Widths</strong>
+			<div class="ilist">
+				<div class="itit" style="margin-left:5px;" th:text="#{lbl.claimQty}"></div>
+				<input type="text" id="txtClaimW" name="txtClaimW" class="ipt" maxlength="3" value="50" style="width:123px;">
+			</div>
+			<div class="ilist">
+				<div class="itit" style="margin-left:5px;" th:text="#{lbl.salesQty}"></div>
+				<input type="text" id="txtSalesW" name="txtSalesW" class="ipt" maxlength="3" value="50" style="width:123px;">
+			</div>
+			<div class="ilist">
+				<div class="itit" style="margin-left:5px;" th:text="#{lbl.claimRate}"></div>
+				<input type="text" id="txtRateW" name="txtRateW" class="ipt" maxlength="3" value="50" style="width:123px;">
+			</div>
+		</div>
+		
+	</div>
+</th:block>
+
+<!-- grid 영역 -->
+<th:block layout:fragment="contentScroll">
+	<div id="realgrid" style="width: 100%;" class="realgrid1"></div>
+</th:block>
+
+<!-- view script -->
+<th:block layout:fragment="contentjs">
+	<script th:inline="javascript">
+	//전역변수 설정
+  	var gridInstance, grdMain, dataProvider;
+  	var codeMap = {};
+	var codeMapEx;
+	var enterSearchFlag = "Y";
+	var _siq = "quality.claimStatus";
+
+	// onload 
+	$(document).ready(function() {
+		gfn_formLoad();
+		fn_initCode();
+		fn_initFilter();
+		fn_events();
+		fn_initGrid();
+		gfn_tabresize();
+	});
+		
+	function fn_initFilter() {
+		//품목대그룹
+		var upperItemEvent = {
+			childId   : ["itemGroup"],
+			childData : [codeMapEx.ITEM_GROUP],
+		};
+		
+		// 콤보박스
+		gfn_setMsComboAll([
+			{target : 'divUpItemGroup',   id : 'upItemGroup',   title : /*[[#{lbl.upperItemGroup}]]*/'', data : codeMapEx.UPPER_ITEM_GROUP, exData:["*"], event: upperItemEvent},
+			{target : 'divItemGroup',     id : 'itemGroup',     title : /*[[#{lbl.itemGroup}]]*/'',      data : codeMapEx.ITEM_GROUP,     exData:["*"]},
+			{target : 'divRoute',         id : 'route',         title : /*[[#{lbl.routing}]]*/'',        data : codeMapEx.ROUTING,        exData:["*"]},
+			{target : 'divReptItemGroup', id : 'reptItemGroup', title : /*[[#{lbl.reptItemGroup}]]*/'',  data : codeMapEx.REP_ITEM_GROUP, exData:["*"]},
+			{target : 'divKey',           id : 'keyGroupYn',    title : /*[[#{lbl.keyProd}]]*/'',        data : codeMap.KEY_GROUP_YN,     exData:["*"], type : "S"},
+		]);
+		
+		
+		MONTHPICKER(null, -2, 0);
+		
+		$('#toMon')  .monthpicker("option", "maxDate", 0);
+		$("#txtClaimW, #txtSalesW, #txtRateW").inputmask("numeric");
+	}
+		
+	function fn_initCode() {
+		var grpCd = 'KEY_GROUP_YN,FLAG_YN';
+		codeMap = gfn_getComCode(grpCd, 'Y'); //공통코드 조회
+		codeMapEx = gfn_getComCodeEx(["REP_ITEM_GROUP", "ITEM_GROUP", "ROUTING", "UPPER_ITEM_GROUP"], null, {itemType : '10,50' });
+	}
+	
+	function fn_initGrid() {
+		gridInstance = new GRID();
+		gridInstance.init("realgrid");
+		gridInstance.measureHFlag = true;
+		grdMain      = gridInstance.objGrid;
+		dataProvider = gridInstance.objData;
+		gfn_setMonthSum(gridInstance, false, false, true);
+		
+		grdMain.onColumnHeaderClicked = function (grid, column) {
+			fn_setChildColumnResize(gridInstance, grdMain, column.name);
+		}
+	}
+			
+	function fn_gridCallBack() {
+		var dt = new Date();
+		$.each(BUCKET.all[0], function(n,v) {
+			fn_setChildColumnResize(gridInstance, grdMain, v.BUCKET_ID);
+		});
+		
+		$("#realgrid").show();
+	}
+	
+	function fn_events() {
+		$("#btnSearch").on("click", function(e) {
+			fn_apply(false);
+		});
+	}
+		
+	// 조회
+	function fn_search() {
+		FORM_SEARCH._mtd     = "getList";
+		FORM_SEARCH.tranData = [{ outDs : "resList",_siq : this._siq }];
+		
+		var aOption = {
+			url     : GV_CONTEXT_PATH + "/biz/obj",
+			data    : FORM_SEARCH,
+			success : function (data) {
+				if (FORM_SEARCH.sql == 'N') {
+					dataProvider.clearRows(); //데이터 초기화
+			
+					//그리드 데이터 생성
+					grdMain.cancel();
+					
+					dataProvider.setRows(data.resList);
+					dataProvider.clearSavePoints();
+					dataProvider.savePoint(); //초기화 포인트 저장
+					//gfn_setSearchRow(dataProvider.getRowCount());
+					gfn_actionMonthSum(gridInstance);
+					gfn_setRowTotalFixed(grdMain);
+					fn_gridCallBack();
+					
+					//excel download condition area
+					EXCEL_SEARCH_DATA = gfn_getExcelCondition($("#searchForm"), function(id) {
+						let filterTitle = "";
+						switch(id) {
+							case "fromMon" :
+							case "toMon" :
+								filterTitle = "View Horizon"
+								break;
+						}
+						return filterTitle;
+					}); 
+				}
+			}
+		}
+		
+		gfn_service(aOption, "obj");
+	}
+		
+	function fn_getBucket(sqlFlag) {
+		var dt = new Date();
+		var custBucket = function() {
+			$.each(BUCKET.all[0], function(n,v) {
+                v.FOLDING_FLAG = 'Y';
+                v.EXPAND_YN = 'Y';
+			});
+			
+			$.each(BUCKET.all[1], function(n,v) {
+				if (v.TOT_TYPE == "MT") {
+					v.TOT_TYPE = "";
+					v.TYPE = "group";
+				}
+			});
+		};
+		
+		var claim = ($.isNumeric($('#txtClaimW').val()) ? Number($('#txtClaimW').val()) : 0);
+		var sales = ($.isNumeric($('#txtSalesW').val()) ? Number($('#txtSalesW').val()) : 0);
+		var rate  = ($.isNumeric($('#txtRateW').val())  ? Number($('#txtRateW').val())  : 0);
+		
+		if (claim > 0) {
+			MEASURE.user.push({CD : "CLAIM", NM : /*[[#{lbl.claimQty}]]*/'' , numberFormat : "#,##0"})
+		}
+		if (claim == 1) {
+			claim = 2;
+		} 
+		if (sales > 0) {
+			MEASURE.user.push({CD : "GI",    NM : /*[[#{lbl.salesQty}]]*/'' , numberFormat : "#,##0"})
+		}
+		if (sales == 1) {
+			sales = 2;
+		} 
+		if (rate > 0) {
+			MEASURE.user.push({CD : "RATE",  NM : /*[[#{lbl.claimRate}]]*/'', numberFormat : "#,##0"} )
+		}
+		if (rate == 1) {
+			rate = 2;
+		} 
+		var fromDt = $("#fromMon").val().substring(0, 4) + "0101";
+		if (dt.getFullYear() == $("#fromMon").val().substring(0, 4)) {
+			fromDt = gfn_replaceAll( $("#fromMon").val(), "-", "")  + "01";
+		}
+		
+		var ajaxMap = {
+			fromDate : fromDt,
+			toDate   : gfn_replaceAll($("#toMon").val(), "-", "") + "31",
+			year     : {isDown: "Y", isUp:"N", upCal:"" , isMt:"Y", isExp:"Y", expCnt:999},
+			month    : {isDown: "Y", isUp:"Y", upCal:"Y", isMt:"Y", isExp:"N", expCnt:999},
+			sqlId    : ["bucketYear","bucketMonth"]
+		};
+		
+		var allWidth = (claim + sales + rate) ;
+		
+		gfn_getBucket(ajaxMap, true, custBucket);
+		
+		if(!sqlFlag) {
+			gridInstance.setDraw();
+		} 
+	}
+
+	//조회
+	function fn_apply(sqlFlag) {
+		$("#realgrid").hide();
+		
+		// 디멘젼, 메져
+		gfn_getMenuInit();
+		
+    	fn_getBucket(sqlFlag); //2. 버켓정보 조회
+    	
+    	//조회조건 설정
+    	FORM_SEARCH = $("#searchForm").serializeObject(); //초기화
+    	FORM_SEARCH.sql        = sqlFlag;
+   		FORM_SEARCH.hrcyFlag   = true;
+   		FORM_SEARCH.dimList    = DIMENSION.user;
+   		FORM_SEARCH.meaList    = MEASURE.user;
+   		FORM_SEARCH.bucketList = BUCKET.query;
+   		FORM_SEARCH.startYear  = $("#fromMon").val().substring(0,4);
+        FORM_SEARCH.endYear    = $("#toMon").val().substring(0,4);
+   		fn_search();
+	}
+
+	//그리드 접힘 펼침 처리
+	function fn_setChildColumnResize(objInstance, objGrd, name) {
+		//접힘/펼침모드인지 확인
+		var header = objGrd.getColumnProperty(name, "header");
+		if (header.text.indexOf(gv_expand) == -1 && header.text.indexOf(gv_folding) == -1) {
+			return;
+		}
+
+		var visible = false;
+		var columns = objGrd.getColumnProperty(name, "columns");
+		var chkCnt = -1;
+		var cName,subColumns,cDisplayWidth;
+		for (var i=columns.length-1; i>=0; i--) {
+		
+			cName         = columns[i]._name;
+			subColumns    =  objGrd.getColumnProperty(cName, "columns");
+			visible       = !objGrd.getColumnProperty(cName, "visible");
+			cDisplayWidth =  objGrd.getColumnProperty(cName, "displayWidth");
+			
+			if (isNaN(cDisplayWidth)) cDisplayWidth = objGrd.getColumnProperty(cName, "width"); 
+			
+			if (cDisplayWidth > 0) {
+				chkCnt++;
+				if (subColumns) {
+					_fn_setChildColumnResize(objInstance,objGrd, cName, !visible);
+				}
+			}
+			if (chkCnt == 0) continue;
+
+			objGrd.setColumnProperty(cName, "visible", visible);
+			if (subColumns) {
+				_fn_setChildColumnResize(objInstance,objGrd, cName, visible);
+			}
+		}
+		
+		var claim = ($.isNumeric($('#txtClaimW').val()) ? Number($('#txtClaimW').val()) : 0);
+		var sales = ($.isNumeric($('#txtSalesW').val()) ? Number($('#txtSalesW').val()) : 0);
+		var rate  = ($.isNumeric($('#txtRateW').val())  ? Number($('#txtRateW').val())  : 0);
+		
+		if (claim > 0) {
+			if (claim == 1) {
+				claim = 2;
+			} 
+		}
+		if (sales > 0) {
+			if (sales == 1) {
+				sales = 2;
+			} 
+		}
+		if (rate > 0) {
+			if (rate == 1) {
+				rate = 2;
+			} 
+		}
+
+		var allWidth = (claim + sales + rate) ;
+		
+		var tmpWidth = 0;
+		var addHTxt  = gv_folding;
+		if (visible) {
+			addHTxt = gv_expand;
+			$.each(objInstance.idMap, function() {
+				if (this.key == name) {
+					tmpWidth = this.value;
+					return false;
+				}
+			});
+		} else {
+			var chkColumn = true;
+			$.each(objInstance.idMap, function() {
+				if (this.key == name) {
+					this.value = objGrd.getColumnProperty(name, "displayWidth");
+					chkColumn = false;
+				}
+			});
+			if (chkColumn) {
+				objInstance.idMap.push({key:name,value:objGrd.getColumnProperty(name, "displayWidth")});
+			}
+		}
+
+		objGrd.setColumnProperty(name, "displayWidth", tmpWidth + allWidth);
+
+		//헤더텍스트 변경
+		var header = objGrd.getColumnProperty(name, "header");
+		header.text = (header.text).replace(gv_folding,"").replace(gv_expand,"") + addHTxt;
+		objGrd.setColumnProperty(name, "header", header);
+
+	}
+
+	function _fn_setChildColumnResize(objInstance,objGrd, name, isVisible) {
+		var chkCnt = -1;
+		var visible = isVisible;
+		var cName,subColumns,cDisplayWidth;
+		var columns = objGrd.getColumnProperty(name, "columns");
+		for (var i=columns.length-1; i>=0; i--) {
+			cName         = columns[i]._name;
+			subColumns    =  objGrd.getColumnProperty(cName, "columns");
+			cDisplayWidth =  objGrd.getColumnProperty(cName, "displayWidth");
+			
+			if (isNaN(cDisplayWidth)) cDisplayWidth = objGrd.getColumnProperty(cName, "width"); 
+			
+			if (cDisplayWidth > 0) chkCnt++;
+			if (chkCnt == 0) continue;
+
+			objGrd.setColumnProperty(cName, "visible", visible);
+
+			if (subColumns) {
+				_fn_setChildColumnResize(objInstance,objGrd, cName, visible);
+			}
+		}
+	}
+
+	</script>
+</th:block>
+	
+</html>

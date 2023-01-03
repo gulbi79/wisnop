@@ -3,28 +3,28 @@
 
 <th:block th:fragment="viewFragment">
 	<div class="location">
-		<img th:src="@{/statics/images/common/ico_home.gif}" alt=""> 
+		<img th:src="@{/static/images/common/ico_home.gif}" alt=""> 
 		
 		<th:block th:if="${menuInfo?.level3Nm} != null">
-		<img th:src="@{/statics/images/common/img_location_ar.gif}" alt="" th:text="' ' + ${menuInfo?.level1Nm} + '&nbsp;'">
-		<img th:src="@{/statics/images/common/img_location_ar.gif}" alt="" th:text="' ' + ${menuInfo?.level2Nm} + '&nbsp;'">
-		<img th:src="@{/statics/images/common/img_location_ar.gif}" alt="" > <strong th:text="${menuInfo?.level3Nm}"></strong>
+		<img th:src="@{/static/images/common/img_location_ar.gif}" alt="" th:text="' ' + ${menuInfo?.level1Nm} + '&nbsp;'">
+		<img th:src="@{/static/images/common/img_location_ar.gif}" alt="" th:text="' ' + ${menuInfo?.level2Nm} + '&nbsp;'">
+		<img th:src="@{/static/images/common/img_location_ar.gif}" alt="" > <strong th:text="${menuInfo?.level3Nm}"></strong>
 		<font style="color:red" id="invenTrans" th:if="${menuInfo.menuCd} == 'SNOP205'" th:text="#{lbl.invenWeek}"></font>
 		<font style="color:red" id="grCompRate" th:if="${menuInfo.menuCd} == 'MP205'" th:text="#{lbl.grCompRate}"></font>
 		</th:block>
 		
 		<div class="fnc">
-            <a href="#" id="allItem" style="padding-top:7px;" th:if="${menuInfo.menuCd} == 'APS407'"><img th:src="@{/statics/images/common/square.png}" title="All Item"></a>
+            <a href="#" id="allItem" style="padding-top:7px;" th:if="${menuInfo.menuCd} == 'APS407'"><img th:src="@{/static/images/common/square.png}" title="All Item"></a>
 			
-			<a href="#" class="viewfnc6" th:if="${menuInfo?.level3Nm} != null"><img th:src="@{/statics/images/common/btn_gun6.gif}" title="My Favorite"></a>
+			<a href="#" class="viewfnc6" th:if="${menuInfo?.level3Nm} != null"><img th:src="@{/static/images/common/btn_gun6.gif}" title="My Favorite"></a>
 			
-			<a href="#" class="viewfnc1" th:if="${menuInfo.decimalYn} == 'Y'"><img th:src="@{/statics/images/common/btn_gun1.gif}" title="Decimal"></a>
-			<a href="#" class="viewfnc2" th:if="${menuInfo.measureYn} == 'Y'"><img th:src="@{/statics/images/common/btn_gun2.gif}" title="Measure Configration"></a>
-			<a href="#" class="viewfnc3" th:if="${menuInfo.dimensionYn} == 'Y'"><img th:src="@{/statics/images/common/btn_gun3.gif}" title="Dimension Configration"></a>
+			<a href="#" class="viewfnc1" th:if="${menuInfo.decimalYn} == 'Y'"><img th:src="@{/static/images/common/btn_gun1.gif}" title="Decimal"></a>
+			<a href="#" class="viewfnc2" th:if="${menuInfo.measureYn} == 'Y'"><img th:src="@{/static/images/common/btn_gun2.gif}" title="Measure Configration"></a>
+			<a href="#" class="viewfnc3" th:if="${menuInfo.dimensionYn} == 'Y'"><img th:src="@{/static/images/common/btn_gun3.gif}" title="Dimension Configration"></a>
 
-			<a href="#" class="viewfnc4" th:if="${menuInfo.sqlYn} == 'Y'"><img th:src="@{/statics/images/common/btn_gun4.gif}" title="SQL View"></a>
-			<a href="#" class="viewfnc5" th:if="${menuInfo.excelYn} == 'Y'"><img th:src="@{/statics/images/common/btn_gun5.gif}" title="Excel Download"></a>
-			<a href="#" class="viewfnc7" id="viewfnc7" style="display:none;" th:if="${menuInfo.excelYn} == 'Y'"><img th:src="@{/statics/images/common/btn_gun5.gif}" title="Excel Download"></a>
+			<a href="#" class="viewfnc4" th:if="${menuInfo.sqlYn} == 'Y'"><img th:src="@{/static/images/common/btn_gun4.gif}" title="SQL View"></a>
+			<a href="#" class="viewfnc5" th:if="${menuInfo.excelYn} == 'Y'"><img th:src="@{/static/images/common/btn_gun5.gif}" title="Excel Download"></a>
+			<a href="#" class="viewfnc7" id="viewfnc7" style="display:none;" th:if="${menuInfo.excelYn} == 'Y'"><img th:src="@{/static/images/common/btn_gun5.gif}" title="Excel Download"></a>
 		</div>
 	</div>
 	

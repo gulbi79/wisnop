@@ -59,7 +59,7 @@
 			    	$(tId).html("");
 			    	$.each(data.rtnList, function(n, v) {
 			    		if (type == "F") {
-			    	    	$(tId).append('<li><a onClick="fn_removeBookMark(\''+v.MENU_CD+'\')" href="#" class="close"><img src='+GV_CONTEXT_PATH +'"/statics/images/common/pop_close2.png" alt=""></a><a href="#" class="fav" onClick="fn_goBookMark(\''+v.MENU_CD+'\');" title="'+v.MENU_NM+'" >'+v.MENU_NM+'</a></li>');
+			    	    	$(tId).append('<li><a onClick="fn_removeBookMark(\''+v.MENU_CD+'\')" href="#" class="close"><img src='+GV_CONTEXT_PATH +'"/static/images/common/pop_close2.png" alt=""></a><a href="#" class="fav" onClick="fn_goBookMark(\''+v.MENU_CD+'\');" title="'+v.MENU_NM+'" >'+v.MENU_NM+'</a></li>');
 			    		} else {
 			    	    	$(tId).append('<li><a href="#" class="fav" onClick="fn_goBookMark(\''+v.MENU_CD+'\');" title="'+v.MENU_NM+'" >'+v.MENU_NM+'</a></li>');
 			    		}

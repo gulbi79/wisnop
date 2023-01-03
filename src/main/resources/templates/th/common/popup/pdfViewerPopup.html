@@ -85,11 +85,9 @@
 	<th:block th:replace="~{th/layout/fragments/script :: scriptFragment('Y','N')}"></th:block>
 	
 	<!-- PDF -->
-	<script type="text/javascript" th:src="@{/statics/js/pdf/pdfobject.js}"></script>
+	<script type="text/javascript" th:src="@{/static/js/pdf/pdfobject.js}"></script>
 	
 	<script th:inline="javascript">
-	
-	console.log("1111",/*[[${pdfViewerPopup}]]*/);
 	
 	var popupWidth, popupHeight;
 	var gridInstance, grdMain, dataProvider;

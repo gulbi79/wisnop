@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<th:block th:replace="~{th/layout/fragments/head :: headFragment('Y')}"></th:block>
+</head>
+<body>
+	<div class="popupDv">
+		<div class="pop_tit" th:text="${dimensionConfPopup?.popupTitle}"></div>
+		<div class="popCont">
+
+			<div>
+				<span id="dimConfMsg" style="color:#FE2E2E;"></span>
+			</div>
+
+			<div class="ovselect_tr">
+				<div class="lf_tbl" style="width:300px;padding:30px 0 0 0;">
+					<div id="realgrid" class="realgrid1" ></div>
+				</div>
+				<div class="movBtn">
+					<span><a href="#" id="moveR"><img th:src="@{/static/images/common/pop_mov1.gif}" alt=""></a></span>
+					<span><a href="#" id="moveL"><img th:src="@{/static/images/common/pop_mov2.gif}" alt=""></a></span>
+				</div>
+				<div class="rf_tbl" style="width:580px;">
+					<div class="topbtn">
+						<a href="#" id="moveUp"><img th:src="@{/static/images/common/pop_st1.gif}" alt=""></a>
+						<a href="#" id="moveDown"><img th:src="@{/static/images/common/pop_st2.gif}" alt=""></a>
+						<a href="#" id="moveFirst"><img th:src="@{/static/images/common/pop_st4.gif}" alt=""></a>
+						<a href="#" id="moveLast"><img th:src="@{/static/images/common/pop_st3.gif}" alt=""></a>
+					</div>
+					<div id="realgridSub" class="realgrid1" ></div>
+				</div>
+			</div>
+
+			<div class="pop_btn">
+				<a href="#" id="btnReset" class="pbtn pApply" th:text="#{lbl.reset}"></a>
+				<a href="#" id="btnSave" class="pbtn pApply" th:text="#{lbl.apply}"></a>
+				<a href="#" id="btnClose" class="pbtn pClose" th:text="#{lbl.close}"></a>
+			</div>
+		</div>
+	</div>
+	
+	<th:block th:replace="~{th/layout/fragments/script :: commonFormFragment('Y')}"></th:block>
+	
+	<th:block th:replace="~{th/layout/fragments/script :: scriptFragment('Y','N')}"></th:block>
+	
+	<script th:inline="javascript" type="text/javascript">
+	//전역변수 설정
+	var popupWidth, popupHeight;
+	var gridInstance, grdMain, dataProvider;
+	var gridInstanceSub, grdSub, dataProviderSub;
+	var lvMenuCd;
+	var lvOrgDim;
+	var orgSubData = [];
+	
+	$("document").ready(function () {
+		gfn_popresize();
+		fn_init();
+		fn_initGrid();
+		fn_initEvent(); //이벤트 정의
+	});
+	
+	$(window).resize(function() {
+		gfn_popresizeSub();
+	}).resize();
+	
+	function fn_init() {
+		lvMenuCd = /*[[${dimensionConfPopup?.P_MENU_CD}]]*/"";
+		
+		//msg
+		var pMsg = $("#dimConfMsg",opener.document).val();
+		if (!gfn_isNull(pMsg)) {
+			var tmpMsg = gfn_getDomainMsg("msg.dimConfMsg",pMsg);
+			$("#dimConfMsg").text('※ '+tmpMsg);
+		}
+		
+		//디멘전 순서변경 잠금
+		if ($("#dimFixYn",opener.document).val() == "Y") {
+			$(".topbtn").hide();
+			$(".lf_tbl").css("padding","0 0 0 0");
+		} 
+		
+		gfn_popresizeSub();
+	}
+	
+	//이벤트 정의
+	function fn_initEvent() {
+		fn_apply();
+		$("#moveR").click("on", function() { fn_move("R"); });
+		$("#moveL").click("on", function() { fn_move("L"); });
+		$("#moveUp").click("on", function() { fn_moveSort("U"); });
+		$("#moveDown").click("on", function() { fn_moveSort("D"); });
+		$("#moveFirst").click("on", function() { fn_moveSort("F"); });
+		$("#moveLast").click("on", function() { fn_moveSort("L"); });
+		$("#btnReset").click("on", function() { fn_apply(); });
+		$("#btnSave").click("on", function() { fn_save(); });
+		$("#btnClose").on("click", function() { window.close(); });
+	}
+	
+	function fn_apply(sqlFlag) {
+		//조회조건 설정
+		FORM_SEARCH = {}; //초기화
+		FORM_SEARCH.sql = sqlFlag;
+		FORM_SEARCH.SEARCH_MENU_CD = lvMenuCd;
+		FORM_SEARCH.menuCd = lvMenuCd;
+		fn_getGridData();
+	}
+	
+	//그리드를 그린다.
+	function fn_initGrid() {
+		//그리드 1 ------------------------
+		gridInstance = new GRID();
+		gridInstance.init("realgrid");
+		grdMain = gridInstance.objGrid;
+		dataProvider = gridInstance.objData;
+	
+	    fn_setFields(dataProvider,"M"); //set fields
+	    fn_setColumns(grdMain,"M"); // set columns
+	    fn_setOptions(grdMain,"M"); // set options
+	    
+	    //그리드 2 ------------------------
+		gridInstanceSub = new GRID();
+		gridInstanceSub.init("realgridSub");
+		grdSub = gridInstanceSub.objGrid;
+		dataProviderSub = gridInstanceSub.objData;
+		
+		fn_setFields(dataProviderSub,"S"); //set fields
+	    fn_setColumns(grdSub,"S"); // set columns
+	    fn_setOptions(grdSub,"S"); // set options
+	    
+	  	//셀 더블클릭
+	   	grdMain.onDataCellDblClicked = function (grid, index) {
+	   		if(index.fieldName == "DIM_CD") {
+	   			fn_moveSub("R", index.dataRow, "Y");
+	   		}
+	   	};
+	
+	   	//셀 더블클릭
+	   	grdSub.onDataCellDblClicked = function (grid, index) {
+	   		if(index.fieldName == "DIM_CD" && dataProviderSub.getValue(index.dataRow, "MAND_FLAG") != "Y") {
+	   			fn_moveSub("L", index.dataRow, "Y");
+	   		}
+	   	};
+	   	
+	   	grdSub.onItemAllChecked = function (grid, checked) {
+		   	if (checked) {
+	   			for (var i=0; i<dataProviderSub.getRowCount(); i++) {
+		   	    	if (dataProviderSub.getValue(i ,"MAND_FLAG") == "Y") {
+		   	    		grid.checkItem(grid.getItemIndex(i),!checked,false);    
+		   	    	}
+		   	    }
+	   		}
+	   	};
+	   	
+	   	grdSub.onItemChecked = function (grid, itemIndex, checked) {
+	   	    if (checked) {
+	   	    	if (dataProviderSub.getValue(grid.getDataRow(itemIndex) ,"MAND_FLAG") == "Y") {
+	   	    		grid.checkItem(itemIndex,!checked,false);    
+	   	    	}
+	   	    }
+	   	};
+	   	
+	   	dataProviderSub.onRowDeleting = function (provider, row) {
+	   		var tmpJRow = dataProviderSub.getJsonRow(row);
+	   		var chkData = true;
+	   		for (var i=0; i<orgSubData.length; i++) {
+	   			if (orgSubData[i].DIM_CD == tmpJRow.DIM_CD) {
+	   				chkData = false;
+	   				break;
+	   			}
+	   		}
+	   		
+	   		if (gfn_isNull(tmpJRow.USER_ID)) chkData = false;
+	   		
+	   		//없을때만 처리
+	   		if (chkData) {
+	   			orgSubData.push(dataProviderSub.getJsonRow(row));   			
+	   		}
+	   	};
+	}
+	
+	function fn_setOptions(grd,grdType) {
+		var options;
+	    if (grdType == "M") {
+			options = {
+	            checkBar: { visible: true },
+		        stateBar: { visible: false },
+		        edit    : { editable: false},
+		        hideDeletedRows : true
+	        };
+			grd.setOptions(options);
+			grd.setSelectOptions({style: "rows"});
+	    } else {
+	    	options = {
+	            checkBar: { visible: true },
+		        stateBar: { visible: true },
+		        edit    : { editable: true},
+		        //hideDeletedRows : true
+	        };
+	    	grd.setOptions(options);
+	    	
+	    	//renderer 처리
+	        fn_setRenderers(grd);
+	    	
+	    	dataProviderSub.setOptions({softDeleting: false});
+	    }
+	}
+	
+	function fn_setFields(provider,grdType) {
+		//필드 배열 객체를  생성합니다.
+		var fields;
+		if (grdType == "M") {
+			fields = [
+				{fieldName: "COMPANY_CD"},
+				{fieldName: "BU_CD"},
+				{fieldName: "MENU_CD"},
+				{fieldName: "DIM_CD"},
+				{fieldName: "DIM_NM"},
+				{fieldName: "SORT"},
+				{fieldName: "WIDTH"},
+				{fieldName: "MAND_FLAG"},
+				{fieldName: "DEFAULT_FLAG"},
+				{fieldName: "TOTAL_FLAG"},
+				{fieldName: "LVL"},
+				{fieldName: "MAPPING_FLAG"},
+	        ];
+		} else {
+			fields = [
+				{fieldName: "COMPANY_CD"},
+				{fieldName: "BU_CD"},
+				{fieldName: "USER_ID"},
+				{fieldName: "MENU_CD"},
+				{fieldName: "DIM_CD"},
+				{fieldName: "DIM_NM"},
+				{fieldName: "SORT"},
+				{fieldName: "SORT_ORG"},
+				{fieldName: "WIDTH"},
+				{fieldName: "MAND_FLAG"},
+				{fieldName: "DEFAULT_FLAG"},
+				{fieldName: "TOTAL_FLAG_YN"},
+				{fieldName: "TOTAL_FLAG"},
+				{fieldName: "LVL"},
+				{fieldName: "MAPPING_FLAG"},
+	        ];
+		}
+		provider.setFields(fields); //DataProvider의 setFields함수로 필드를 입력합니다.
+	}
+	
+	function fn_setColumns(grd,grdType) {
+		//필드와 연결된 컬럼 배열 객체를 생성합니다.
+		var columns;
+		if (grdType == "M") {
+			columns = [
+	            {
+	                name: "DIM_CD",
+	                fieldName: "DIM_CD",
+	                header: {text: /*[[#{lbl.dimension}]]*/''},
+	                styles: {textAlignment: "near"},
+	                width: 100,
+	                editable: false,
+	                cursor: "pointer",
+	            },
+	            {
+	            	name: "DIM_NM",
+	                fieldName: "DIM_NM",
+	                header: {text: /*[[#{lbl.dimensionName}]]*/''},
+	                styles: {textAlignment: "near"},
+	                width: 100
+	            },
+	        ];
+		} else {
+			columns = [
+	            {
+	                name: "DIM_CD",
+	                fieldName: "DIM_CD",
+	                header: {text: /*[[#{lbl.dimension}]]*/''},
+	                styles: {textAlignment: "near",background: gv_noneEditColor},
+	                width: 100,
+	                editable: false,
+	                cursor: "pointer",
+	            },
+	            {
+	            	name: "DIM_NM",
+	                fieldName: "DIM_NM",
+	                header: {text: /*[[#{lbl.dimensionName}]]*/''},
+	                styles: {textAlignment: "near",background: gv_noneEditColor},
+	                width: 100,
+	                editable: false,
+	            },
+	            {
+	            	name: "WIDTH",
+	                fieldName: "WIDTH",
+	                editor: {
+	                    type: "number",
+	                    maxLength: 3,
+	                },
+	                header: {text: /*[[#{lbl.width}]]*/''},
+	                styles: {textAlignment: "far",background:gv_requiredColor},
+	                width: 50,
+	            },
+	            {
+	                name: "MAND_FLAG",
+	                fieldName: "MAND_FLAG",
+	                header: {text: /*[[#{lbl.required}]]*/''},
+	                styles: {textAlignment: "near",background: gv_noneEditColor},
+	                width: 60,
+	                editable: false,
+	                renderer : gfn_getRenderer("CHECK",{editable:false})
+	            },
+	            {
+	                name: "LVL",
+	                fieldName: "LVL",
+	                editor: {
+	                    type: "number",
+	                    maxLength: 3,
+	                },
+	                header: {text: /*[[#{lbl.level}]]*/''},
+	                styles: {textAlignment: "far",background: gv_noneEditColor},
+	                width: 50,
+	                editable: false,
+	            },
+	            {
+	                name: "TOTAL_FLAG",
+	                fieldName: "TOTAL_FLAG",
+	                header: {text: /*[[#{lbl.total}]]*/''},
+	                styles: {textAlignment: "near",background: gv_editColor},
+	                dynamicStyles: [{
+	                    criteria: ["values['TOTAL_FLAG_YN']='Y'","values['TOTAL_FLAG_YN']<>'Y'"],
+	                    styles: ["renderer=check1","renderer=check2"]
+	                }],
+	                width: 50,
+	                editable: false,
+	                //renderer : gfn_getRenderer("CHECK")
+	            },
+	        ];
+		}
+	    grd.setColumns(columns); //컬럼을 GridView에 입력 합니다.
+	}
+	
+	//그리드 데이터 조회
+	function fn_getGridData() {
+		FORM_SEARCH._mtd = "getList";
+		FORM_SEARCH.tranData = [{outDs:"dimListAll",_siq:"admin.dimMapMenu"}
+		                      , {outDs:"dimList",_siq:"common.dimension"}];
+		var sMap = {
+			url: GV_CONTEXT_PATH + "/biz/obj",
+	        data: FORM_SEARCH,
+	        success:function(data) {
+				orgSubData = []; //초기화
+	        	
+	        	lvOrgDim = data.dimListAll;
+				grdSub.cancel();
+				dataProviderSub.setRows(data.dimList);
+	        	
+				//그리드 데이터 생성
+		    	grdMain.cancel();
+				dataProvider.setRows(fn_getFilterData());
+	        }
+	    }
+	    gfn_service(sMap,"obj");
+	}
+	
+	//저장
+	function fn_save() {
+		
+		//순서변경
+		for (var i=0; i<dataProviderSub.getRowCount(); i++) {
+			dataProviderSub.setValue(i,"SORT",i+1);
+		}
+		
+		//삭제된 데이터 추가
+		var tmpIdx;
+		for (var i=0; i<orgSubData.length; i++) {
+			dataProviderSub.addRow(orgSubData[i]);
+			tmpIdx = dataProviderSub.getRowCount()-1;
+			dataProviderSub.setRowState(tmpIdx, "deleted", false);
+		}
+		
+		//수정된 그리드 데이터만 가져온다.
+		var grdData = gfn_getGrdSavedataAll(grdSub);
+		if (grdData.length == 0) {
+			//부모창 조회실행
+	    	opener.fn_apply();
+	    	self.close();
+		} else {
+			//normal을 업데이트로 처리
+			var rows = dataProviderSub.getStateRows("none");
+	        $.each(rows, function(k, v) {
+	        	if (dataProviderSub.getValue(v, "MAPPING_FLAG") != "Y") {
+		        	dataProviderSub.setRowState(v, "updated", false);
+	        	}
+	        });
+			grdData = gfn_getGrdSavedataAll(grdSub);
+		}
+		
+		//그리드 유효성 검사
+		var arrColumn = ["DIM_CD","DIM_NM","WIDTH"];
+		if (!gfn_getValidation(gridInstanceSub,arrColumn)) return;
+		
+		//confirm(/*[[#{msg.confirmSave}]]*/'', function() {  // 저장하시겠습니까?
+			//저장
+	   		FORM_SAVE = {}; //초기화
+	   		FORM_SAVE._mtd   = "saveAll";
+	   		FORM_SAVE.tranData = [{outDs:"saveCnt",_siq:"common.dimConfMenu",mergeFlag:"Y", grdData : grdData}];
+			var serviceMap = {
+				url: GV_CONTEXT_PATH + "/biz/obj",
+	            data: FORM_SAVE,
+	            success:function(data) {
+	            	//부모창 조회실행
+	            	opener.fn_apply();
+	            	window.close();
+	            }
+	        }
+			gfn_service(serviceMap, "obj");
+		//}); 
+	}
+	
+	
+	//cust 디멘전 제외하고 return
+	function fn_getFilterData() {
+		var filerData = $.grep(lvOrgDim, function (item) {
+			var chkB = false;
+			for (var i=0; i<dataProviderSub.getRowCount(); i++) {
+				if (dataProviderSub.getRowState(i) == "deleted" || dataProviderSub.getRowState(i) == "createAndDeleted") continue;
+				if(item.DIM_CD == dataProviderSub.getValue(i,"DIM_CD")) {
+					chkB = true;
+					break;
+				}
+			}
+			return chkB;
+		},true);
+		
+		return filerData;
+	}
+	
+	function fn_move(type) {
+		var rows;
+		if (type == "R") {
+			rows = grdMain.getCheckedRows(true);
+	    	$.each(rows,function (n,v) {
+	    		fn_moveSub(type, v, "N");
+	    	});
+	    	
+	    	//이동후 삭제
+	    	dataProvider.removeRows(rows, false);
+		} else {
+			rows = grdSub.getCheckedRows(true);
+	    	
+	    	//이동후 삭제
+	    	for (var i=rows.length-1; i>=0; i--) {
+	    		dataProviderSub.removeRow(rows[i], false);
+	    	}
+			
+			//필터링
+	    	dataProvider.setRows(fn_getFilterData());
+		}
+	}
+	
+	function fn_moveSub(type, idx, gubun) {
+		var setCols = {};
+		if (type == "R") {
+			setCols.COMPANY_CD    = dataProvider.getValue(idx,"COMPANY_CD");
+			setCols.BU_CD         = dataProvider.getValue(idx,"BU_CD");
+			setCols.MENU_CD       = dataProvider.getValue(idx,"MENU_CD");
+			setCols.DIM_CD        = dataProvider.getValue(idx,"DIM_CD");
+			setCols.DIM_NM        = dataProvider.getValue(idx,"DIM_NM");
+			setCols.WIDTH         = dataProvider.getValue(idx,"WIDTH");
+			setCols.MAND_FLAG     = dataProvider.getValue(idx,"MAND_FLAG");
+			setCols.DEFAULT_FLAG  = dataProvider.getValue(idx,"DEFAULT_FLAG");
+			setCols.TOTAL_FLAG_YN = dataProvider.getValue(idx,"TOTAL_FLAG");
+			setCols.LVL      	  = dataProvider.getValue(idx,"LVL");
+			setCols.SORT_ORG  	  = dataProvider.getValue(idx,"SORT");
+			setCols.MAPPING_FLAG  = dataProvider.getValue(idx,"MAPPING_FLAG");
+			
+			var mIdx = gfn_getLastRow(dataProviderSub,"LVL",setCols.LVL);
+			if (mIdx == -1) {
+				//sort fixed
+				for (var i=0; i<dataProviderSub.getRowCount(); i++) {
+					if (Number(setCols.SORT_ORG) < Number(dataProviderSub.getValue(i ,"SORT_ORG"))) {
+						mIdx = i;
+						break;
+					}
+				}
+				
+				if (mIdx == -1) mIdx = dataProviderSub.getRowCount();
+				
+				dataProviderSub.insertRow(mIdx,setCols);
+				
+				//이동데이터 체크
+				grdSub.checkRow(mIdx,true,false);
+			} else {
+				
+				//sort fixed
+				for (var i=0; i<dataProviderSub.getRowCount(); i++) {
+					if (Number(setCols.SORT_ORG) < Number(dataProviderSub.getValue(i ,"SORT_ORG"))) {
+						mIdx = i-1;
+						break;
+					}
+				}
+				
+				dataProviderSub.insertRow(mIdx+1, setCols);
+				
+				//이동데이터 체크
+				grdSub.checkRow(mIdx+1,true,false);
+			}
+			
+			//이동후 삭제
+			if (gubun == "Y") dataProvider.removeRow(idx, false);
+		} else {
+			
+			//이동데이터 체크
+			grdMain.checkRow(dataProvider.getRowCount()-1,true,false);
+			
+			//이동후 삭제
+	    	if (gubun == "Y") {
+	    		dataProviderSub.removeRow(idx, false);
+	    		
+	    		//필터링
+	        	dataProvider.setRows(fn_getFilterData());
+	    	}
+		}
+	}
+	
+	function fn_moveSort(type) {
+		var index = grdSub.getCurrent();
+		var lvl = dataProviderSub.getValue(index.dataRow,"LVL");
+		var lvlCnt = gfn_getCaseCnt(dataProviderSub,"LVL",lvl);
+		var toIdx,preLvl,preLvlCnt,nextLvl,nextLvlCnt,focusIdx;
+		if (type == "U") {
+			if (index.dataRow > 0) {
+				//레벨정보에따른 처리
+				preLvl    = dataProviderSub.getValue(index.dataRow-1,"LVL");
+				preLvlCnt = gfn_getCaseCnt(dataProviderSub,"LVL",preLvl);
+				if (lvl == preLvl) {
+					dataProviderSub.moveRow(index.dataRow,index.dataRow-1);
+					grdSub.setCurrent({dataRow : index.dataRow-1});
+	
+				} else {
+					toIdx = index.dataRow - preLvlCnt;
+					for (var i=0; i<lvlCnt; i++) {
+						dataProviderSub.moveRow(index.dataRow+i,toIdx+i);	
+					}
+					//커서이동
+					grdSub.setCurrent({dataRow : toIdx});
+				}
+			}
+		} else if (type == "D") {
+			if (index.dataRow < dataProviderSub.getRowCount()-1) {
+				
+				//레벨정보에따른 처리
+				nextLvl    = dataProviderSub.getValue(index.dataRow+1,"LVL");
+				nextLvlCnt = gfn_getCaseCnt(dataProviderSub,"LVL",nextLvl);
+				if (lvl == nextLvl) {
+					dataProviderSub.moveRow(index.dataRow,index.dataRow+1);
+					grdSub.setCurrent({dataRow : index.dataRow+1});
+	
+				} else {
+					toIdx = index.dataRow + nextLvlCnt;
+					for (var i=0; i<lvlCnt; i++) {
+						dataProviderSub.moveRow(index.dataRow-i,toIdx-i);	
+					}
+					//커서이동
+					grdSub.setCurrent({dataRow : toIdx});
+				}
+			} 
+		} else if (type == "F") {
+			if (index.dataRow > 0) {
+				
+				preLvl = dataProviderSub.getValue(index.dataRow-1,"LVL");
+				if (lvl == preLvl) {
+					grdSub.setCurrent({dataRow : gfn_getFindRow(dataProviderSub,"LVL",lvl)});
+					index = grdSub.getCurrent();
+				}
+				//레벨정보에따른 처리
+				toIdx = 0;
+				for (var i=0; i<lvlCnt; i++) {
+					dataProviderSub.moveRow(index.dataRow+i,toIdx+i);	
+				}
+				//커서이동
+				grdSub.setCurrent({dataRow : toIdx});
+			}
+		} else if (type == "L") {
+			if (index.dataRow < dataProviderSub.getRowCount()-1) {
+				
+				nextLvl    = dataProviderSub.getValue(index.dataRow+1,"LVL");
+				nextLvlCnt = gfn_getCaseCnt(dataProviderSub,"LVL",nextLvl);
+				if (lvl == nextLvl) {
+					grdSub.setCurrent({dataRow : gfn_getLastRow(dataProviderSub,"LVL",lvl)});
+					index = grdSub.getCurrent();
+				}
+				//레벨정보에따른 처리
+				toIdx = dataProviderSub.getRowCount()-1;
+				for (var i=0; i<lvlCnt; i++) {
+					dataProviderSub.moveRow(index.dataRow-i,toIdx-i);	
+				}
+				//커서이동
+				grdSub.setCurrent({dataRow : toIdx});
+			} 
+		} 
+	}
+	
+	function fn_setRenderers(grid) {
+	    grid.addCellRenderers([{
+	        id: "check1",
+	       	type: "check",
+	        shape: "box",
+	        editable: true,
+	        startEditOnClick: true,
+	        trueValues: "Y",
+	        falseValues: "N"
+	    },{
+	        id: "check2",
+	       	type: "text",
+	        shape: "box",
+	        editable: false,
+	        startEditOnClick: true,
+	        trueValues: "",
+	        falseValues: ""
+	    }]);
+	}
+	
+	</script>
+</body>
+</html>

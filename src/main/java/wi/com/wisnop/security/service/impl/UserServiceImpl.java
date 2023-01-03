@@ -2,11 +2,10 @@ package wi.com.wisnop.security.service.impl;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import wi.com.wisnop.dao.CommonDao;
 import wi.com.wisnop.security.dto.UserDto;
 import wi.com.wisnop.security.service.UserService;
@@ -16,16 +15,17 @@ import wi.com.wisnop.security.service.UserService;
  * @author sung
  *
  */
+@RequiredArgsConstructor
+//@Slf4j
 @Service
-@Slf4j
 public class UserServiceImpl implements UserService {
 	
 	// 공통 DAO
     private final CommonDao commonDao;
 	
-	public UserServiceImpl(CommonDao ss) {
-        this.commonDao = ss;
-    }
+//	public UserServiceImpl(CommonDao ss) {
+//        this.commonDao = ss;
+//    }
 
     /**
      * 로그인 구현체
@@ -35,10 +35,10 @@ public class UserServiceImpl implements UserService {
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
-    public Optional<UserDto> login(UserDto userDto) {
+    public UserDto login(String userId, String userPw) {
     	Map param = new HashMap();
-    	param.put("userId", userDto.getUserId());
-    	param.put("userPw", userDto.getUserPw());
-        return Optional.ofNullable((UserDto)commonDao.selectOne("security.login.loginSelect", param));
+    	param.put("userId", userId);
+    	param.put("userPw", userPw);
+        return (UserDto)commonDao.selectOne("security.login.loginSelect", param);
     }
 }
