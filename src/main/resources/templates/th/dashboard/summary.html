@@ -121,7 +121,7 @@
 			        	    <div class="view_combo">
                             	<ul class="rdofl">
                                 	<li class="manuel">
-                                    	<a href="#" id="businessPerformance"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"/></a>
+                                    	<a href="#" id="businessPerformance"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
                                  	</li>
                              	</ul>
                            	</div>
@@ -171,13 +171,13 @@
 			        <!-- 제품 재고 현황 -->
 			        <div class="col_3">
 			        	<div class="titleContainer">	
-				            <h4 id="productInventoryStatusH4" th:text="'(' + #{lbl.prevDayChart} + ', ' + #{lbl.hMillion} + ')'"></h4>
+				            <h4 id="productInventoryStatusH4" th:text="#{lbl.prodInvStatusChart} + ' (' + #{lbl.prevDayChart} + ', ' + #{lbl.hMillion} + ')'"></h4>
 				        	<div class="view_combo">
 								<ul class="rdofl">
 									<li><input type="radio" id="companyCons1" name="companyCons" value="companyCons"/> <label for="companyCons1" th:text="#{lbl.companyCons}"></label></li>
 									<li><input type="radio" id="companyCons2" name="companyCons" value="company" checked="checked"/> <label for="companyCons2" th:text="#{lbl.company2}"></label></li>
 								    <li class="manuel">
-                                    	<a href="#" id="productInventoryStatus"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"></a>
+                                    	<a href="#" id="productInventoryStatus"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"></a>
                                     </li>
 								</ul>
 							</div>
@@ -193,11 +193,11 @@
 			       	<!-- 불량률 -->
 			        <div class="col_3">
 			        	<div class="titleContainer">
-			        	    <h4 id="defectiveRateH4" th:text="#{lbl.defectRateChart} + '(' + #{lbl.thisMonth} + ')'"></h4>
+			        	    <h4 id="defectiveRateH4" th:text="#{lbl.defectRateChart} + ' (' + #{lbl.thisMonth} + ')'"></h4>
 			        	    <div class="view_combo">
                                 <ul class="rdofl">
                                     <li class="manuel">
-                                        <a href="#" id="defectiveRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"/></a>
+                                        <a href="#" id="defectiveRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
                                     </li>
                             	</ul>
                             </div>
@@ -217,11 +217,11 @@
 			        <!-- 출하 예상 -->
 			   		<div class="col_3">
 			   		    <div class="titleContainer">
-			   		        <h4 id="expectedToShipH4" th:text="#{lbl.shipmentForecasting} + ' (' + #{lbl.thisMonth} + ',' + #{lbl.hMillion} + ')'"></h4>
+			   		        <h4 id="expectedToShipH4" th:text="#{lbl.shipmentForecasting} + ' (' + #{lbl.thisMonth} + ', ' + #{lbl.hMillion} + ')'"></h4>
 			   		        <div class="view_combo">
                                 <ul class="rdofl">
                                     <li class="manuel">
-                                        <a href="#" id="expectedToShip"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"/></a>
+                                        <a href="#" id="expectedToShip"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
                                     </li>
                                 </ul>
                            	</div>    
@@ -241,11 +241,11 @@
 			        <!-- 자재 재고 -->
 			        <div class="col_3">
 			        	<div class="titleContainer">
-			        	    <h4 id="materialStockH4" th:text="#{lbl.matInv} + ' (' + #{lbl.prevDayChart} + '' + #{lbl.hMillion} + ')'"></h4>
+			        	    <h4 id="materialStockH4" th:text="#{lbl.matInv} + ' (' + #{lbl.prevDayChart} + ', ' + #{lbl.hMillion} + ')'"></h4>
 			        	    <div class="view_combo">
                                 <ul class="rdofl">
                                     <li class="manuel">
-                                        <a href="#" id="materialStock"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"/></a>
+                                        <a href="#" id="materialStock"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
                                     </li>
                                 </ul>
                            	</div>
@@ -261,11 +261,11 @@
 			        <!-- 주간 생산 계획 준수율 -->
 			        <div class="col_3">
 			            <div class="titleContainer">
-			                <h4 id="weeklyProductionPlanComplianceRateH4" th:text="#{lbl.weekPpcr}"><span class="cweekTxt"></span></h4>
+			                <h4 id="weeklyProductionPlanComplianceRateH4"><span th:text="#{lbl.weekPpcr}"></span><span class="cweekTxt"></span></h4>
 			                <div class="view_combo">
                             	<ul class="rdofl">
 	                                <li class="manuel">
-	                                    <a href="#" id="weeklyProductionPlanComplianceRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"/></a>
+	                                    <a href="#" id="weeklyProductionPlanComplianceRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
 	                                </li>
                                 </ul>
                            	</div>
@@ -289,11 +289,11 @@
 			        <!-- 주간 출하 계획 준수율 -->
 			   		<div class="col_3">
 			   		    <div class="titleContainer">
-			        	    <h4 id="weeklyShippingPlanComplianceRateH4" th:text="#{lbl.weekSpcr}"><span class="cweekTxt"></span></h4>
+			        	    <h4 id="weeklyShippingPlanComplianceRateH4"><span th:text="#{lbl.weekSpcr}"></span><span class="cweekTxt"></span></h4>
 			                <div class="view_combo">
                                 <ul class="rdofl">
                                     <li class="manuel">
-                                        <a href="#" id="weeklyShippingPlanComplianceRate"><img src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"/></a>
+                                        <a href="#" id="weeklyShippingPlanComplianceRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
                                     </li>
                                 </ul>
                            	</div>
@@ -317,13 +317,13 @@
 			        <!-- 주간 자재 가용률 -->
 			        <div class="col_3">
 						<div class="titleContainer">				        
-				            <h4 id="weeklyMaterialAvailabilityRateH4" th:text="#{lbl.weekMpr}"><span class="pweekTxt"></span></h4>
+				            <h4 id="weeklyMaterialAvailabilityRateH4"><span th:text="#{lbl.weekMpr}"></span><span class="pweekTxt"></span></h4>
 				        	<div class="view_combo">
 								<ul class="rdofl">
 									<li><input type="radio" id="weekMaterialsAvail1" name="weekMaterialsAvail" value="rawMaterials" checked="checked"/> <label for="weekMaterialsAvail1" th:text="#{lbl.rawMaterial}"></label></li>
 									<li><input type="radio" id="weekMaterialsAvail2" name="weekMaterialsAvail" value="outerHalfProduct" /> <label for="weekMaterialsAvail2" th:text="#{lbl.osfp}"></label></li>
 								    <li class="manuel">
-	                                	<a href="#" id=weeklyMaterialAvailabilityRate><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:attr="title=#{lbl.description2}"/></a>
+	                                	<a href="#" id=weeklyMaterialAvailabilityRate><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
 	                                </li>
 								</ul>
 							</div>
@@ -407,7 +407,7 @@
     	
     	var msHmillion = /*[[#{lbl.hMillion}]]*/'';
     	$.each($(".cweekTxt"), function(n,v) {
-    		$(v).text(' ('+cWeek+', '+msHmillion+' )');
+    		$(v).text(' ('+cWeek+', '+msHmillion+')');
     	});
 
     	$.each($(".pweekTxt"), function(n,v) {

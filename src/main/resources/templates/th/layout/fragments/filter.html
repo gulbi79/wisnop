@@ -21,4 +21,30 @@
 </div>
 </th:block>
 
+<th:block th:fragment="filterViewHorizonFragment(radioYn, wType)">
+<div id="view_Her">
+	<strong class="filter_tit" id="filter_tit">View Horizon</strong>
+	<ul class="rdofl" th:if="${radioYn} == 'Y'">
+		<li><input type="radio" id="rSWeek" name="vhWeekType" value="SW" onchange="javascript:gfn_setViewH();" th:checked="${wType} == 'SW'"><label for="rSWeek" th:text="#{lbl.stdWeek}"></label></li>
+		<li><input type="radio" id="rPweek" name="vhWeekType" value="PW" onchange="javascript:gfn_setViewH();" th:checked="${wType} != 'SW'"><label for="rPweek" th:text="#{lbl.partialWeek}"></label></li>
+	</ul>
+	<div class="tlist">
+		<div class="tit2" th:text="#{lbl.start}"></div>
+		<input type="text" id="fromCal" name="fromCal" class="iptdate datepicker1" readonly value="" />
+		<input th:type="${wType} == 'SW' ? 'hidden' : 'text'" id="fromPWeek" name="fromPWeek" class="iptdateweek" disabled="disabled" value=""/>
+		<input th:type="${wType} == 'SW' ? 'text' : 'hidden'" id="fromWeek" name="fromWeek" class="iptdateweek" disabled="disabled" value=""/>
+		<input type="hidden" id="swFromDate" name="swFromDate"/>
+		<input type="hidden" id="pwFromDate" name="pwFromDate"/>
+	</div>
+	<div class="tlist">
+		<div class="tit2" th:text="#{lbl.end}"></div>
+		<input type="text" id="toCal" name="toCal" class="iptdate datepicker2" readonly value="" />
+		<input th:type="${wType} == 'SW' ? 'hidden' : 'text'" id="toPWeek" name="toPWeek" class="iptdateweek" disabled="disabled" value=""/>
+		<input th:type="${wType} == 'SW' ? 'text' : 'hidden'" id="toWeek" name="toWeek" class="iptdateweek" disabled="disabled" value=""/>
+		<input type="hidden" id="swToDate" name="swToDate"/>
+		<input type="hidden" id="pwToDate" name="pwToDate"/>
+	</div>
+</div>
+</th:block>
+
 </html>

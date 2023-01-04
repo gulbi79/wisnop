@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{th/layout/basebiz}">
+      
+<!-- style add -->
+<th:block layout:fragment="headStyle">
+</th:block>
+
+<!-- searchForm hidden add -->
+<th:block layout:fragment="searchFormHidden">
+</th:block>
+
+<!-- filter -->
+<th:block layout:fragment="filter">
+	<div class="tabMargin"></div>
+	<div class="scroll">
+		<div class="view_combo" id="divMonthAcc"></div>
+		<div class="view_combo" id="divMonth">
+			<div class="ilist">
+				<div class="itit" th:text="#{lbl.month}"></div>
+				<input type="text" id="fromMon" name="fromMon" class="iptdate datepicker2 monthpicker" value="">
+			</div>
+		</div>
+	</div>
+	<div class="bt_btn">
+		<a href="#" class="fl_app" id="btnSearch" th:text="#{lbl.search}"></a>
+	</div>
+</th:block>
+
+<!-- grid 영역 -->
+<th:block layout:fragment="contentScroll">
+	<div id="realgrid" class="realgrid1"></div>
+</th:block>
+
+<!-- 하단버튼 영역 -->
+<th:block layout:fragment="contentBottomButton">
+	<div class="cbt_btn roleWrite">	
+		<div class="bright">
+			<a id="btnReset" href="#" class="app1" th:text="#{lbl.reset}"></a>  
+			<a id="btnSave"  href="#" class="app2" th:text="#{lbl.save}"></a>
+		</div>
+	</div>
+</th:block>
+
+<!-- view script -->
+<th:block layout:fragment="contentjs">
+	<script th:inline="javascript">
+	var enterSearchFlag = "Y";
+	var rowsPasteObj = [], changeMap = [];
+	
+	//전역변수 설정
+  	var gridInstance, grdMain, dataProvider;
+  	var codeMap = {};
+	var codeMapEx;
+	var _siq =  "bsc.bscCompany";
+	
+	$(document).ready(function() {
+		gfn_formLoad();
+		fn_initCode();
+		fn_initFilter();
+		fn_events();
+		fn_initGrid();
+		gfn_tabresize();
+		
+		MONTHPICKER(null, 0, 0);
+		var baseDt = new Date();
+		$("#fromMon").monthpicker("option", "maxDate", new Date(baseDt.getFullYear(), baseDt.getMonth(), '01'));
+	});
+		
+	function fn_initCode() {
+		codeMap = gfn_getComCode("BSC_GRADE_CD,MONTH_ACC_TYPE", 'N');
+	}
+			
+	function fn_initFilter() {
+		gfn_setMsComboAll([
+			{target : 'divMonthAcc', id : 'rdoAqType', title : /*[[#{lbl.monthAccFlag}]]*/'', data : codeMap.MONTH_ACC_TYPE, exData:[""], type : "R"},
+		]);
+		
+		$(':radio[name=rdoAqType]:input[value="MON"]').attr("checked", true);
+	}
+			
+	function fn_initGrid() {
+		gridInstance = new GRID();
+		gridInstance.init("realgrid");
+		grdMain      = gridInstance.objGrid;
+		dataProvider = gridInstance.objData;
+
+		fn_setColumn();
+		fn_setFields();
+		fn_setOptions();
+		
+		grdMain.onEditRowChanged = function (grid, itemIndex, dataRow, field, oldValue, newValue) {
+			fn_gridCalc(dataRow, field, oldValue, newValue);
+		};
+
+		grdMain.onEditRowPasted = function(grid, itemIndex, dataRow, fields, oldValues, newValues) {
+			if (fields.length == newValues.length) {
+				fn_gridCalc(dataRow, field, oldValues, newValues);
+			} else {
+				var arrNewVal = [];
+				$.each(fields, function(n,v) {
+					arrNewVal.push(newValues[v]);
+				});
+				fn_gridCalc(dataRow, oldValues, arrNewVal);
+			}
+		};
+	}
+			
+	function fn_setColumn() {
+		var totAr =  ['BU_NM', 'DIV_NM', 'TEAM_NM', 'PART_NM'];
+		var columns = 
+		[
+			{ 
+				type      : "group",
+				name      : "DIV", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.division}]]*/"" },
+				width     : 460, 
+				columns   : [
+					{
+						name      : "BU_NM", 
+						fieldName : "BU_NM", 
+						header    : { text : /*[[#{lbl.bu}]]*/"" }, 
+						styles    : { textAlignment : "near", background : gfn_getArrDimColor(0)},
+						mergeRule : { criteria : "values['BU_CD'] + value" },
+						dynamicStyles:[gfn_getDynamicStyle(0, totAr)],
+						width     : 100, 
+						editable  : false 
+					}, {
+						name      : "DIV_NM", 
+						fieldName : "DIV_NM", 
+						header    : { text : /*[[#{lbl.division}]]*/"" }, 
+						styles    : { textAlignment : "near", background : gfn_getArrDimColor(1)},
+						mergeRule : { criteria : "values['DIV_CD'] + value" },
+						dynamicStyles:[gfn_getDynamicStyle(1, totAr)],
+						width     : 150, 
+						editable  : false 
+					}, {
+						name      : "TEAM_NM", 
+						fieldName : "TEAM_NM", 
+						header    : { text : /*[[#{lbl.team}]]*/"" }, 
+						styles    : { textAlignment : "near", background : gfn_getArrDimColor(2)},
+						mergeRule : { criteria : "values['TEAM_CD'] + value" },
+						dynamicStyles:[gfn_getDynamicStyle(2, totAr)],
+						width     : 130, 
+						editable  : false 
+					}, {
+						name      : "PART_NM", 
+						fieldName : "PART_NM", 
+						header    : { text : /*[[#{lbl.part}]]*/"" }, 
+						styles    : { textAlignment : "near", background : gfn_getArrDimColor(3)},
+						dynamicStyles:[gfn_getDynamicStyle(3, totAr)],
+						mergeRule : { criteria : "values['PART_CD'] + value" },
+						width     : 80, 
+						editable  : false 
+					}
+				]
+			}, { 
+				type      : "group",
+				name      : "ALL", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.total}]]*/"" },
+				width     : 270, 
+				columns   : [
+					{
+						name      : "HDR_WEIGHT_RATE", 
+						fieldName : "HDR_WEIGHT_RATE", 
+						header    : { text : /*[[#{lbl.weighted}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0.00"}, 
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 100, 
+						editable  : false 
+					}, {
+						name      : "TOT_BSC_VAL", 
+						fieldName : "TOT_BSC_VAL", 
+						header    : { text : /*[[#{lbl.bscScore}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0"},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 100, 
+						editable  : false 
+					}, {
+						name      : "TOT_BSC_GRADE", 
+						fieldName : "TOT_BSC_GRADE", 
+						header    : { text : /*[[#{lbl.class}]]*/"" }, 
+						styles    : { textAlignment : "center", background : gv_noneEditColor},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 70, 
+						editable  : false 
+					}
+				]
+			}, { 
+				type      : "group",
+				name      : "QC_ALL", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.qualityTotal}]]*/"" },
+				width     : 160, 
+				columns   : [
+					{
+						name      : "QC_WEIGHT_RATE", 
+						fieldName : "QC_WEIGHT_RATE", 
+						header    : { text : /*[[#{lbl.weighted}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0.00"}, 
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}, {
+						name      : "QC_BSC_VAL", 
+						fieldName : "QC_BSC_VAL", 
+						header    : { text : /*[[#{lbl.bscScore}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0"},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}
+				]
+			}, { 
+				type      : "group",
+				name      : "SALES_ALL", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.salesProfitTotal}]]*/"" },
+				width     : 160, 
+				columns   : [
+					{
+						name      : "SALES_WEIGHT_RATE", 
+						fieldName : "SALES_WEIGHT_RATE", 
+						header    : { text : /*[[#{lbl.weighted}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0.00"}, 
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}, {
+						name      : "SALES_BSC_VAL", 
+						fieldName : "SALES_BSC_VAL", 
+						header    : { text : /*[[#{lbl.bscScore}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0"},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}
+				]
+			}, { 
+				type      : "group",
+				name      : "INV_ALL", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.ibt}]]*/"" },
+				width     : 160, 
+				columns   : [
+					{
+						name      : "INV_WEIGHT_RATE", 
+						fieldName : "INV_WEIGHT_RATE", 
+						header    : { text : /*[[#{lbl.weighted}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0.00"}, 
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}, {
+						name      : "INV_BSC_VAL", 
+						fieldName : "INV_BSC_VAL", 
+						header    : { text : /*[[#{lbl.bscScore}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0"},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}
+				]
+			
+			}, { 
+				type      : "group",
+				name      : "SNOP_ALL", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.snopTotal}]]*/"" },
+				width     : 160, 
+				columns   : [
+					{
+						name      : "SNOP_WEIGHT_RATE", 
+						fieldName : "SNOP_WEIGHT_RATE", 
+						header    : { text : /*[[#{lbl.weighted}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0.00"}, 
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}, {
+						name      : "SNOP_BSC_VAL", 
+						fieldName : "SNOP_BSC_VAL", 
+						header    : { text : /*[[#{lbl.bscScore}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0"},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}
+				]
+			}, { 
+				type      : "group",
+				name      : "INOVATION_ALL", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.inovationTotal}]]*/"" },
+				width     : 160, 
+				columns   : [
+					{
+						name      : "INVT_WEIGHT_RATE", 
+						fieldName : "INVT_WEIGHT_RATE", 
+						header    : { text : /*[[#{lbl.weighted}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0.00"}, 
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}, {
+						name      : "INVT_BSC_VAL", 
+						fieldName : "INVT_BSC_VAL", 
+						header    : { text : /*[[#{lbl.bscScore}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0"},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}
+				]
+			}, { 
+				type      : "group",
+				name      : "GWP_ALL", 
+				header    : { fixedHeight : 20, text : /*[[#{lbl.gwpTotal}]]*/"" },
+				width     : 160, 
+				columns   : [
+					{
+						name      : "GWP_WEIGHT_RATE", 
+						fieldName : "GWP_WEIGHT_RATE", 
+						header    : { text : /*[[#{lbl.weighted}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0.00"}, 
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}, {
+						name      : "GWP_BSC_VAL", 
+						fieldName : "GWP_BSC_VAL", 
+						header    : { text : /*[[#{lbl.bscScore}]]*/"" }, 
+						styles    : { textAlignment : "far", background : gv_noneEditColor, numberFormat : "#,##0"},
+						dynamicStyles:[gfn_getDynamicStyle(-1, totAr)],
+						width     : 80, 
+						editable  : false 
+					}
+				]
+			}
+		];
+		
+		grdMain.setColumns(columns); 
+	}
+	
+	function fn_setFields(cols) {
+		var fields = new Array();
+		fields = [
+			{ fieldName : "YEARMONTH"    , dataType : "text" },
+			{ fieldName : "GRP_LVL_ID"   , dataType : "text" },
+			{ fieldName : "BU_CD"        , dataType : "text" },
+			{ fieldName : "BU_NM"        , dataType : "text" },
+			{ fieldName : "DIV_CD"       , dataType : "text" },
+			{ fieldName : "DIV_NM"       , dataType : "text" },
+			{ fieldName : "TEAM_CD"      , dataType : "text" },
+			{ fieldName : "TEAM_NM"      , dataType : "text" },
+			{ fieldName : "PART_CD"      , dataType : "text" },
+			{ fieldName : "PART_NM"      , dataType : "text" },
+			
+			{ fieldName : "HDR_WEIGHT_RATE"   , dataType : "number" },
+			{ fieldName : "TOT_BSC_VAL"       , dataType : "number" },
+			{ fieldName : "TOT_BSC_GRADE"     , dataType : "text"  },
+			
+			{ fieldName : "QC_WEIGHT_RATE"    , dataType : "number" },
+			{ fieldName : "QC_BSC_VAL"        , dataType : "number" },
+
+			{ fieldName : "SALES_WEIGHT_RATE" , dataType : "number" },
+			{ fieldName : "SALES_BSC_VAL"     , dataType : "number" },
+
+			{ fieldName : "INV_WEIGHT_RATE"   , dataType : "number" },
+			{ fieldName : "INV_BSC_VAL"       , dataType : "number" },
+			
+			{ fieldName : "SNOP_WEIGHT_RATE"  , dataType : "number" },
+			{ fieldName : "SNOP_BSC_VAL"      , dataType : "number" },
+			
+			{ fieldName : "INVT_WEIGHT_RATE"  , dataType : "number" },
+			{ fieldName : "INVT_BSC_VAL"      , dataType : "number" },
+			
+			{ fieldName : "GWP_WEIGHT_RATE"   , dataType : "number" },
+			{ fieldName : "GWP_BSC_VAL"       , dataType : "number" },
+			{ fieldName : "TOT_WEIGHT_RATE"   , dataType : "number" },
+		];
+		
+		dataProvider.setFields(fields);
+	}
+			
+	function fn_setOptions() {
+		grdMain.setOptions({
+			stateBar: { visible      : true  },
+			sorting : { enabled      : false },
+			display : { columnMovable: false }
+		});
+
+		dataProvider.setOptions({
+			softDeleting : true
+		});
+		
+		grdMain.addCellStyles([{
+			id         : "editStyle",
+			editable   : true,
+			background : gv_editColor
+		}]);
+		
+		
+		var group = grdMain.columnByName("DIV");
+		if (group) {
+			var hide = !grdMain.getColumnProperty(group, "hideChildHeaders");
+			grdMain.setColumnProperty(group, "hideChildHeaders", hide);
+		}
+		
+		var valArray = ["ALL", "HDR_WEIGHT_RATE", "TOT_BSC_VAL", "TOT_BSC_GRADE", "SALES_ALL", "SALES_WEIGHT_RATE", "SALES_BSC_VAL", "SNOP_ALL", "SNOP_WEIGHT_RATE", "SNOP_BSC_VAL", "GWP_ALL", "GWP_WEIGHT_RATE", "GWP_BSC_VAL"];
+		var valArrayLen = valArray.length;
+		
+		for (var i = 0; i < valArrayLen; i++) {
+			var val = valArray[i];
+			var setHeader = grdMain.getColumnProperty(val, "header");
+			setHeader.styles = {background: gv_headerColor};
+			grdMain.setColumnProperty(val, "header", setHeader);
+		}
+	}
+			
+	function fn_gridCallback() {
+		var baseDt = new Date();
+		var yymm = baseDt.getFullYear() + '' + (baseDt.getMonth() + 1 < 10 ? '0' + (baseDt.getMonth() + 1) : baseDt.getMonth() + 1);
+		var yymmBefore = baseDt.getFullYear() + '' + (baseDt.getMonth() + 1 < 10 ? '0' + (baseDt.getMonth()) : baseDt.getMonth());
+		var tFromMon = FORM_SEARCH.fromMon;
+		var tRdoAqType = $('input:radio[name="rdoAqType"]:checked').val();
+		var rowCnt = dataProvider.getRowCount();
+		
+		if(rowCnt > 0){
+			fn_setTotal(tFromMon);
+		}
+		
+		if (!(yymm == tFromMon || yymmBefore == tFromMon) || tRdoAqType == "ACC") {
+			return false;
+		}
+		
+		var cols     = grdMain.getColumnNames();
+		var targetAr1 = new Array();
+		var arrIdx1   = new Array();
+		
+		for (var i = 0; i < rowCnt; i++) {
+			// 조건
+			if (dataProvider.getValue(i, "GRP_LVL_ID") == '3') {
+				arrIdx1.push(i);
+			}
+		}
+		
+		for (var j = 0; j < cols.length; j++) {
+			
+			if (cols[j].indexOf("HDR_WEIGHT_RATE") > -1) {
+				targetAr1.push(cols[j])
+			}
+		}
+	
+		grdMain.setCellStyles(arrIdx1, targetAr1 , "editStyle");
+	}
+			
+	function fn_setTotal(yymm) {
+		grdMain.commit();
+		
+		var current = grdMain.getCurrent();
+		var row     = current.dataRow;
+		var setCols = {
+			YEARMONTH     : yymm,
+			GRP_LVL_ID    : 15,
+			BU_CD         : null,
+			BU_NM         : 'Total',
+			TOT_BSC_VAL   : null,
+			TOT_BSC_GRADE : null
+		};
+		
+		dataProvider.insertRow(0, setCols);
+		var json = dataProvider.getJsonRow(2);
+		fn_gridCalc(2, 10, json.HDR_WEIGHT_RATE, json.HDR_WEIGHT_RATE);
+
+		dataProvider.setRowState(0, 'none');
+	}
+			
+	/*
+	* event 정의
+	*/
+	function fn_events() {
+		$("#btnSearch").on("click", function(e) {
+			fn_apply(false);
+		});
+		
+		$("#btnSave").on('click', function (e) {
+			fn_save();
+		});
+		
+		$("#btnReset").on('click', function (e) {
+			grdMain.cancel();
+			dataProvider.rollback(dataProvider.getSavePoints()[0]);
+			fn_gridCallback();
+		});
+	}
+		
+	// 조회
+	function fn_search() {
+		FORM_SEARCH._mtd     = "getList";
+		FORM_SEARCH.tranData = [{ outDs : "resList",_siq : _siq }];
+		var aOption = {
+			url     : GV_CONTEXT_PATH + "/biz/obj",
+			data    : FORM_SEARCH,
+			success : function (data) {
+				if (FORM_SEARCH.sql == 'N') {
+					dataProvider.clearRows(); //데이터 초기화
+			
+					//그리드 데이터 생성
+					grdMain.cancel();
+					
+					dataProvider.setRows(data.resList);
+					dataProvider.clearSavePoints();
+					dataProvider.savePoint(); //초기화 포인트 저장
+					gfn_setSearchRow(dataProvider.getRowCount());
+					
+					gridInstance.setFocusKeys();
+					fn_gridCallback();
+					
+					//excel download condition area
+					EXCEL_SEARCH_DATA = gfn_getExcelCondition($("#searchForm")); 
+				}
+			}
+		}
+		
+		gfn_service(aOption, "obj");
+	}
+		
+	function fn_save() {
+		var grdData = gfn_getGrdSavedataAll(grdMain);
+		if (grdData.length == 0) {
+			alert(/*[[#{msg.noChangeData}]]*/'');
+			return;
+		}
+		confirm(/*[[#{msg.confirmSave}]]*/'', function() {  // 저장하시겠습니까?
+			//var data = dataProvider.getJsonRows();
+			var data = gfn_getGrdSavedataAll(grdMain);
+			var jsonData = [];
+			$.each(data, function (i, jd) {
+				if (jd.GRP_LVL_ID == '3') {
+					jsonData.push(jd);
+				}
+			});
+			
+			FORM_SAVE = {}; //초기화
+			FORM_SAVE._mtd   = "saveAll";
+			FORM_SAVE.tranData = [{outDs:"saveCnt",_siq : _siq, grdData : jsonData, mergeFlag : "Y"}];
+			
+			gfn_service({
+				url    : GV_CONTEXT_PATH + "/biz/obj",
+				data   : FORM_SAVE,
+				success: function(data) {
+					alert(/*[[#{msg.saveOk}]]*/'');
+					fn_apply();
+				}
+			}, "obj");
+		});
+	}
+	
+	//조회
+	var fn_apply = function (sqlFlag) {
+		FORM_SEARCH     = $("#searchForm").serializeObject(); //초기화
+		FORM_SEARCH.sql = sqlFlag;
+		fn_search();
+	}
+
+	function fn_gridCalc(dataRow, field, oldValues, newVal) {
+		var provider = dataProvider;
+		provider.beginUpdate();
+		provider.setValue(dataRow, "HDR_WEIGHT_RATE", newVal);
+		try {
+			if ($.isArray(field)) {
+				var tmpOldVal;
+				$.each(field, function(n,v) {
+					var bsc = fn_getDivCalcVal (dataRow);
+					provider.setValue(0, "TOT_BSC_VAL", bsc);
+				});
+			} else {
+				var bsc = fn_getDivCalcVal (dataRow);
+				provider.setValue(0, "TOT_BSC_VAL", bsc);
+				var code = fn_getClaz (bsc);
+				provider.setValue(0, "TOT_BSC_GRADE", code);
+			}
+		} finally {
+			provider.endUpdate();
+		}
+	};
+	
+	function fn_getDivCalcVal(idx) {
+		var provider = dataProvider;
+		var rtnVal   = 0;
+		var startIdx = provider.getRowCount()-1;
+		for (var i = startIdx; i >= 0; i--) {
+			if (provider.getValue(i, gv_grpLvlId) == '3') {
+				rtnVal += ( ( Number(gfn_nvl(provider.getValue(i, "HDR_WEIGHT_RATE"),0))/ 100) * Number(gfn_nvl(provider.getValue(i, "TOT_BSC_VAL"),0)));
+			}
+		}
+		return rtnVal;
+	};
+	
+	function fn_getClaz(val) {
+		var code = '';
+		$.each (codeMap.BSC_GRADE_CD, function(i, v) {
+			if (Number(val) >= Number(v.ATTB_1_CD) && Number(val) < Number(v.ATTB_2_CD)) {
+				code = v.CODE_CD;
+				return false;
+			}
+		});
+		return code;
+	};
+	
+	function fn_checkClose() {
+		return gfn_getGrdSaveCount(grdMain) == 0;
+	}
+	</script>
+</th:block>
+	
+</html>

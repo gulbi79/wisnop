@@ -221,8 +221,9 @@ $.fn.serializeObject = function() {
 function gfn_getExcelCondition($form, callFn) {
 	var rtnO = [];
     $($form).find('input[type="text"], input[type="password"], input[type="checkbox"]:checked, input[type="radio"]:checked, select').each(function() {
+    	var oName = this.name;
     	var o = {};
-        if (this.name === null || this.name === undefined || this.name === '') return;
+        if (oName === null || oName === undefined || oName === '') return;
         
         var elemValue = null;
         if ($(this).is('select')) {
@@ -231,21 +232,19 @@ function gfn_getExcelCondition($form, callFn) {
         	} else {
         		elemValue = $(this).find('option:selected').text();
         	}
+        } else if ($(this).prop('type') === 'radio') {
+        	oName     = this.id;
+        	elemValue = $(this).next().text();
         } else {
-        	//datepicker 처리
-            if ($(this).hasClass("iptdate")) {
-            	elemValue = this.value.replace(/-/g, '');
-            } else {
-            	elemValue = this.value;
-            }
+        	elemValue = this.value;
         }
-        if (o[this.name] !== undefined) {
-            if (!o[this.name].push) {
-                o[this.name] = [o[this.name]];
+        if (o[oName] !== undefined) {
+            if (!o[oName].push) {
+                o[oName] = [o[oName]];
             }
-            o[this.name].push(elemValue || '');
+            o[oName].push(elemValue || '');
         } else {
-            o[this.name] = elemValue || '';
+            o[oName] = elemValue || '';
         }
         rtnO.push(o);
     });
@@ -266,7 +265,11 @@ function gfn_getExcelCondition($form, callFn) {
 			}
 			
 			if (gfn_isNull(exTitle)) {
-				exTitle = $("#"+key).siblings(".itit").length > 0 ? $("#"+key).siblings(".itit").text() : $("#"+key).parent().siblings(".itit").text();
+				if ($("#"+key).prop("type") === "radio") {
+					exTitle = $("#"+key).parent().parent().siblings(".filter_tit").text();
+				} else {
+					exTitle = $("#"+key).siblings(".itit").length > 0 ? $("#"+key).siblings(".itit").text() : $("#"+key).parent().siblings(".itit").text();
+				}
 			}
 			
 			let exValue = v[key];

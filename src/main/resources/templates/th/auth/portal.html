@@ -88,7 +88,7 @@
 		        </div>
 		        <div class="col_3">
 			        <div class="titleContainer">
-			        	<h4 th:text="#{lbl.prodInvStatusChart} + '(' + #{lbl.prevDayChart} + ',' + #{lbl.hMillion} + ')'"></h4>
+			        	<h4 th:text="#{lbl.prodInvStatusChart} + '(' + #{lbl.prevDayChart} + ', ' + #{lbl.hMillion} + ')'"></h4>
 			        	<div class="view_combo">
 							<ul class="rdofl">
 								<li><input type="radio" id="companyCons1" name="companyCons" value="companyCons"/> <label for="companyCons1" th:text="#{lbl.companyCons}"></label></li>
@@ -99,7 +99,7 @@
 		            <div style="height: 100%" id="chartInv1"></div>
 		        </div>
 		        <div class="col_3">
-		        	<h4 th:text="#{lbl.defectRateChart} + '(' + #{lbl.thisMonth} + ')'"></h4>
+		        	<h4 th:text="#{lbl.defectRateChart} + ' (' + #{lbl.thisMonth} + ')'"></h4>
 		        	<!-- <div style="height: 88%" id="chartDefRate"></div> -->
 		            <div class="graphwrap" id="chartDefRate"></div>
 		            <div class="textwrap">
@@ -107,18 +107,18 @@
 	                </div>
 		        </div>
 		   		<div class="col_3">
-		        	<h4 th:text="#{lbl.shipmentForecasting} + '(' + #{lbl.thisMonth} + ',' + #{lbl.hMillion} + ')'"></h4>
+		        	<h4 th:text="#{lbl.shipmentForecasting} + ' (' + #{lbl.thisMonth} + ', ' + #{lbl.hMillion} + ')'"></h4>
 		            <div class="graphwrap" id="chartSales"></div>
 		            <div class="textwrap">
 		            	<p th:text="#{lbl.achieRateChart2} + '(' + #{lbl.chartPredict} + ')'"></p>
 	                </div>
 		        </div>
 		        <div class="col_3">
-		        	<h4 th:text="#{lbl.matInv} + '(' + #{lbl.prevDayChart} + ',' + #{lbl.hMillion} + ')'"></h4>
+		        	<h4 th:text="#{lbl.matInv} + '(' + #{lbl.prevDayChart} + ', ' + #{lbl.hMillion} + ')'"></h4>
 		            <div style="height: 100%" id="chartInv2"></div>
 		        </div> 
 		        <div class="col_3">
-		        	<h4 th:text="#{lbl.weekPpcr}"><span class="cweekTxt"></span></h4>
+		        	<h4><span th:text="#{lbl.weekPpcr}"></span><span class="cweekTxt"></span></h4>
 		            <div class="graphwrap" id="chartProdComp"></div>
 		            <div class="textwrap">
 		            	<p th:text="#{lbl.cmplRateChart}"></p>
@@ -128,7 +128,7 @@
 	                </div>
 		        </div>
 		   		<div class="col_3">
-		        	<h4 th:text="#{lbl.weekSpcr}"><span class="cweekTxt"></span></h4>
+		        	<h4><span th:text="#{lbl.weekSpcr}"></span><span class="cweekTxt"></span></h4>
 		            <div class="graphwrap" id="chartSalesComp"></div>
 		            <div class="textwrap">
 		            	<p th:text="#{lbl.cmplRateChart}"></p>
@@ -139,7 +139,7 @@
 		        </div>
 		        <div class="col_3">
 			        <div class="titleContainer">
-			        	<h4 th:text="#{lbl.weekMpr}"><span class="pweekTxt"></span></h4>
+			        	<h4><span th:text="#{lbl.weekMpr}"></span><span class="pweekTxt"></span></h4>
 			            <div class="view_combo">
 									<ul class="rdofl">
 										<li><input type="radio" id="weekMaterialsAvail1" name="weekMaterialsAvail" value="rawMaterials" checked="checked"/> <label for="weekMaterialsAvail1" th:text="#{lbl.rawMaterial}"></label></li>
@@ -230,9 +230,10 @@
    			unitQuery = 1000000000;
    		}
    		
-   		$.each($(".cweekTxt"), function(n,v) {
-   			$(v).text(' ('+cWeek+', /*[[#{lbl.hMillion}]]*/)');
-   		});
+   		var msHmillion = /*[[#{lbl.hMillion}]]*/'';
+    	$.each($(".cweekTxt"), function(n,v) {
+    		$(v).text(' ('+cWeek+', '+msHmillion+')');
+    	});
 
    		$.each($(".pweekTxt"), function(n,v) {
    			$(v).text(' ('+pWeek+')');
