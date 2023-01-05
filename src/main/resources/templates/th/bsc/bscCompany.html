@@ -61,7 +61,7 @@
 		fn_initFilter();
 		fn_events();
 		fn_initGrid();
-		gfn_tabresize();
+		gfn_completedFormload();
 		
 		MONTHPICKER(null, 0, 0);
 		var baseDt = new Date();
@@ -554,7 +554,7 @@
 	}
 	
 	//조회
-	var fn_apply = function (sqlFlag) {
+	function fn_apply(sqlFlag) {
 		FORM_SEARCH     = $("#searchForm").serializeObject(); //초기화
 		FORM_SEARCH.sql = sqlFlag;
 		fn_search();

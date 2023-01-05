@@ -1966,7 +1966,10 @@ function gfn_siteMap() {
 	$("#sitemappop .scroll").html(menuHtml);
 }
 
-
+//iframe 로드 완료시 호출되는 공통함수
+function gfn_completedFormload() {
+	gfn_tabresize();
+}
 
 
 

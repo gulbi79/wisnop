@@ -268,17 +268,18 @@ function gfn_getExcelCondition($form, callFn) {
 				if ($("#"+key).prop("type") === "radio") {
 					exTitle = $("#"+key).parent().parent().siblings(".filter_tit").text();
 				} else {
-					exTitle = $("#"+key).siblings(".itit").length > 0 ? $("#"+key).siblings(".itit").text() : $("#"+key).parent().siblings(".itit").text();
+					exTitle = $("#"+key).siblings(".itit").length > 0 ? $("#"+key).siblings(".itit").text() : $("#"+key).parent().siblings(".itit, .filter_tit").text();
 				}
 			}
 			
 			let exValue = v[key];
 			let dateB = $("#"+key).hasClass("iptdate");
+			let dateweekB = $("#"+key).hasClass("iptdateweek");
 			
 			if (preTitle !== exTitle) {
 				rtnStr += (gfn_isNull(rtnStr) ? "" : "\n") + exTitle + " : " + exValue;
 			} else {
-				rtnStr += (dateB ? " ~ " : " ") + exValue;
+				rtnStr += (dateB ? " ~ " : " ") + (dateweekB ? "(" + exValue + ")" : exValue);
 			}
 			preTitle = exTitle;
 		}

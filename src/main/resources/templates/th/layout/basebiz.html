@@ -7,7 +7,7 @@
     <th:block layout:fragment="headStyle"></th:block>
 </head>
 <body id="framesb">
-	<div id="a" class="split content split-horizontal">
+	<div id="a" class="split split-horizontal" th:classappend="${menuInfo.producthrcyYn != 'Y' and menuInfo.customerhrcyYn != 'Y' and menuInfo.salesOrghrcyYn != 'Y'} ? 'content'">
         <div id="c" class="split content" th:if="${menuInfo.producthrcyYn == 'Y' or menuInfo.customerhrcyYn == 'Y' or menuInfo.salesOrghrcyYn == 'Y'}">
 		 	<!-- left tree -->
         	<th:block th:replace="~{th/layout/fragments/leftTree :: treeFragment}"></th:block>

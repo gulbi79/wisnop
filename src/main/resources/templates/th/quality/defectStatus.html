@@ -16,7 +16,6 @@
 
 <!-- filter -->
 <th:block layout:fragment="filter">
-	
 	<th:block th:replace="~{th/layout/fragments/filter :: filterMonthSumFragment}"></th:block>
 					
 	<div class="tabMargin"></div>
@@ -73,7 +72,7 @@
 		fn_initFilter();
 		fn_events();
 		fn_initGrid();
-		gfn_tabresize();
+		gfn_completedFormload();
 	});
 	
 	var _siq = "quality.defectStatus";
@@ -184,16 +183,7 @@
 					fn_gridCallBack();
 					
 					//excel download condition area
-					EXCEL_SEARCH_DATA = gfn_getExcelCondition($("#searchForm"), function(id) {
-						let filterTitle = "";
-						switch(id) {
-							case "fromMon" :
-							case "toMon" :
-								filterTitle = "View Horizon(확정일 기준)"
-								break;
-						}
-						return filterTitle;
-					}); 
+					EXCEL_SEARCH_DATA = gfn_getExcelCondition($("#searchForm")); 
 				}
 			}
 		}

@@ -212,13 +212,6 @@ function gfn_availableSize(pWidth) {
 }
 
 function gfn_tabresize(col) {
-	/* 컨텐츠 우측상단 트리선택값 나오는 부분 */
-	var tab_length = $(".srhTab ul li").length;
-	if(tab_length != undefined){
-		var tab_width = $(".srhTab ul").width();
-		$(".srhTab ul li").width(tab_width/tab_length-25); // margin값 13, padding값 12 크기의 왼쪽 여백이 있기 때문에 각각에 대해 그만큼 사이즈를 작게 해야함.
-	}
-	
 	if($(top.document).find(".header_wrap").css("display") == "none"){
 		var brheight = $(top.document).height() - 43;
 		$(top.document).find("iframe[name="+$("#frameMenuCd").val()+"]").css('height',brheight);
@@ -275,6 +268,13 @@ function gfn_tabresize(col) {
 			$('#a').width(availSize);
 			$('#b').width(bWidth);
 		}
+	}
+	
+	/* 컨텐츠 우측상단 트리선택값 나오는 부분 */
+	var tab_length = $(".srhTab ul li").length;
+	if (tab_length != undefined) {
+		var tab_width = $(".srhTab ul").width();
+		$(".srhTab ul li").width(tab_width / tab_length - 25); // margin값 13, padding값 12 크기의 왼쪽 여백이 있기 때문에 각각에 대해 그만큼 사이즈를 작게 해야함.
 	}
 	
 	// 높이조절 이후 그리드 영역에 맞게 크기 변경
