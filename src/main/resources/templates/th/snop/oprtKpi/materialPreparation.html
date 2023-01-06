@@ -47,22 +47,23 @@
     </div>
 </th:block>
 
-<!-- grid 영역 -->
-<th:block layout:fragment="contentScroll">
-	<div id="realgrid" style="width: 100%;" class="realgrid1"></div>
-</th:block>
-
-<!-- 하단버튼 영역 -->
-<th:block layout:fragment="contentBottomButton">
-	<div class="cbt_btn" style="height:25px">
-         <div class="bright">
-             <a style="display:none" href="javascript:;" id="btnConfirmY" class="app1 roleWrite" th:text="#{lbl.confirm}"></a>
-             <a style="display:none" href="javascript:;" id="btnConfirmN" class="app1 roleWrite" th:text="#{lbl.confirmCancel}"></a>
-             <a href="javascript:;" id="btnSummary" class="app1" th:text="#{lbl.summary}"></a>
-             <a href="javascript:;" id="btnReset" class="app1 roleWrite" th:text="#{lbl.reset}"></a>
-             <a href="javascript:;" id="btnSave" class="app2 roleWrite" th:text="#{lbl.save}"></a>
-         </div>
-     </div>
+<!-- grid -->
+<th:block layout:fragment="contentB">
+	<div id="grid1" class="fconbox">
+		<th:block th:replace="~{th/layout/fragments/commonLocation :: viewFragment}"></th:block>
+		<div class="scroll">
+			<div id="realgrid" style="width: 100%;" class="realgrid1"></div>
+		</div>
+		<div class="cbt_btn" style="height:25px">
+	         <div class="bright">
+	             <a style="display:none" href="javascript:;" id="btnConfirmY" class="app1 roleWrite" th:text="#{lbl.confirm}"></a>
+	             <a style="display:none" href="javascript:;" id="btnConfirmN" class="app1 roleWrite" th:text="#{lbl.confirmCancel}"></a>
+	             <a href="javascript:;" id="btnSummary" class="app1" th:text="#{lbl.summary}"></a>
+	             <a href="javascript:;" id="btnReset" class="app1 roleWrite" th:text="#{lbl.reset}"></a>
+	             <a href="javascript:;" id="btnSave" class="app2 roleWrite" th:text="#{lbl.save}"></a>
+	         </div>
+	     </div>
+	</div>
 </th:block>
 
 <!-- view script -->

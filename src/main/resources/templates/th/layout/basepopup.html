@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" 
+	  xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+	<th:block th:replace="~{th/layout/fragments/head :: headFragment('Y')}"></th:block>
+	
+	<!-- content script -->
+    <th:block layout:fragment="headStyle"></th:block>
+</head>
+<body>
+	<div id="keywordpop" class="popupDv">
+		<div class="pop_tit" th:text="${param.popupTitle}"></div>
+		<div class="popCont">
+			<div class="srhwrap">
+				<form id="searchForm" name="searchForm" method="POST">
+				<!-- hidden form -->
+    			<th:block layout:fragment="searchFormHidden"></th:block>
+    			
+				<!-- search condition html -->
+   				<th:block layout:fragment="searchForm"></th:block>
+   				
+				</form>
+ 				<div class="bt_btn">
+					<a href="#" id="btnSearch" class="fl_app" th:text="#{lbl.search}"></a>
+				</div>
+			</div>
+			
+			<th:block layout:fragment="contentScroll"></th:block>
+		
+			<!-- 하단버튼 영역 -->
+			<th:block layout:fragment="contentBottomButton"></th:block>
+			
+		</div>
+	</div>
+	
+	<th:block th:replace="~{th/layout/fragments/script :: commonFormFragment('Y')}"></th:block>
+	
+	<th:block th:replace="~{th/layout/fragments/script :: scriptFragment('Y','N')}"></th:block>
+	
+	<!-- content script -->
+    <th:block layout:fragment="contentjs"></th:block>
+</body>
+</html>

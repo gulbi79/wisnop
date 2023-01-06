@@ -218,12 +218,15 @@ $.fn.serializeObject = function() {
 /**
  excel condition
  */
-function gfn_getExcelCondition($form, callFn) {
+function gfn_getExcelCondition($form, callFn, arrSkip = []) {
 	var rtnO = [];
     $($form).find('input[type="text"], input[type="password"], input[type="checkbox"]:checked, input[type="radio"]:checked, select').each(function() {
     	var oName = this.name;
     	var o = {};
         if (oName === null || oName === undefined || oName === '') return;
+        
+        //skip
+        if (arrSkip.findIndex(v => v === oName) > -1) return; 
         
         var elemValue = null;
         if ($(this).is('select')) {
@@ -269,6 +272,13 @@ function gfn_getExcelCondition($form, callFn) {
 					exTitle = $("#"+key).parent().parent().siblings(".filter_tit").text();
 				} else {
 					exTitle = $("#"+key).siblings(".itit").length > 0 ? $("#"+key).siblings(".itit").text() : $("#"+key).parent().siblings(".itit, .filter_tit").text();
+					if ($("#"+key).siblings(".itit").length > 0) {
+						exTitle = $("#"+key).siblings(".itit").text();
+					} else if ($("#"+key).parent().siblings(".itit, .filter_tit").length > 0) {
+						exTitle = $("#"+key).parent().siblings(".itit, .filter_tit").text();
+					} else if ($("#"+key).parent().siblings("strong").length > 0) {
+						exTitle = $("#"+key).parent().siblings("strong").text();
+					}
 				}
 			}
 			

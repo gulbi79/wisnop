@@ -30,25 +30,26 @@
 	</div>
 </th:block>
 
-<!-- grid 영역 -->
-<th:block layout:fragment="contentScroll">
-	<div id="realgrid" class="realgrid1"></div>
-</th:block>
-
-<!-- 하단 버튼 영역 -->
-<th:block layout:fragment="contentBottomButton">
-	<div class="cbt_btn">
-		<div class="bleft">
-			<a href="javascript:;" id="btnOpenPopup" class="app authClass MNG10501" th:text="#{lbl.reptItemGroupMgmt}"></a>
-			<a href="javascript:;" id="btnOpenMenu" class="app" th:text="#{lbl.itemMaster}"></a>
+<!-- grid -->
+<th:block layout:fragment="contentB">
+	<div id="grid1" class="fconbox">
+		<th:block th:replace="~{th/layout/fragments/commonLocation :: viewFragment}"></th:block>
+		<div class="scroll">
+			<div id="realgrid" style="width: 100%;" class="realgrid1"></div>
 		</div>
-		<div class="bright">
-			<a href="javascript:;" id="btnReset" class="app1" th:text="#{lbl.reset}"></a>
-			<a href="javascript:;" id="btnSave" class="app2 roleWrite" th:text="#{lbl.save}"></a>
+		<div class="cbt_btn">
+			<div class="bleft">
+				<a href="javascript:;" id="btnOpenPopup" class="app authClass MNG10501" th:text="#{lbl.reptItemGroupMgmt}"></a>
+				<a href="javascript:;" id="btnOpenMenu" class="app" th:text="#{lbl.itemMaster}"></a>
+			</div>
+			<div class="bright">
+				<a href="javascript:;" id="btnReset" class="app1" th:text="#{lbl.reset}"></a>
+				<a href="javascript:;" id="btnSave" class="app2 roleWrite" th:text="#{lbl.save}"></a>
+			</div>
 		</div>
 	</div>
 </th:block>
-      
+
 <!-- view script -->
 <th:block layout:fragment="contentjs">
 	<script th:inline="javascript">

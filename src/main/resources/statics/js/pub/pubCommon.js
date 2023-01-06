@@ -181,7 +181,7 @@ function gfn_formResize() {
     		minSize: 1,
     		cursor: 'row-resize',
     		onDrag: function() {
-    			gfn_tabresize('col');
+    			gfn_tabresize();
     		}
     	});
     }
@@ -195,23 +195,40 @@ function gfn_formResize() {
     		minSize: 100,
     		cursor: 'row-resize',
     		onDrag: function() {
-    			gfn_tabresize('col');
+    			gfn_tabresize();
     		}
     	});
     }
 }
 
 //callback 함수
-function gfn_availableSize(pWidth) {
-	if ($("#filterDv .scroll").hasVerticalScrollBar()) selectorAWidth = "270px";
-	else selectorAWidth = "249px";
-	
-	if (pWidth) selectorAWidth = pWidth;
-	if (selectorAWidth != undefined) return selectorAWidth.substring(0,selectorAWidth.length-2); //px 제거 
-	else return selectorAWidth;
+function gfn_availableSize(pWidth){
+	if (pWidth){
+		selectorAWidth = pWidth;
+	} 
+	if (selectorAWidth != undefined){
+		
+		//px 제거	
+		return selectorAWidth.substring(0,selectorAWidth.length-2);	
+	} else {
+		return selectorAWidth;
+	}
 }
 
 function gfn_tabresize(col) {
+	
+	/* 영역 지정 */
+	// col = 좌우분할화면 이동여부 / 좌우 분할 화면이 움직일때는 아래의 구문이 동작하면 안됨.
+	if (gfn_availableSize() != undefined && col!="col") {
+		if ($("#a").css("display") != "none") {  
+			// 브라우저가 IE8 일때는 document.documentElement.clientWidth 이걸로..			
+			var browser_width = window.innerWidth || document.body.clientWidth;
+			$('#a').css('width', gfn_availableSize()+'px');
+			// 25 는 영역외의 짜투리 값
+			$('#b').css('width', (browser_width - gfn_availableSize()-25)+'px');	
+		}
+	}
+
 	/* 컨텐츠 우측상단 트리선택값 나오는 부분 */
 	var tab_length = $(".srhTab ul li").length;
 	if(tab_length != undefined){
@@ -233,8 +250,8 @@ function gfn_tabresize(col) {
 	var ddiv = 0;
 	
 	// 트리없는 필터영역 스크롤 높이 구하기
-	if ($("#a").length && !$("#c").length) {
-		if($("#filterDv .scroll").position() != undefined) {
+	if($("#a").length && !$("#c").length){
+		if($("#filterDv .scroll").position() != undefined){
 			var ah_top = $("#filterDv .scroll").position().top; 
 			var ah_bottom = $("#filterDv .bt_btn").height() + 8; // 버튼 상단 여백 20
 			adiv = $("#a").height() - ah_top - ah_bottom;
@@ -242,16 +259,16 @@ function gfn_tabresize(col) {
 	}
 	
 	// 트리영역 스크롤 높이 구하기
-	if ($("#c").height()) {
-		if($("#treewrap .scroll").position() != undefined) {
+	if($("#c").height()){
+		if($("#treewrap .scroll").position() != undefined){
 			var ch_top = $("#treewrap .scroll").position().top;
 			cdiv = $("#c").height() - ch_top - 1; // 스크롤의 상하여백 합이 16
 		}
 	}
 	
 	// 필터영역 스크롤 높이 구하기
-	if ($("#d").height()) {
-		if ($("#filterDv .scroll").position() != undefined) {
+	if($("#d").height()){
+		if($("#filterDv .scroll").position() != undefined){
 			var dh_top = $("#filterDv .scroll").position().top - $("#d").position().top + 8; // 필터의 상단 여백 8
 			var dh_bottom = $("#filterDv .bt_btn").height() + 8; // 버튼상단 여백 20
 			ddiv = $("#d").height() - dh_top - dh_bottom;
@@ -263,19 +280,6 @@ function gfn_tabresize(col) {
 	if ($("#c").length) $("#treewrap .treeborder").height(cdiv);
 	if ($("#c").length) $("#treewrap .scroll").height(cdiv);
 	if ($("#d").length) $("#filterDv .scroll").height(ddiv);
-	
-	/* 영역 지정 */
-	// col = 좌우분할화면 이동여부 / 좌우 분할 화면이 움직일때는 아래의 구문이 동작하면 안됨.
-	var availSize = gfn_availableSize();
-	if (availSize != undefined && col != "col") {
-		if ($("#a").css("display") != "none") {
-			// 브라우저가 IE8 일때는 document.documentElement.clientWidth 이걸로..			
-			var browser_width = window.innerWidth || document.body.clientWidth;
-			var bWidth = browser_width - availSize - 26; // 26 는 영역외의 짜투리 값
-			$('#a').width(availSize);
-			$('#b').width(bWidth);
-		}
-	}
 	
 	// 높이조절 이후 그리드 영역에 맞게 크기 변경
 	$.each(GV_ARR_GRID, function() {

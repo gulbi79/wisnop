@@ -1,74 +1,69 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-	<th:block th:replace="~{th/layout/fragments/head :: headFragment('Y')}"></th:block>
-</head>
-<body>
-	<div id="keywordpop" class="popupDv">
-		<div class="pop_tit" th:text="${param.popupTitle}"></div>
-		<div class="popCont">
-			<div class="srhwrap">
-				<form id="searchForm" name="searchForm" method="POST" onSubmit="return false;">
-				<input type="hidden" id="POP_TYPE" name="POP_TYPE" th:value="${param.popType}">
-				<div class="srhcondi">
-				<ul>
-					<li>
-					<strong class="srhcondipop" th:text="#{lbl.item}"></strong>
-					<div class="selectBox">
-					<input type="text" id="ITEM_NM" name="ITEM_NM" th:value="${param.ITEM_NM}" class="ipt" style="width:115px;">
-					</div>
-					</li>
-					<li>
-					<strong class="srhcondipop" th:text="#{lbl.itemType}"></strong>
-					<div class="selectBox">
-					<select id="ITEM_TYPE" name="ITEM_TYPE" multiple="multiple"></select>
-					</div>
-					</li>
-					<li>
-					<strong class="srhcondipop" th:text="#{lbl.itemGroup}"></strong>
-					<div class="selectBox">
-					<input type="text" id="ITEM_GROUP_CD" name="ITEM_GROUP_CD" value="" class="ipt" style="width:115px;">
-					</div>
-					</li>
-				</ul>
-				<ul>
-					<li>
-					<strong class="srhcondipop" th:text="#{lbl.spec}"></strong>
-					<div class="selectBox">
-					<input type="text" id="SPEC" name="SPEC" value="" class="ipt" style="width:115px;">
-					</div>
-					</li>
-					<li>
-					<strong class="srhcondipop" th:text="#{lbl.drawNo}"></strong>
-					<div class="selectBox">
-					<input type="text" id="DRAW_NO" name="DRAW_NO" value="" class="ipt" style="width:115px;">
-					</div>
-					</li>
-					<li>
-					<strong class="srhcondipop" th:text="#{lbl.custGroup}"></strong>
-					<div class="selectBox">
-					<input type="text" id="CUST_GROUP_CD" name="CUST_GROUP_CD" value="" class="ipt" style="width:115px;">
-					</div>
-					</li>
-				</ul>
-				</div>
-				</form>
- 				<div class="bt_btn">
-					<a href="#" id="btnSearch" class="fl_app" th:text="#{lbl.search}"></a>
-				</div>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{th/layout/basepopup}">
+      
+<th:block layout:fragment="searchFormHidden">
+	<input type="hidden" id="POP_TYPE" name="POP_TYPE" th:value="${param.popType}">
+</th:block>
+
+<th:block layout:fragment="searchForm">
+	<div class="srhcondi">
+		<ul>
+			<li>
+			<strong class="srhcondipop" th:text="#{lbl.item}"></strong>
+			<div class="selectBox">
+			<input type="text" id="ITEM_NM" name="ITEM_NM" th:value="${param.ITEM_NM}" class="ipt" style="width:115px;">
 			</div>
-			<div id="realgrid" class="realgrid1"></div>
-			<div class="pop_btn">
-				<a href="#" id="btnApply" class="pbtn pApply" th:text="#{lbl.apply}"></a>
-				<a href="#" id="btnClose" class="pbtn pClose" th:text="#{lbl.close}"></a>
+			</li>
+			<li>
+			<strong class="srhcondipop" th:text="#{lbl.itemType}"></strong>
+			<div class="selectBox">
+			<select id="ITEM_TYPE" name="ITEM_TYPE" multiple="multiple"></select>
 			</div>
+			</li>
+			<li>
+			<strong class="srhcondipop" th:text="#{lbl.itemGroup}"></strong>
+			<div class="selectBox">
+			<input type="text" id="ITEM_GROUP_CD" name="ITEM_GROUP_CD" value="" class="ipt" style="width:115px;">
+			</div>
+			</li>
+		</ul>
+		<ul>
+			<li>
+			<strong class="srhcondipop" th:text="#{lbl.spec}"></strong>
+			<div class="selectBox">
+			<input type="text" id="SPEC" name="SPEC" value="" class="ipt" style="width:115px;">
+			</div>
+			</li>
+			<li>
+			<strong class="srhcondipop" th:text="#{lbl.drawNo}"></strong>
+			<div class="selectBox">
+			<input type="text" id="DRAW_NO" name="DRAW_NO" value="" class="ipt" style="width:115px;">
+			</div>
+			</li>
+			<li>
+			<strong class="srhcondipop" th:text="#{lbl.custGroup}"></strong>
+			<div class="selectBox">
+			<input type="text" id="CUST_GROUP_CD" name="CUST_GROUP_CD" value="" class="ipt" style="width:115px;">
+			</div>
+			</li>
+		</ul>
 		</div>
+</th:block>
+
+<th:block layout:fragment="contentScroll">
+	<div id="realgrid" class="realgrid1"></div>
+</th:block>
+
+<th:block layout:fragment="contentBottomButton">
+	<div class="pop_btn">
+		<a href="#" id="btnApply" class="pbtn pApply" th:text="#{lbl.apply}"></a>
+		<a href="#" id="btnClose" class="pbtn pClose" th:text="#{lbl.close}"></a>
 	</div>
-	
-	<th:block th:replace="~{th/layout/fragments/script :: commonFormFragment('Y')}"></th:block>
-	
-	<th:block th:replace="~{th/layout/fragments/script :: scriptFragment('Y','N')}"></th:block>
-	
+</th:block>
+
+<th:block layout:fragment="contentjs">
 	<script th:inline="javascript" type="text/javascript">
 	var popupWidth, popupHeight;
 	var gridInstance, grdMain, dataProvider;
@@ -283,5 +278,5 @@
 	}
 	
 	</script>
-</body>
+</th:block>
 </html>

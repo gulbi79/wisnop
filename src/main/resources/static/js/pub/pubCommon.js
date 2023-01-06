@@ -157,7 +157,7 @@ function brresize(){
 
 function gfn_formResize() {
 	selectorAWidth = '240px'; // 초기값
-	gfn_tabresize();
+	//gfn_tabresize();
 
 	if ($("#a").length) {
 		Split(['#a', '#b'], {

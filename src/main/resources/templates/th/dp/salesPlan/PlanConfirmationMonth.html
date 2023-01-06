@@ -65,19 +65,20 @@
 	</div>
 </th:block>
 
-<!-- grid 영역 -->
-<th:block layout:fragment="contentScroll">
-	<div id="realgrid" class="realgrid1"></div>
-	<div id="realgridExcel" class="realgrid1" style="display: none"></div>
-</th:block>
-
-<!-- 하단버튼 영역 -->
-<th:block layout:fragment="contentBottomButton">
-	<div class="cbt_btn">
-		<div class="bleft"></div>
-		<div class="bright">
-			<a href="javascript:;" id="btnChart" class="app1" th:text="#{lbl.chart}"></a>
-			<a href="javascript:;" id="btnSummary" class="app1" th:text="#{lbl.summary}"></a>
+<!-- grid -->
+<th:block layout:fragment="contentB">
+	<div id="grid1" class="fconbox">
+		<th:block th:replace="~{th/layout/fragments/commonLocation :: viewFragment}"></th:block>
+		<div class="scroll">
+			<div id="realgrid" style="width: 100%;" class="realgrid1"></div>
+			<div id="realgridExcel" class="realgrid1" style="display: none"></div>
+		</div>
+		<div class="cbt_btn">
+			<div class="bleft"></div>
+			<div class="bright">
+				<a href="javascript:;" id="btnChart" class="app1" th:text="#{lbl.chart}"></a>
+				<a href="javascript:;" id="btnSummary" class="app1" th:text="#{lbl.summary}"></a>
+			</div>
 		</div>
 	</div>
 </th:block>
