@@ -127,7 +127,7 @@
 	   	</form>
 	   	</th:block>
 	   	
-	   	<form id="commonPopForm" name="commonPopForm" method="POST" onSubmit="return false;">
+	   	<form id="commonPopForm" name="commonPopForm" method="POST" onSubmit="return false;" th:action="@{/}">
 	   	</form>
 	   	
 	   	<th:block th:if="${popupYn} == 'Y'">

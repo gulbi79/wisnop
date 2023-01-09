@@ -1,6 +1,5 @@
 package wi.com.wisnop.config;
 
-import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +17,7 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import lombok.RequiredArgsConstructor;
+import wi.com.wisnop.security.filter.CsrfMatcher;
 import wi.com.wisnop.security.handler.CustomAuthenticationProvider;
 
 @Configuration
@@ -27,7 +27,7 @@ public class SecurityConfig {
 	
 	/* 로그인 실패 핸들러 의존성 주입 */
     private final AuthenticationFailureHandler customFailureHandler;
-	
+
 	/**
      * 1. 정적 자원(Resource)에 대해서 인증된 사용자가  정적 자원의 접근에 대해 ‘인가’에 대한 설정을 담당하는 메서드이다.
      *
@@ -53,8 +53,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        // 서버에 인증정보를 저장하지 않기에 csrf를 사용하지 않는다.
-        http.csrf().disable();
+        http.csrf().disable(); //thymeleaf로 전환 될때까지 csrf를 사용하지 않는다.
+//    	http.csrf().ignoringRequestMatchers(csrfMatcher());
 
         http.authorizeHttpRequests()
         	.antMatchers("/th/common/**").authenticated()
@@ -125,6 +125,11 @@ public class SecurityConfig {
     @Bean
     public SessionRegistry sessionRegistry() {
         return new SessionRegistryImpl();
+    }
+
+    @Bean
+    public CsrfMatcher csrfMatcher() {
+    	return new CsrfMatcher();
     }
 
     // was가 여러개 있을 때(session clustering)

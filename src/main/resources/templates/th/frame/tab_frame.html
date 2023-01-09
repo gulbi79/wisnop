@@ -7,7 +7,7 @@
 </head>
 <body>
 	<div>
-		<form id="menuForm" name="menuForm" method="POST" onSubmit="return false;">
+		<form id="menuForm" name="menuForm" method="POST" onSubmit="return false;" th:action="@{/}">
 			<input type="hidden" id="moduleCd" name="moduleCd" th:value="${paramMap.moduleCd}" />
 			<input type="hidden" id="menuCd" name="menuCd" th:value="${paramMap.menuCd}" />
 			<input type="hidden" id="menuUrl" name="menuUrl" th:value="${paramMap.menuUrl}" />

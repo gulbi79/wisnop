@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{th/layout/basepopup}">
+      
+<th:block layout:fragment="searchFormHidden">
+</th:block>
+
+<th:block layout:fragment="searchForm">
+	<div class="srhcondi">
+		<ul>
+			<li>
+			<strong>Name</strong>
+			<div class="selectBox">
+			<input type="text" id="CUST_NM" name="CUST_NM" th:value="${param.CUST_NM}" class="ipt">
+			</div>
+			</li>
+		</ul>
+	</div>
+</th:block>
+
+<th:block layout:fragment="contentScroll">
+	<div id="realgrid" class="realgrid1"></div>
+</th:block>
+
+<th:block layout:fragment="contentBottomButton">
+	<div class="pop_btn">
+		<a href="#" id="btnApply" class="pbtn pApply" th:text="#{lbl.apply}"></a>
+		<a href="#" id="btnClose" class="pbtn pClose" th:text="#{lbl.close}"></a>
+	</div>
+</th:block>
+
+<th:block layout:fragment="contentjs">
+	<script th:inline="javascript" type="text/javascript">
+	var popupWidth, popupHeight;
+	var gridInstance, grdMain, dataProvider;
+	var searchCode, searchName;
+	var arrChkData = [];
+	var chkData = [];
+	var chkKeyData = [];
+	
+	$("document").ready(function (){
+		gfn_popresize();
+		fn_init();
+		fn_initGrid();
+		fn_apply();
+		fn_initEvent(); //이벤트 정의
+	});
+	
+	$(window).resize(function() {
+		gfn_popresizeSub();
+	}).resize();
+	
+	function fn_init() {
+		searchCode = /*[[${param.searchCode[0]}]]*/"";
+		searchName = /*[[${param.searchName[0]}]]*/"";
+		
+		if (gfn_isNull(searchCode) && !gfn_isNull(searchName)) {
+			$("#CUST_NM").val(searchName);
+		}
+	}
+	
+	//이벤트 정의
+	function fn_initEvent() {
+		$("#btnSearch").click("on", function() {
+			fn_apply();
+		});
+	
+		$("#btnClose").on("click", function() {
+			window.close();
+		});
+	
+		$("#btnApply").on("click", function() {
+			var rows = grdMain.getCheckedRows(true);
+			var returnData = [];
+			$.each(rows, function(n,v) {
+				returnData.push(dataProvider.getJsonRow(v));
+			});
+			
+			fn_setData(returnData);
+		});
+	}
+	
+	function fn_setData(returnData) {
+		var strCallback = /*[[${param.callback[0]}]]*/"";
+		var strObjId = /*[[${param.objId[0]}]]*/"";
+		var strRowId = /*[[${param.get('rowId')}]]*/"";
+		if(strCallback != "" && strCallback != null) {
+			//필터 키워드 팝업			
+			if (strCallback == "gfn_comPopupCallback") {
+				eval("opener."+strCallback)(returnData,strObjId,"CUST_CD","CUST_NM");
+			} else {
+				eval("opener."+strCallback)(returnData,strRowId);
+			}
+		}
+		window.close();
+	}
+	
+	function fn_apply() {
+		var rows = grdMain.getCheckedRows(true);
+		gfn_clearArrayObject(arrChkData);
+		gfn_clearArrayObject(chkKeyData);
+		gfn_clearArrayObject(chkData);
+		$.each(rows, function(n,v) {
+			chkKeyData.push(dataProvider.getValue(v,"CUST_CD"));
+			chkData.push(dataProvider.getValue(v,"CUST_CD"));
+			arrChkData.push(dataProvider.getJsonRow(v));
+		});
+		
+		var data = $("#searchForm").serializeObject();
+		data.CHK_DATA  = chkKeyData.toString();
+		data.INIT_DATA = searchCode;
+		fn_getGridData(data);
+	}
+	
+	//그리드를 그린다.
+	function fn_initGrid() {
+		//변수처리
+		gridInstance = new GRID();
+		gridInstance.init("realgrid");
+		grdMain = gridInstance.objGrid;
+		dataProvider = gridInstance.objData;
+	
+	    fn_setFields(dataProvider); //set fields
+	    fn_setColumns(grdMain); // set columns
+	    fn_setOptions(grdMain);
+	
+	    grdMain.onItemChecked = function (grid, itemIndex, checked) {
+	    	if (/*[[${param.singleYn[0]} + '== "Y"']]*/"") {
+	    		var items = grdMain.getCheckedItems();
+	    		if(items.length>1) {
+	    			grdMain.checkAll(false);
+	    			grdMain.checkRow(itemIndex, true);
+	    		}
+	    	}
+	    };
+	    
+	    grdMain.onDataCellDblClicked =  function (grid, index) {
+	   	  	var returnData = [];
+	   	 	returnData.push(dataProvider.getJsonRow(index.dataRow));
+	   	 	fn_setData(returnData);
+	   	};
+	}
+	
+	function fn_setOptions(grd) {
+		var showAll = true;
+		if (/*[[${param.singleYn[0]} + '== "Y"']]*/"") {
+			showAll = false;
+		}
+	
+	    grd.setOptions({
+	        checkBar: { visible: true, showAll:showAll },
+	        edit    : { insertable: false, appendable: false, updatable: false, editable: false, deletable: false},
+	    });
+	}
+	
+	function fn_setFields(provider) {
+		//필드 배열 객체를  생성합니다.
+	    var fields = [
+	        {fieldName: "CUST_CD"},
+	        {fieldName: "CUST_NM"}
+	    ];
+	    //DataProvider의 setFields함수로 필드를 입력합니다.
+	    dataProvider.setFields(fields);
+	}
+	
+	function fn_setColumns(tree) {
+		//필드와 연결된 컬럼 배열 객체를 생성합니다.
+	    var columns = [
+			{name: "CUST_CD", fieldName: "CUST_CD", header: {text: /*[[#{lbl.customer}]]*/''    }, styles: {textAlignment: "center"}, width: 80 },
+			{name: "CUST_NM", fieldName: "CUST_NM", header: {text: /*[[#{lbl.customerName}]]*/''}, styles: {textAlignment: "near"}, width: 242 }
+	    ];
+	    //컬럼을 GridView에 입력 합니다.김
+	    grdMain.setColumns(columns);
+	}
+	
+	var fn_gridCallback = function(data) {
+		grdMain.cancel();
+		var grdData = data.rtnList;
+		dataProvider.setRows($.merge(arrChkData, grdData));
+		searchCode = chkKeyData.toString() || searchCode;
+		dataProvider.clearSavePoints();
+		dataProvider.savePoint(); //초기화 포인트 저장
+		gfn_unblockUI();
+		
+		//코드가 있는경우 체크
+		if(!gfn_isNull(searchCode)) {
+			var arrCode = searchCode.split(",");
+			$.each(arrCode, function(n,v) {
+				for (var i=0; i<dataProvider.getRowCount(); i++) {
+					if (grdMain.getValue(i, "CUST_CD") == v) {
+						grdMain.checkRow(i,true,false);
+						break;
+					}
+				}
+			});
+		}
+		
+		grdMain.resetCurrent();
+	};
+	
+	//그리드 데이터 조회
+	function fn_getGridData(data) {
+		data._mtd = "getList";
+		data.tranData = [{outDs:"rtnList",_siq:"common.customerPopup"}];
+		var sMap = {
+	        url: GV_CONTEXT_PATH + "/biz/obj",
+	        data: data,
+	        success:fn_gridCallback,
+	    }
+		gfn_service(sMap,"obj");
+	}
+	
+	</script>
+</th:block>
+</html>

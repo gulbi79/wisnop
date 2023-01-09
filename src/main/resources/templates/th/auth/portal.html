@@ -3,6 +3,8 @@
 <head>
  	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<meta name="_csrf" th:content="${_csrf.token}"/>
+	<meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 	<title>wonik qnc</title>
 	
 	<link th:href="@{/static/css/jquery-ui.css}" href="/static/css/jquery-ui.css" rel="stylesheet"/>
@@ -160,7 +162,7 @@
 					<Strong th:text="${session.userInfo.userNm} + '님'"></Strong> 환영합니다.
 					&nbsp;<img id="btn_logout" style="cursor:pointer;" th:attr="src=@{/static/images/portal/btn_logout.png}" src="/static/images/portal/btn_logout.png" alt="">
 				</div>
-		    	<form id="mainForm2" name="mainForm2" method="POST">
+		    	<form id="mainForm2" name="mainForm2" method="POST" th:action="@{/th/common/godashboard}">
 				<input type="hidden" id="bu" name="bu" value="">
 		  		<div class="sel">
 		  			<select name="company" title="company" style="margin-bottom:4px;">

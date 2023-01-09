@@ -3,6 +3,8 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<meta name="_csrf" th:content="${_csrf.token}"/>
+	<meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 	<title>WonIk S&OP</title>
 	
 	<link th:href="@{/static/css/style.css}" href="/static/css/style.css" rel="stylesheet" />
@@ -18,7 +20,7 @@
 			<div id="util">
 			<ul>
 				<li class="tselect">
-					<form id="mainForm" name="mainForm" method="POST" onSubmit="return false;">
+					<form id="mainForm" name="mainForm" method="POST" onSubmit="return false;" th:action="@{/}">
 					<input type="hidden" id="userTimeInt" name="userTimeInt" value="" />
 					<input type="hidden" id="userLang" name="userLang" th:value="${session.GV_LANG}" />
 					<select id="company" name="company" title="company">

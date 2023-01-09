@@ -161,7 +161,7 @@
 </th:block>
 <th:block th:fragment="menuHiddenFragment">
 	<div>
-		<form id="menuForm" name="menuForm" method="POST" onSubmit="return false;">
+		<form id="menuForm" name="menuForm" method="POST" onSubmit="return false;" th:action="@{/}">
 			<input type="hidden" id="moduleCd" name="moduleCd" value="" />
 			<input type="hidden" id="menuCd" name="menuCd" value="" />
 			<input type="hidden" id="frameMenuCd" name="frameMenuCd" value="" />
@@ -191,7 +191,7 @@
 		</ul>
 	</div>
 	
-	<form id="pdfPopForm" name=pdfPopForm method="POST" onSubmit="return false;">
+	<form id="pdfPopForm" name=pdfPopForm method="POST" onSubmit="return false;" th:action="@{/th/common/popup/pdfViewerPopup}">
    	</form>
 </th:block>
 </html>

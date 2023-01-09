@@ -181,7 +181,7 @@
 	    fn_setOptions(grdMain);
 	
 	    grdMain.onItemChecked = function (grid, itemIndex, checked) {
-	    	if(/*[[${param.singleYn[0]} + '== "Y"']]*/"") {
+	    	if (/*[[${param.singleYn[0]} + '== "Y"']]*/"") {
 	    		var items = grdMain.getCheckedItems();
 	    		if(items.length>1) {
 	    			grdMain.checkAll(false);

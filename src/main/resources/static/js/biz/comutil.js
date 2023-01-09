@@ -267,24 +267,27 @@ function gfn_getExcelCondition($form, callFn, arrSkip = []) {
 				exTitle = callFn.call(this,key);
 			}
 			
+			let objKey = $("#"+key).length > 0 ? $("#"+key) : $("input[name='"+key+"']");
 			if (gfn_isNull(exTitle)) {
 				if ($("#"+key).prop("type") === "radio") {
-					exTitle = $("#"+key).parent().parent().siblings(".filter_tit").text();
+					exTitle = objKey.parent().parent().siblings(".filter_tit").text();
 				} else {
-					exTitle = $("#"+key).siblings(".itit").length > 0 ? $("#"+key).siblings(".itit").text() : $("#"+key).parent().siblings(".itit, .filter_tit").text();
+					exTitle = objKey.siblings(".itit").length > 0 ? objKey.siblings(".itit").text() : objKey.parent().siblings(".itit, .filter_tit").text();
 					if ($("#"+key).siblings(".itit").length > 0) {
-						exTitle = $("#"+key).siblings(".itit").text();
-					} else if ($("#"+key).parent().siblings(".itit, .filter_tit").length > 0) {
-						exTitle = $("#"+key).parent().siblings(".itit, .filter_tit").text();
-					} else if ($("#"+key).parent().siblings("strong").length > 0) {
-						exTitle = $("#"+key).parent().siblings("strong").text();
+						exTitle = objKey.siblings(".itit").text();
+					} else if (objKey.parent().siblings(".itit, .filter_tit").length > 0) {
+						exTitle = objKey.parent().siblings(".itit, .filter_tit").text();
+					} else if (objKey.parent().siblings("strong").length > 0) {
+						exTitle = objKey.parent().siblings("strong").text();
+					} else if (objKey.siblings("strong").length > 0) {
+						exTitle = objKey.siblings("strong").text();
 					}
 				}
 			}
 			
 			let exValue = v[key];
-			let dateB = $("#"+key).hasClass("iptdate");
-			let dateweekB = $("#"+key).hasClass("iptdateweek");
+			let dateB = objKey.hasClass("iptdate");
+			let dateweekB = objKey.hasClass("iptdateweek");
 			
 			if (preTitle !== exTitle) {
 				rtnStr += (gfn_isNull(rtnStr) ? "" : "\n") + exTitle + " : " + exValue;

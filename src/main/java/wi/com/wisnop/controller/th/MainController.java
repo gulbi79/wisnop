@@ -9,6 +9,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
+import org.springframework.context.support.DelegatingMessageSource;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.ObjectUtils;
@@ -24,6 +26,7 @@ import org.thymeleaf.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import wi.com.wisnop.common.constant.Namespace;
+import wi.com.wisnop.common.message.DatabaseDrivenMessageSource;
 import wi.com.wisnop.common.webutil.CommUtil;
 import wi.com.wisnop.common.webutil.SessionUtil;
 import wi.com.wisnop.dto.common.MenuVO;
@@ -47,6 +50,7 @@ public class MainController {
 	
     private final CommonService commonService;
     private final LoginService loginService;
+	private final MessageSource messageSource;
 
     @RequestMapping(value = "/loginAfter")
 	public ModelAndView submit(@AuthenticationPrincipal UserDetailsDto userDto,
@@ -265,4 +269,18 @@ public class MainController {
 		return mav;
 	}
 	
+	@RequestMapping(value = "/locale/applyLocale", method= RequestMethod.POST)
+    public @ResponseBody Map<String, Object> applyLocale(HttpServletRequest request, HttpServletResponse response) throws Exception {
+		if (messageSource instanceof DatabaseDrivenMessageSource) {
+			((DatabaseDrivenMessageSource)messageSource).reload();
+		} else if (messageSource instanceof DelegatingMessageSource) {
+			DelegatingMessageSource myMessage = ((DelegatingMessageSource)messageSource);
+			if (myMessage.getParentMessageSource() != null && myMessage.getParentMessageSource() instanceof DatabaseDrivenMessageSource) {
+				((DatabaseDrivenMessageSource) myMessage.getParentMessageSource()).reload();
+			}
+		}
+		Map<String,Object> hm = new HashMap<String,Object>();
+		hm.put("errMsg", "success");
+		return hm;
+    }
 }
