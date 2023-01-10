@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+	  xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+	<th:block th:replace="~{th/layout/fragments/head :: headFragment('N')}"></th:block>
+
+	<th:block layout:fragment="headStyle"></th:block>
+</head>
+<body id="framesb" class="portalFrame">
+	<!-- contents -->
+	<div id="grid1" class="fconbox">
+		<th:block th:replace="~{th/layout/fragments/commonLocation :: viewFragment}"></th:block>
+		
+		<div class="scroll" style="height:calc(100% - 35px)">
+			
+			<!-- container -->
+			<th:block layout:fragment="container"></th:block>
+			
+			<!-- sitemap -->
+			<div id="cont_chart3">
+				<div id="cont_chart">
+					<div class="col_3" style="height:100%;width:100%;margin: 0;padding:0">
+			            <div id="sitemappop" style="margin: 0; display:block; height:calc(100% - 30px);width:100%;">
+							<div class="drag">
+								<div style="height: 100%;padding: 15px 0px 15px 10px;">
+									<div class="scroll"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+		</div>
+	</div>
+	
+	<th:block th:replace="~{th/layout/fragments/script :: commonFormFragment('N')}"></th:block>
+	
+	<th:block th:replace="~{th/layout/fragments/script :: scriptFragment('N','Y')}"></th:block>
+	
+	<th:block layout:fragment="contentjs"></th:block>
+</body>
+</html>

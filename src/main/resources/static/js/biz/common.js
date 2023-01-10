@@ -60,7 +60,13 @@ function gfn_service(ajaxMap, appType) {
         
         ajaxMap.error = function() {
         	gfn_unblockUI();
-        	tmpError;
+        	//세션만료
+	        if (err.status === 403) {
+	        	console.log("세션이 만료되었습니다");
+	          	top.location.replace(GV_CONTEXT_PATH + "/th/auth/login"); //여기서 최상위 프레임을 로그인 창으로 이동시킴
+	        } else {
+	        	tmpError;
+			}
         };
 	}
 

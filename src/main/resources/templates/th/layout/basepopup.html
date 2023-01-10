@@ -9,7 +9,7 @@
 </head>
 <body>
 	<div id="keywordpop" class="popupDv">
-		<div class="pop_tit" th:text="${param.popupTitle}"></div>
+		<th:block layout:fragment="popupTitle"></th:block>
 		<div class="popCont">
 			<div class="srhwrap">
 				<form id="searchForm" name="searchForm" method="POST">

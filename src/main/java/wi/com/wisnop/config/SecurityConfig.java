@@ -18,6 +18,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import lombok.RequiredArgsConstructor;
 import wi.com.wisnop.security.filter.CsrfMatcher;
+import wi.com.wisnop.security.handler.AjaxAuthenticationEntryPoint;
 import wi.com.wisnop.security.handler.CustomAuthenticationProvider;
 
 @Configuration
@@ -81,6 +82,10 @@ public class SecurityConfig {
 	    	.logoutSuccessUrl("/th/auth/logout")
 //	    	.deleteCookies("JSESSIONID", "remember - me") // 로그아웃 후 해당 쿠키 삭제
 	    	.invalidateHttpSession(true);
+    	
+    	http.exceptionHandling()
+		    .authenticationEntryPoint(new AjaxAuthenticationEntryPoint("/th/auth/login"))
+			.accessDeniedPage("/th/auth/denied");
         
         http.headers()
 			.frameOptions().sameOrigin();

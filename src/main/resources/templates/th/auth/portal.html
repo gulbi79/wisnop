@@ -3,8 +3,8 @@
 <head>
  	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-	<meta name="_csrf" th:content="${_csrf.token}"/>
-	<meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+	<meta name="_csrf" th:content="${_csrf?.token}"/>
+	<meta name="_csrf_header" th:content="${_csrf?.headerName}"/>
 	<title>wonik qnc</title>
 	
 	<link th:href="@{/static/css/jquery-ui.css}" href="/static/css/jquery-ui.css" rel="stylesheet"/>

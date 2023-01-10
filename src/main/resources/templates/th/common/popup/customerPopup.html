@@ -2,7 +2,11 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{th/layout/basepopup}">
-      
+
+<th:block layout:fragment="popupTitle">
+	<div class="pop_tit" th:text="${param.popupTitle}"></div>
+</th:block>
+
 <th:block layout:fragment="searchFormHidden">
 </th:block>
 
