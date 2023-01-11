@@ -185,7 +185,7 @@
     #cont_chart .col_3 > .titleContainer > .action ul > li:hover {
      font-weight: 600;
     }
-	</style>	
+	</style>
 </th:block>
 
 <th:block layout:fragment="container">
@@ -194,7 +194,7 @@
 			<!-- 출하 준수율 1-->
 			<div class="col_3" >
 				<div class="titleContainer">
-					<h4 id="shipmentComplianceRateH4" th:text="#{lbl.salesCmplRateChart2} + ' (%)'"></h4>
+					<h4 id="shipmentComplianceRateH4" th:text="|#{lbl.salesCmplRateChart2} (%)|"></h4>
 					<div class="view_combo" >
 						<ul class="rdofl">
 							<li><input type="radio" id="salesInv1" name="salesInv" value="inv" checked="checked"/><label for="salesInv1" th:text="#{lbl.salesInvY}"></label></li>
@@ -221,14 +221,14 @@
 			<!-- 출하 적중률 2-->
 			<div class="col_3">
 				<div class="titleContainer">
-					<h4 id="shipmentHitRateH4" th:text="#{lbl.salesHittingRation} + ' (%)'"></h4>
+					<h4 id="shipmentHitRateH4" th:text="|#{lbl.salesHittingRation} (%)|"></h4>
 					<div class="view_combo" >
 						<ul class="rdofl">
 							<li><input type="radio" id="salesFcst1" name="salesFcst" value="cust"/> <label for="salesFcst1" th:text="#{lbl.reptCust}"></label></li>
 							<li><input type="radio" id="salesFcst2" name="salesFcst" value="total" checked="checked"/> <label for="salesFcst2" th:text="#{lbl.total}"></label></li>
 						    <li class="manuel">
-                                      <a href="#" id="shipmentHitRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                 <a href="#" id="shipmentHitRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                             </li>
 						</ul>
 					</div>
 				</div>
@@ -244,14 +244,14 @@
 			<!-- 출하 달성률 3-->
 			<div class="col_3">
 				<div class="titleContainer">
-					<h4 id="shipmentAchievementRateH4" th:text="#{lbl.achieRateChart4} + ' (M+3) (%)'"></h4>
+					<h4 id="shipmentAchievementRateH4" th:text="|#{lbl.achieRateChart4} (M+3) (%)|"></h4>
 					<div class="view_combo" >
 						<ul class="rdofl">
 							<li><input type="radio" id="achivRt1" name="achivRt" value="cust"/> <label for="achivRt1" th:text="#{lbl.reptCust}"></label></li>
 							<li><input type="radio" id="achivRt2" name="achivRt" value="total" checked="checked"/> <label for="achivRt2" th:text="#{lbl.total}"></label></li>
 						    <li class="manuel">
-                                      <a href="#" id="shipmentAchievementRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                 <a href="#" id="shipmentAchievementRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                             </li>
 						</ul>
 					</div>
 				</div>
@@ -271,8 +271,8 @@
 					<div class="view_combo" style="float: right;">
 					     <ul class="rdofl">
 					         <li class="manuel">
-                                      <a href="#" id="cpfrShipmentPlanTrend"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                 <a href="#" id="cpfrShipmentPlanTrend"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                             </li>
 					     </ul>
 					</div>
 				</div>
@@ -290,23 +290,23 @@
 			
 			<!-- CPFR 출하계획 & 실적 5-->
 			<div class="col_3">
-			   <div class="titleContainer">
+				<div class="titleContainer">
 					<h4 id="cpfrShipmentPlanNPerformanceH4" th:text="#{lbl.cpfrShipPlanResult}"></h4>
 					<div class="view_combo" style="float: right;">
 						<ul class="rdofl">
 						    <li class="manuel">
-                                      <a href="#" id="cpfrShipmentPlanNPerformance"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                <a href="#" id="cpfrShipmentPlanNPerformance"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
 						</ul>
 					</div>
 				</div>
 				<div style="height: 100%" id="cpfrShipPlanResultChart"></div>
 			    <div class="modal" id="cpfrShipmentPlanNPerformanceContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-5"></div>
-                         </div>
-                     </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-5"></div>
+                    </div>
+                </div>
 			</div>
 			
 			<!-- 수주 잔량 (S/O) 6-->
@@ -319,18 +319,18 @@
 							<li><input type="radio" id="chart23Prod" name="chart23Radio" value="prod" /> <label for="chart23Prod" th:text="#{lbl.prodCate}"></label></li>
 							<li><input type="radio" id="chart23Tot" name="chart23Radio" value="total"/> <label for="chart23Tot" th:text="#{lbl.total}"></label></li>
 						    <li class="manuel">
-                                      <a href="#" id="remainingOrderAmountSO"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                <a href="#" id="remainingOrderAmountSO"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
 						</ul>
 					</div>
 				</div>
 				<div style="height: 100%;clear:both;" id="chart23"></div>
 			    <div class="modal" id="remainingOrderAmountSOContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-6"></div>
-                         </div>
-                     </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-6"></div>
+                    </div>
+                </div>
 			</div>
 			
 			<!-- 출하 TREND 7-->
@@ -346,18 +346,18 @@
 							<li><input type="radio" id="chart24_type3" name="chart24_type" value="prod" /> <label for="chart24_type3" th:text="#{lbl.prodCate}"></label></li>
 							<li><input type="radio" id="chart24_type2" name="chart24_type" value="total" checked="checked"/> <label for="chart24_type2" th:text="#{lbl.total}"> </label></li>
 						    <li class="manuel">
-                                      <a href="#" id="shipmentTrend"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                <a href="#" id="shipmentTrend"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
 						</ul>
 					</div>
 				</div>
 				<div style="height: 100%;clear:both;" id="chart24"></div>
 				<div class="modal" id="shipmentTrendContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-7"></div>
-                         </div>
-                     </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-7"></div>
+                    </div>
+                </div>
 			</div>
 			
 			<!-- 매출 TREND 8-->
@@ -373,22 +373,21 @@
 							<li><input type="radio" id="chart2_type3" name="chart2_type" value="prod" /> <label for="chart2_type3" th:text="#{lbl.prodCate}"></label></li>
 							<li><input type="radio" id="chart2_type2" name="chart2_type" value="total" checked="checked"/> <label for="chart2_type2" th:text="#{lbl.total}"> </label></li>
 						    <li class="manuel">
-                                      <a href="#" id="salesTrend"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                <a href="#" id="salesTrend"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
 						</ul>
 					</div>
 				</div>
 				<div style="height: 100%;clear:both;" id="chart2"></div>
 				<div class="modal" id="salesTrendContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-8"></div>
-                         </div>
-                     </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-8"></div>
+                    </div>
+                </div>
 			</div>
 			
 			<!-- 영업 이익 9-->
-			
 			<div class="col_3">
 				<th:block th:if="${session.userInfo.dashboardYn == 'Y'}">
 				<div class="titleContainer">	
@@ -399,28 +398,28 @@
 							<li><input type="radio" id="operProfitProd" name="operProfitType" value="prod" /> <label for="operProfitProd" th:text="#{lbl.prodCate}"></label></li>
 							<li><input type="radio" id="operProfitTotal" name="operProfitType" value="total" checked="checked"/> <label for="operProfitTotal" th:text="#{lbl.total}"></label></li>
 						    <li class="manuel">
-                                      <a href="#" id="operatingProfit"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
+                                <a href="#" id="operatingProfit"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
 						</ul>
 					</div>
 				</div>
 				<div style="height: 100%;clear:both;" id="operProfit"></div>
 				<div class="modal" id="operatingProfitContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-9"></div>
-                         </div>
-                     </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-9"></div>
+                    </div>
+                </div>
 				</th:block>
 				<th:block th:if="${session.userInfo.dashboardYn != 'Y'}">
 				<h4></h4>
 				<div style="height: 88%;display:none;" id="operProfit"></div>
 				<div class="modal" id="operatingProfitContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-9"></div>
-                         </div>
-                     </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-9"></div>
+                    </div>
+                </div>
 				</th:block>
 			</div>
 		</div>
@@ -429,29 +428,31 @@
 
 <th:block layout:fragment="contentjs">
 	<script th:inline="javascript">
-	var quill_1,quill_2,quill_3,quill_4,quill_5,quill_6,quill_7,quill_8,quill_9;
+	var arrQuill = [
+		{chartId: "shipmentComplianceRate", quillObj: null},
+		{chartId: "shipmentHitRate", quillObj: null},
+		{chartId: "shipmentAchievementRate", quillObj: null},
+		{chartId: "cpfrShipmentPlanTrend", quillObj: null},
+		{chartId: "cpfrShipmentPlanNPerformance", quillObj: null},
+		{chartId: "remainingOrderAmountSO", quillObj: null},
+		{chartId: "shipmentTrend", quillObj: null},
+		{chartId: "salesTrend", quillObj: null},
+		{chartId: "operatingProfit", quillObj: null},
+	];
 	var unit = 0;
 	var demendTrend1 = {
-
 		init : function () {
 			gfn_formLoad();
-			fn_siteMap();
-
-
+			gfn_siteMap();
             fn_quilljsInit();
-            
-			
 			this.initSearch();
 			this.events();
-			
 			var userLang = /*[[${session.GV_LANG}]]*/"";
-			
-			if(userLang == "ko"){
+			if (userLang == "ko") {
 	    		unit = 100000000;
-	    	}else if(userLang == "en" || userLang == "cn"){
+	    	} else if (userLang == "en" || userLang == "cn") {
 	    		unit = 1000000000;
 	    	}
-			
 		},
 	
 		_siq	: "dashboard.demendTrend.",
@@ -515,18 +516,12 @@
 	    	});
 			
 			$(".manuel > a").dblclick("on", function() {
-	            
 	            var chartId  = this.id;
-	        
 	            fn_popUpAuthorityHasOrNot();
-	            
 	            var isSCMTeam = SCM_SEARCH.isSCMTeam;
-	            
-	            if(isSCMTeam>=1)
-	            {
+	            if (isSCMTeam>=1) {
 	            	//출하 준수율
-	            	if(chartId == "shipmentComplianceRate")
-	            	{
+	            	if (chartId == "shipmentComplianceRate") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -535,10 +530,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-	            	}
 	            	//출하 적중률
-	            	else if(chartId == "shipmentHitRate")
-	            	{
+	            	} else if(chartId == "shipmentHitRate") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -547,10 +540,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-	            	}
 	            	//출하 달성률
-	            	else if(chartId == "shipmentAchievementRate")
-                    {
+	            	} else if(chartId == "shipmentAchievementRate") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -559,10 +550,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-                    }
 	            	//CPFR 출하계획 TREND
-	            	else if(chartId == "cpfrShipmentPlanTrend")
-                    {
+                    } else if(chartId == "cpfrShipmentPlanTrend") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -571,10 +560,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-                    }
 	            	//CPFR 출하계획 & 실적
-	            	else if(chartId == "cpfrShipmentPlanNPerformance")
-                    {
+                    } else if(chartId == "cpfrShipmentPlanNPerformance") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -583,10 +570,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-                    }
 	            	//수주 잔량 (S/O)
-	            	else if(chartId == "remainingOrderAmountSO")
-                    {
+                    } else if(chartId == "remainingOrderAmountSO") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -595,10 +580,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-                    }
 	            	//출하 TREND
-	            	else if(chartId == "shipmentTrend")
-                    {
+                    } else if(chartId == "shipmentTrend") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -607,10 +590,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-                    }
 	            	//매출 TREND
-	            	else if(chartId == "salesTrend")
-                    {
+                    } else if(chartId == "salesTrend") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -619,10 +600,8 @@
 	                        chartId   : chartId,
 	                        title     : "Dashboard Chart Info"
 	                    });
-                    }
 	            	//영업이익
-	            	else if(chartId == "operatingProfit")
-                    {
+                    } else if(chartId == "operatingProfit") {
 	            		gfn_comPopupOpen("DASHBOARD_CHART_INFO", {
 	                        rootUrl   : "dashboard",
 	                        url       : "dashBoardChartInfoPopup",
@@ -632,163 +611,104 @@
 	                        title     : "Dashboard Chart Info"
 	                    });
                     }
-	            	
 	            }
-	            
-	            
 			});
 			
+			$(".manuel > a").click("on", function() {
+				var chartId  = this.id;
+                //출하 준수율
+                if(chartId == "shipmentComplianceRate") {
+                	$('#chart10').toggle();
+                	$('#shipmentComplianceRateContent').toggle();
+                //출하 적중률
+                } else if(chartId == "shipmentHitRate") {
+                    $('#chart11').toggle();
+                    $('#shipmentHitRateContent').toggle();
+                //출하 달성률
+                } else if(chartId == "shipmentAchievementRate") {
+                    $('#chart12').toggle();
+                    $('#shipmentAchievementRateContent').toggle();
+                //CPFR 출하계획 TREND
+                } else if(chartId == "cpfrShipmentPlanTrend") {
+                    $('#cpfrShipmentPlanTrendTable').toggle();
+                    $('#cpfrShipmentPlanTrendContent').toggle();
+                //CPFR 출하계획 & 실적
+                } else if(chartId == "cpfrShipmentPlanNPerformance") {
+                    $('#cpfrShipPlanResultChart').toggle();
+                    $('#cpfrShipmentPlanNPerformanceContent').toggle();
+                //수주 잔량 (S/O)
+                } else if(chartId == "remainingOrderAmountSO") {
+                    $('#chart23').toggle();
+                    $('#remainingOrderAmountSOContent').toggle();
+                //출하 TREND
+                } else if(chartId == "shipmentTrend") {
+                    $('#chart24').toggle();
+                    $('#shipmentTrendContent').toggle();
+                //매출 TREND
+                } else if(chartId == "salesTrend") {
+                    $('#chart2').toggle();
+                    $('#salesTrendContent').toggle();
+                //영업이익
+                } else if(chartId == "operatingProfit") {
+                    $('#operProfit').toggle();
+                    $('#operatingProfitContent').toggle();
+                }
+			});
 			
-		     $(".manuel > a").click("on", function() {
-		        		            
-		            var chartId  = this.id;
-		            
-
-                    //출하 준수율
-                    if(chartId == "shipmentComplianceRate")
-                    {
-                    	$('#chart10').toggle();
-                    	$('#shipmentComplianceRateContent').toggle();
-                    }
-                    //출하 적중률
-                    else if(chartId == "shipmentHitRate")
-                    {
-                        $('#chart11').toggle();
-                        $('#shipmentHitRateContent').toggle();
-                    }
-                    //출하 달성률
-                    else if(chartId == "shipmentAchievementRate")
-                    {
-                        $('#chart12').toggle();
-                        $('#shipmentAchievementRateContent').toggle();
-                    }
-                    //CPFR 출하계획 TREND
-                    else if(chartId == "cpfrShipmentPlanTrend")
-                    {
-                        $('#cpfrShipmentPlanTrendTable').toggle();
-                        $('#cpfrShipmentPlanTrendContent').toggle();
-                    }
-                    //CPFR 출하계획 & 실적
-                    else if(chartId == "cpfrShipmentPlanNPerformance")
-                    {
-                        $('#cpfrShipPlanResultChart').toggle();
-                        $('#cpfrShipmentPlanNPerformanceContent').toggle();
-                    }
-                    //수주 잔량 (S/O)
-                    else if(chartId == "remainingOrderAmountSO")
-                    {
-                        $('#chart23').toggle();
-                        $('#remainingOrderAmountSOContent').toggle();
-                    }
-                    //출하 TREND
-                    else if(chartId == "shipmentTrend")
-                    {
-                        $('#chart24').toggle();
-                        $('#shipmentTrendContent').toggle();
-                    }
-                    //매출 TREND
-                    else if(chartId == "salesTrend")
-                    {
-                        $('#chart2').toggle();
-                        $('#salesTrendContent').toggle();
-                    }
-                    //영업이익
-                    else if(chartId == "operatingProfit")
-                    {
-                        $('#operProfit').toggle();
-                        $('#operatingProfitContent').toggle();
-                    }
-		            
-		     });
-			
-		     $(".titleContainer > h4").hover(function() {
-		            
-		            var chartId  = this.id;
-		            
-
-                    //출하 준수율
-                    if(chartId == "shipmentComplianceRateH4")
-                    {
-                        $('#chart10').toggle();
-                        $('#shipmentComplianceRateContent').toggle();
-                    }
-                    //출하 적중률
-                    else if(chartId == "shipmentHitRateH4")
-                    {
-                        $('#chart11').toggle();
-                        $('#shipmentHitRateContent').toggle();
-                    }
-                    //출하 달성률
-                    else if(chartId == "shipmentAchievementRateH4")
-                    {
-                        $('#chart12').toggle();
-                        $('#shipmentAchievementRateContent').toggle();
-                    }
-                    //CPFR 출하계획 TREND
-                    else if(chartId == "cpfrShipmentPlanTrendH4")
-                    {
-                        $('#cpfrShipmentPlanTrendTable').toggle();
-                        $('#cpfrShipmentPlanTrendContent').toggle();
-                    }
-                    //CPFR 출하계획 & 실적
-                    else if(chartId == "cpfrShipmentPlanNPerformanceH4")
-                    {
-                        $('#cpfrShipPlanResultChart').toggle();
-                        $('#cpfrShipmentPlanNPerformanceContent').toggle();
-                    }
-                    //수주 잔량 (S/O)
-                    else if(chartId == "remainingOrderAmountSOH4")
-                    {
-                        $('#chart23').toggle();
-                        $('#remainingOrderAmountSOContent').toggle();
-                    }
-                    //출하 TREND
-                    else if(chartId == "shipmentTrendH4")
-                    {
-                        $('#chart24').toggle();
-                        $('#shipmentTrendContent').toggle();
-                    }
-                    //매출 TREND
-                    else if(chartId == "salesTrendH4")
-                    {
-                        $('#chart2').toggle();
-                        $('#salesTrendContent').toggle();
-                    }
-                    //영업이익
-                    else if(chartId == "operatingProfitH4")
-                    {
-                        $('#operProfit').toggle();
-                        $('#operatingProfitContent').toggle();
-                    }
-		            
-		     });
+			$(".titleContainer > h4").hover(function() {
+				var chartId  = this.id;
+                //출하 준수율
+                if (chartId == "shipmentComplianceRateH4") {
+                    $('#chart10').toggle();
+                    $('#shipmentComplianceRateContent').toggle();
+				//출하 적중률
+                } else if(chartId == "shipmentHitRateH4") {
+                    $('#chart11').toggle();
+                    $('#shipmentHitRateContent').toggle();
+                //출하 달성률
+                } else if(chartId == "shipmentAchievementRateH4") {
+                    $('#chart12').toggle();
+                    $('#shipmentAchievementRateContent').toggle();
+                //CPFR 출하계획 TREND
+                } else if(chartId == "cpfrShipmentPlanTrendH4") {
+                    $('#cpfrShipmentPlanTrendTable').toggle();
+                    $('#cpfrShipmentPlanTrendContent').toggle();
+                //CPFR 출하계획 & 실적
+                } else if(chartId == "cpfrShipmentPlanNPerformanceH4") {
+                    $('#cpfrShipPlanResultChart').toggle();
+                    $('#cpfrShipmentPlanNPerformanceContent').toggle();
+                //수주 잔량 (S/O)
+                } else if(chartId == "remainingOrderAmountSOH4") {
+                    $('#chart23').toggle();
+                    $('#remainingOrderAmountSOContent').toggle();
+                //출하 TREND
+                } else if(chartId == "shipmentTrendH4") {
+                    $('#chart24').toggle();
+                    $('#shipmentTrendContent').toggle();
+                //매출 TREND
+                } else if(chartId == "salesTrendH4") {
+                    $('#chart2').toggle();
+                    $('#salesTrendContent').toggle();
+                //영업이익
+                } else if(chartId == "operatingProfitH4") {
+                    $('#operProfit').toggle();
+                    $('#operatingProfitContent').toggle();
+                }
+		    });
 		     
-		     /*
-		     $('.titleContainer > .action').hover(function(){
-		    	
-		    	 var chartId = this.id;
-	                
-	                
-	                if(chartId == 'shipmentTrendAction')
-	                {
-	                	shipmentTrendActionToggle();
-	                    
-	                }
-	                
-	                else if(chartId == 'salesTrendAction')
-	                {
-	                	salesTrendActionToggle();  
-	                
-	                }
-		    	 
-		    	 
-		     });
-		     */
-		     
+		    /*
+			$('.titleContainer > .action').hover(function(){
+		   		var chartId = this.id;
+	            if(chartId == 'shipmentTrendAction') {
+	             	shipmentTrendActionToggle();
+	            } else if(chartId == 'salesTrendAction') {
+	             	salesTrendActionToggle();  
+	            }
+		    });
+		    */
 		},
 		
 		bucket : null,
-		
 		initSearch : function (sqlFlag) {
 			FORM_SEARCH = {}
 			FORM_SEARCH._mtd = "getList";
@@ -815,7 +735,6 @@
 		},
 		
 		search : function (sqlFlag) {
-			
 			FORM_SEARCH            = {};
 			FORM_SEARCH            = this.bucket;
 			FORM_SEARCH.sales      = $(':radio[name=sales]:checked').val();
@@ -842,12 +761,11 @@
 				{ outDs : "chart2", _siq : demendTrend1._siq + "chart2" },
 				{ outDs : "cpfrShipPlanResultChart", _siq : demendTrend1._siq + "cpfrShipPlanResultChart" },
 				
-				/*[#th:block th:if="${session.userInfo.dashboardYn == 'Y'}"]*/
+				/*[# th:if="${session.userInfo.dashboardYn == 'Y'}"]*/
 				{ outDs : "operProfit", _siq : demendTrend1._siq + "operProfit" },
-				/*[/th:block]*/
+				/*[/]*/
 				
 			];
-			
 			
 			var sMap = {
 				url	 : GV_CONTEXT_PATH + "/biz/obj",
@@ -957,12 +875,9 @@
 				url	 : GV_CONTEXT_PATH + "/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
-					
 					var weekMonth = $(':radio[name=chart24_weekMonth_type]:checked').val();
-					
 					if(weekMonth == "WEEK"){
 						var arWeek = new Array();
-						
 						$.each (demendTrend1.bucket.week, function (i, el) {
 							arWeek.push(el.DISWEEK);
 						});
@@ -972,7 +887,6 @@
 						
 					}else{
 						var arMonth = new Array();
-						
 						$.each (demendTrend1.bucket.month, function (i, el) {
 							arMonth.push(el.DISMONTH);
 						});
@@ -998,9 +912,7 @@
 				url	 : GV_CONTEXT_PATH + "/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
-					
 					var arMonth = new Array();
-			
 					$.each (demendTrend1.bucket.month, function (i, el) {
 						arMonth.push(el.DISMONTH);
 					});
@@ -1026,22 +938,17 @@
 				url	 : GV_CONTEXT_PATH + "/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
-					
 					var weekMonth = $(':radio[name=chart2_weekMonth_type]:checked').val();
-					
 					if(weekMonth == "WEEK"){
 						var arWeek = new Array();
-						
 						$.each (demendTrend1.bucket.week, function (i, el) {
 							arWeek.push(el.DISWEEK);
 						});
 						
 						var chart2 = JSON.parse(data.chart2[0].CUST);
-
 						demendTrend1.chartGen('chart2', 'line', arWeek, chart2);
 					}else{
 						var arMonth = new Array();
-						
 						$.each (demendTrend1.bucket.month, function (i, el) {
 							arMonth.push(el.DISMONTH);
 						});
@@ -1054,9 +961,7 @@
 		},
 		
 		drawChart : function (res) {
-			
 			fn_setHighchartTheme();
-			
 			var arPreWeek  = new Array();
 			var arWeek     = new Array();
 			var arMonth    = new Array();
@@ -1095,14 +1000,13 @@
 			this.chartGen('chart2', 'line', arMonth, chart2);
 			
 			this.chartGen('cpfrShipPlanResultChart', 'line', arMonth, cpfrShipPlanResultChart);
-			<c:if test="${sessionScope.userInfo.dashboardYn == 'Y'}">
+			
+			/*[# th:if="${session.userInfo.dashboardYn == 'Y'}"]*/
 			var operProfit = JSON.parse(res.operProfit[0].OPER_PROFIT);
 			this.chartGen('operProfit', 'line', arPreMonth, operProfit);
-			</c:if>
-			
+			/*[/]*/
 			
 			//CPFR 출하계획 TREND html 그리기
-			
 			var cpfrData = res.cpfrTrend;
 			var tmp = "<tr><td style=\"background-color: #bbdefb;width: 16%; \"></td>";
 			$.each (demendTrend1.bucket.month2, function (i, el) {
@@ -1113,14 +1017,11 @@
 			tmp += "</tr>";
 			
 			$.each(cpfrData, function(n, v){
-				
 				tmp += "<tr>";
 				tmp += "<td style=\"text-align: center;background-color: #bbdefb;\">";
 				tmp += v.NM;
 				tmp += "</td>";
-				
 				$.each (demendTrend1.bucket.month2, function (i, el) {
-					
 					var disMonth = el.DISMONTH;
 					var cpData = gfn_getNumberFmt(eval("v." + disMonth) / unit, 1, "R", "Y");
 					tmp += "<td onclick=\"cpfrTrendPop()\" style=\"cursor:pointer;\">";
@@ -1147,9 +1048,7 @@
 				url	 : GV_CONTEXT_PATH + "/biz/obj",
 				data	: FORM_SEARCH,
 				success : function(data) {
-					
 					var arPreMonth = new Array();
-					
 					$.each (demendTrend1.bucket.month, function (i, el) {
 						arPreMonth.push(el.PRE_DISMONTH);
 					});
@@ -1173,7 +1072,6 @@
 		},
 		
 		chartGen : function (chartId, type, arCarte, arData) {
-			
 			var chart = {
 				chart  : { type : type },
 				xAxis  : { categories : arCarte },
@@ -1197,33 +1095,23 @@
 			        		},
 							
 							legendItemClick: function() {
-								
 			                    var seriesIndex = this.index;
 			                    var series = this.chart.series;
-			                   	
-			                	if(this.chart.isFirstClick!= true)
-			                	{
+			                	if(this.chart.isFirstClick!= true) {
 						        	for (var i = 0; i < series.length; i++) {
-			                    	   
 						                if(series[i].index != seriesIndex) {
 						                    series[i].hide();
-					                    }
-						                else if(series[i].index == seriesIndex)
-						                {
+					                    } else if(series[i].index == seriesIndex) {
 						                	series[i].show();
 						                }
-					                   
 			                    	}
 			                    	this.show()
 			                    	this.chart.isFirstClick = true;
-			                		
 			                    	
 				            		return false;
 			                	}
 			                			    	
 			            	}// end of legendItemClick
-				
-				
 						},							
 						cursor: 'pointer',
 						point: {
@@ -1267,7 +1155,7 @@
 											height    : 1060,
 											menuCd    : "SNOP100",
 											chartId   : "chart23",
-											title     : "<spring:message code='lbl.trend23Chart' /> (<spring:message code='lbl.hMillion' />)"
+											title     : /*[[|#{lbl.trend23Chart} (#{lbl.hMillion})|]]*/""
 										});	
 									} else if(chartId == "chart24") {
 										gfn_comPopupOpen("POPUP_CHART_DEMEND", {
@@ -1277,7 +1165,7 @@
 											height    : 1060,
 											menuCd    : "SNOP100",
 											chartId   : "chart24",
-											title     : "<spring:message code='lbl.chart24' /> (<spring:message code='lbl.hMillion' />)"
+											title     : /*[[|#{lbl.chart24} (#{lbl.hMillion})|]]*/""
 										});	
 									} else if(chartId == "chart2")	{
 				                		gfn_comPopupOpen("POPUP_CHART_DEMEND", {
@@ -1287,7 +1175,7 @@
 				        					height    : 1060,
 				        					menuCd    : "SNOP100",
 				        					chartId   : "chart2",
-				        					title     : "<spring:message code='lbl.custSalesTrend' /> (<spring:message code='lbl.hMillion' />)"
+				        					title     : /*[[|#{lbl.custSalesTrend} (#{lbl.hMillion})|]]*/""
 				        				});
 				                	} else if(chartId == "operProfit")	{
 				                		gfn_comPopupOpen("POPUP_CHART_DEMEND", {
@@ -1297,7 +1185,7 @@
 				        					height    : 1060,
 				        					menuCd    : "SNOP100",
 				        					chartId   : "operProfit",
-				        					title     : "<spring:message code='lbl.operationProfit' /> (<spring:message code='lbl.hMillion' />)"
+				        					title     : /*[[|#{lbl.operationProfit} (#{lbl.hMillion})|]]*/""
 				        				});
 				                	} else if(chartId == "cpfrShipPlanResultChart"){
 				                		gfn_comPopupOpen("POPUP_CHART_DEMEND", {
@@ -1307,14 +1195,9 @@
 				        					height    : 1060,
 				        					menuCd    : "SNOP100",
 				        					chartId   : "cpfrShipPlanResultChart",
-				        					title     : "<spring:message code='lbl.cpfrShipPlanResult' />"
+				        					title     : /*[[#{lbl.cpfrShipPlanResult}]]*/""
 				        				});
-				                		
-				                		
-				                		
 				                	}
-									
-									
 								}
 							}
 						}
@@ -1337,7 +1220,7 @@
 			height    : 1060,
 			menuCd    : "SNOP100",
 			chartId   : "cpfrTrend",
-			title     : "<spring:message code='lbl.cpfrTrend' /> (<spring:message code='lbl.hMillion' />)"
+			title     : /*[[|#{lbl.cpfrTrend} (#{lbl.hMillion})|]]*/""
 		});
 	}
 	
@@ -1395,46 +1278,6 @@
 					contextButton: {
 		            	align: 'left',
 						menuItems: ['printChart','downloadJPEG', 'downloadPDF'],
-						/* menuItems : [
-						{
-							text : 'printChart',
-							onclick : function(){
-								
-								var cId = this.xAxis[0].chart.renderTo.id;
-								this.print();
-								
-								setTimeout(function(){
-									$("#" + cId).css("overflow", "");	
-								}, 1000);
-							}
-							
-						}, {
-							text : 'downloadJPEG',
-							onclick : function(){
-								var cId = this.xAxis[0].chart.renderTo.id;
-								this.exportChart({
-									type: 'image/jpeg'
-								});
-								
-								setTimeout(function(){
-									$("#" + cId).css("overflow", "");	
-								}, 1000);
-							}
-							
-						}, {
-							text : 'downloadJPEG',
-							onclick : function(){
-								var cId = this.xAxis[0].chart.renderTo.id;
-								this.exportChart({
-									type: 'application/pdf'
-								});
-								
-								setTimeout(function(){
-									$("#" + cId).css("overflow", "");	
-								}, 1000);
-							}
-							
-						}]  */
 					}
 				}
 			},
@@ -1492,206 +1335,73 @@
 	$(document).ready(function() {
 		demendTrend1.init();
 	});
-	
  	
- 	
-function fn_popUpAuthorityHasOrNot(){
-        
+	function fn_popUpAuthorityHasOrNot(){
         SCM_SEARCH = {}; // 초기화
-        
-        SCM_SEARCH.USER_ID = "${sessionScope.userInfo.userId}" ;
-        
-        
+        SCM_SEARCH.USER_ID = /*[[${session.userInfo.userId}]]*/"" ;
         SCM_SEARCH._mtd     = "getList";
         SCM_SEARCH.tranData = [
-                               { outDs : "isSCMTeam",_siq : "dashboard.chartInfo.isSCMTeam"}
-                            ];
-        
-        
+        	{ outDs : "isSCMTeam",_siq : "dashboard.chartInfo.isSCMTeam"}
+        ];
         
         var aOption = {
             async   : false,
             url     : GV_CONTEXT_PATH + "/biz/obj",
             data    : SCM_SEARCH,
             success : function (data) {
-            
                 if (SCM_SEARCH.sql == 'N') {
-                    
                     SCM_SEARCH.isSCMTeam = data.isSCMTeam[0].isSCMTeam;
-                
                 }
             }
         }
         
         gfn_service(aOption, "obj");
-        
-        
-        
-        
-    }
-  
- 	
- 	
-var fn_popupCallback = function () {
-    location.reload();
-}
-
- 	
- 	
-function fn_chartContentInit(){
-    
-    
-    /*
-    
-    0. shipmentComplianceRate
-    1. shipmentHitRate
-	2. shipmentAchievementRate
-	3. cpfrShipmentPlanTrend
-	4. cpfrShipmentPlanNPerformance
-	5. remainingOrderAmountSO
-	6. shipmentTrend
-	7. salesTrend
-	8. operatingProfit
-
-    
-    */
-    
-    
-    for(i=0;i<9;i++)
-    {
-        if(FORM_SEARCH.chartList[i].ID=="shipmentComplianceRate")             FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_1.setContents([{ insert: '\n' }]):quill_1.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-        else if(FORM_SEARCH.chartList[i].ID=="shipmentHitRate")               FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_2.setContents([{ insert: '\n' }]):quill_2.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-        else if(FORM_SEARCH.chartList[i].ID=="shipmentAchievementRate")       FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_3.setContents([{ insert: '\n' }]):quill_3.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-        else if(FORM_SEARCH.chartList[i].ID=="cpfrShipmentPlanTrend")         FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_4.setContents([{ insert: '\n' }]):quill_4.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-        else if(FORM_SEARCH.chartList[i].ID=="cpfrShipmentPlanNPerformance")  FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_5.setContents([{ insert: '\n' }]):quill_5.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-        else if(FORM_SEARCH.chartList[i].ID=="remainingOrderAmountSO")        FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_6.setContents([{ insert: '\n' }]):quill_6.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-        else if(FORM_SEARCH.chartList[i].ID=="shipmentTrend")                 FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_7.setContents([{ insert: '\n' }]):quill_7.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-        else if(FORM_SEARCH.chartList[i].ID=="salesTrend")                    FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_8.setContents([{ insert: '\n' }]):quill_8.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-        else if(FORM_SEARCH.chartList[i].ID=="operatingProfit")               FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_9.setContents([{ insert: '\n' }]):quill_9.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-                                    
-    }
-    
-    
-    
-}
- 	
- 	
-function fn_quilljsInit(){
-	  
-
-    quill_1 =  new Quill('#editor-1', {
-                  
-                  modules: {
-                      "toolbar": false
-                  } ,            
-                  theme: 'snow'  // or 'bubble'
-                })
-    quill_1.enable(false);
-    
-    
-    quill_2 =  new Quill('#editor-2', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_2.enable(false);
-    
-    
-    quill_3 =  new Quill('#editor-3', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_3.enable(false);
-    
-    
-    
-    quill_4 =  new Quill('#editor-4', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_4.enable(false);
-    
-    
-    
-    quill_5 =  new Quill('#editor-5', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_5.enable(false);
-    
-    
-    
-    quill_6 =  new Quill('#editor-6', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_6.enable(false);
-    
-    
-    
-    quill_7 =  new Quill('#editor-7', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_7.enable(false);
-    
-    
-    
-    quill_8 =  new Quill('#editor-8', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_8.enable(false);
-    
-    
-    
-    quill_9 =  new Quill('#editor-9', {
-        
-        modules: {
-            "toolbar": false
-        } ,            
-        theme: 'snow'  // or 'bubble'
-      })
-    quill_9.enable(false);
-
-    
-}
-
-    function shipmentTrendActionToggle()
-    {
-    	 const action = $('#shipmentTrendAction');
-         
-         action.toggleClass('active')
-    }
-
-    function salesTrendActionToggle()
-    {
-    	
-    	 const action = $('#salesTrendAction');
-         
-         action.toggleClass('active')
     }
  	
+	var fn_popupCallback = function () {
+	    location.reload();
+	}
+ 	
+	function fn_chartContentInit() {
+	    /*
+	    0. shipmentComplianceRate
+	    1. shipmentHitRate
+		2. shipmentAchievementRate
+		3. cpfrShipmentPlanTrend
+		4. cpfrShipmentPlanNPerformance
+		5. remainingOrderAmountSO
+		6. shipmentTrend
+		7. salesTrend
+		8. operatingProfit
+	    */
+    	for (let i=0; i<FORM_SEARCH.chartList.length; i++) {
+	    	for (let k=0; k<arrQuill.length; k++) {
+	    		if (FORM_SEARCH.chartList[i].ID == arrQuill[k].chartId) {
+	    			FORM_SEARCH.chartList[i].CONTENT == undefined ? arrQuill[k].quillObj.setContents([{ insert: '\n' }]) : arrQuill[k].quillObj.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
+	    		}
+	    	}
+		}
+	}
+ 	
+	function fn_quilljsInit() {
+		for (var i=0; i<arrQuill.length; i++) {
+			arrQuill[i].quillObj = new Quill('#editor-'+(i+1), {
+		    	modules: { "toolbar": false} ,            
+		        theme: 'snow'  // or 'bubble'
+		    })
+			arrQuill[i].quillObj.enable(false);
+		}
+	}
+
+    function shipmentTrendActionToggle() {
+		const action = $('#shipmentTrendAction');
+        action.toggleClass('active')
+    }
+
+    function salesTrendActionToggle() {
+		const action = $('#salesTrendAction');
+        action.toggleClass('active')
+    }
  	
 	</script>
 </th:block>

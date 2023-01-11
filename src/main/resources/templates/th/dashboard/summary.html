@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
-<head>
- 	<th:block th:replace="~{th/layout/fragments/head :: headFragment('N')}"></th:block>
-	
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{th/layout/basedashboard}">
+      
+<th:block layout:fragment="headStyle">
 	<style type="text/css">
 	#container { margin: 0;width: calc(100% - 250px);height: 100%;padding: 0; }
 	#cont_chart { width: 100%;height: 100%;}
@@ -74,296 +75,278 @@
 	    flex-direction:column
 	}
 	</style>	
+</th:block>
 
-</head>
-<body id="framesb" class="portalFrame">
-	<!-- contents -->
-	<div id="grid1" class="fconbox">
-		<div class="location">
-			<img th:src="@{/static/images/common/ico_home.gif}" alt="">
-			<div class="fnc">
-				<a href="#" id='chartConfig' class="viewfnc8"><img th:src="@{/static/images/common/grid.png}" style="margin-top:-3px;" title="CHART Config"></a>
-				<a href="#" id='sql' style="display:none"class="viewfnc4"><img th:src="@{/static/images/common/btn_gun4.gif}" title="SQL View"></a>
+<th:block layout:fragment="container">
+	<div id="container" style="float: left">
+   		<div id="cont_chart">
+			<!-- 1줄 3개씩 뿌리길 원하실 경우 col_3 으로 클래스명 변경하시면 됩니다 -->
+	       	<!-- BSC 종합 -->
+	    	<div class="col_3">
+	       		<div class="titleContainer">
+	           		<h4 id="bscGeneralH4" th:text="#{lbl.bscSummary}"></h4>
+	             	<div class="view_combo">
+	                	<ul class="rdofl">
+	                    	<li class="manuel">
+                              	<a href="#" id="bscGeneral"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                           	</li>
+	                 	</ul>
+	             	</div>
+	          	</div> 
+              	<div class="graphwrap" id="chartBsc" style="clear:both;"></div>
+              	<div class="textwrap" id="chartBscScore" >
+            		<p class="per_txt" id="chartBscScore_ptag"><strong id="chartBscScore_ptag_strong"></strong></p>
+               	</div>
+               	<div class="modal" id="bscGeneralContent" style="display:none;">
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                       	<div id="editor-1"></div>
+                   	</div>
+               	</div>
 			</div>
-		</div>
-		<div class="scroll" style="height:calc(100% - 35px)">
-			<!-- chart -->
-			<div id="container" style="float: left">
-		   		<div id="cont_chart">
-					<!-- 1줄 3개씩 뿌리길 원하실 경우 col_3 으로 클래스명 변경하시면 됩니다 -->
-			       	<!-- BSC 종합 -->
-			    	<div class="col_3">
-			       		<div class="titleContainer">
-			           		<h4 id="bscGeneralH4" th:text="#{lbl.bscSummary}"></h4>
-			             	<div class="view_combo">
-			                	<ul class="rdofl">
-			                    	<li class="manuel">
-                                    	<a href="#" id="bscGeneral"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                 	</li>
-			                 	</ul>
-			             	</div>
-			          	</div> 
-		              	<div class="graphwrap" id="chartBsc" style="clear:both;"></div>
-		              	<div class="textwrap" id="chartBscScore" >
-		            		<p class="per_txt" id="chartBscScore_ptag"><strong id="chartBscScore_ptag_strong"></strong></p>
-	                  	</div>
-	                   	<div class="modal" id="bscGeneralContent" style="display:none;">
-	                       	<div class="modal_header"></div>
-	                       	<div class="modal_content">
-	                           	<div id="editor-1"></div>
-	                       	</div>
-	                   	</div>
-					</div>
-					<!-- 경영실적 -->
-			        <div class="col_3">
-			        	<div class="titleContainer">
-			        	    <h4 id="businessPerformanceH4" th:text="#{lbl.bizActualChart}"></h4>
-			        	    <div class="view_combo">
-                            	<ul class="rdofl">
-                                	<li class="manuel">
-                                    	<a href="#" id="businessPerformance"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                 	</li>
-                             	</ul>
-                           	</div>
-			            </div>
-			            <div class="tablewrap" id="businessPerformanceTable"  style="height:calc(100% - 35px);">
-			               	<table style="height:100%">
-			                   	<caption th:text="#{lbl.bizActualChart}"></caption>
-								<thead>
-								    <tr>
-								      <th scope="col" rowspan="2" th:text="#{lbl.divisionChart}"></th>
-								      <th scope="col" colspan="2" th:text="#{lbl.thisMonth}"></th>
-								      <th scope="col" colspan="2" th:text="#{lbl.yearChart}"></th>
-								    </tr>
-								    <tr>
-								      <th scope="col" th:text="#{lbl.performance}"></th>
-								      <th scope="col" th:text="#{lbl.achieRateChart2}"></th>
-								      <th scope="col" th:text="#{lbl.performance}"></th>
-								      <th scope="col" th:text="#{lbl.achieRateChart2}"></th>
-								    </tr>
-								</thead>
-							  	<tbody id="chartBiz">
-							  		<tr>
-								    	<td th:text="#{lbl.salesChart}"></td>
-								      	<td class="red_f" th:text="'0' + #{lbl.billion}"></td>
-								      	<td>0%</td>
-								      	<td th:text="'0' + #{lbl.billion}"></td>
-								      	<td class="green_f">0%</td>
-								    </tr>
-								    <tr>
-								      	<td th:text="'0' + #{lbl.operationProfit}"></td>
-								      	<td class="red_f"></td>
-								      	<td>0%</td>
-								      	<td></td>
-								      	<td class="green_f">0%</td>
-								    </tr>
-							  	</tbody>
-							</table>
-							<p class="help_txt" style="display:none;" th:text="'1) ' + #{lbl.expActualChart}" ></p>
-						</div>
-						<div class="modal" id="businessPerformanceContent" style="display:none;">
-                           <div class="modal_header"></div>
-                           <div class="modal_content">
-                               <div id="editor-2"></div>
-                           </div>
-                   	    </div>
-					</div>
-			        <!-- 제품 재고 현황 -->
-			        <div class="col_3">
-			        	<div class="titleContainer">	
-				            <h4 id="productInventoryStatusH4" th:text="#{lbl.prodInvStatusChart} + ' (' + #{lbl.prevDayChart} + ', ' + #{lbl.hMillion} + ')'"></h4>
-				        	<div class="view_combo">
-								<ul class="rdofl">
-									<li><input type="radio" id="companyCons1" name="companyCons" value="companyCons"/> <label for="companyCons1" th:text="#{lbl.companyCons}"></label></li>
-									<li><input type="radio" id="companyCons2" name="companyCons" value="company" checked="checked"/> <label for="companyCons2" th:text="#{lbl.company2}"></label></li>
-								    <li class="manuel">
-                                    	<a href="#" id="productInventoryStatus"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"></a>
-                                    </li>
-								</ul>
-							</div>
-						</div>
-			        	<div style="height: 100%;clear:both;" id="chartInv1"></div>
-			            <div class="modal" id="productInventoryStatusContent" style="display:none;">
-                        	<div class="modal_header"></div>
-                           	<div class="modal_content">
-                            	<div id="editor-3"></div>
-                           </div>
-                       	</div>
-			        </div>
-			       	<!-- 불량률 -->
-			        <div class="col_3">
-			        	<div class="titleContainer">
-			        	    <h4 id="defectiveRateH4" th:text="#{lbl.defectRateChart} + ' (' + #{lbl.thisMonth} + ')'"></h4>
-			        	    <div class="view_combo">
-                                <ul class="rdofl">
-                                    <li class="manuel">
-                                        <a href="#" id="defectiveRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                    </li>
-                            	</ul>
-                            </div>
-			        	</div>
-			            <div class="graphwrap" id="chartDefRate" style="clear:both;"></div>
-			            <div class="textwrap" id="chartDefRateScore">
-		                	<p th:text="#{lbl.achieRateChart2}"></p>
-		                	<p class="per_txt" id="chartDefRateScore_ptag"><strong id="chartDefRateScore_ptag_strong"></strong>%</p>
-		                </div>
-		                <div class="modal" id="defectiveRateContent" style="display:none;">
-                           	<div class="modal_header"></div>
-                           	<div class="modal_content">
-                               	<div id="editor-4"></div>
-                           </div>
-                       	</div>
-			        </div>
-			        <!-- 출하 예상 -->
-			   		<div class="col_3">
-			   		    <div class="titleContainer">
-			   		        <h4 id="expectedToShipH4" th:text="#{lbl.shipmentForecasting} + ' (' + #{lbl.thisMonth} + ', ' + #{lbl.hMillion} + ')'"></h4>
-			   		        <div class="view_combo">
-                                <ul class="rdofl">
-                                    <li class="manuel">
-                                        <a href="#" id="expectedToShip"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                    </li>
-                                </ul>
-                           	</div>    
-			   		    </div>
-			            <div class="graphwrap" id="chartSales" style="clear:both;"></div>
-			            <div class="textwrap" id="chartSalesScore">
-			            	<p th:text="#{lbl.achieRateChart2} + '(' + #{lbl.chartPredict} + ')'"></p>
-			            	<p class="per_txt" id="chartSalesScore_ptag"><strong id="chartSalesScore_ptag_strong"></strong>%</p>
-		                </div>
-		                <div class="modal" id="expectedToShipContent" style="display:none;">
-                           	<div class="modal_header"></div>
-                           	<div class="modal_content">
-                               	<div id="editor-5"></div>
-                           	</div>
-                       	</div>
-			        </div>
-			        <!-- 자재 재고 -->
-			        <div class="col_3">
-			        	<div class="titleContainer">
-			        	    <h4 id="materialStockH4" th:text="#{lbl.matInv} + ' (' + #{lbl.prevDayChart} + ', ' + #{lbl.hMillion} + ')'"></h4>
-			        	    <div class="view_combo">
-                                <ul class="rdofl">
-                                    <li class="manuel">
-                                        <a href="#" id="materialStock"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                    </li>
-                                </ul>
-                           	</div>
-			        	</div>
-			        	<div style="height: 100%;clear:both;" id="chartInv2"></div>
-			            <div class="modal" id="materialStockContent" style="display:none;">
-                           	<div class="modal_header"></div>
-                           	<div class="modal_content">
-                               	<div id="editor-6"></div>
-                           	</div>
-                       	</div>
-			        </div>
-			        <!-- 주간 생산 계획 준수율 -->
-			        <div class="col_3">
-			            <div class="titleContainer">
-			                <h4 id="weeklyProductionPlanComplianceRateH4"><span th:text="#{lbl.weekPpcr}"></span><span class="cweekTxt"></span></h4>
-			                <div class="view_combo">
-                            	<ul class="rdofl">
-	                                <li class="manuel">
-	                                    <a href="#" id="weeklyProductionPlanComplianceRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-	                                </li>
-                                </ul>
-                           	</div>
-						</div>
-			            <div class="graphwrap" id="chartProdComp"></div>
-			            <div class="textwrap" id="chartProdCompScore1">
-		            		<p th:text="#{lbl.cmplRateChart}"></p>
-			            	<p class="per_txt" id="chartProdCompScore1_ptag"><strong id="chartProdCompScore1_ptag_strong"/></strong>%</p>
-		                </div>
-		                <div class="textwrap" id="chartProdCompScore2">
-		                	<p th:text="#{lbl.targetPrevDay}"></p>
-		                	<p style="color:#a0a0a0;"><strong id = "chartProdCompScore2_ptag_strong" style="font-size:30px;"></strong>%</p>
-		                </div>
-		                <div class="modal" id="weeklyProductionPlanComplianceRateContent" style="display:none;">
-                           	<div class="modal_header"></div>
-                           	<div class="modal_content">
-                               	<div id="editor-7"></div>
-                           	</div>
-                       	</div>
-			        </div>
-			        <!-- 주간 출하 계획 준수율 -->
-			   		<div class="col_3">
-			   		    <div class="titleContainer">
-			        	    <h4 id="weeklyShippingPlanComplianceRateH4"><span th:text="#{lbl.weekSpcr}"></span><span class="cweekTxt"></span></h4>
-			                <div class="view_combo">
-                                <ul class="rdofl">
-                                    <li class="manuel">
-                                        <a href="#" id="weeklyShippingPlanComplianceRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                    </li>
-                                </ul>
-                           	</div>
-			            </div>
-			            <div class="graphwrap" id="chartSalesComp"></div>
-			            <div class="textwrap" id="chartSalesCompScore1">
-			            	<p th:text="#{lbl.cmplRateChart}"></p>
-			            	<p class="per_txt" id = "chartSalesCompScore1_ptag"><strong id = "chartSalesCompScore1_ptag_strong"></strong>%</p>
-		                </div>
-		                <div class="textwrap" id="chartSalesCompScore2">
-		                	<p th:text="#{lbl.targetPrevDay}"></p>
-		                	<p style="color:#a0a0a0;"><strong style="font-size:30px;" id="chartSalesCompScore2_ptag_strong"></strong>%</p>
-		                </div>
-		                <div class="modal" id="weeklyShippingPlanComplianceRateContent" style="display:none;">
-                           	<div class="modal_header"></div>
-                           	<div class="modal_content">
-                               	<div id="editor-8"></div>
-                           	</div>
-                    	</div>
-			        </div>
-			        <!-- 주간 자재 가용률 -->
-			        <div class="col_3">
-						<div class="titleContainer">				        
-				            <h4 id="weeklyMaterialAvailabilityRateH4"><span th:text="#{lbl.weekMpr}"></span><span class="pweekTxt"></span></h4>
-				        	<div class="view_combo">
-								<ul class="rdofl">
-									<li><input type="radio" id="weekMaterialsAvail1" name="weekMaterialsAvail" value="rawMaterials" checked="checked"/> <label for="weekMaterialsAvail1" th:text="#{lbl.rawMaterial}"></label></li>
-									<li><input type="radio" id="weekMaterialsAvail2" name="weekMaterialsAvail" value="outerHalfProduct" /> <label for="weekMaterialsAvail2" th:text="#{lbl.osfp}"></label></li>
-								    <li class="manuel">
-	                                	<a href="#" id=weeklyMaterialAvailabilityRate><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-	                                </li>
-								</ul>
-							</div>
-			            </div>
-			            <div class="graphwrap" style="clear:both;" id="chartMatPrepRate"></div>
-			            <div class="textwrap" id="chartMatPrepRateScore">
-			            	<p th:text="#{lbl.changeRate}"></p>
-			            	<p class="per_txt" id="chartMatPrepRate_changeRate"><strong id ="chartMatPrepRate_changeRate_strong"></strong>%</p>
-			            </div>
-			            <div class="modal" id="weeklyMaterialAvailabilityRateContent" style="display:none;">
-                           	<div class="modal_header"></div>
-                           	<div class="modal_content">
-                               	<div id="editor-9"></div>
-                           	</div>
-                       	</div>
+			<!-- 경영실적 -->
+	        <div class="col_3">
+	        	<div class="titleContainer">
+	        	    <h4 id="businessPerformanceH4" th:text="#{lbl.bizActualChart}"></h4>
+	        	    <div class="view_combo">
+                      	<ul class="rdofl">
+                          	<li class="manuel">
+                              	<a href="#" id="businessPerformance"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                           	</li>
+                       	</ul>
+                 	</div>
+	            </div>
+	            <div class="tablewrap" id="businessPerformanceTable"  style="height:calc(100% - 35px);">
+	               	<table style="height:100%">
+	                   	<caption th:text="#{lbl.bizActualChart}"></caption>
+						<thead>
+						    <tr>
+						      <th scope="col" rowspan="2" th:text="#{lbl.divisionChart}"></th>
+						      <th scope="col" colspan="2" th:text="#{lbl.thisMonth}"></th>
+						      <th scope="col" colspan="2" th:text="#{lbl.yearChart}"></th>
+						    </tr>
+						    <tr>
+						      <th scope="col" th:text="#{lbl.performance}"></th>
+						      <th scope="col" th:text="#{lbl.achieRateChart2}"></th>
+						      <th scope="col" th:text="#{lbl.performance}"></th>
+						      <th scope="col" th:text="#{lbl.achieRateChart2}"></th>
+						    </tr>
+						</thead>
+					  	<tbody id="chartBiz">
+					  		<tr>
+						    	<td th:text="#{lbl.salesChart}"></td>
+						      	<td class="red_f" th:text="'0' + #{lbl.billion}"></td>
+						      	<td>0%</td>
+						      	<td th:text="'0' + #{lbl.billion}"></td>
+						      	<td class="green_f">0%</td>
+						    </tr>
+						    <tr>
+						      	<td th:text="'0' + #{lbl.operationProfit}"></td>
+						      	<td class="red_f"></td>
+						      	<td>0%</td>
+						      	<td></td>
+						      	<td class="green_f">0%</td>
+						    </tr>
+					  	</tbody>
+					</table>
+					<p class="help_txt" style="display:none;" th:text="|1) #{lbl.expActualChart}|" ></p>
+				</div>
+				<div class="modal" id="businessPerformanceContent" style="display:none;">
+                	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                		<div id="editor-2"></div>
+                  	</div>
+              	</div>
+			</div>
+	        <!-- 제품 재고 현황 -->
+	        <div class="col_3">
+	        	<div class="titleContainer">	
+		            <h4 id="productInventoryStatusH4" th:text="|#{lbl.prodInvStatusChart} (#{lbl.prevDayChart}, #{lbl.hMillion})|"></h4>
+		        	<div class="view_combo">
+						<ul class="rdofl">
+							<li><input type="radio" id="companyCons1" name="companyCons" value="companyCons"/> <label for="companyCons1" th:text="#{lbl.companyCons}"></label></li>
+							<li><input type="radio" id="companyCons2" name="companyCons" value="company" checked="checked"/> <label for="companyCons2" th:text="#{lbl.company2}"></label></li>
+						    <li class="manuel">
+                            	<a href="#" id="productInventoryStatus"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"></a>
+                            </li>
+						</ul>
 					</div>
 				</div>
-			</div>
-			<div id="cont_chart3">
-				<div id="cont_chart">
-					<div class="col_3" style="height:100%;width:100%;margin: 0;padding:0">
-			            <div id="sitemappop" style="margin: 0; display:block; height:calc(100% - 30px);width:100%;">
-							<div class="drag">
-								<div style="height: 100%;padding: 15px 0px 15px 10px;">
-									<div class="scroll"></div>
-								</div>
-							</div>
-						</div>
-					</div>
+	        	<div style="height: 100%;clear:both;" id="chartInv1"></div>
+	            <div class="modal" id="productInventoryStatusContent" style="display:none;">
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                       	<div id="editor-3"></div>
+                	</div>
+             	</div>
+	        </div>
+	       	<!-- 불량률 -->
+	        <div class="col_3">
+	        	<div class="titleContainer">
+	        	    <h4 id="defectiveRateH4" th:text="|#{lbl.defectRateChart} (#{lbl.thisMonth})|"></h4>
+	        	    <div class="view_combo">
+                         <ul class="rdofl">
+                           	<li class="manuel">
+                          		<a href="#" id="defectiveRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                     		</li>
+                     	</ul>
+                     </div>
+	        	</div>
+	            <div class="graphwrap" id="chartDefRate" style="clear:both;"></div>
+	            <div class="textwrap" id="chartDefRateScore">
+                	<p th:text="#{lbl.achieRateChart2}"></p>
+                	<p class="per_txt" id="chartDefRateScore_ptag"><strong id="chartDefRateScore_ptag_strong"></strong>%</p>
+                </div>
+                <div class="modal" id="defectiveRateContent" style="display:none;">
+           			<div class="modal_header"></div>
+                   	<div class="modal_content">
+                    	<div id="editor-4"></div>
+                   	</div>
+           		</div>
+	        </div>
+	        <!-- 출하 예상 -->
+	   		<div class="col_3">
+	   		    <div class="titleContainer">
+	   		        <h4 id="expectedToShipH4" th:text="|#{lbl.shipmentForecasting} (#{lbl.thisMonth}, #{lbl.hMillion})|"></h4>
+	   		        <div class="view_combo">
+                       	<ul class="rdofl">
+                           <li class="manuel">
+                               <a href="#" id="expectedToShip"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                           </li>
+                       	</ul>
+                  	</div>    
+	   		    </div>
+	            <div class="graphwrap" id="chartSales" style="clear:both;"></div>
+	            <div class="textwrap" id="chartSalesScore">
+	            	<p th:text="#{lbl.achieRateChart2} + '(' + #{lbl.chartPredict} + ')'"></p>
+	            	<p class="per_txt" id="chartSalesScore_ptag"><strong id="chartSalesScore_ptag_strong"></strong>%</p>
+                </div>
+                <div class="modal" id="expectedToShipContent" style="display:none;">
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                       	<div id="editor-5"></div>
+                   	</div>
+               	</div>
+	        </div>
+	        <!-- 자재 재고 -->
+	        <div class="col_3">
+	        	<div class="titleContainer">
+	        	    <h4 id="materialStockH4" th:text="|#{lbl.matInv} (#{lbl.prevDayChart}, #{lbl.hMillion})|"></h4>
+	        	    <div class="view_combo">
+                       <ul class="rdofl">
+                           <li class="manuel">
+                               <a href="#" id="materialStock"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                           </li>
+                       </ul>
+                  	</div>
+	        	</div>
+	        	<div style="height: 100%;clear:both;" id="chartInv2"></div>
+	            <div class="modal" id="materialStockContent" style="display:none;">
+                  	<div class="modal_header"></div>
+                  	<div class="modal_content">
+                      	<div id="editor-6"></div>
+                  	</div>
+              	</div>
+	        </div>
+	        <!-- 주간 생산 계획 준수율 -->
+	        <div class="col_3">
+	            <div class="titleContainer">
+	                <h4 id="weeklyProductionPlanComplianceRateH4"><span th:text="#{lbl.weekPpcr}"></span><span class="cweekTxt"></span></h4>
+	                <div class="view_combo">
+	                   	<ul class="rdofl">
+	                        <li class="manuel">
+	                            <a href="#" id="weeklyProductionPlanComplianceRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+	                   	    </li>
+                   		</ul>
+                  	</div>
 				</div>
+	            <div class="graphwrap" id="chartProdComp"></div>
+	            <div class="textwrap" id="chartProdCompScore1">
+            		<p th:text="#{lbl.cmplRateChart}"></p>
+	            	<p class="per_txt" id="chartProdCompScore1_ptag"><strong id="chartProdCompScore1_ptag_strong"/></strong>%</p>
+                </div>
+                <div class="textwrap" id="chartProdCompScore2">
+                	<p th:text="#{lbl.targetPrevDay}"></p>
+                	<p style="color:#a0a0a0;"><strong id = "chartProdCompScore2_ptag_strong" style="font-size:30px;"></strong>%</p>
+                </div>
+                <div class="modal" id="weeklyProductionPlanComplianceRateContent" style="display:none;">
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                       	<div id="editor-7"></div>
+                   	</div>
+               	</div>
+	        </div>
+	        <!-- 주간 출하 계획 준수율 -->
+	   		<div class="col_3">
+	   		    <div class="titleContainer">
+	        	    <h4 id="weeklyShippingPlanComplianceRateH4"><span th:text="#{lbl.weekSpcr}"></span><span class="cweekTxt"></span></h4>
+	                <div class="view_combo">
+                    	<ul class="rdofl">
+                        	<li class="manuel">
+                            	<a href="#" id="weeklyShippingPlanComplianceRate"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                          	</li>
+                     	</ul>
+                   	</div>
+	            </div>
+	            <div class="graphwrap" id="chartSalesComp"></div>
+	            <div class="textwrap" id="chartSalesCompScore1">
+	            	<p th:text="#{lbl.cmplRateChart}"></p>
+	            	<p class="per_txt" id = "chartSalesCompScore1_ptag"><strong id = "chartSalesCompScore1_ptag_strong"></strong>%</p>
+                </div>
+                <div class="textwrap" id="chartSalesCompScore2">
+                	<p th:text="#{lbl.targetPrevDay}"></p>
+                	<p style="color:#a0a0a0;"><strong style="font-size:30px;" id="chartSalesCompScore2_ptag_strong"></strong>%</p>
+                </div>
+                <div class="modal" id="weeklyShippingPlanComplianceRateContent" style="display:none;">
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                       	<div id="editor-8"></div>
+                   	</div>
+            	</div>
+	        </div>
+	        <!-- 주간 자재 가용률 -->
+	        <div class="col_3">
+				<div class="titleContainer">				        
+		            <h4 id="weeklyMaterialAvailabilityRateH4"><span th:text="#{lbl.weekMpr}"></span><span class="pweekTxt"></span></h4>
+		        	<div class="view_combo">
+						<ul class="rdofl">
+							<li><input type="radio" id="weekMaterialsAvail1" name="weekMaterialsAvail" value="rawMaterials" checked="checked"/> <label for="weekMaterialsAvail1" th:text="#{lbl.rawMaterial}"></label></li>
+							<li><input type="radio" id="weekMaterialsAvail2" name="weekMaterialsAvail" value="outerHalfProduct" /> <label for="weekMaterialsAvail2" th:text="#{lbl.osfp}"></label></li>
+						    <li class="manuel">
+                            	<a href="#" id=weeklyMaterialAvailabilityRate><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
+						</ul>
+					</div>
+	            </div>
+	            <div class="graphwrap" style="clear:both;" id="chartMatPrepRate"></div>
+	            <div class="textwrap" id="chartMatPrepRateScore">
+	            	<p th:text="#{lbl.changeRate}"></p>
+	            	<p class="per_txt" id="chartMatPrepRate_changeRate"><strong id ="chartMatPrepRate_changeRate_strong"></strong>%</p>
+	            </div>
+	            <div class="modal" id="weeklyMaterialAvailabilityRateContent" style="display:none;">
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                       	<div id="editor-9"></div>
+                   	</div>
+               	</div>
 			</div>
 		</div>
 	</div>
-	
-	<th:block th:replace="~{th/layout/fragments/script :: commonFormFragment('N')}"></th:block>
-	
-	<th:block th:replace="~{th/layout/fragments/script :: scriptFragment('N','Y')}"></th:block>
-	
+</th:block>
+
+<th:block layout:fragment="contentjs">
 	<script th:inline="javascript">
-    var quill_1,quill_2,quill_3,quill_4,quill_5,quill_6,quill_7,quill_8,quill_9;
+	var arrQuill = [
+		{chartId: "bscGeneral", quillObj: null},
+		{chartId: "businessPerformance", quillObj: null},
+		{chartId: "productInventoryStatus", quillObj: null},
+		{chartId: "defectiveRate", quillObj: null},
+		{chartId: "expectedToShip", quillObj: null},
+		{chartId: "materialStock", quillObj: null},
+		{chartId: "weeklyProductionPlanComplianceRate", quillObj: null},
+		{chartId: "weeklyShippingPlanComplianceRate", quillObj: null},
+		{chartId: "weeklyMaterialAvailabilityRate", quillObj: null},
+	];
 	var unitQuery = 0;
 	var dMain,dBiz,dDefRate, itemInvData, matInvData;
 	var cWeek, pWeek, nWeek, bucket;
@@ -1273,77 +1256,13 @@
 	}
   
 	function fn_quilljsInit(){
-		quill_1 = new Quill('#editor-1', {
-			modules: {
-  				"toolbar": false
-            } ,            
-         	theme: 'snow'  // or 'bubble'
-		})
-		quill_1.enable(false);
-          
-		quill_2 = new Quill('#editor-2', {
-			modules: {
-				"toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-        })
-        quill_2.enable(false);
-          
-        quill_3 = new Quill('#editor-3', {
-			modules: {
-				"toolbar": false
-			} ,            
-			theme: 'snow'  // or 'bubble'
-		})
-		quill_3.enable(false);
-          
-        quill_4 =  new Quill('#editor-4', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-		})
-        quill_4.enable(false);
-        
-        quill_5 =  new Quill('#editor-5', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-		})
-        quill_5.enable(false);
-        
-        quill_6 =  new Quill('#editor-6', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-		})
-        quill_6.enable(false);
-        
-        quill_7 =  new Quill('#editor-7', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-		})
-        quill_7.enable(false);
-        
-        quill_8 =  new Quill('#editor-8', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-        })
-        quill_8.enable(false);
-        
-        quill_9 =  new Quill('#editor-9', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-		})
-        quill_9.enable(false);
+		for (var i=0; i<arrQuill.length; i++) {
+			arrQuill[i].quillObj = new Quill('#editor-'+(i+1), {
+		    	modules: { "toolbar": false} ,            
+		        theme: 'snow'  // or 'bubble'
+		    })
+			arrQuill[i].quillObj.enable(false);
+		}
 	}
   
     /*
@@ -1358,17 +1277,13 @@
     6. weeklyMaterialAvailabilityRate     quill_9
     */
 	function fn_chartContentInit() {
-      for (i=0;i<9;i++) {
-          if (FORM_SEARCH.chartList[i].ID == "bscGeneral")                              FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_1.setContents([{ insert: '\n' }]):quill_1.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-          else if (FORM_SEARCH.chartList[i].ID == "businessPerformance")                FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_2.setContents([{ insert: '\n' }]):quill_2.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-          else if (FORM_SEARCH.chartList[i].ID == "productInventoryStatus")             FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_3.setContents([{ insert: '\n' }]):quill_3.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-          else if (FORM_SEARCH.chartList[i].ID == "defectiveRate")                      FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_4.setContents([{ insert: '\n' }]):quill_4.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-          else if (FORM_SEARCH.chartList[i].ID == "expectedToShip")                     FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_5.setContents([{ insert: '\n' }]):quill_5.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-          else if (FORM_SEARCH.chartList[i].ID == "materialStock")                      FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_6.setContents([{ insert: '\n' }]):quill_6.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-          else if (FORM_SEARCH.chartList[i].ID == "weeklyProductionPlanComplianceRate") FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_7.setContents([{ insert: '\n' }]):quill_7.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-          else if (FORM_SEARCH.chartList[i].ID == "weeklyShippingPlanComplianceRate")   FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_8.setContents([{ insert: '\n' }]):quill_8.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-          else if (FORM_SEARCH.chartList[i].ID == "weeklyMaterialAvailabilityRate")     FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_9.setContents([{ insert: '\n' }]):quill_9.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-      }
+		for (let i=0; i<FORM_SEARCH.chartList.length; i++) {
+	    	for (let k=0; k<arrQuill.length; k++) {
+	    		if (FORM_SEARCH.chartList[i].ID == arrQuill[k].chartId) {
+	    			FORM_SEARCH.chartList[i].CONTENT == undefined ? arrQuill[k].quillObj.setContents([{ insert: '\n' }]) : arrQuill[k].quillObj.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
+	    		}
+	    	}
+		}
   	}
   
 	function fn_popUpAuthorityHasOrNot() {
@@ -1393,4 +1308,6 @@
 	}
     </script>
 </body>
+</th:block>
+
 </html>

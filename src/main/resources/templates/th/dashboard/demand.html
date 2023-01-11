@@ -71,14 +71,14 @@
 	       	<!-- 금주 출하 진척률  -->
 	       	<div class="col_3">
 	       	    <div class="titleContainer">
-	           	     <h4 id="shipmentProgressThisWeekH4" th:text="#{lbl.weekProgressChart1} + ' (' + #{lbl.hMillion} + ')'"></h4>
-	                 <div class="view_combo">
-                           	<ul class="rdofl">
-                               <li class="manuel">
-                                   <a href="#" id="shipmentProgressThisWeek"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                               </li>
-                              </ul>
-                          </div>
+					<h4 id="shipmentProgressThisWeekH4" th:text="|#{lbl.weekProgressChart1} (#{lbl.hMillion})|"></h4>
+	                <div class="view_combo">
+                       	<ul class="rdofl">
+                           	<li class="manuel">
+                               <a href="#" id="shipmentProgressThisWeek"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                        	</li>
+                    	</ul>
+                    </div>
 	            </div>
 	            <div class="graphwrap" id="chart1"></div>
 	            <div class="textwrap" id="shipmentProgressThisWeekScore1">
@@ -88,117 +88,117 @@
                 	<p th:text="#{lbl.targetPrevDay}"></p>
                 </div>
                 <div class="modal" id="shipmentProgressThisWeekContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-1"></div>
-                         </div>
-                      </div>
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                    	<div id="editor-1"></div>
+                	</div>
+                </div>
 			</div>
 			<!-- 대표 거래처 그룹별 금주 출하 진척률 -->
 	        <div class="col_3">
 	        	<div class="titleContainer">
-	        	      <h4 id="shipmentProgressRateThisWeekByRepresentativeCustomerGroupH4" th:text="#{lbl.weekProgressChart2} + ' (%)'"></h4>
-	                  <div class="view_combo">
-                              <ul class="rdofl">
-                                  <li class="manuel">
-                                      <a href="#" id="shipmentProgressRateThisWeekByRepresentativeCustomerGroup"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
-                              </ul>
-                          </div>   
+        	      	<h4 id="shipmentProgressRateThisWeekByRepresentativeCustomerGroupH4" th:text="|#{lbl.weekProgressChart2} (%)|"></h4>
+                  	<div class="view_combo">
+                       	<ul class="rdofl">
+                           	<li class="manuel">
+                            	<a href="#" id="shipmentProgressRateThisWeekByRepresentativeCustomerGroup"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                           	</li>
+                       	</ul>
+               		</div>   
 	            </div>
 	            <div id="chart2" style="height:100%;width:100%"></div>
 	            <div class="modal" id="shipmentProgressRateThisWeekByRepresentativeCustomerGroupContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-2"></div>
-                         </div>
-                      </div>
+                   	<div class="modal_header"></div>
+                   	<div class="modal_content">
+                       <div id="editor-2"></div>
+                   	</div>
+                </div>
 	        </div>
 	        <!--당월 출하 예상  -->
 	        <div class="col_3">
 	        	<div class="titleContainer">
-	        	      <h4 id="expectedMonthlyShipmentsByRepresentativeCustomerGroup1H4" th:text="#{lbl.monthSalesExpChart} + ' (' + #{lbl.hMillion} + ')'"></h4>
-	                  <div class="view_combo">
-                              <ul class="rdofl">
-                                  <li class="manuel">
-                                      <a href="#" id="expectedMonthlyShipmentsByRepresentativeCustomerGroup1"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
-                              </ul>
-                          </div>   
+        	      	<h4 id="expectedMonthlyShipmentsByRepresentativeCustomerGroup1H4" th:text="|#{lbl.monthSalesExpChart} (#{lbl.hMillion})|"></h4>
+                  	<div class="view_combo">
+                        <ul class="rdofl">
+                            <li class="manuel">
+                                <a href="#" id="expectedMonthlyShipmentsByRepresentativeCustomerGroup1"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
+                        </ul>
+                    </div>   
 	            </div>
 	            <div class="graphwrap" id="chart3"></div>
 	            <div class="textwrap" id="expectedMonthlyShipmentsByRepresentativeCustomerGroup1Score">
-	            	<p th:text="#{lbl.achieRateChart2} + '(' + #{lbl.chartPredict} + ')'"></p>
+	            	<p th:text="|#{lbl.achieRateChart2} (#{lbl.chartPredict})|"></p>
                 </div>
                 <div class="modal" id="expectedMonthlyShipmentsByRepresentativeCustomerGroup1Content" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-3"></div>
-                         </div>
-                      </div>
+                   <div class="modal_header"></div>
+                   <div class="modal_content">
+                       <div id="editor-3"></div>
+                   </div>
+                </div>
 	        </div>
 	        <!-- 대표 거래처 그룹별 당월 출하 예상 -->
 	   		<div class="col_3">
 	        	<div class="titleContainer"> 
-	        	    <h4 id="expectedMonthlyShipmentsByRepresentativeCustomerGroup2H4" th:text="#{lbl.monthSalesExpChart2} + ' (' + #{lbl.hMillion} + ')'"></h4>
+	        	    <h4 id="expectedMonthlyShipmentsByRepresentativeCustomerGroup2H4" th:text="|#{lbl.monthSalesExpChart2} (#{lbl.hMillion})|"></h4>
 	                <div class="view_combo">
-                              <ul class="rdofl">
-                                  <li class="manuel">
-                                      <a href="#" id="expectedMonthlyShipmentsByRepresentativeCustomerGroup2"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
-                              </ul>
-                          </div>
+                        <ul class="rdofl">
+                            <li class="manuel">
+                                <a href="#" id="expectedMonthlyShipmentsByRepresentativeCustomerGroup2"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
+                        </ul>
+                    </div>
 	            </div>
 	            <div id="chart4" style="height:100%;width:100%"></div>
 	            <div class="modal" id="expectedMonthlyShipmentsByRepresentativeCustomerGroup2Content" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-4"></div>
-                         </div>
-                      </div>
+                   <div class="modal_header"></div>
+                   <div class="modal_content">
+                       <div id="editor-4"></div>
+                   </div>
+                </div>
 	        </div>
 	        <!-- 연간 출하 예상 -->
 	        <div class="col_3">
 	        	<div class="titleContainer">
-	        	    <h4 id="estimatedAnnualShipmentsH4" th:text="#{lbl.yearSalesChart1} + ' (' + #{lbl.hMillion} + ')'"></h4>
+	        	    <h4 id="estimatedAnnualShipmentsH4" th:text="|#{lbl.yearSalesChart1} (#{lbl.hMillion})|"></h4>
 	                <div class="view_combo">
-                              <ul class="rdofl">
-                                  <li class="manuel">
-                                      <a href="#" id="estimatedAnnualShipments"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
-                              </ul>
-                          </div>
+                        <ul class="rdofl">
+                            <li class="manuel">
+                                <a href="#" id="estimatedAnnualShipments"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
+                        </ul>
+                    </div>
 	            </div>
 	            <div class="graphwrap" id="chart5"></div>
 	            <div class="textwrap" id="estimatedAnnualShipmentsScore">
-	            	<p th:text="#{lbl.achieRateChart2} + '(' + #{lbl.chartPredict} + ')'"></p>
+	            	<p th:text="|#{lbl.achieRateChart2} (#{lbl.chartPredict})|"></p>
                 </div>
                 <div class="modal" id="estimatedAnnualShipmentsContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-5"></div>
-                         </div>
-                      </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-5"></div>
+                    </div>
+                 </div>
 	        </div>
 	        <!-- 대표 거래처 그룹별 연간 출하 예상  -->
 	   		<div class="col_3">
 	        	<div class="titleContainer">
-	        	    <h4 id="annualShipmentForecastByRepresentativeCustomerGroupH4" th:text="#{lbl.yearSalesChart2} + ' (' + #{lbl.hMillion} + ')'"></h4>
+	        	    <h4 id="annualShipmentForecastByRepresentativeCustomerGroupH4" th:text="|#{lbl.yearSalesChart2} (#{lbl.hMillion})|"></h4>
 	                <div class="view_combo">
-                              <ul class="rdofl">
-                                  <li class="manuel">
-                                      <a href="#" id="annualShipmentForecastByRepresentativeCustomerGroup"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
-                                  </li>
-                              </ul>
-                          </div>
+                        <ul class="rdofl">
+                            <li class="manuel">
+                                <a href="#" id="annualShipmentForecastByRepresentativeCustomerGroup"><img th:src="@{/static/images/common/google-docs.png}" alt="Menual" th:title="#{lbl.description2}"/></a>
+                            </li>
+                        </ul>
+                    </div>
 	            </div>
 	            <div id="chart6" style="height:100%;width:100%"></div>
 	            <div class="modal" id="annualShipmentForecastByRepresentativeCustomerGroupContent" style="display:none;">
-                         <div class="modal_header"></div>
-                         <div class="modal_content">
-                             <div id="editor-6"></div>
-                         </div>
-                      </div>
+                    <div class="modal_header"></div>
+                    <div class="modal_content">
+                        <div id="editor-6"></div>
+                    </div>
+                 </div>
 	        </div>
 	  </div>
 	</div>
@@ -206,7 +206,14 @@
 
 <th:block layout:fragment="contentjs">
 	<script th:inline="javascript">
-	var quill_1,quill_2,quill_3,quill_4,quill_5,quill_6;
+	var arrQuill = [
+		{chartId: "shipmentProgressThisWeek", quillObj: null},
+		{chartId: "shipmentProgressRateThisWeekByRepresentativeCustomerGroup", quillObj: null},
+		{chartId: "expectedMonthlyShipmentsByRepresentativeCustomerGroup1", quillObj: null},
+		{chartId: "expectedMonthlyShipmentsByRepresentativeCustomerGroup2", quillObj: null},
+		{chartId: "estimatedAnnualShipments", quillObj: null},
+		{chartId: "annualShipmentForecastByRepresentativeCustomerGroup", quillObj: null},
+	];
 	var mainList,subList;
     $(function() {
     	gfn_formLoad(); //공통 폼 초기 정보 설정
@@ -836,66 +843,25 @@
 	3. expectedMonthlyShipmentsByRepresentativeCustomerGroup2    quill_4
 	4. estimatedAnnualShipments                                  quill_5
 	5. annualShipmentForecastByRepresentativeCustomerGroup       quill_6
-       */
+    */
     function fn_chartContentInit(){
-        for (i=0;i<6;i++) {
-            if (FORM_SEARCH.chartList[i].ID == "shipmentProgressThisWeek")                                           FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_1.setContents([{ insert: '\n' }]):quill_1.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-            else if (FORM_SEARCH.chartList[i].ID == "shipmentProgressRateThisWeekByRepresentativeCustomerGroup")     FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_2.setContents([{ insert: '\n' }]):quill_2.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-            else if (FORM_SEARCH.chartList[i].ID == "expectedMonthlyShipmentsByRepresentativeCustomerGroup1")        FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_3.setContents([{ insert: '\n' }]):quill_3.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-            else if (FORM_SEARCH.chartList[i].ID == "expectedMonthlyShipmentsByRepresentativeCustomerGroup2")        FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_4.setContents([{ insert: '\n' }]):quill_4.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-            else if (FORM_SEARCH.chartList[i].ID == "estimatedAnnualShipments")                                      FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_5.setContents([{ insert: '\n' }]):quill_5.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));       
-            else if (FORM_SEARCH.chartList[i].ID == "annualShipmentForecastByRepresentativeCustomerGroup")           FORM_SEARCH.chartList[i].CONTENT== undefined ? quill_6.setContents([{ insert: '\n' }]):quill_6.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
-        }
+    	for (let i=0; i<FORM_SEARCH.chartList.length; i++) {
+	    	for (let k=0; k<arrQuill.length; k++) {
+	    		if (FORM_SEARCH.chartList[i].ID == arrQuill[k].chartId) {
+	    			FORM_SEARCH.chartList[i].CONTENT == undefined ? arrQuill[k].quillObj.setContents([{ insert: '\n' }]) : arrQuill[k].quillObj.setContents(JSON.parse(FORM_SEARCH.chartList[i].CONTENT));
+	    		}
+	    	}
+		}
     }
-	    
+    
     function fn_quilljsInit(){
-        quill_1 = new Quill('#editor-1', {
-           	modules: {
-                     "toolbar": false
-               } ,            
-               theme: 'snow'  // or 'bubble'
-           })
-        quill_1.enable(false);
-        
-        quill_2 = new Quill('#editor-2', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-        })
-        quill_2.enable(false);
-        
-        quill_3 = new Quill('#editor-3', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-        })
-        quill_3.enable(false);
-        
-        quill_4 = new Quill('#editor-4', {
-        	modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-        })
-        quill_4.enable(false);
-        
-        quill_5 = new Quill('#editor-5', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-        })
-        quill_5.enable(false);
-        
-        quill_6 = new Quill('#editor-6', {
-            modules: {
-                "toolbar": false
-            } ,            
-            theme: 'snow'  // or 'bubble'
-        })
-        quill_6.enable(false);
+    	for (var i=0; i<arrQuill.length; i++) {
+			arrQuill[i].quillObj = new Quill('#editor-'+(i+1), {
+		    	modules: { "toolbar": false} ,            
+		        theme: 'snow'  // or 'bubble'
+		    })
+			arrQuill[i].quillObj.enable(false);
+		}
 	}
 	    
 	function fn_popUpAuthorityHasOrNot(){
